@@ -1,0 +1,452 @@
+"use client";
+
+import { useEffect, useState, type Dispatch, type SetStateAction } from "react";
+import NuevoPresupuesto from "./NuevoPresupuesto";
+import DatosPaciente from "./DatosPaciente";
+import HistoriaClinica from "./HistoriaClinica";
+import ListadoCitas from "./ListadoCitas";
+import Fotografias from "./Fotografias";
+import Pagos from "./Pagos";
+import ConsentimientoInformado from "./ConsentimientoInformado";
+import Laboratorios from "./Laboratorios";
+import NotasEvolucion from "./NotasEvolucion";
+import { usePatientData } from "@/context/PatientDataContext";
+import { formatCurrency, type Patient, type SavedBudget, type Pago } from "@/lib/patientData";
+
+const expedienteTabs = [
+  "Presupuestos",
+  "Datos del Paciente",
+  "Historia Clínica",
+  "Notas de Evolución y Seguimiento",
+  "Listado de Citas",
+  "Fotografías",
+  "Pagos",
+  "Consentimientos Informados y Recetas",
+  "Laboratorios",
+] as const;
+
+type ExpedienteTab = (typeof expedienteTabs)[number];
+
+function buildWhatsAppMessage(patientName: string, budget: SavedBudget) {
+  const lineas = [
+    `Presupuesto #${budget.folio}`,
+    `Paciente: ${patientName}`,
+    `Fecha: ${budget.fecha}`,
+    budget.diagnostico && `Diagnóstico y tratamiento: ${budget.diagnostico}`,
+    "",
+    ...budget.items.map(
+      (item) =>
+        `- ${item.note || item.procedure}${item.teeth.length ? ` (dientes ${[...item.teeth].sort((a, b) => a - b).join(", ")})` : ""}: ${formatCurrency(item.price)}`
+    ),
+    "",
+    `Total: ${formatCurrency(budget.total)}`,
+  ].filter(Boolean);
+  return lineas.join("\n");
+}
+
+function PrinterIcon() {
+  return (
+    <svg width="15" height="15" viewBox="0 0 24 24" fill="none">
+      <path
+        d="M6 9V3h12v6M6 18H4a1 1 0 0 1-1-1v-6a1 1 0 0 1 1-1h16a1 1 0 0 1 1 1v6a1 1 0 0 1-1 1h-2M6 14h12v7H6v-7Z"
+        stroke="currentColor"
+        strokeWidth="1.8"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+    </svg>
+  );
+}
+
+function WhatsAppIcon() {
+  return (
+    <svg width="15" height="15" viewBox="0 0 24 24" fill="none">
+      <path
+        d="M3 21l1.4-4.2A8.5 8.5 0 1 1 8.3 20.5L3 21ZM8.5 8.3c.2-.5.4-.5.6-.5h.5c.2 0 .4 0 .5.3.2.4.6 1.4.7 1.5.1.1.1.3 0 .4-.1.2-.2.3-.3.4-.2.2-.3.3-.1.6.7 1.1 1.4 1.7 2.5 2.3.2.1.3.1.4-.1.2-.2.5-.6.7-.8.1-.2.3-.2.5-.1.5.2 1.3.6 1.5.7.2.1.3.1.4.3.1.2.1.9-.2 1.4-.3.5-1.1.9-1.6 1-.5 0-1.1.1-3.4-.9-2.4-1.1-3.9-3.5-4.1-3.7-.1-.2-1-1.3-1-2.5s.6-1.7.8-2Z"
+        stroke="currentColor"
+        strokeWidth="1.4"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+    </svg>
+  );
+}
+
+function PencilIcon() {
+  return (
+    <svg width="15" height="15" viewBox="0 0 24 24" fill="none">
+      <path
+        d="M12 20h9M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5Z"
+        stroke="currentColor"
+        strokeWidth="1.8"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+    </svg>
+  );
+}
+
+function TrashIcon() {
+  return (
+    <svg width="15" height="15" viewBox="0 0 24 24" fill="none">
+      <path
+        d="M3 6h18M8 6V4a1 1 0 0 1 1-1h6a1 1 0 0 1 1 1v2m2 0-1 14a1 1 0 0 1-1 1H7a1 1 0 0 1-1-1L5 6h14ZM10 11v6M14 11v6"
+        stroke="currentColor"
+        strokeWidth="1.8"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+    </svg>
+  );
+}
+
+function PresupuestosTab({
+  patientName,
+  presupuestos,
+  setPresupuestos,
+}: {
+  patientName: string;
+  presupuestos: SavedBudget[];
+  setPresupuestos: Dispatch<SetStateAction<SavedBudget[]>>;
+}) {
+  const [view, setView] = useState<"list" | "form">("list");
+  const [editingBudget, setEditingBudget] = useState<SavedBudget | null>(null);
+  const [printTarget, setPrintTarget] = useState<SavedBudget | null>(null);
+
+  useEffect(() => {
+    if (printTarget) {
+      window.print();
+    }
+  }, [printTarget]);
+
+  if (view === "form") {
+    return (
+      <NuevoPresupuesto
+        patientName={patientName}
+        initialBudget={editingBudget ?? undefined}
+        onCancel={() => setView("list")}
+        onSave={(budget) => {
+          setPresupuestos((prev) => {
+            if (editingBudget) {
+              return prev.map((p) => (p.id === editingBudget.id ? { ...budget, id: p.id } : p));
+            }
+            return [{ ...budget, id: `${Date.now()}` }, ...prev];
+          });
+          setEditingBudget(null);
+          setView("list");
+        }}
+      />
+    );
+  }
+
+  return (
+    <div className="space-y-4">
+      <div className="flex items-center justify-between">
+        <h3 className="text-sm font-semibold uppercase tracking-wide text-ink/60">
+          Presupuestos
+        </h3>
+        <button
+          onClick={() => {
+            setEditingBudget(null);
+            setView("form");
+          }}
+          className="rounded-lg bg-gradient-to-r from-accent to-orange-500 px-4 py-2 text-xs font-semibold text-black transition-opacity hover:opacity-90"
+        >
+          + Nuevo Presupuesto
+        </button>
+      </div>
+
+      {presupuestos.length === 0 ? (
+        <div className="rounded-2xl border border-dashed border-edge/15 bg-surface p-10 text-center text-sm text-ink/40">
+          No hay presupuestos registrados
+        </div>
+      ) : (
+        <div className="overflow-hidden rounded-2xl border border-edge/10 bg-surface print:hidden">
+          <div className="grid grid-cols-[64px_1fr_auto] gap-3 border-b border-edge/10 px-4 py-3 text-xs font-semibold uppercase tracking-wide text-ink/40">
+            <span>Folio</span>
+            <span>Tratamiento</span>
+            <span className="text-right">Acción</span>
+          </div>
+          <div className="divide-y divide-edge/5">
+            {presupuestos.map((p) => (
+              <div key={p.id} className="grid grid-cols-[64px_1fr_auto] items-start gap-3 px-4 py-4">
+                <div className="pt-1 text-sm font-medium text-ink/70">{p.folio}</div>
+
+                <div>
+                  <div className="space-y-1">
+                    {p.items.map((item) => (
+                      <div key={item.id} className="flex items-center justify-between gap-3 text-sm">
+                        <span className="text-ink/80">{item.note || item.procedure}</span>
+                        <span className="shrink-0 rounded bg-inset px-2 py-0.5 text-xs text-ink/60">
+                          {formatCurrency(item.price)}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                  <div className="mt-2 flex items-center gap-3">
+                    <span className="font-semibold text-accent">{formatCurrency(p.total)}</span>
+                    <span className="text-xs text-ink/40">{p.fecha}</span>
+                    <button
+                      onClick={() => setPrintTarget(p)}
+                      title="Imprimir"
+                      className="flex h-6 w-6 items-center justify-center rounded-full border border-edge/15 text-ink/50 transition-colors hover:border-accent/50 hover:text-accent"
+                    >
+                      <PrinterIcon />
+                    </button>
+                    <button
+                      onClick={() =>
+                        window.open(
+                          `https://wa.me/?text=${encodeURIComponent(buildWhatsAppMessage(patientName, p))}`,
+                          "_blank"
+                        )
+                      }
+                      title="Enviar por WhatsApp"
+                      className="flex h-6 w-6 items-center justify-center rounded-full border border-success/30 text-success/70 transition-colors hover:border-success hover:text-success"
+                    >
+                      <WhatsAppIcon />
+                    </button>
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-2">
+                  <button
+                    onClick={() => {
+                      setEditingBudget(p);
+                      setView("form");
+                    }}
+                    title="Editar"
+                    className="flex h-7 w-7 items-center justify-center rounded-full border border-edge/15 text-ink/50 transition-colors hover:border-accent/50 hover:text-accent"
+                  >
+                    <PencilIcon />
+                  </button>
+                  <button
+                    onClick={() => setPresupuestos((prev) => prev.filter((b) => b.id !== p.id))}
+                    title="Eliminar"
+                    className="flex h-7 w-7 items-center justify-center rounded-full border border-danger/20 text-danger/50 transition-colors hover:border-danger/60 hover:text-danger"
+                  >
+                    <TrashIcon />
+                  </button>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {printTarget && (
+        <div className="hidden print:block">
+          <h2 className="text-xl font-bold">Presupuesto #{printTarget.folio}</h2>
+          <p className="mt-1 text-sm">Paciente: {patientName}</p>
+          <p className="text-sm">Fecha: {printTarget.fecha}</p>
+          {printTarget.diagnostico && (
+            <p className="mt-2 text-sm">Diagnóstico y tratamiento: {printTarget.diagnostico}</p>
+          )}
+          <div className="mt-4 space-y-1">
+            {printTarget.items.map((item) => (
+              <div key={item.id} className="flex justify-between text-sm">
+                <span>
+                  {item.note || item.procedure}
+                  {item.teeth.length > 0 &&
+                    ` (dientes ${[...item.teeth].sort((a, b) => a - b).join(", ")})`}
+                </span>
+                <span>{formatCurrency(item.price)}</span>
+              </div>
+            ))}
+          </div>
+          <div className="mt-4 flex justify-between border-t pt-2 text-sm font-bold">
+            <span>Total</span>
+            <span>{formatCurrency(printTarget.total)}</span>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+const citasResumen = [
+  { id: "1", fecha: "12/08/2026", hora: "10:00", tipo: "Limpieza dental", estado: "Confirmada" },
+  { id: "2", fecha: "28/08/2026", hora: "16:30", tipo: "Revisión de ortodoncia", estado: "Pendiente" },
+  { id: "3", fecha: "02/07/2026", hora: "09:00", tipo: "Consulta general", estado: "Atendida" },
+] as const;
+
+const estadoColor: Record<string, string> = {
+  Confirmada: "bg-info/10 text-info",
+  Pendiente: "bg-accent/10 text-accent",
+  Atendida: "bg-success/10 text-success",
+};
+
+function ExpedienteSidePanel() {
+  return (
+    <div className="space-y-6 print:hidden">
+      <div className="rounded-2xl border border-edge/10 bg-surface p-5">
+        <h3 className="mb-4 text-xs font-semibold uppercase tracking-wide text-ink/50">
+          Resumen de Citas
+        </h3>
+        <div className="space-y-3">
+          {citasResumen.map((cita) => (
+            <div key={cita.id} className="rounded-lg border border-edge/10 bg-inset p-3">
+              <div className="flex items-center justify-between">
+                <span className="text-sm font-medium text-ink">
+                  {cita.fecha} · {cita.hora}
+                </span>
+                <span
+                  className={`rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide ${estadoColor[cita.estado]}`}
+                >
+                  {cita.estado}
+                </span>
+              </div>
+              <p className="mt-1 text-xs text-ink/50">{cita.tipo}</p>
+            </div>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+export default function Expediente({
+  patient,
+  avatarColor,
+  initials,
+  formatDate,
+  calculateAge,
+  initialTab,
+  onTabApplied,
+  onBack,
+}: {
+  patient: Patient;
+  avatarColor: string;
+  initials: string;
+  formatDate: (date: string) => string;
+  calculateAge: (date: string) => number | null;
+  initialTab?: string;
+  onTabApplied?: () => void;
+  onBack: () => void;
+}) {
+  const [activeTab, setActiveTab] = useState<ExpedienteTab>(expedienteTabs[0]);
+  const {
+    presupuestosPorPaciente,
+    setPresupuestosPaciente,
+    pagosPorPaciente,
+    setPagosPaciente,
+    cargarDatosPaciente,
+  } = usePatientData();
+
+  useEffect(() => {
+    cargarDatosPaciente(patient.id);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [patient.id]);
+
+  useEffect(() => {
+    if (initialTab && (expedienteTabs as readonly string[]).includes(initialTab)) {
+      setActiveTab(initialTab as ExpedienteTab);
+      onTabApplied?.();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [initialTab]);
+
+  const presupuestos = presupuestosPorPaciente[patient.id] ?? [];
+  const setPresupuestos: Dispatch<SetStateAction<SavedBudget[]>> = (updater) =>
+    setPresupuestosPaciente(patient.id, updater);
+  const pagos = pagosPorPaciente[patient.id] ?? [];
+  const setPagos: Dispatch<SetStateAction<Pago[]>> = (updater) =>
+    setPagosPaciente(patient.id, updater);
+
+  return (
+    <div className="space-y-6">
+      <button
+        onClick={onBack}
+        className="flex items-center gap-2 text-sm font-medium text-accent hover:text-accent print:hidden"
+      >
+        ← Volver a pacientes
+      </button>
+
+      <div className="flex items-center gap-4 print:hidden">
+        <div
+          className="flex h-16 w-16 shrink-0 items-center justify-center rounded-full text-lg font-bold text-black"
+          style={{ backgroundColor: avatarColor }}
+        >
+          {initials}
+        </div>
+        <div>
+          <h2 className="text-xl font-semibold text-ink">{patient.name}</h2>
+          <p className="mt-1 text-sm text-ink/50">
+            {patient.phone} · {formatDate(patient.birthDate)}
+            {calculateAge(patient.birthDate) !== null && ` · ${calculateAge(patient.birthDate)} años`}
+          </p>
+        </div>
+      </div>
+
+      <div className="flex flex-wrap gap-2 border-b border-edge/10 pb-4 print:hidden">
+        {expedienteTabs.map((tab) => (
+          <button
+            key={tab}
+            onClick={() => setActiveTab(tab)}
+            className={`rounded-lg px-3 py-2 text-xs font-semibold uppercase tracking-wide transition-colors ${
+              activeTab === tab
+                ? "bg-accent/15 text-accent"
+                : "text-ink/40 hover:bg-surface hover:text-ink/70"
+            }`}
+            style={
+              activeTab === tab
+                ? { textShadow: "0 0 8px rgba(251,146,60,0.4)" }
+                : undefined
+            }
+          >
+            {tab}
+          </button>
+        ))}
+      </div>
+
+      <div
+        className={`grid grid-cols-1 items-start gap-6 ${
+          activeTab === "Pagos" ? "" : "lg:grid-cols-[1fr_300px]"
+        }`}
+      >
+        <div className="min-w-0">
+          {activeTab === "Presupuestos" && (
+            <PresupuestosTab
+              patientName={patient.name}
+              presupuestos={presupuestos}
+              setPresupuestos={setPresupuestos}
+            />
+          )}
+          {activeTab === "Datos del Paciente" && (
+            <DatosPaciente patient={patient} formatDate={formatDate} calculateAge={calculateAge} />
+          )}
+          {activeTab === "Historia Clínica" && <HistoriaClinica />}
+          {activeTab === "Listado de Citas" && <ListadoCitas />}
+          {activeTab === "Fotografías" && <Fotografias />}
+          {activeTab === "Pagos" && (
+            <Pagos
+              patientName={patient.name}
+              presupuestos={presupuestos}
+              pagos={pagos}
+              setPagos={setPagos}
+            />
+          )}
+          {activeTab === "Consentimientos Informados y Recetas" && (
+            <ConsentimientoInformado patient={patient} />
+          )}
+          {activeTab === "Laboratorios" && <Laboratorios />}
+          {activeTab === "Notas de Evolución y Seguimiento" && <NotasEvolucion />}
+          {activeTab !== "Presupuestos" &&
+            activeTab !== "Datos del Paciente" &&
+            activeTab !== "Historia Clínica" &&
+            activeTab !== "Listado de Citas" &&
+            activeTab !== "Fotografías" &&
+            activeTab !== "Pagos" &&
+            activeTab !== "Consentimientos Informados y Recetas" &&
+            activeTab !== "Laboratorios" &&
+            activeTab !== "Notas de Evolución y Seguimiento" && (
+              <div className="rounded-2xl border border-dashed border-edge/15 bg-surface p-10 text-center text-sm text-ink/40">
+                {activeTab} — próximamente
+              </div>
+            )}
+        </div>
+
+        <ExpedienteSidePanel />
+      </div>
+    </div>
+  );
+}

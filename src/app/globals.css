@@ -1,0 +1,52 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --app: #000000;
+  --surface: #0d0d0d;
+  --surface2: #1a1a1a;
+  --field: #000000;
+  --inset: #050505;
+
+  --edge-rgb: 255 255 255;
+  --ink-rgb: 255 255 255;
+  --accent-rgb: 251 191 36;
+  --success-rgb: 52 211 153;
+  --danger-rgb: 248 113 113;
+  --info-rgb: 96 165 250;
+
+  --shadow-card: none;
+}
+
+[data-theme="light"] {
+  /* Gris Oxford + naranja Longhorn */
+  --app: #f2f1f4;
+  --surface: #ffffff;
+  --surface2: #eaeaef;
+  --field: #ffffff;
+  --inset: #edecf1;
+
+  --edge-rgb: 64 67 76;
+  --ink-rgb: 28 29 34;
+  --accent-rgb: 191 87 0;
+  --success-rgb: 4 120 87;
+  --danger-rgb: 185 28 28;
+  --info-rgb: 29 78 216;
+
+  --shadow-card: 0 1px 2px rgba(30, 31, 36, 0.04), 0 10px 24px -8px rgba(30, 31, 36, 0.14);
+}
+
+html,
+body {
+  margin: 0;
+  padding: 0;
+  height: 100%;
+  background: var(--app);
+}
+
+.bg-surface.rounded-2xl,
+.bg-surface.rounded-xl,
+.bg-surface.rounded-lg {
+  box-shadow: var(--shadow-card);
+}
