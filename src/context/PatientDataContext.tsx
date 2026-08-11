@@ -47,6 +47,7 @@ import {
   type FinanzasConfig,
 } from "@/lib/metas";
 import { formatosWhatsAppInicial, type FormatosWhatsApp } from "@/lib/formatosWhatsapp";
+import { calcularFechaFin, type MembershipPlan, type PatientMembership, type UsoBeneficio } from "@/lib/membresias";
 
 type Updater<T> = T | ((prev: T) => T);
 
@@ -320,6 +321,21 @@ type PatientDataContextValue = {
   setPagosPaciente: (patientId: string, updater: Updater<Pago[]>) => void;
   recetasPorPaciente: Record<string, Receta[]>;
   setRecetasPaciente: (patientId: string, updater: Updater<Receta[]>) => void;
+  membershipPlanes: MembershipPlan[];
+  setMembershipPlanes: (updater: Updater<MembershipPlan[]>) => void;
+  membresiasPorPaciente: Record<string, PatientMembership[]>;
+  activarMembresia: (
+    patientId: string,
+    plan: MembershipPlan,
+    datosPago: { medico: string; formaPago: string; facturar: boolean }
+  ) => void;
+  renovarMembresia: (
+    patientId: string,
+    membresiaAnterior: PatientMembership,
+    datosPago: { medico: string; formaPago: string; facturar: boolean }
+  ) => void;
+  usarBeneficio: (patientId: string, membresiaId: string, beneficioId: string, profesional: string) => void;
+  cancelarMembresia: (patientId: string, membresiaId: string) => void;
   recursos: Recurso[];
   setRecursos: (updater: Updater<Recurso[]>) => void;
   citas: CitaAgenda[];
@@ -396,12 +412,19 @@ export function PatientDataProvider({
     "formatosWhatsapp",
     formatosWhatsAppInicial
   );
+  const [membershipPlanes, setMembershipPlanes] = useFirestoreList<MembershipPlan>(
+    clinicUid,
+    "membresiaPlanes"
+  );
 
   const [presupuestosPorPaciente, setPresupuestosPorPacienteState] = useState<
     Record<string, SavedBudget[]>
   >({});
   const [pagosPorPaciente, setPagosPorPacienteState] = useState<Record<string, Pago[]>>({});
   const [recetasPorPaciente, setRecetasPorPacienteState] = useState<Record<string, Receta[]>>({});
+  const [membresiasPorPaciente, setMembresiasPorPacienteState] = useState<
+    Record<string, PatientMembership[]>
+  >({});
   const subs = useRef<Record<string, Unsubscribe>>({});
   const [navegacionExpediente, setNavegacionExpediente] = useState<NavegacionExpediente>(null);
 
@@ -463,6 +486,14 @@ export function PatientDataProvider({
       subs.current[recetasKey] = onSnapshot(collection(db, path), (snap) => {
         const next = snap.docs.map((d) => ({ ...(d.data() as Receta), id: d.id }));
         setRecetasPorPacienteState((prev) => ({ ...prev, [patientId]: next }));
+      });
+    }
+    const membresiasKey = `membresias:${patientId}`;
+    if (!subs.current[membresiasKey]) {
+      const path = `users/${clinicUid}/pacientes/${patientId}/membresias`;
+      subs.current[membresiasKey] = onSnapshot(collection(db, path), (snap) => {
+        const next = snap.docs.map((d) => ({ ...(d.data() as PatientMembership), id: d.id }));
+        setMembresiasPorPacienteState((prev) => ({ ...prev, [patientId]: next }));
       });
     }
   };
@@ -569,6 +600,124 @@ export function PatientDataProvider({
     });
   };
 
+  const setMembresiasPaciente = (patientId: string, updater: Updater<PatientMembership[]>) => {
+    if (!clinicUid) return;
+    setMembresiasPorPacienteState((prev) => {
+      const prevArr = prev[patientId] ?? [];
+      const next = resolveUpdater(updater, prevArr);
+      syncFirestoreList(`users/${clinicUid}/pacientes/${patientId}/membresias`, prevArr, next);
+      return { ...prev, [patientId]: next };
+    });
+  };
+
+  /** Crea la membresía del paciente y, en el mismo movimiento, el pago que la
+   * respalda (reutilizando setPagosPaciente, que ya alimenta config/finanzas
+   * para que Corte Diario/Semanal/Mensual y Metas queden correctos). */
+  const crearMembresiaConPago = (
+    patientId: string,
+    plan: MembershipPlan,
+    fechaInicioISO: string,
+    datosPago: { medico: string; formaPago: string; facturar: boolean }
+  ) => {
+    const pagoId = `${Date.now()}`;
+    const fechaDisplay = new Date(`${fechaInicioISO}T00:00:00`).toLocaleDateString("es-MX", {
+      day: "2-digit",
+      month: "2-digit",
+      year: "numeric",
+    });
+    setPagosPaciente(patientId, (prev) => [
+      {
+        id: pagoId,
+        fecha: fechaDisplay,
+        medico: datosPago.medico,
+        formaPago: datosPago.formaPago,
+        lineas: [
+          {
+            id: `${pagoId}-membresia`,
+            tratamientoId: null,
+            folio: null,
+            label: `Membresía: ${plan.nombre}`,
+            monto: plan.precio,
+          },
+        ],
+        total: plan.precio,
+        facturar: datosPago.facturar,
+        firma: null,
+      },
+      ...prev,
+    ]);
+
+    const nuevaMembresia: PatientMembership = {
+      id: `mem${Date.now()}`,
+      planId: plan.id,
+      planNombre: plan.nombre,
+      precio: plan.precio,
+      fechaInicio: fechaInicioISO,
+      fechaFin: calcularFechaFin(fechaInicioISO, plan.duracionTipo, plan.duracionDiasPersonalizada),
+      estatus: "activa",
+      beneficios: plan.beneficios,
+      usos: {},
+      pagoId,
+    };
+    setMembresiasPaciente(patientId, (prev) => [nuevaMembresia, ...prev]);
+  };
+
+  const activarMembresia = (
+    patientId: string,
+    plan: MembershipPlan,
+    datosPago: { medico: string; formaPago: string; facturar: boolean }
+  ) => {
+    const hoyISO = new Date().toISOString().slice(0, 10);
+    crearMembresiaConPago(patientId, plan, hoyISO, datosPago);
+  };
+
+  const renovarMembresia = (
+    patientId: string,
+    membresiaAnterior: PatientMembership,
+    datosPago: { medico: string; formaPago: string; facturar: boolean }
+  ) => {
+    const hoyISO = new Date().toISOString().slice(0, 10);
+    const diaSiguienteAlVencimiento = (() => {
+      const d = new Date(`${membresiaAnterior.fechaFin}T00:00:00`);
+      d.setDate(d.getDate() + 1);
+      return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+    })();
+    const fechaInicio = diaSiguienteAlVencimiento > hoyISO ? diaSiguienteAlVencimiento : hoyISO;
+    const planActual = membershipPlanes.find((p) => p.id === membresiaAnterior.planId);
+    const plan: MembershipPlan = planActual ?? {
+      id: membresiaAnterior.planId,
+      nombre: membresiaAnterior.planNombre,
+      precio: membresiaAnterior.precio,
+      duracionTipo: "anual",
+      renovacionAutomatica: false,
+      beneficios: membresiaAnterior.beneficios,
+      exclusiones: "",
+    };
+    crearMembresiaConPago(patientId, plan, fechaInicio, datosPago);
+  };
+
+  const usarBeneficio = (
+    patientId: string,
+    membresiaId: string,
+    beneficioId: string,
+    profesional: string
+  ) => {
+    const uso: UsoBeneficio = { fecha: new Date().toISOString().slice(0, 10), profesional };
+    setMembresiasPaciente(patientId, (prev) =>
+      prev.map((m) =>
+        m.id === membresiaId
+          ? { ...m, usos: { ...m.usos, [beneficioId]: [...(m.usos[beneficioId] ?? []), uso] } }
+          : m
+      )
+    );
+  };
+
+  const cancelarMembresia = (patientId: string, membresiaId: string) => {
+    setMembresiasPaciente(patientId, (prev) =>
+      prev.map((m) => (m.id === membresiaId ? { ...m, estatus: "cancelada" } : m))
+    );
+  };
+
   const invitarColaborador = async (data: { nombre: string; correo: string; rol: RolClinica }) => {
     if (!clinicUid) return;
     const correo = data.correo.trim().toLowerCase();
@@ -617,6 +766,13 @@ export function PatientDataProvider({
         setPagosPaciente,
         recetasPorPaciente,
         setRecetasPaciente,
+        membershipPlanes,
+        setMembershipPlanes,
+        membresiasPorPaciente,
+        activarMembresia,
+        renovarMembresia,
+        usarBeneficio,
+        cancelarMembresia,
         recursos,
         setRecursos,
         citas,

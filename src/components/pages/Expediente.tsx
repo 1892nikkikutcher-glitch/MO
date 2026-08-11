@@ -10,6 +10,7 @@ import Pagos from "./Pagos";
 import ConsentimientoInformado from "./ConsentimientoInformado";
 import Laboratorios from "./Laboratorios";
 import NotasEvolucion from "./NotasEvolucion";
+import MembresiaTab from "./MembresiaTab";
 import { usePatientData } from "@/context/PatientDataContext";
 import {
   computeTratamientosPendientes,
@@ -29,6 +30,7 @@ const expedienteTabs = [
   "Listado de Citas",
   "Fotografías",
   "Pagos",
+  "Membresía",
   "Consentimientos Informados y Recetas",
   "Laboratorios",
 ] as const;
@@ -520,12 +522,16 @@ export default function Expediente({
           )}
           {activeTab === "Laboratorios" && <Laboratorios />}
           {activeTab === "Notas de Evolución y Seguimiento" && <NotasEvolucion />}
+          {activeTab === "Membresía" && (
+            <MembresiaTab patientId={patient.id} patientName={patient.name} />
+          )}
           {activeTab !== "Presupuestos" &&
             activeTab !== "Datos del Paciente" &&
             activeTab !== "Historia Clínica" &&
             activeTab !== "Listado de Citas" &&
             activeTab !== "Fotografías" &&
             activeTab !== "Pagos" &&
+            activeTab !== "Membresía" &&
             activeTab !== "Consentimientos Informados y Recetas" &&
             activeTab !== "Laboratorios" &&
             activeTab !== "Notas de Evolución y Seguimiento" && (
