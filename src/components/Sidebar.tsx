@@ -268,11 +268,15 @@ export default function Sidebar({
   onNavigate,
   theme,
   onToggleTheme,
+  mobileOpen,
+  onCloseMobile,
 }: {
   active: string;
   onNavigate: (id: string) => void;
   theme: "dark" | "light";
   onToggleTheme: () => void;
+  mobileOpen: boolean;
+  onCloseMobile: () => void;
 }) {
   const [collapsed, setCollapsed] = useState(false);
   const isLight = theme === "light";
@@ -282,11 +286,18 @@ export default function Sidebar({
   const [expanded, setExpanded] = useState<string | null>(activeParent?.id ?? null);
 
   return (
-    <aside
-      className={`flex h-screen flex-col border-r border-edge/10 bg-surface transition-all duration-200 print:hidden ${
-        collapsed ? "w-[4.5rem]" : "w-64"
-      }`}
-    >
+    <>
+      {mobileOpen && (
+        <div
+          onClick={onCloseMobile}
+          className="fixed inset-0 z-40 bg-black/60 md:hidden"
+        />
+      )}
+      <aside
+        className={`fixed inset-y-0 left-0 z-50 flex h-screen flex-col border-r border-edge/10 bg-surface transition-transform duration-200 print:hidden md:static md:translate-x-0 md:transition-[width] ${
+          mobileOpen ? "translate-x-0" : "-translate-x-full"
+        } ${collapsed ? "md:w-[4.5rem]" : "w-64"}`}
+      >
       <div className="flex h-16 shrink-0 items-center justify-center border-b border-edge/10 px-4">
         <span className="bg-gradient-to-r from-red-600 to-blue-600 bg-clip-text text-xl font-bold text-transparent">
           {collapsed ? "M" : "MO"}
@@ -307,6 +318,7 @@ export default function Sidebar({
                     if (collapsed) setCollapsed(false);
                   } else {
                     onNavigate(item.id);
+                    onCloseMobile();
                   }
                 }}
                 className={`flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-colors ${
@@ -332,7 +344,10 @@ export default function Sidebar({
                   {item.children!.map((child) => (
                     <button
                       key={child.id}
-                      onClick={() => onNavigate(child.id)}
+                      onClick={() => {
+                        onNavigate(child.id);
+                        onCloseMobile();
+                      }}
                       className={`block w-full rounded-md px-2.5 py-1.5 text-left text-xs font-medium transition-colors ${
                         active === child.id
                           ? "text-accent"
@@ -387,6 +402,7 @@ export default function Sidebar({
           {!collapsed && <span>Contraer</span>}
         </button>
       </div>
-    </aside>
+      </aside>
+    </>
   );
 }

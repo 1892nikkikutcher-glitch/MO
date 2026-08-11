@@ -74,7 +74,7 @@ function QuickActionsBar({
   const visibles = quickActions.filter((action) => action.key !== "gastos" || puedeVerFinanzas);
 
   return (
-    <div className="flex flex-1 items-center justify-between">
+    <div className="flex items-center gap-1 sm:flex-1 sm:justify-between sm:gap-0">
       {visibles.map((action) => {
         const icon = navItems.find((item) => item.id === action.pageId)?.icon;
         const badge = "badge" in action ? action.badge : undefined;
@@ -129,6 +129,7 @@ export default function Dashboard({
   const [activePage, setActivePage] = useState("inicio");
   const [showRegistrarPago, setShowRegistrarPago] = useState(false);
   const [theme, setTheme] = useState<"dark" | "light">("dark");
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const isLight = theme === "light";
   const activeLabel =
     navItems.find((item) => item.id === activePage)?.label ??
@@ -146,28 +147,42 @@ export default function Dashboard({
         onNavigate={setActivePage}
         theme={theme}
         onToggleTheme={() => setTheme((t) => (t === "dark" ? "light" : "dark"))}
+        mobileOpen={mobileMenuOpen}
+        onCloseMobile={() => setMobileMenuOpen(false)}
       />
 
-      <main className="flex-1">
-        <header className="flex h-16 items-center gap-4 border-b border-edge/10 px-6 print:hidden">
-          <QuickActionsBar
-            isLight={isLight}
-            onNavigate={setActivePage}
-            onOpenPago={() => setShowRegistrarPago(true)}
-          />
+      <main className="min-w-0 flex-1">
+        <header className="flex h-16 items-center gap-2 border-b border-edge/10 px-3 print:hidden sm:gap-4 sm:px-6">
+          <button
+            onClick={() => setMobileMenuOpen(true)}
+            className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg text-ink/70 hover:bg-surface hover:text-ink md:hidden"
+            title="Abrir menú"
+          >
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none">
+              <path d="M4 6h16M4 12h16M4 18h16" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
+            </svg>
+          </button>
 
-          <span className="h-6 w-px bg-edge/10" />
+          <div className="min-w-0 flex-1 overflow-x-auto">
+            <QuickActionsBar
+              isLight={isLight}
+              onNavigate={setActivePage}
+              onOpenPago={() => setShowRegistrarPago(true)}
+            />
+          </div>
 
-          <span className="text-sm text-ink/50">{userEmail}</span>
+          <span className="hidden h-6 w-px bg-edge/10 sm:block" />
+
+          <span className="hidden truncate text-sm text-ink/50 sm:inline">{userEmail}</span>
           <button
             onClick={onLogout}
-            className="rounded-lg border border-edge/10 bg-surface px-3 py-1.5 text-xs text-ink/70 transition-colors hover:text-ink"
+            className="shrink-0 rounded-lg border border-edge/10 bg-surface px-2.5 py-1.5 text-xs text-ink/70 transition-colors hover:text-ink sm:px-3"
           >
             Cerrar sesión
           </button>
         </header>
 
-        <div className="px-6 py-8">
+        <div className="px-3 py-6 sm:px-6 sm:py-8">
           <h1 className="mb-6 text-2xl font-semibold print:hidden">
             {activePage === "inicio" ? "Dashboard Principal" : activeLabel}
           </h1>
