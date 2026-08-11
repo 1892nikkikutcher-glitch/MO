@@ -261,6 +261,8 @@ export type CitaAgenda = {
   horaFin: string;
   estatus: CitaEstatus;
   recurrenciaId: string | null;
+  /** Hora real (HH:MM) en que el paciente se presentó — asistencia de pacientes. */
+  horaLlegada?: string | null;
 };
 
 export function formatCurrency(value: number) {

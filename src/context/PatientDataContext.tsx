@@ -48,6 +48,7 @@ import {
 } from "@/lib/metas";
 import { formatosWhatsAppInicial, type FormatosWhatsApp } from "@/lib/formatosWhatsapp";
 import { calcularFechaFin, type MembershipPlan, type PatientMembership, type UsoBeneficio } from "@/lib/membresias";
+import type { PersonalAsistencia, RegistroAsistencia } from "@/lib/asistencia";
 
 type Updater<T> = T | ((prev: T) => T);
 
@@ -336,6 +337,11 @@ type PatientDataContextValue = {
   ) => void;
   usarBeneficio: (patientId: string, membresiaId: string, beneficioId: string, profesional: string) => void;
   cancelarMembresia: (patientId: string, membresiaId: string) => void;
+  personalAsistencia: PersonalAsistencia[];
+  setPersonalAsistencia: (updater: Updater<PersonalAsistencia[]>) => void;
+  registrosAsistencia: RegistroAsistencia[];
+  marcarAsistencia: (personalId: string, fecha: string, campo: "entrada" | "salida", hora: string | null) => void;
+  marcarLlegadaCita: (citaId: string, hora: string | null) => void;
   recursos: Recurso[];
   setRecursos: (updater: Updater<Recurso[]>) => void;
   citas: CitaAgenda[];
@@ -415,6 +421,14 @@ export function PatientDataProvider({
   const [membershipPlanes, setMembershipPlanes] = useFirestoreList<MembershipPlan>(
     clinicUid,
     "membresiaPlanes"
+  );
+  const [personalAsistencia, setPersonalAsistencia] = useFirestoreList<PersonalAsistencia>(
+    clinicUid,
+    "personalAsistencia"
+  );
+  const [registrosAsistencia, setRegistrosAsistencia] = useFirestoreList<RegistroAsistencia>(
+    clinicUid,
+    "registrosAsistencia"
   );
 
   const [presupuestosPorPaciente, setPresupuestosPorPacienteState] = useState<
@@ -718,6 +732,33 @@ export function PatientDataProvider({
     );
   };
 
+  const marcarAsistencia = (
+    personalId: string,
+    fecha: string,
+    campo: "entrada" | "salida",
+    hora: string | null
+  ) => {
+    const id = `${personalId}_${fecha}`;
+    setRegistrosAsistencia((prev) => {
+      const existe = prev.find((r) => r.id === id);
+      if (existe) return prev.map((r) => (r.id === id ? { ...r, [campo]: hora } : r));
+      return [
+        ...prev,
+        {
+          id,
+          personalId,
+          fecha,
+          entrada: campo === "entrada" ? hora : null,
+          salida: campo === "salida" ? hora : null,
+        },
+      ];
+    });
+  };
+
+  const marcarLlegadaCita = (citaId: string, hora: string | null) => {
+    setCitas((prev) => prev.map((c) => (c.id === citaId ? { ...c, horaLlegada: hora } : c)));
+  };
+
   const invitarColaborador = async (data: { nombre: string; correo: string; rol: RolClinica }) => {
     if (!clinicUid) return;
     const correo = data.correo.trim().toLowerCase();
@@ -773,6 +814,11 @@ export function PatientDataProvider({
         renovarMembresia,
         usarBeneficio,
         cancelarMembresia,
+        personalAsistencia,
+        setPersonalAsistencia,
+        registrosAsistencia,
+        marcarAsistencia,
+        marcarLlegadaCita,
         recursos,
         setRecursos,
         citas,

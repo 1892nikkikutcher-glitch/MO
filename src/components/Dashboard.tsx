@@ -10,6 +10,7 @@ import PerfilDoctor from "./pages/PerfilDoctor";
 import Colaboradores from "./pages/Colaboradores";
 import Metas from "./pages/Metas";
 import Membresias from "./pages/Membresias";
+import Asistencia from "./pages/Asistencia";
 import FormatosWhatsApp from "./pages/FormatosWhatsApp";
 import Planes from "./pages/Planes";
 import GlobalAgregarPago from "./GlobalAgregarPago";
@@ -198,6 +199,7 @@ export default function Dashboard({
           {activePage === "administracion-metas" && <Metas />}
           {activePage === "administracion-formatos-whatsapp" && <FormatosWhatsApp />}
           {activePage === "membresias" && <Membresias />}
+          {activePage === "asistencia" && <Asistencia />}
           {activePage === "planes" && <Planes />}
         </div>
       </main>
