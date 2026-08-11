@@ -49,6 +49,7 @@ import {
 import { formatosWhatsAppInicial, type FormatosWhatsApp } from "@/lib/formatosWhatsapp";
 import { calcularFechaFin, type MembershipPlan, type PatientMembership, type UsoBeneficio } from "@/lib/membresias";
 import type { PersonalAsistencia, RegistroAsistencia } from "@/lib/asistencia";
+import type { Procedimiento } from "@/lib/procedimientos";
 
 type Updater<T> = T | ((prev: T) => T);
 
@@ -342,6 +343,8 @@ type PatientDataContextValue = {
   registrosAsistencia: RegistroAsistencia[];
   marcarAsistencia: (personalId: string, fecha: string, campo: "entrada" | "salida", hora: string | null) => void;
   marcarLlegadaCita: (citaId: string, hora: string | null) => void;
+  procedimientos: Procedimiento[];
+  setProcedimientos: (updater: Updater<Procedimiento[]>) => void;
   recursos: Recurso[];
   setRecursos: (updater: Updater<Recurso[]>) => void;
   citas: CitaAgenda[];
@@ -430,6 +433,7 @@ export function PatientDataProvider({
     clinicUid,
     "registrosAsistencia"
   );
+  const [procedimientos, setProcedimientos] = useFirestoreList<Procedimiento>(clinicUid, "procedimientos");
 
   const [presupuestosPorPaciente, setPresupuestosPorPacienteState] = useState<
     Record<string, SavedBudget[]>
@@ -819,6 +823,8 @@ export function PatientDataProvider({
         registrosAsistencia,
         marcarAsistencia,
         marcarLlegadaCita,
+        procedimientos,
+        setProcedimientos,
         recursos,
         setRecursos,
         citas,

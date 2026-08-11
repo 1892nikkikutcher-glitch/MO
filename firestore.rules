@@ -180,6 +180,10 @@ service cloud.firestore {
     match /users/{ownerId}/registrosAsistencia/{registroId} {
       allow read, write: if isActiveMember(ownerId);
     }
+    match /users/{ownerId}/procedimientos/{procedimientoId} {
+      allow read: if isActiveMember(ownerId);
+      allow write: if isClinicAdmin(ownerId);
+    }
 
     match /{document=**} {
       allow read, write: if false;
