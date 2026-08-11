@@ -190,6 +190,10 @@ export type SuscripcionPlan = {
   planActivo: PlanId;
   /** Fecha ISO (YYYY-MM-DD) en que arrancó el periodo de prueba de esta clínica. */
   pruebaIniciadaEl: string;
+  /** Los siguientes campos los escribe únicamente el webhook de Stripe. */
+  stripeCustomerId?: string;
+  stripeSubscriptionId?: string;
+  stripeStatus?: string;
 };
 
 export type RolClinica = "admin" | "colaborador";

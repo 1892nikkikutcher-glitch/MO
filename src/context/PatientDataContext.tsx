@@ -310,6 +310,8 @@ function useClinicResolution(authUid: string, authEmail: string) {
 export type NavegacionExpediente = { patientId: string; tab?: string } | null;
 
 type PatientDataContextValue = {
+  clinicUid: string | null;
+  userEmail: string;
   patients: Patient[];
   addPatient: (data: { name: string; phone: string; birthDate?: string }) => Patient;
   updatePatient: (patientId: string, data: Partial<Omit<Patient, "id">>) => void;
@@ -801,6 +803,8 @@ export function PatientDataProvider({
   return (
     <PatientDataContext.Provider
       value={{
+        clinicUid,
+        userEmail,
         patients,
         addPatient,
         updatePatient,

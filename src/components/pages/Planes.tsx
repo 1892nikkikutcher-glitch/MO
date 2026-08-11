@@ -1,7 +1,8 @@
 "use client";
 
+import { useState } from "react";
 import { usePatientData } from "@/context/PatientDataContext";
-import { DURACION_PRUEBA_DIAS, planesDisponibles } from "@/lib/patientData";
+import { DURACION_PRUEBA_DIAS, planesDisponibles, type PlanId } from "@/lib/patientData";
 
 function diasRestantesDePrueba(pruebaIniciadaEl: string | undefined) {
   if (!pruebaIniciadaEl) return DURACION_PRUEBA_DIAS;
@@ -15,9 +16,30 @@ function diasRestantesDePrueba(pruebaIniciadaEl: string | undefined) {
 }
 
 export default function Planes() {
-  const { suscripcion, setSuscripcion } = usePatientData();
+  const { suscripcion, setSuscripcion, clinicUid, userEmail } = usePatientData();
   const diasRestantes = diasRestantesDePrueba(suscripcion.pruebaIniciadaEl);
   const pruebaVencida = suscripcion.planActivo === "prueba" && diasRestantes <= 0;
+  const [cargando, setCargando] = useState<PlanId | null>(null);
+  const [error, setError] = useState("");
+
+  const suscribirse = async (plan: "consultorio" | "clinicas") => {
+    if (!clinicUid) return;
+    setError("");
+    setCargando(plan);
+    try {
+      const res = await fetch("/api/stripe/checkout", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ clinicUid, plan, email: userEmail }),
+      });
+      const data = await res.json();
+      if (!res.ok || !data.url) throw new Error(data.error || "No se pudo iniciar el pago.");
+      window.location.href = data.url;
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "No se pudo iniciar el pago.");
+      setCargando(null);
+    }
+  };
 
   return (
     <div className="space-y-6">
@@ -35,10 +57,14 @@ export default function Planes() {
         </div>
       )}
 
-      <div className="rounded-2xl border border-accent/30 bg-accent/10 p-4 text-sm text-accent">
-        Esta sección todavía no procesa pagos reales — solo guarda qué plan tiene activa la cuenta.
-        Conectar cobros (Stripe u otro) es un paso aparte que haremos cuando lo pidas.
-      </div>
+      {suscripcion.stripeStatus && (
+        <div className="rounded-2xl border border-edge/10 bg-surface p-4 text-xs text-ink/50">
+          Estado de tu suscripción en Stripe: <span className="font-semibold text-ink/70">{suscripcion.stripeStatus}</span>
+        </div>
+      )}
+      {error && (
+        <div className="rounded-2xl border border-danger/30 bg-danger/10 p-4 text-sm text-danger">{error}</div>
+      )}
 
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
         {planesDisponibles.map((plan) => {
@@ -69,24 +95,31 @@ export default function Planes() {
                 ))}
               </ul>
               <button
-                onClick={() =>
-                  setSuscripcion((prev) => ({
-                    ...prev,
-                    planActivo: plan.id,
-                    pruebaIniciadaEl:
-                      plan.id === "prueba" && !prev.pruebaIniciadaEl
-                        ? new Date().toISOString().slice(0, 10)
-                        : prev.pruebaIniciadaEl,
-                  }))
-                }
-                disabled={activo}
+                onClick={() => {
+                  if (plan.id === "prueba") {
+                    setSuscripcion((prev) => ({
+                      ...prev,
+                      planActivo: plan.id,
+                      pruebaIniciadaEl: prev.pruebaIniciadaEl || new Date().toISOString().slice(0, 10),
+                    }));
+                  } else {
+                    suscribirse(plan.id);
+                  }
+                }}
+                disabled={activo || cargando !== null}
                 className={`mt-6 rounded-lg px-4 py-2.5 text-sm font-semibold transition-opacity ${
                   activo
                     ? "cursor-not-allowed border border-edge/15 text-ink/40"
-                    : "bg-gradient-to-r from-accent to-orange-500 text-black hover:opacity-90"
+                    : "bg-gradient-to-r from-accent to-orange-500 text-black hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50"
                 }`}
               >
-                {activo ? "Plan activo" : "Seleccionar plan"}
+                {activo
+                  ? "Plan activo"
+                  : cargando === plan.id
+                    ? "Abriendo pago…"
+                    : plan.id === "prueba"
+                      ? "Seleccionar plan"
+                      : "Suscribirme"}
               </button>
             </div>
           );
