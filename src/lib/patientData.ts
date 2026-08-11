@@ -6,6 +6,32 @@ export type Patient = {
   birthDate: string;
 };
 
+export function calcularEdadDetallada(birthDate: string): { years: number; months: number } | null {
+  if (!birthDate) return null;
+  const today = new Date();
+  const birth = new Date(`${birthDate}T00:00:00`);
+  if (Number.isNaN(birth.getTime())) return null;
+  let years = today.getFullYear() - birth.getFullYear();
+  let months = today.getMonth() - birth.getMonth();
+  if (today.getDate() < birth.getDate()) months--;
+  if (months < 0) {
+    years--;
+    months += 12;
+  }
+  return { years, months };
+}
+
+/** Ej. "38 años, 4 meses" · "8 meses" · "1 año" */
+export function formatEdad(birthDate: string): string {
+  const edad = calcularEdadDetallada(birthDate);
+  if (!edad) return "Sin registrar";
+  const { years, months } = edad;
+  const partes: string[] = [];
+  if (years > 0) partes.push(`${years} ${years === 1 ? "año" : "años"}`);
+  if (months > 0 || years === 0) partes.push(`${months} ${months === 1 ? "mes" : "meses"}`);
+  return partes.join(", ");
+}
+
 export const patients: Patient[] = [
   { id: "1", name: "María Fernanda López", phone: "55 1234 5678", birthDate: "1990-04-12" },
   { id: "2", name: "Carlos Alberto Ramírez", phone: "55 8765 4321", birthDate: "1985-11-02" },

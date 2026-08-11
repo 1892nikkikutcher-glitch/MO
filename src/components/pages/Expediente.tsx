@@ -14,6 +14,7 @@ import { usePatientData } from "@/context/PatientDataContext";
 import {
   computeTratamientosPendientes,
   formatCurrency,
+  formatEdad,
   type CitaAgenda,
   type Patient,
   type SavedBudget,
@@ -451,7 +452,7 @@ export default function Expediente({
           <h2 className="text-xl font-semibold text-ink">{patient.name}</h2>
           <p className="mt-1 text-sm text-ink/50">
             {patient.phone} · {formatDate(patient.birthDate)}
-            {calculateAge(patient.birthDate) !== null && ` · ${calculateAge(patient.birthDate)} años`}
+            {patient.birthDate && ` · ${formatEdad(patient.birthDate)}`}
           </p>
         </div>
         <button
@@ -501,7 +502,7 @@ export default function Expediente({
             />
           )}
           {activeTab === "Datos del Paciente" && (
-            <DatosPaciente patient={patient} formatDate={formatDate} calculateAge={calculateAge} />
+            <DatosPaciente patient={patient} formatDate={formatDate} />
           )}
           {activeTab === "Historia Clínica" && <HistoriaClinica />}
           {activeTab === "Listado de Citas" && <ListadoCitas />}

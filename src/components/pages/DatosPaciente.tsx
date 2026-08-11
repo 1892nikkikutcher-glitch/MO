@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { formatEdad } from "@/lib/patientData";
 
 type Patient = {
   id: string;
@@ -63,11 +64,9 @@ function CardShell({ title, children }: { title: string; children: React.ReactNo
 export default function DatosPaciente({
   patient,
   formatDate,
-  calculateAge,
 }: {
   patient: Patient;
   formatDate: (date: string) => string;
-  calculateAge: (date: string) => number | null;
 }) {
   const [nombreCompleto, setNombreCompleto] = useState(patient.name);
   const [sexo, setSexo] = useState(sexoOptions[0]);
@@ -120,8 +119,8 @@ export default function DatosPaciente({
               type="text"
               readOnly
               value={
-                calculateAge(patient.birthDate) !== null
-                  ? `${formatDate(patient.birthDate)} (${calculateAge(patient.birthDate)} años)`
+                patient.birthDate
+                  ? `${formatDate(patient.birthDate)} (${formatEdad(patient.birthDate)})`
                   : formatDate(patient.birthDate)
               }
               className={`${inputClass} cursor-not-allowed text-ink/50`}
