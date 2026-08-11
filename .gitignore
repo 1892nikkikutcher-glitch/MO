@@ -30,3 +30,6 @@ next-env.d.ts
 
 .vercel
 .env*
+
+# datos de pacientes reales — nunca en el repositorio
+pacientes_importar.json

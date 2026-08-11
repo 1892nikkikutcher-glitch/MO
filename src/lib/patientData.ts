@@ -4,6 +4,9 @@ export type Patient = {
   phone: string;
   email?: string;
   birthDate: string;
+  /** Texto libre para datos importados de un sistema anterior que no tienen
+   * todavía un campo estructurado propio (domicilio, ocupación, etc.). */
+  notas?: string;
 };
 
 export function calcularEdadDetallada(birthDate: string): { years: number; months: number } | null {

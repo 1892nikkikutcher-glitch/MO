@@ -17,6 +17,7 @@ import {
   query,
   setDoc,
   where,
+  writeBatch,
   type Unsubscribe,
 } from "firebase/firestore";
 import { db } from "@/lib/firebase";
@@ -301,6 +302,10 @@ type PatientDataContextValue = {
   patients: Patient[];
   addPatient: (data: { name: string; phone: string; birthDate?: string }) => Patient;
   updatePatient: (patientId: string, data: Partial<Omit<Patient, "id">>) => void;
+  importarPacientes: (
+    nuevos: Omit<Patient, "id">[],
+    onProgreso?: (hechos: number, total: number) => void
+  ) => Promise<void>;
   presupuestosPorPaciente: Record<string, SavedBudget[]>;
   setPresupuestosPaciente: (patientId: string, updater: Updater<SavedBudget[]>) => void;
   pagosPorPaciente: Record<string, Pago[]>;
@@ -457,6 +462,29 @@ export function PatientDataProvider({
     setPatients((prev) => prev.map((p) => (p.id === patientId ? { ...p, ...data } : p)));
   };
 
+  /** Escribe en bloques de 500 (límite de Firestore por batch) directo a
+   * Firestore — la lista local se actualiza sola vía el listener ya activo. */
+  const importarPacientes = async (
+    nuevos: Omit<Patient, "id">[],
+    onProgreso?: (hechos: number, total: number) => void
+  ) => {
+    if (!clinicUid) return;
+    const path = `users/${clinicUid}/pacientes`;
+    const tamañoLote = 450;
+    let hechos = 0;
+    for (let i = 0; i < nuevos.length; i += tamañoLote) {
+      const lote = nuevos.slice(i, i + tamañoLote);
+      const batch = writeBatch(db);
+      lote.forEach((data, idx) => {
+        const id = `imp${Date.now()}${i + idx}`;
+        batch.set(doc(db, path, id), { id, ...data });
+      });
+      await batch.commit();
+      hechos += lote.length;
+      onProgreso?.(hechos, nuevos.length);
+    }
+  };
+
   const irAExpediente = (patientId: string, tab?: string) => {
     setNavegacionExpediente({ patientId, tab });
     onIrAPagina?.("pacientes");
@@ -535,6 +563,7 @@ export function PatientDataProvider({
         patients,
         addPatient,
         updatePatient,
+        importarPacientes,
         presupuestosPorPaciente,
         setPresupuestosPaciente,
         pagosPorPaciente,

@@ -129,6 +129,149 @@ function NuevoPacienteDialog({
   );
 }
 
+type RegistroImportado = {
+  name: string;
+  phone: string;
+  birthDate: string;
+  email?: string;
+  notas?: string;
+};
+
+function esRegistroValido(v: unknown): v is RegistroImportado {
+  return (
+    !!v &&
+    typeof v === "object" &&
+    typeof (v as Record<string, unknown>).name === "string" &&
+    (v as Record<string, unknown>).name !== ""
+  );
+}
+
+function ImportarPacientesDialog({
+  onClose,
+  onImportar,
+}: {
+  onClose: () => void;
+  onImportar: (registros: RegistroImportado[], onProgreso: (hechos: number) => void) => Promise<void>;
+}) {
+  const [registros, setRegistros] = useState<RegistroImportado[] | null>(null);
+  const [nombreArchivo, setNombreArchivo] = useState("");
+  const [error, setError] = useState("");
+  const [importando, setImportando] = useState(false);
+  const [progreso, setProgreso] = useState(0);
+  const [terminado, setTerminado] = useState(false);
+
+  const handleArchivo = async (file: File) => {
+    setError("");
+    setRegistros(null);
+    setNombreArchivo(file.name);
+    try {
+      const texto = await file.text();
+      const data = JSON.parse(texto);
+      if (!Array.isArray(data)) throw new Error("El archivo debe ser una lista (array JSON).");
+      const validos = data.filter(esRegistroValido);
+      if (validos.length === 0) throw new Error("No se encontró ningún registro con al menos un nombre.");
+      setRegistros(validos);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "No se pudo leer el archivo.");
+    }
+  };
+
+  const confirmar = async () => {
+    if (!registros) return;
+    setImportando(true);
+    await onImportar(registros, setProgreso);
+    setTerminado(true);
+    setImportando(false);
+  };
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4">
+      <div className="max-h-[85vh] w-full max-w-lg overflow-y-auto rounded-2xl border border-edge/10 bg-[#0a0a0a] p-6">
+        <div className="mb-4 flex items-center justify-between">
+          <h3 className="text-base font-semibold text-ink">Importar Pacientes</h3>
+          <button
+            onClick={onClose}
+            className="flex h-7 w-7 items-center justify-center rounded-full text-ink/50 hover:bg-surface hover:text-ink"
+          >
+            ✕
+          </button>
+        </div>
+
+        {terminado ? (
+          <div className="space-y-4 text-center">
+            <p className="text-sm text-success">
+              ¡Listo! Se importaron {registros?.length ?? 0} pacientes correctamente.
+            </p>
+            <button
+              onClick={onClose}
+              className="w-full rounded-lg bg-gradient-to-r from-accent to-orange-500 py-2.5 text-sm font-semibold text-black transition-opacity hover:opacity-90"
+            >
+              Cerrar
+            </button>
+          </div>
+        ) : (
+          <>
+            <p className="mb-4 text-xs text-ink/40">
+              Sube un archivo .json con la lista de pacientes (nombre, teléfono, fecha de nacimiento,
+              correo y notas). Revisa la vista previa antes de confirmar.
+            </p>
+
+            <label className="flex cursor-pointer flex-col items-center justify-center gap-2 rounded-lg border border-dashed border-edge/20 p-6 text-center text-sm text-ink/50 hover:border-accent/40 hover:text-ink">
+              {nombreArchivo || "Selecciona un archivo .json"}
+              <input
+                type="file"
+                accept=".json,application/json"
+                className="hidden"
+                onChange={(e) => e.target.files?.[0] && handleArchivo(e.target.files[0])}
+              />
+            </label>
+
+            {error && <p className="mt-3 text-xs text-danger">{error}</p>}
+
+            {registros && (
+              <div className="mt-4 space-y-3">
+                <p className="text-sm text-ink/70">
+                  <span className="font-semibold text-accent">{registros.length}</span> pacientes
+                  listos para importar. Vista previa:
+                </p>
+                <div className="max-h-48 space-y-1.5 overflow-y-auto rounded-lg border border-edge/10 p-2">
+                  {registros.slice(0, 8).map((r, i) => (
+                    <div key={i} className="rounded-md bg-surface px-2.5 py-1.5 text-xs">
+                      <span className="font-medium text-ink">{r.name}</span>{" "}
+                      <span className="text-ink/40">
+                        {r.phone && `· ${r.phone}`} {r.birthDate && `· ${r.birthDate}`}
+                      </span>
+                    </div>
+                  ))}
+                  {registros.length > 8 && (
+                    <p className="px-2.5 py-1 text-xs text-ink/30">
+                      … y {registros.length - 8} más
+                    </p>
+                  )}
+                </div>
+
+                {importando && (
+                  <p className="text-center text-xs text-ink/50">
+                    Importando… {progreso}/{registros.length}
+                  </p>
+                )}
+
+                <button
+                  onClick={confirmar}
+                  disabled={importando}
+                  className="w-full rounded-lg bg-gradient-to-r from-accent to-orange-500 py-2.5 text-sm font-semibold text-black transition-opacity hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-40"
+                >
+                  {importando ? "Importando…" : `Importar ${registros.length} pacientes`}
+                </button>
+              </div>
+            )}
+          </>
+        )}
+      </div>
+    </div>
+  );
+}
+
 function ExpedienteIcon() {
   return (
     <svg width="18" height="18" viewBox="0 0 24 24" fill="none">
@@ -144,9 +287,11 @@ function ExpedienteIcon() {
 }
 
 export default function Pacientes() {
-  const { patients, addPatient, navegacionExpediente, consumirNavegacionExpediente } = usePatientData();
+  const { patients, addPatient, importarPacientes, navegacionExpediente, consumirNavegacionExpediente } =
+    usePatientData();
   const [selected, setSelected] = useState<Patient | null>(null);
   const [showNuevoPaciente, setShowNuevoPaciente] = useState(false);
+  const [showImportar, setShowImportar] = useState(false);
 
   useEffect(() => {
     if (!navegacionExpediente) return;
@@ -174,7 +319,13 @@ export default function Pacientes() {
 
   return (
     <div className="space-y-4">
-      <div className="flex justify-end">
+      <div className="flex justify-end gap-3">
+        <button
+          onClick={() => setShowImportar(true)}
+          className="rounded-lg border border-edge/15 px-4 py-2.5 text-sm font-semibold text-ink/80 transition-colors hover:bg-surface"
+        >
+          Importar Pacientes
+        </button>
         <button
           onClick={() => setShowNuevoPaciente(true)}
           className="rounded-lg bg-gradient-to-r from-accent to-orange-500 px-4 py-2.5 text-sm font-semibold text-black transition-opacity hover:opacity-90"
@@ -241,6 +392,13 @@ export default function Pacientes() {
             addPatient(data);
             setShowNuevoPaciente(false);
           }}
+        />
+      )}
+
+      {showImportar && (
+        <ImportarPacientesDialog
+          onClose={() => setShowImportar(false)}
+          onImportar={(registros, onProgreso) => importarPacientes(registros, onProgreso)}
         />
       )}
     </div>
