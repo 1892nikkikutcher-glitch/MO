@@ -12,8 +12,6 @@ import {
 import { renderPlantilla, formatFechaLarga, formatHora12 } from "@/lib/formatosWhatsapp";
 import { manejarCambioNombre } from "@/lib/textoNombre";
 
-const HOUR_START = 8;
-const HOUR_END = 20;
 const PX_PER_MIN = 1.2;
 const DIAS_SEMANA = ["lun.", "mar.", "mié.", "jue.", "vie.", "sáb.", "dom."];
 const MESES = [
@@ -766,6 +764,11 @@ function CitaDialog({
 
 export default function Agenda() {
   const { recursos, setRecursos, citas, setCitas, horario, setHorario } = usePatientData();
+  /** La agenda siempre se ve/agenda de 7am a 22h como base (para casos
+   * extemporáneos), pero si el horario de atención configurado es más
+   * amplio, se extiende para que ese horario quede disponible también. */
+  const HOUR_START = Math.min(7, Math.floor(timeToMinutes(horario.apertura || "07:00") / 60));
+  const HOUR_END = Math.max(22, Math.ceil(timeToMinutes(horario.cierre || "22:00") / 60));
   const [weekStart, setWeekStart] = useState(() => getMonday(new Date()));
   const [vista, setVista] = useState<"semana" | "3dias" | "dia" | "mes">("semana");
   const [diaSeleccionado, setDiaSeleccionado] = useState(() => new Date());
