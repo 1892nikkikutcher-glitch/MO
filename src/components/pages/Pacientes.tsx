@@ -5,13 +5,14 @@ import Expediente from "./Expediente";
 import { usePatientData } from "@/context/PatientDataContext";
 import { formatEdad, type Patient } from "@/lib/patientData";
 import { exportarCsv } from "@/lib/exportCsv";
+import { parseArchivoPacientes, type RegistroImportado } from "@/lib/importPacientes";
 
 const avatarColors = ["#f59e0b", "#ec4899", "#3b82f6", "#22c55e", "#dc2626", "#a855f7"];
 
 function calculateAge(birthDate: string) {
   if (!birthDate) return null;
   const today = new Date();
-  const birth = new Date(birthDate);
+  const birth = new Date(`${birthDate}T00:00:00`);
   let age = today.getFullYear() - birth.getFullYear();
   const monthDiff = today.getMonth() - birth.getMonth();
   if (monthDiff < 0 || (monthDiff === 0 && today.getDate() < birth.getDate())) age--;
@@ -20,7 +21,7 @@ function calculateAge(birthDate: string) {
 
 function formatDate(birthDate: string) {
   if (!birthDate) return "Sin registrar";
-  return new Date(birthDate).toLocaleDateString("es-MX", {
+  return new Date(`${birthDate}T00:00:00`).toLocaleDateString("es-MX", {
     day: "2-digit",
     month: "2-digit",
     year: "numeric",
@@ -130,23 +131,6 @@ function NuevoPacienteDialog({
   );
 }
 
-type RegistroImportado = {
-  name: string;
-  phone: string;
-  birthDate: string;
-  email?: string;
-  notas?: string;
-};
-
-function esRegistroValido(v: unknown): v is RegistroImportado {
-  return (
-    !!v &&
-    typeof v === "object" &&
-    typeof (v as Record<string, unknown>).name === "string" &&
-    (v as Record<string, unknown>).name !== ""
-  );
-}
-
 function ImportarPacientesDialog({
   onClose,
   onImportar,
@@ -155,6 +139,7 @@ function ImportarPacientesDialog({
   onImportar: (registros: RegistroImportado[], onProgreso: (hechos: number) => void) => Promise<void>;
 }) {
   const [registros, setRegistros] = useState<RegistroImportado[] | null>(null);
+  const [avisos, setAvisos] = useState<string[]>([]);
   const [nombreArchivo, setNombreArchivo] = useState("");
   const [error, setError] = useState("");
   const [importando, setImportando] = useState(false);
@@ -164,14 +149,13 @@ function ImportarPacientesDialog({
   const handleArchivo = async (file: File) => {
     setError("");
     setRegistros(null);
+    setAvisos([]);
     setNombreArchivo(file.name);
     try {
-      const texto = await file.text();
-      const data = JSON.parse(texto);
-      if (!Array.isArray(data)) throw new Error("El archivo debe ser una lista (array JSON).");
-      const validos = data.filter(esRegistroValido);
-      if (validos.length === 0) throw new Error("No se encontró ningún registro con al menos un nombre.");
-      setRegistros(validos);
+      const buffer = await file.arrayBuffer();
+      const { registros: nuevos, avisos: nuevosAvisos } = parseArchivoPacientes(buffer, file.name);
+      setRegistros(nuevos);
+      setAvisos(nuevosAvisos);
     } catch (err) {
       setError(err instanceof Error ? err.message : "No se pudo leer el archivo.");
     }
@@ -213,21 +197,32 @@ function ImportarPacientesDialog({
         ) : (
           <>
             <p className="mb-4 text-xs text-ink/40">
-              Sube un archivo .json con la lista de pacientes (nombre, teléfono, fecha de nacimiento,
-              correo y notas). Revisa la vista previa antes de confirmar.
+              Sube el archivo que ya exporta tu sistema anterior — .csv o .txt (también .json).
+              Detectamos automáticamente las columnas de nombre, teléfono, fecha de nacimiento y
+              correo; todo lo demás se guarda como nota en el expediente. Revisa la vista previa
+              antes de confirmar.
             </p>
 
             <label className="flex cursor-pointer flex-col items-center justify-center gap-2 rounded-lg border border-dashed border-edge/20 p-6 text-center text-sm text-ink/50 hover:border-accent/40 hover:text-ink">
-              {nombreArchivo || "Selecciona un archivo .json"}
+              {nombreArchivo || "Selecciona un archivo .csv, .txt o .json"}
               <input
                 type="file"
-                accept=".json,application/json"
+                accept=".csv,.txt,.tsv,.xls,.json,text/csv,application/vnd.ms-excel,application/json"
                 className="hidden"
                 onChange={(e) => e.target.files?.[0] && handleArchivo(e.target.files[0])}
               />
             </label>
 
             {error && <p className="mt-3 text-xs text-danger">{error}</p>}
+            {avisos.length > 0 && (
+              <div className="mt-3 space-y-1 rounded-lg bg-amber-500/10 px-3 py-2">
+                {avisos.map((a, i) => (
+                  <p key={i} className="text-xs text-amber-400">
+                    ⚠ {a}
+                  </p>
+                ))}
+              </div>
+            )}
 
             {registros && (
               <div className="mt-4 space-y-3">
