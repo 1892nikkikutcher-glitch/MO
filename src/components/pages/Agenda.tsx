@@ -67,14 +67,13 @@ function minutesToTime(m: number) {
   return `${String(h).padStart(2, "0")}:${String(min).padStart(2, "0")}`;
 }
 
-function formatRangeLabel(weekStart: Date) {
-  const weekEnd = addDays(weekStart, 6);
-  const sameMonth = weekStart.getMonth() === weekEnd.getMonth();
-  const mesInicio = MESES_ABR[weekStart.getMonth()];
-  const mesFin = MESES_ABR[weekEnd.getMonth()];
+function formatRangeLabel(inicio: Date, fin: Date) {
+  const sameMonth = inicio.getMonth() === fin.getMonth();
+  const mesInicio = MESES_ABR[inicio.getMonth()];
+  const mesFin = MESES_ABR[fin.getMonth()];
   return sameMonth
-    ? `${weekStart.getDate()} – ${weekEnd.getDate()} de ${mesFin} de ${weekEnd.getFullYear()}`
-    : `${weekStart.getDate()} de ${mesInicio} – ${weekEnd.getDate()} de ${mesFin} de ${weekEnd.getFullYear()}`;
+    ? `${inicio.getDate()} – ${fin.getDate()} de ${mesFin} de ${fin.getFullYear()}`
+    : `${inicio.getDate()} de ${mesInicio} – ${fin.getDate()} de ${mesFin} de ${fin.getFullYear()}`;
 }
 
 const inputClass =
@@ -768,7 +767,7 @@ function CitaDialog({
 export default function Agenda() {
   const { recursos, setRecursos, citas, setCitas, horario, setHorario } = usePatientData();
   const [weekStart, setWeekStart] = useState(() => getMonday(new Date()));
-  const [vista, setVista] = useState<"semana" | "dia" | "mes">("semana");
+  const [vista, setVista] = useState<"semana" | "3dias" | "dia" | "mes">("semana");
   const [diaSeleccionado, setDiaSeleccionado] = useState(() => new Date());
   const [mesActual, setMesActual] = useState(() => {
     const d = new Date();
@@ -784,8 +783,11 @@ export default function Agenda() {
 
   const dias = useMemo(() => {
     if (vista === "dia") return [diaSeleccionado];
+    if (vista === "3dias") return Array.from({ length: 3 }, (_, i) => addDays(diaSeleccionado, i));
     return Array.from({ length: 7 }, (_, i) => addDays(weekStart, i));
   }, [vista, weekStart, diaSeleccionado]);
+
+  const minGridWidth = vista === "dia" ? 300 : vista === "3dias" ? 400 : 640;
 
   const diasMes = useMemo(() => {
     const inicio = getMonday(new Date(mesActual.getFullYear(), mesActual.getMonth(), 1));
@@ -893,13 +895,15 @@ export default function Agenda() {
   };
 
   return (
-    <div className="flex gap-6">
-      <aside className="w-60 shrink-0 space-y-6 print:hidden">
+    <div className="flex flex-col gap-6 md:flex-row">
+      <aside className="w-full space-y-6 print:hidden md:w-60 md:shrink-0">
         <div className="rounded-2xl border border-edge/10 bg-surface p-4">
           <label className="mb-2 block text-xs font-medium text-ink/60">Ir a fecha</label>
           <input
             type="date"
-            value={toISODate(vista === "dia" ? diaSeleccionado : vista === "mes" ? mesActual : weekStart)}
+            value={toISODate(
+              vista === "dia" || vista === "3dias" ? diaSeleccionado : vista === "mes" ? mesActual : weekStart
+            )}
             onChange={(e) => {
               const d = new Date(`${e.target.value}T00:00:00`);
               setWeekStart(getMonday(d));
@@ -1036,6 +1040,14 @@ export default function Agenda() {
                 Semana
               </button>
               <button
+                onClick={() => setVista("3dias")}
+                className={`rounded-md px-3 py-1 text-xs font-semibold transition-colors ${
+                  vista === "3dias" ? "bg-accent/15 text-accent" : "text-ink/50"
+                }`}
+              >
+                3 días
+              </button>
+              <button
                 onClick={() => setVista("dia")}
                 className={`rounded-md px-3 py-1 text-xs font-semibold transition-colors ${
                   vista === "dia" ? "bg-accent/15 text-accent" : "text-ink/50"
@@ -1056,9 +1068,11 @@ export default function Agenda() {
               onClick={() =>
                 vista === "dia"
                   ? setDiaSeleccionado((d) => addDays(d, -1))
-                  : vista === "mes"
-                    ? setMesActual((m) => new Date(m.getFullYear(), m.getMonth() - 1, 1))
-                    : setWeekStart((w) => addDays(w, -7))
+                  : vista === "3dias"
+                    ? setDiaSeleccionado((d) => addDays(d, -3))
+                    : vista === "mes"
+                      ? setMesActual((m) => new Date(m.getFullYear(), m.getMonth() - 1, 1))
+                      : setWeekStart((w) => addDays(w, -7))
               }
               className="flex h-7 w-7 items-center justify-center rounded-lg border border-edge/10 text-ink/60 hover:bg-surface"
             >
@@ -1068,9 +1082,11 @@ export default function Agenda() {
               onClick={() =>
                 vista === "dia"
                   ? setDiaSeleccionado((d) => addDays(d, 1))
-                  : vista === "mes"
-                    ? setMesActual((m) => new Date(m.getFullYear(), m.getMonth() + 1, 1))
-                    : setWeekStart((w) => addDays(w, 7))
+                  : vista === "3dias"
+                    ? setDiaSeleccionado((d) => addDays(d, 3))
+                    : vista === "mes"
+                      ? setMesActual((m) => new Date(m.getFullYear(), m.getMonth() + 1, 1))
+                      : setWeekStart((w) => addDays(w, 7))
               }
               className="flex h-7 w-7 items-center justify-center rounded-lg border border-edge/10 text-ink/60 hover:bg-surface"
             >
@@ -1082,9 +1098,11 @@ export default function Agenda() {
         <h2 className="text-lg font-semibold text-ink">
           {vista === "dia"
             ? `${DIAS_SEMANA[(diaSeleccionado.getDay() + 6) % 7]} ${diaSeleccionado.getDate()} de ${MESES[diaSeleccionado.getMonth()]} de ${diaSeleccionado.getFullYear()}`
-            : vista === "mes"
-              ? `${MESES[mesActual.getMonth()].charAt(0).toUpperCase()}${MESES[mesActual.getMonth()].slice(1)} de ${mesActual.getFullYear()}`
-              : formatRangeLabel(weekStart)}
+            : vista === "3dias"
+              ? formatRangeLabel(diaSeleccionado, addDays(diaSeleccionado, 2))
+              : vista === "mes"
+                ? `${MESES[mesActual.getMonth()].charAt(0).toUpperCase()}${MESES[mesActual.getMonth()].slice(1)} de ${mesActual.getFullYear()}`
+                : formatRangeLabel(weekStart, addDays(weekStart, 6))}
         </h2>
 
         {vista === "mes" && (
@@ -1156,7 +1174,7 @@ export default function Agenda() {
 
         {vista !== "mes" && (
         <div className="overflow-x-auto rounded-2xl border border-edge/10 bg-surface">
-          <div className="flex min-w-[640px]">
+          <div className="flex" style={{ minWidth: minGridWidth }}>
             <div className="w-14 shrink-0 border-r border-edge/10">
               <div className="h-12 border-b border-edge/10" />
               {Array.from({ length: HOUR_END - HOUR_START }, (_, i) => HOUR_START + i).map((h) => (
