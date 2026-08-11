@@ -8,6 +8,7 @@ import Agenda from "./pages/Agenda";
 import Recetas from "./pages/Recetas";
 import PerfilDoctor from "./pages/PerfilDoctor";
 import Colaboradores from "./pages/Colaboradores";
+import Metas from "./pages/Metas";
 import Planes from "./pages/Planes";
 import GlobalAgregarPago from "./GlobalAgregarPago";
 import { PatientDataProvider, usePatientData } from "@/context/PatientDataContext";
@@ -192,6 +193,7 @@ export default function Dashboard({
           {activePage === "recetas" && <Recetas />}
           {activePage === "administracion-perfil" && <PerfilDoctor />}
           {activePage === "administracion-colaboradores" && <Colaboradores />}
+          {activePage === "administracion-metas" && <Metas />}
           {activePage === "planes" && <Planes />}
         </div>
       </main>

@@ -163,6 +163,7 @@ export const navItems = [
       { id: "administracion-promociones", label: "Promociones" },
       { id: "administracion-formatos-whatsapp", label: "Formatos WhatsApp" },
       { id: "administracion-catalogos", label: "Catálogos" },
+      { id: "administracion-metas", label: "Metas" },
       { id: "administracion-perfil", label: "Perfil del Doctor" },
       { id: "administracion-colaboradores", label: "Colaboradores" },
     ],

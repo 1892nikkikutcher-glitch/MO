@@ -1,7 +1,8 @@
 "use client";
 
 import { usePatientData } from "@/context/PatientDataContext";
-import { calcularEdadDetallada } from "@/lib/patientData";
+import { calcularEdadDetallada, formatCurrency } from "@/lib/patientData";
+import { calcularAvanceMetas } from "@/lib/metas";
 
 const MESES = [
   "enero", "febrero", "marzo", "abril", "mayo", "junio",
@@ -36,13 +37,9 @@ const genderData = [
 const averageAge = 34;
 
 const kpis = [
-  { label: "Corte Diario", value: "$3,200", color: "#f59e0b", financiero: true },
-  { label: "Corte Semanal", value: "$16,850", color: "#ec4899", financiero: true },
-  { label: "Corte Mensual", value: "$48,900", color: "#22c55e", financiero: true },
   { label: "Ticket Promedio", value: "$820", color: "#f59e0b", financiero: true },
   { label: "Saldo Pendiente", value: "$6,500", color: "#dc2626", financiero: true },
   { label: "Nuevos Pacientes (Mes)", value: "12", color: "#ec4899", financiero: false },
-  { label: "Total de Expedientes", value: "348", color: "#3b82f6", financiero: false },
   { label: "Citas por Mes", value: "96", color: "#3b82f6", financiero: false },
   { label: "Citas Atendidas", value: "81", color: "#22c55e", financiero: false },
   { label: "Laboratorios Pendientes", value: "7", color: "#f59e0b", financiero: false },
@@ -125,10 +122,17 @@ function CardShell({ title, children }: { title: string; children: React.ReactNo
 }
 
 export default function Inicio() {
-  const { puedeVerFinanzas, patients } = usePatientData();
+  const { puedeVerFinanzas, patients, finanzas, metas } = usePatientData();
   const kpisVisibles = kpis.filter((kpi) => puedeVerFinanzas || !kpi.financiero);
 
   const hoy = new Date();
+  const hoyISO = `${hoy.getFullYear()}-${String(hoy.getMonth() + 1).padStart(2, "0")}-${String(
+    hoy.getDate()
+  ).padStart(2, "0")}`;
+  const avanceMetas = calcularAvanceMetas(finanzas.porFecha, metas.metaMensual);
+  const corteDiario = finanzas.porFecha[hoyISO] ?? 0;
+  const corteSemanal = avanceMetas.find((a) => a.label === "Semanal")?.actual ?? 0;
+  const corteMensual = avanceMetas.find((a) => a.label === "Mensual")?.actual ?? 0;
   const cumpleanerosDelMes = patients
     .filter((p) => p.birthDate)
     .map((p) => {
@@ -149,6 +153,38 @@ export default function Inicio() {
   return (
     <div className="space-y-6">
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-6">
+        {puedeVerFinanzas && (
+          <>
+            <div
+              className="rounded-xl border border-edge/10 bg-surface p-4"
+              style={{ boxShadow: "inset 3px 0 0 0 #f59e0b" }}
+            >
+              <div className="text-xl font-bold text-ink">{formatCurrency(corteDiario)}</div>
+              <div className="mt-1 text-[11px] uppercase tracking-wide text-ink/40">Corte Diario</div>
+            </div>
+            <div
+              className="rounded-xl border border-edge/10 bg-surface p-4"
+              style={{ boxShadow: "inset 3px 0 0 0 #ec4899" }}
+            >
+              <div className="text-xl font-bold text-ink">{formatCurrency(corteSemanal)}</div>
+              <div className="mt-1 text-[11px] uppercase tracking-wide text-ink/40">Corte Semanal</div>
+            </div>
+            <div
+              className="rounded-xl border border-edge/10 bg-surface p-4"
+              style={{ boxShadow: "inset 3px 0 0 0 #22c55e" }}
+            >
+              <div className="text-xl font-bold text-ink">{formatCurrency(corteMensual)}</div>
+              <div className="mt-1 text-[11px] uppercase tracking-wide text-ink/40">Corte Mensual</div>
+            </div>
+          </>
+        )}
+        <div
+          className="rounded-xl border border-edge/10 bg-surface p-4"
+          style={{ boxShadow: "inset 3px 0 0 0 #3b82f6" }}
+        >
+          <div className="text-xl font-bold text-ink">{patients.length}</div>
+          <div className="mt-1 text-[11px] uppercase tracking-wide text-ink/40">Total de Expedientes</div>
+        </div>
         {kpisVisibles.map((kpi) => (
           <div
             key={kpi.label}
@@ -169,6 +205,36 @@ export default function Inicio() {
           </div>
         </div>
       </div>
+
+      {puedeVerFinanzas && (
+        <CardShell title="Metas">
+          {metas.metaMensual <= 0 ? (
+            <p className="text-sm text-ink/40">
+              Aún no configuras tu meta mensual. Ve a Administración → Metas para definirla.
+            </p>
+          ) : (
+            <div className="space-y-4">
+              {avanceMetas.map((a) => (
+                <div key={a.label}>
+                  <div className="mb-1.5 flex items-center justify-between text-sm">
+                    <span className="font-medium text-ink">Meta {a.label}</span>
+                    <span className="text-ink/50">
+                      {formatCurrency(Math.round(a.actual))} / {formatCurrency(Math.round(a.meta))}{" "}
+                      <span className="font-semibold text-accent">· {a.porcentaje}%</span>
+                    </span>
+                  </div>
+                  <div className="h-2.5 w-full overflow-hidden rounded-full bg-inset">
+                    <div
+                      className="h-full rounded-full bg-gradient-to-r from-accent to-orange-500 transition-all"
+                      style={{ width: `${a.porcentaje}%` }}
+                    />
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </CardShell>
+      )}
 
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
         <CardShell title="Tipos de Paciente">

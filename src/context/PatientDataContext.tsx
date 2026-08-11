@@ -39,6 +39,13 @@ import {
   type SuscripcionPlan,
   type CitaAgenda,
 } from "@/lib/patientData";
+import {
+  metaConfigInicial,
+  finanzasInicial,
+  fechaPagoAIso,
+  type MetaConfig,
+  type FinanzasConfig,
+} from "@/lib/metas";
 
 type Updater<T> = T | ((prev: T) => T);
 
@@ -322,6 +329,9 @@ type PatientDataContextValue = {
   setPerfilDoctor: (updater: Updater<PerfilDoctor>) => void;
   suscripcion: SuscripcionPlan;
   setSuscripcion: (updater: Updater<SuscripcionPlan>) => void;
+  metas: MetaConfig;
+  setMetas: (updater: Updater<MetaConfig>) => void;
+  finanzas: FinanzasConfig;
   cargarDatosPaciente: (patientId: string) => void;
   navegacionExpediente: NavegacionExpediente;
   irAExpediente: (patientId: string, tab?: string) => void;
@@ -376,6 +386,8 @@ export function PatientDataProvider({
     "suscripcion",
     suscripcionInicial
   );
+  const [metas, setMetas] = useFirestoreDoc<MetaConfig>(clinicUid, "metas", metaConfigInicial);
+  const [finanzas, setFinanzas] = useFirestoreDoc<FinanzasConfig>(clinicUid, "finanzas", finanzasInicial);
 
   const [presupuestosPorPaciente, setPresupuestosPorPacienteState] = useState<
     Record<string, SavedBudget[]>
@@ -502,14 +514,41 @@ export function PatientDataProvider({
     });
   };
 
+  /** Refleja en `config/finanzas` el neto por fecha (alta, edición o baja de
+   * un pago) para que el KPI de Metas se calcule con ingresos reales de toda
+   * la clínica, sin depender de tener cada expediente de paciente cargado. */
+  const registrarDeltaFinanzas = (prevArr: Pago[], next: Pago[]) => {
+    const conIso = (arr: Pago[]) =>
+      arr.map((p) => ({ ...p, _iso: fechaPagoAIso(p.fecha) })).filter((p) => p._iso);
+    const prevConIso = conIso(prevArr);
+    const nextConIso = conIso(next);
+    const fechas = new Set([...prevConIso, ...nextConIso].map((p) => p._iso as string));
+    if (fechas.size === 0) return;
+    setFinanzas((prevFin) => {
+      const porFecha = { ...prevFin.porFecha };
+      fechas.forEach((iso) => {
+        const sumPrev = prevConIso.filter((p) => p._iso === iso).reduce((s, p) => s + p.total, 0);
+        const sumNext = nextConIso.filter((p) => p._iso === iso).reduce((s, p) => s + p.total, 0);
+        const delta = sumNext - sumPrev;
+        if (delta !== 0) porFecha[iso] = (porFecha[iso] ?? 0) + delta;
+      });
+      return { porFecha };
+    });
+  };
+
+  /** OJO: prevArr/next y los efectos secundarios (Firestore + delta de
+   * finanzas) se calculan aquí afuera, no dentro del updater de
+   * setPagosPorPacienteState — en React 18 Strict Mode (solo en desarrollo)
+   * los updaters funcionales se invocan dos veces, y como el delta de
+   * finanzas es acumulativo (no una sobreescritura idempotente como
+   * syncFirestoreList), duplicarlo inflaría el ingreso registrado. */
   const setPagosPaciente = (patientId: string, updater: Updater<Pago[]>) => {
     if (!clinicUid) return;
-    setPagosPorPacienteState((prev) => {
-      const prevArr = prev[patientId] ?? [];
-      const next = resolveUpdater(updater, prevArr);
-      syncFirestoreList(`users/${clinicUid}/pacientes/${patientId}/pagos`, prevArr, next);
-      return { ...prev, [patientId]: next };
-    });
+    const prevArr = pagosPorPaciente[patientId] ?? [];
+    const next = resolveUpdater(updater, prevArr);
+    syncFirestoreList(`users/${clinicUid}/pacientes/${patientId}/pagos`, prevArr, next);
+    registrarDeltaFinanzas(prevArr, next);
+    setPagosPorPacienteState((prev) => ({ ...prev, [patientId]: next }));
   };
 
   const setRecetasPaciente = (patientId: string, updater: Updater<Receta[]>) => {
@@ -580,6 +619,9 @@ export function PatientDataProvider({
         setPerfilDoctor,
         suscripcion,
         setSuscripcion,
+        metas,
+        setMetas,
+        finanzas,
         cargarDatosPaciente,
         navegacionExpediente,
         irAExpediente,
