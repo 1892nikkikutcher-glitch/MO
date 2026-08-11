@@ -850,6 +850,33 @@ export default function Agenda() {
     setDialogState({ initial: cita, isEditing: true });
   };
 
+  /** Arma la agenda del día en texto (respeta los médicos/unidades ocultos
+   * en el filtro de Recursos, para poder mandar la agenda de uno solo) y
+   * abre WhatsApp para elegir a quién enviarla — el grupo de la clínica o
+   * el médico correspondiente. */
+  const enviarAgendaDelDia = (dia: Date) => {
+    const fechaISO = toISODate(dia);
+    const citasDelDia = citasVisibles
+      .filter((c) => c.fecha === fechaISO && c.estatus !== "Cancelada")
+      .sort((a, b) => timeToMinutes(a.horaInicio) - timeToMinutes(b.horaInicio));
+
+    const tituloDia = `${DIAS_SEMANA[(dia.getDay() + 6) % 7].replace(".", "").toUpperCase()} ${dia.getDate()} DE ${MESES[dia.getMonth()].toUpperCase()}`;
+    const lineas = [`AGENDA ${tituloDia}.`, ""];
+
+    if (citasDelDia.length === 0) {
+      lineas.push("Sin citas agendadas.");
+    } else {
+      citasDelDia.forEach((c) => {
+        const emoji = c.estatus === "Confirmada" || c.estatus === "Atendida" ? "🟢" : c.estatus === "En espera" ? "🟡" : "🔴";
+        lineas.push(`${emoji} ${c.horaInicio}-${c.horaFin} ${c.paciente}`);
+        if (c.tratamientos?.length) lineas.push(c.tratamientos.join(", "));
+        lineas.push("");
+      });
+    }
+
+    window.open(`https://wa.me/?text=${encodeURIComponent(lineas.join("\n").trimEnd())}`, "_blank");
+  };
+
   const [draggingId, setDraggingId] = useState<string | null>(null);
   const [dragOverDay, setDragOverDay] = useState<string | null>(null);
   const dragGrabOffsetRef = useRef(0);
@@ -1195,12 +1222,30 @@ export default function Agenda() {
               return (
                 <div key={toISODate(dia)} className="min-w-[130px] flex-1 border-r border-edge/10 last:border-r-0">
                   <div
-                    className={`flex h-12 flex-col items-center justify-center border-b border-edge/10 text-xs ${
+                    className={`relative flex h-12 flex-col items-center justify-center border-b border-edge/10 text-xs ${
                       esHoy ? "bg-accent/10 text-accent" : "text-ink/60"
                     }`}
                   >
                     <span className="uppercase">{DIAS_SEMANA[(dia.getDay() + 6) % 7]}</span>
                     <span className="font-semibold">{dia.getDate()}</span>
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        enviarAgendaDelDia(dia);
+                      }}
+                      title="Enviar agenda del día por WhatsApp (al grupo de la clínica o al médico)"
+                      className="absolute right-1 top-1 flex h-5 w-5 items-center justify-center rounded-full text-success/70 transition-colors hover:bg-success/15 hover:text-success"
+                    >
+                      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" className="shrink-0">
+                        <path
+                          d="M3 21l1.4-4.2A8.5 8.5 0 1 1 8.3 20.5L3 21ZM8.5 8.3c.2-.5.4-.5.6-.5h.5c.2 0 .4 0 .5.3.2.4.6 1.4.7 1.5.1.1.1.3 0 .4-.1.2-.2.3-.3.4-.2.2-.3.3-.1.6.7 1.1 1.4 1.7 2.5 2.3.2.1.3.1.4-.1.2-.2.5-.6.7-.8.1-.2.3-.2.5-.1.5.2 1.3.6 1.5.7.2.1.3.1.4.3.1.2.1.9-.2 1.4-.3.5-1.1.9-1.6 1-.5 0-1.1.1-3.4-.9-2.4-1.1-3.9-3.5-4.1-3.7-.1-.2-1-1.3-1-2.5s.6-1.7.8-2Z"
+                          stroke="currentColor"
+                          strokeWidth="1.4"
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                        />
+                      </svg>
+                    </button>
                   </div>
                   <div
                     className={`relative cursor-pointer transition-colors ${
