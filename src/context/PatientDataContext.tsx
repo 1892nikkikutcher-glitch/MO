@@ -46,6 +46,7 @@ import {
   type MetaConfig,
   type FinanzasConfig,
 } from "@/lib/metas";
+import { formatosWhatsAppInicial, type FormatosWhatsApp } from "@/lib/formatosWhatsapp";
 
 type Updater<T> = T | ((prev: T) => T);
 
@@ -332,6 +333,8 @@ type PatientDataContextValue = {
   metas: MetaConfig;
   setMetas: (updater: Updater<MetaConfig>) => void;
   finanzas: FinanzasConfig;
+  formatosWhatsapp: FormatosWhatsApp;
+  setFormatosWhatsapp: (updater: Updater<FormatosWhatsApp>) => void;
   cargarDatosPaciente: (patientId: string) => void;
   navegacionExpediente: NavegacionExpediente;
   irAExpediente: (patientId: string, tab?: string) => void;
@@ -388,6 +391,11 @@ export function PatientDataProvider({
   );
   const [metas, setMetas] = useFirestoreDoc<MetaConfig>(clinicUid, "metas", metaConfigInicial);
   const [finanzas, setFinanzas] = useFirestoreDoc<FinanzasConfig>(clinicUid, "finanzas", finanzasInicial);
+  const [formatosWhatsapp, setFormatosWhatsapp] = useFirestoreDoc<FormatosWhatsApp>(
+    clinicUid,
+    "formatosWhatsapp",
+    formatosWhatsAppInicial
+  );
 
   const [presupuestosPorPaciente, setPresupuestosPorPacienteState] = useState<
     Record<string, SavedBudget[]>
@@ -622,6 +630,8 @@ export function PatientDataProvider({
         metas,
         setMetas,
         finanzas,
+        formatosWhatsapp,
+        setFormatosWhatsapp,
         cargarDatosPaciente,
         navegacionExpediente,
         irAExpediente,

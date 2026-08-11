@@ -9,6 +9,7 @@ import {
   type FrecuenciaRecurrencia,
   type Recurso,
 } from "@/lib/patientData";
+import { renderPlantilla, formatFechaLarga, formatHora12 } from "@/lib/formatosWhatsapp";
 
 const HOUR_START = 8;
 const HOUR_END = 20;
@@ -129,6 +130,20 @@ function IconNotas() {
         strokeLinejoin="round"
       />
       <path d="M8 9h8M8 13h5" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
+    </svg>
+  );
+}
+
+function IconWhatsApp() {
+  return (
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" className="shrink-0">
+      <path
+        d="M3 21l1.4-4.2A8.5 8.5 0 1 1 8.3 20.5L3 21ZM8.5 8.3c.2-.5.4-.5.6-.5h.5c.2 0 .4 0 .5.3.2.4.6 1.4.7 1.5.1.1.1.3 0 .4-.1.2-.2.3-.3.4-.2.2-.3.3-.1.6.7 1.1 1.4 1.7 2.5 2.3.2.1.3.1.4-.1.2-.2.5-.6.7-.8.1-.2.3-.2.5-.1.5.2 1.3.6 1.5.7.2.1.3.1.4.3.1.2.1.9-.2 1.4-.3.5-1.1.9-1.6 1-.5 0-1.1.1-3.4-.9-2.4-1.1-3.9-3.5-4.1-3.7-.1-.2-1-1.3-1-2.5s.6-1.7.8-2Z"
+        stroke="currentColor"
+        strokeWidth="1.4"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
     </svg>
   );
 }
@@ -267,7 +282,8 @@ function CitaDialog({
   onSave: (citas: CitaAgenda[]) => void;
   onDelete?: () => void;
 }) {
-  const { patients, addPatient, updatePatient, irAExpediente } = usePatientData();
+  const { patients, addPatient, updatePatient, irAExpediente, clinicInfo, formatosWhatsapp } =
+    usePatientData();
   const [recursoId, setRecursoId] = useState(initial.recursoId ?? recursos[0]?.id ?? "");
   const [patientId, setPatientId] = useState(initial.patientId ?? "");
   const [searchText, setSearchText] = useState(initial.paciente ?? "");
@@ -330,6 +346,25 @@ function CitaDialog({
     setTratamientos((prev) => prev.filter((_, i) => i !== idx));
   };
 
+  const nombrePacienteActual = patientId
+    ? patients.find((p) => p.id === patientId)?.name ?? searchText
+    : searchText.trim();
+
+  const enviarConfirmacion = () => {
+    const telefonoLimpio = telefono.replace(/\D/g, "");
+    if (!telefonoLimpio || !nombrePacienteActual || !fecha || !horaInicio) return;
+    const texto = renderPlantilla(formatosWhatsapp.confirmacionCita, {
+      clinica: clinicInfo?.nombre || "tu clínica",
+      paciente: nombrePacienteActual,
+      fecha: formatFechaLarga(fecha),
+      hora: formatHora12(horaInicio),
+    });
+    window.open(`https://wa.me/${telefonoLimpio}?text=${encodeURIComponent(texto)}`, "_blank");
+  };
+
+  const puedeEnviarConfirmacion =
+    telefono.replace(/\D/g, "").length > 0 && !!nombrePacienteActual && !!fecha && !!horaInicio;
+
   const handleGuardar = () => {
     if (!puedeGuardar) return;
     const nombrePaciente = patientId
@@ -385,12 +420,27 @@ function CitaDialog({
             </h2>
             <p className="text-xs text-ink/40">Folio: {initial.folio ?? folioRef}</p>
           </div>
-          <button
-            onClick={onClose}
-            className="flex h-7 w-7 items-center justify-center rounded-full text-ink/50 hover:bg-surface hover:text-ink"
-          >
-            ✕
-          </button>
+          <div className="flex items-center gap-1">
+            <button
+              type="button"
+              onClick={enviarConfirmacion}
+              disabled={!puedeEnviarConfirmacion}
+              title={
+                puedeEnviarConfirmacion
+                  ? "Enviar confirmación de cita por WhatsApp"
+                  : "Falta teléfono, paciente, fecha u hora para poder enviar"
+              }
+              className="flex h-7 w-7 items-center justify-center rounded-full text-success/80 transition-colors hover:bg-success/15 hover:text-success disabled:cursor-not-allowed disabled:opacity-30 disabled:hover:bg-transparent"
+            >
+              <IconWhatsApp />
+            </button>
+            <button
+              onClick={onClose}
+              className="flex h-7 w-7 items-center justify-center rounded-full text-ink/50 hover:bg-surface hover:text-ink"
+            >
+              ✕
+            </button>
+          </div>
         </div>
 
         <div className="space-y-4">
