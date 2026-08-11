@@ -118,7 +118,7 @@ export default function Home() {
   };
 
   if (checkingSession) {
-    return <main className="flex min-h-screen items-center justify-center bg-black" />;
+    return <main className="bg-app flex min-h-screen items-center justify-center" />;
   }
 
   if (user) {
@@ -137,7 +137,7 @@ export default function Home() {
   }
 
   return (
-    <main className="flex min-h-screen flex-col items-center justify-center px-4">
+    <main className="bg-app flex min-h-screen flex-col items-center justify-center px-4">
       <h1 className="bg-gradient-to-r from-red-600 to-blue-600 bg-clip-text text-8xl font-bold text-transparent">
         MO
       </h1>
@@ -146,7 +146,7 @@ export default function Home() {
       </p>
 
       <div
-        className="mt-12 w-full max-w-sm rounded-2xl border border-amber-400/40 bg-black p-8"
+        className="mt-12 w-full max-w-sm rounded-2xl border border-amber-400/40 bg-modal p-8"
         style={{
           boxShadow:
             "0 0 15px 2px rgba(251,146,60,0.55), 0 0 40px 10px rgba(251,146,60,0.3), 0 0 80px 20px rgba(251,146,60,0.12)",

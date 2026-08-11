@@ -3,11 +3,14 @@
 @tailwind utilities;
 
 :root {
-  --app: #000000;
-  --surface: #0d0d0d;
-  --surface2: #1a1a1a;
-  --field: #000000;
-  --inset: #050505;
+  /* Liquid glass — oscuro: paneles translúcidos con blur sobre un fondo
+     ambiental de resplandores azul/violeta, como vidrio esmerilado. */
+  --app: #05070e;
+  --surface: rgba(255, 255, 255, 0.055);
+  --surface2: rgba(255, 255, 255, 0.095);
+  --field: rgba(255, 255, 255, 0.06);
+  --inset: rgba(0, 0, 0, 0.32);
+  --modal: rgba(11, 14, 24, 0.74);
 
   --edge-rgb: 255 255 255;
   --ink-rgb: 255 255 255;
@@ -16,16 +19,21 @@
   --danger-rgb: 248 113 113;
   --info-rgb: 96 165 250;
 
-  --shadow-card: none;
+  --shadow-card: inset 0 1px 0 0 rgba(255, 255, 255, 0.07), 0 8px 30px -14px rgba(0, 0, 0, 0.65);
+  --shadow-modal: inset 0 1px 0 0 rgba(255, 255, 255, 0.09), 0 30px 70px -20px rgba(0, 0, 0, 0.75);
+  --glass-blur: 22px;
+  --glass-blur-modal: 28px;
 }
 
 [data-theme="light"] {
-  /* Gris Oxford + naranja Longhorn */
-  --app: #f2f1f4;
-  --surface: #ffffff;
-  --surface2: #eaeaef;
-  --field: #ffffff;
-  --inset: #edecf1;
+  /* Liquid glass — claro: mismo vidrio esmerilado, sobre gris Oxford con
+     resplandores suaves; naranja Longhorn como acento. */
+  --app: #eef1f7;
+  --surface: rgba(255, 255, 255, 0.58);
+  --surface2: rgba(255, 255, 255, 0.78);
+  --field: rgba(255, 255, 255, 0.62);
+  --inset: rgba(20, 23, 32, 0.05);
+  --modal: rgba(255, 255, 255, 0.8);
 
   --edge-rgb: 64 67 76;
   --ink-rgb: 28 29 34;
@@ -34,7 +42,10 @@
   --danger-rgb: 185 28 28;
   --info-rgb: 29 78 216;
 
-  --shadow-card: 0 1px 2px rgba(30, 31, 36, 0.04), 0 10px 24px -8px rgba(30, 31, 36, 0.14);
+  --shadow-card: inset 0 1px 0 0 rgba(255, 255, 255, 0.7), 0 10px 26px -10px rgba(30, 31, 36, 0.16);
+  --shadow-modal: inset 0 1px 0 0 rgba(255, 255, 255, 0.8), 0 30px 60px -18px rgba(30, 31, 36, 0.24);
+  --glass-blur: 20px;
+  --glass-blur-modal: 24px;
 }
 
 html,
@@ -45,8 +56,50 @@ body {
   background: var(--app);
 }
 
+/* Fondo ambiental: resplandores difusos detrás de los paneles de vidrio,
+   como las luces de ciudad desenfocadas de una foto nocturna. */
+.bg-app {
+  background-color: var(--app);
+  background-image:
+    radial-gradient(680px circle at 12% 18%, rgba(59, 130, 246, 0.20), transparent 60%),
+    radial-gradient(560px circle at 88% 12%, rgba(168, 85, 247, 0.16), transparent 58%),
+    radial-gradient(760px circle at 55% 105%, rgba(34, 211, 238, 0.12), transparent 62%);
+  background-attachment: fixed;
+}
+
+[data-theme="light"] .bg-app {
+  background-image:
+    radial-gradient(680px circle at 12% 18%, rgba(59, 130, 246, 0.10), transparent 60%),
+    radial-gradient(560px circle at 88% 12%, rgba(168, 85, 247, 0.08), transparent 58%),
+    radial-gradient(760px circle at 55% 105%, rgba(14, 165, 233, 0.07), transparent 62%);
+}
+
+/* Paneles de vidrio: blur + saturación + un brillo sutil arriba, simulando
+   la refracción de vidrio esmerilado. */
+.bg-surface,
+.bg-surface2,
+.bg-modal {
+  backdrop-filter: blur(var(--glass-blur)) saturate(160%);
+  -webkit-backdrop-filter: blur(var(--glass-blur)) saturate(160%);
+  background-image: linear-gradient(180deg, rgba(255, 255, 255, 0.07), rgba(255, 255, 255, 0) 45%);
+}
+
+.bg-modal {
+  backdrop-filter: blur(var(--glass-blur-modal)) saturate(160%);
+  -webkit-backdrop-filter: blur(var(--glass-blur-modal)) saturate(160%);
+}
+
 .bg-surface.rounded-2xl,
 .bg-surface.rounded-xl,
-.bg-surface.rounded-lg {
+.bg-surface.rounded-lg,
+.bg-surface2.rounded-2xl,
+.bg-surface2.rounded-xl,
+.bg-surface2.rounded-lg {
   box-shadow: var(--shadow-card);
+}
+
+.bg-modal.rounded-2xl,
+.bg-modal.rounded-xl,
+.bg-modal.rounded-lg {
+  box-shadow: var(--shadow-modal);
 }

@@ -406,7 +406,7 @@ export function AgregarPagoDialog({
   if (paso === "confirmacion" && pagoGuardado) {
     return (
       <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4 print:hidden">
-        <div className="w-full max-w-md rounded-2xl border border-edge/10 bg-[#0a0a0a] p-6">
+        <div className="w-full max-w-md rounded-2xl border border-edge/10 bg-modal p-6">
           <div className="flex items-center gap-2 text-success">
             <span className="flex h-8 w-8 items-center justify-center rounded-full bg-success/15 text-lg">
               ✓
@@ -438,7 +438,7 @@ export function AgregarPagoDialog({
   if (paso === "firma" && pagoGuardado) {
     return (
       <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4 print:hidden">
-        <div className="w-full max-w-md rounded-2xl border border-edge/10 bg-[#0a0a0a] p-6">
+        <div className="w-full max-w-md rounded-2xl border border-edge/10 bg-modal p-6">
           <h2 className="mb-4 text-lg font-semibold text-ink">Solicitar Firma</h2>
           <SignaturePad
             onCancel={() => setPaso("confirmacion")}
@@ -457,7 +457,7 @@ export function AgregarPagoDialog({
   if (paso === "recibo" && pagoGuardado) {
     return (
       <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4 print:bg-transparent">
-        <div className="w-full max-w-md rounded-2xl border border-edge/10 bg-[#0a0a0a] p-6 print:border-none print:bg-transparent print:p-0">
+        <div className="w-full max-w-md rounded-2xl border border-edge/10 bg-modal p-6 print:border-none print:bg-transparent print:p-0">
           <ReciboActions patientName={patientName} pago={pagoGuardado} onDone={onClose} />
         </div>
       </div>
@@ -466,7 +466,7 @@ export function AgregarPagoDialog({
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4">
-      <div className="max-h-[90vh] w-full max-w-lg overflow-y-auto rounded-2xl border border-edge/10 bg-[#0a0a0a] p-6">
+      <div className="max-h-[90vh] w-full max-w-lg overflow-y-auto rounded-2xl border border-edge/10 bg-modal p-6">
         <div className="mb-4 flex items-center justify-between">
           <h2 className="text-lg font-semibold text-ink">Agregar Pago</h2>
           <button

@@ -443,7 +443,7 @@ export default function Recetas() {
 
       {medicamentoParaConfirmar && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4 print:hidden">
-          <div className="w-full max-w-md rounded-2xl border border-edge/10 bg-[#0a0a0a] p-6">
+          <div className="w-full max-w-md rounded-2xl border border-edge/10 bg-modal p-6">
             <h3 className="text-base font-semibold text-ink">Medicamento para recetar</h3>
             <label className="mb-1 mt-4 block text-xs font-medium text-ink/60">Medicamento</label>
             <textarea

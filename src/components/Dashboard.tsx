@@ -30,7 +30,7 @@ function InvitePrompt() {
 
   return (
     <div className="fixed inset-0 z-[70] flex items-center justify-center bg-black/70 p-4">
-      <div className="w-full max-w-sm rounded-2xl border border-edge/10 bg-[#0a0a0a] p-6 text-center">
+      <div className="w-full max-w-sm rounded-2xl border border-edge/10 bg-modal p-6 text-center">
         <h3 className="text-base font-semibold text-ink">Invitación de clínica</h3>
         <p className="mt-2 text-sm text-ink/70">
           Te invitaron a colaborar en{" "}
