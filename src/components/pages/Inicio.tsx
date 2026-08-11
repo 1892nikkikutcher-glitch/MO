@@ -1,5 +1,7 @@
 "use client";
 
+import { usePatientData } from "@/context/PatientDataContext";
+
 const patientTypeData = [
   { label: "Primera vez", value: 24, color: "#3b82f6" },
   { label: "Subsecuentes", value: 58, color: "#f59e0b" },
@@ -14,18 +16,18 @@ const genderData = [
 const averageAge = 34;
 
 const kpis = [
-  { label: "Corte Diario", value: "$3,200", color: "#f59e0b" },
-  { label: "Corte Semanal", value: "$16,850", color: "#ec4899" },
-  { label: "Corte Mensual", value: "$48,900", color: "#22c55e" },
-  { label: "Ticket Promedio", value: "$820", color: "#f59e0b" },
-  { label: "Saldo Pendiente", value: "$6,500", color: "#dc2626" },
-  { label: "Nuevos Pacientes (Mes)", value: "12", color: "#ec4899" },
-  { label: "Total de Expedientes", value: "348", color: "#3b82f6" },
-  { label: "Citas por Mes", value: "96", color: "#3b82f6" },
-  { label: "Citas Atendidas", value: "81", color: "#22c55e" },
-  { label: "Laboratorios Pendientes", value: "7", color: "#f59e0b" },
-  { label: "Presupuestos Activos", value: "15", color: "#dc2626" },
-  { label: "Promedio Citas Reagendadas", value: "4", color: "#dc2626" },
+  { label: "Corte Diario", value: "$3,200", color: "#f59e0b", financiero: true },
+  { label: "Corte Semanal", value: "$16,850", color: "#ec4899", financiero: true },
+  { label: "Corte Mensual", value: "$48,900", color: "#22c55e", financiero: true },
+  { label: "Ticket Promedio", value: "$820", color: "#f59e0b", financiero: true },
+  { label: "Saldo Pendiente", value: "$6,500", color: "#dc2626", financiero: true },
+  { label: "Nuevos Pacientes (Mes)", value: "12", color: "#ec4899", financiero: false },
+  { label: "Total de Expedientes", value: "348", color: "#3b82f6", financiero: false },
+  { label: "Citas por Mes", value: "96", color: "#3b82f6", financiero: false },
+  { label: "Citas Atendidas", value: "81", color: "#22c55e", financiero: false },
+  { label: "Laboratorios Pendientes", value: "7", color: "#f59e0b", financiero: false },
+  { label: "Presupuestos Activos", value: "15", color: "#dc2626", financiero: false },
+  { label: "Promedio Citas Reagendadas", value: "4", color: "#dc2626", financiero: false },
 ];
 
 function DonutChart({
@@ -103,10 +105,13 @@ function CardShell({ title, children }: { title: string; children: React.ReactNo
 }
 
 export default function Inicio() {
+  const { puedeVerFinanzas } = usePatientData();
+  const kpisVisibles = kpis.filter((kpi) => puedeVerFinanzas || !kpi.financiero);
+
   return (
     <div className="space-y-6">
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-6">
-        {kpis.map((kpi) => (
+        {kpisVisibles.map((kpi) => (
           <div
             key={kpi.label}
             className="rounded-xl border border-edge/10 bg-surface p-4"

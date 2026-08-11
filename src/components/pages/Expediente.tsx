@@ -11,7 +11,14 @@ import ConsentimientoInformado from "./ConsentimientoInformado";
 import Laboratorios from "./Laboratorios";
 import NotasEvolucion from "./NotasEvolucion";
 import { usePatientData } from "@/context/PatientDataContext";
-import { formatCurrency, type Patient, type SavedBudget, type Pago } from "@/lib/patientData";
+import {
+  computeTratamientosPendientes,
+  formatCurrency,
+  type CitaAgenda,
+  type Patient,
+  type SavedBudget,
+  type Pago,
+} from "@/lib/patientData";
 
 const expedienteTabs = [
   "Presupuestos",
@@ -42,6 +49,52 @@ function buildWhatsAppMessage(patientName: string, budget: SavedBudget) {
     `Total: ${formatCurrency(budget.total)}`,
   ].filter(Boolean);
   return lineas.join("\n");
+}
+
+function buildResumenExpediente(
+  patient: Patient,
+  edad: number | null,
+  formatDate: (date: string) => string,
+  presupuestos: SavedBudget[],
+  pagos: Pago[],
+  citasFuturas: CitaAgenda[],
+  puedeVerFinanzas: boolean
+) {
+  const tratamientosPendientes = computeTratamientosPendientes(presupuestos, pagos);
+  const lineas = [
+    `Resumen de expediente — ${patient.name}`,
+    edad !== null ? `Edad: ${edad} años` : "",
+    patient.birthDate ? `Fecha de nacimiento: ${formatDate(patient.birthDate)}` : "",
+    "",
+  ];
+
+  if (citasFuturas.length > 0) {
+    lineas.push("Próximas citas:");
+    citasFuturas.forEach((c) =>
+      lineas.push(
+        `- ${c.fecha} ${c.horaInicio}${c.tratamientos?.length ? ` · ${c.tratamientos.join(", ")}` : ""}`
+      )
+    );
+    lineas.push("");
+  }
+
+  if (puedeVerFinanzas) {
+    if (tratamientosPendientes.length > 0) {
+      lineas.push("Tratamientos pendientes de pago:");
+      tratamientosPendientes.forEach((t) => lineas.push(`- ${t.label}: ${formatCurrency(t.pendiente)}`));
+      lineas.push("");
+    }
+    if (presupuestos.length > 0) {
+      lineas.push(`Presupuestos registrados: ${presupuestos.length}`);
+    }
+    if (pagos.length > 0) {
+      const totalPagado = pagos.reduce((sum, p) => sum + p.total, 0);
+      lineas.push(`Total pagado a la fecha: ${formatCurrency(totalPagado)}`);
+    }
+  }
+  lineas.push("", "Este resumen es informativo. Para dudas, contáctanos.");
+
+  return lineas.filter((l, i) => l !== "" || lineas[i - 1] !== "").join("\n");
 }
 
 function PrinterIcon() {
@@ -330,6 +383,8 @@ export default function Expediente({
     pagosPorPaciente,
     setPagosPaciente,
     cargarDatosPaciente,
+    citas,
+    puedeVerFinanzas,
   } = usePatientData();
 
   useEffect(() => {
@@ -345,12 +400,36 @@ export default function Expediente({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [initialTab]);
 
+  useEffect(() => {
+    if (activeTab === "Pagos" && !puedeVerFinanzas) setActiveTab(expedienteTabs[0]);
+  }, [activeTab, puedeVerFinanzas]);
+
   const presupuestos = presupuestosPorPaciente[patient.id] ?? [];
   const setPresupuestos: Dispatch<SetStateAction<SavedBudget[]>> = (updater) =>
     setPresupuestosPaciente(patient.id, updater);
   const pagos = pagosPorPaciente[patient.id] ?? [];
   const setPagos: Dispatch<SetStateAction<Pago[]>> = (updater) =>
     setPagosPaciente(patient.id, updater);
+
+  const hoyISO = new Date().toISOString().slice(0, 10);
+  const citasFuturas = citas
+    .filter((c) => c.patientId === patient.id && c.fecha >= hoyISO)
+    .sort((a, b) => a.fecha.localeCompare(b.fecha) || a.horaInicio.localeCompare(b.horaInicio));
+
+  const enviarResumen = () => {
+    const edad = calculateAge(patient.birthDate);
+    const texto = buildResumenExpediente(
+      patient,
+      edad,
+      formatDate,
+      presupuestos,
+      pagos,
+      citasFuturas,
+      puedeVerFinanzas
+    );
+    const telefono = patient.phone.replace(/\D/g, "");
+    window.open(`https://wa.me/${telefono}?text=${encodeURIComponent(texto)}`, "_blank");
+  };
 
   return (
     <div className="space-y-6">
@@ -368,17 +447,27 @@ export default function Expediente({
         >
           {initials}
         </div>
-        <div>
+        <div className="flex-1">
           <h2 className="text-xl font-semibold text-ink">{patient.name}</h2>
           <p className="mt-1 text-sm text-ink/50">
             {patient.phone} · {formatDate(patient.birthDate)}
             {calculateAge(patient.birthDate) !== null && ` · ${calculateAge(patient.birthDate)} años`}
           </p>
         </div>
+        <button
+          onClick={enviarResumen}
+          title="Enviar resumen del expediente al paciente por WhatsApp"
+          className="flex items-center gap-2 rounded-lg border border-success/40 px-3 py-2 text-xs font-semibold text-success transition-colors hover:bg-success/10"
+        >
+          <WhatsAppIcon />
+          Enviar resumen al paciente
+        </button>
       </div>
 
       <div className="flex flex-wrap gap-2 border-b border-edge/10 pb-4 print:hidden">
-        {expedienteTabs.map((tab) => (
+        {expedienteTabs
+          .filter((tab) => tab !== "Pagos" || puedeVerFinanzas)
+          .map((tab) => (
           <button
             key={tab}
             onClick={() => setActiveTab(tab)}

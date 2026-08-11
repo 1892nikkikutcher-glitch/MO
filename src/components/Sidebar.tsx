@@ -151,6 +151,21 @@ export const navItems = [
         strokeLinejoin="round"
       />
     ),
+    children: [
+      { id: "administracion-procedimientos", label: "Procedimientos" },
+      { id: "administracion-personal", label: "Personal" },
+      { id: "administracion-historial-clinico", label: "Historial Clínico" },
+      { id: "administracion-borrar-citas", label: "Borrar citas" },
+      { id: "administracion-consultorio", label: "Consultorio" },
+      { id: "administracion-comisiones", label: "Comisiones" },
+      { id: "administracion-medicos-pacientes", label: "Médicos vs pacientes" },
+      { id: "administracion-medicamentos", label: "Medicamentos" },
+      { id: "administracion-promociones", label: "Promociones" },
+      { id: "administracion-formatos-whatsapp", label: "Formatos WhatsApp" },
+      { id: "administracion-catalogos", label: "Catálogos" },
+      { id: "administracion-perfil", label: "Perfil del Doctor" },
+      { id: "administracion-colaboradores", label: "Colaboradores" },
+    ],
   },
   {
     id: "asistencia",
@@ -184,6 +199,19 @@ export const navItems = [
     icon: (
       <path
         d="M17 10V7a5 5 0 0 0-10 0v3M5 10h14a1 1 0 0 1 1 1v9a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1v-9a1 1 0 0 1 1-1ZM12 15v3"
+        stroke="currentColor"
+        strokeWidth="1.8"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+    ),
+  },
+  {
+    id: "planes",
+    label: "Planes",
+    icon: (
+      <path
+        d="M4 4h16v16H4V4ZM8 9h8M8 13h8M8 17h4"
         stroke="currentColor"
         strokeWidth="1.8"
         strokeLinecap="round"

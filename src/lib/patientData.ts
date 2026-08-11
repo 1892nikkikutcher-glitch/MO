@@ -82,6 +82,116 @@ export type Receta = {
   notas: string;
 };
 
+export type HorarioAtencion = {
+  apertura: string;
+  comidaInicio: string;
+  comidaFin: string;
+  cierre: string;
+};
+
+export const horarioInicial: HorarioAtencion = {
+  apertura: "09:00",
+  comidaInicio: "14:00",
+  comidaFin: "15:00",
+  cierre: "19:00",
+};
+
+export type PerfilDoctor = {
+  nombre: string;
+  cedulaProfesional: string;
+  especialidad: string;
+  correo: string;
+  telefono: string;
+};
+
+export const perfilDoctorInicial: PerfilDoctor = {
+  nombre: "",
+  cedulaProfesional: "",
+  especialidad: "",
+  correo: "",
+  telefono: "",
+};
+
+export type PlanId = "prueba" | "consultorio" | "clinicas";
+
+export const DURACION_PRUEBA_DIAS = 14;
+
+export const planesDisponibles: {
+  id: PlanId;
+  nombre: string;
+  precio: string;
+  unidades: string;
+  caracteristicas: string[];
+}[] = [
+  {
+    id: "prueba",
+    nombre: "Prueba (14 días)",
+    precio: "Gratis",
+    unidades: "1 unidad",
+    caracteristicas: [
+      "Acceso completo durante 14 días",
+      "Te ayudamos a subir tu consulta",
+      "Suficiente para ver el cambio antes de decidir",
+    ],
+  },
+  {
+    id: "consultorio",
+    nombre: "Consultorio",
+    precio: "$280 cada 4 semanas",
+    unidades: "Hasta 2 unidades",
+    caracteristicas: [
+      "Hasta 2 unidades / consultorios",
+      "Colaboradores (cupo y puestos por definir)",
+    ],
+  },
+  {
+    id: "clinicas",
+    nombre: "Clínicas",
+    precio: "$840 cada 4 semanas",
+    unidades: "3 unidades o más",
+    caracteristicas: [
+      "3 unidades o más",
+      "Colaboradores (cupo y puestos por definir)",
+      "Ej. exige un odontólogo con horario específico por unidad",
+    ],
+  },
+];
+
+export type SuscripcionPlan = {
+  planActivo: PlanId;
+  /** Fecha ISO (YYYY-MM-DD) en que arrancó el periodo de prueba de esta clínica. */
+  pruebaIniciadaEl: string;
+};
+
+export type RolClinica = "admin" | "colaborador";
+
+/** Documento `clinics/{clinicId}` — clinicId es el uid del dueño. */
+export type ClinicInfo = {
+  ownerId: string;
+  nombre: string;
+};
+
+/** Documento `clinicMembers/{clinicId}_{uid}`. Campo `role` en inglés para
+ * compatibilidad con la colección compartida de sonrie-x-todos-dental. */
+export type ClinicMember = {
+  clinicId: string;
+  uid: string;
+  nombre: string;
+  correo: string;
+  role: RolClinica;
+  status: "active";
+};
+
+/** Documento `clinicInvites/{clinicId}_{correo}` — pendiente hasta que se reclama. */
+export type ClinicInvite = {
+  clinicId: string;
+  nombreClinica: string;
+  email: string;
+  nombre: string;
+  role: RolClinica;
+  status: "pending" | "claimed";
+};
+
 export type TipoRecurso = "medico" | "unidad";
 
 export type Recurso = {

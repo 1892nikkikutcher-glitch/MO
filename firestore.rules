@@ -6,15 +6,170 @@ service cloud.firestore {
       return request.auth != null;
     }
 
-    // Silo por usuario: cada cuenta lee/escribe únicamente sus propios datos
-    // (pacientes, recursos, citas, presupuestos, pagos), igual que en
-    // sonrie-x-todos-dental.
+    // ACCESO TOTAL AL SILO DEL USUARIO (arquitectura actual, sin cambios)
+    // Esta regla otorga permisos absolutos de lectura y escritura al dueño de la cuenta
+    // en todas las profundidades de sus colecciones. Se conserva intacta: todos los
+    // módulos existentes (agenda, expediente, odontograma, presupuestos, pagos, etc.)
+    // siguen dependiendo de ella hasta que se migren a la capa multi-clínica.
     match /users/{userId}/{allPaths=**} {
       allow read, write: if signedIn() && request.auth.uid == userId;
     }
 
+    // Acceso al documento raíz del usuario
     match /users/{userId} {
       allow read, write: if signedIn() && request.auth.uid == userId;
+    }
+
+    // ============================================================
+    // CAPA MULTI-CLÍNICA (Fase 4, incremento 1 — sonrie-x-todos-dental)
+    // ============================================================
+
+    function memberDoc(clinicId) {
+      return get(/databases/$(database)/documents/clinicMembers/$(clinicId + '_' + request.auth.uid));
+    }
+    function isActiveMember(clinicId) {
+      return signedIn()
+        && exists(/databases/$(database)/documents/clinicMembers/$(clinicId + '_' + request.auth.uid))
+        && memberDoc(clinicId).data.status == 'active';
+    }
+    function memberRole(clinicId) {
+      return memberDoc(clinicId).data.role;
+    }
+    function isClinicAdmin(clinicId) {
+      return isActiveMember(clinicId) && memberRole(clinicId) == 'admin';
+    }
+    function isClinician(clinicId) {
+      return isActiveMember(clinicId) && memberRole(clinicId) in ['odontologo', 'admin'];
+    }
+
+    // MO: verifica si hay una invitación pendiente reclamable para el correo
+    // de la sesión actual, con el mismo rol que se está intentando auto-asignar.
+    function existsClaimableInvite(clinicId, role) {
+      return exists(/databases/$(database)/documents/clinicInvites/$(clinicId + '_' + request.auth.token.email))
+        && get(/databases/$(database)/documents/clinicInvites/$(clinicId + '_' + request.auth.token.email)).data.status == 'pending'
+        && get(/databases/$(database)/documents/clinicInvites/$(clinicId + '_' + request.auth.token.email)).data.role == role;
+    }
+
+    function linkDoc(clinicId) {
+      return get(/databases/$(database)/documents/patientClinicLinks/$(clinicId + '_' + request.auth.uid));
+    }
+    function isLinkedPatient(clinicId) {
+      return signedIn()
+        && exists(/databases/$(database)/documents/patientClinicLinks/$(clinicId + '_' + request.auth.uid))
+        && linkDoc(clinicId).data.status == 'active';
+    }
+
+    // Identidad general del paciente (uid propio == patientId). Solo lo lee/escribe
+    // el propio paciente en este incremento; el acceso del staff de clínica se
+    // habilitará cuando se construyan los expedientes por clínica (incremento 2).
+    match /patients/{patientId} {
+      allow read, write: if signedIn() && request.auth.uid == patientId;
+    }
+
+    match /clinics/{clinicId} {
+      allow read: if isActiveMember(clinicId) || isLinkedPatient(clinicId)
+        || (signedIn() && resource.data.ownerId == request.auth.uid);
+      allow create: if signedIn() && request.resource.data.ownerId == request.auth.uid;
+      allow update, delete: if isClinicAdmin(clinicId)
+        || (signedIn() && resource.data.ownerId == request.auth.uid);
+    }
+
+    match /clinicMembers/{memberId} {
+      // OJO: esta regla NO puede depender de isClinicAdmin()/isActiveMember() aquí,
+      // porque esas funciones hacen get() sobre la propia colección clinicMembers —
+      // esa auto-referencia hace que Firestore rechace las consultas por lista
+      // (where uid==, where clinicId==) con "Missing or insufficient permissions",
+      // aunque el mismo get() sí funciona bien en reglas de otras colecciones.
+      // Por eso aquí solo se valida por id/campos propios, y el "admin ve a todo
+      // el equipo" se resuelve contra /clinics (colección distinta, sin auto-referencia).
+      allow read: if signedIn()
+        && (memberId.split('_')[1] == request.auth.uid
+            || resource.data.uid == request.auth.uid
+            || get(/databases/$(database)/documents/clinics/$(resource.data.clinicId)).data.ownerId == request.auth.uid);
+      // Un admin ya existente puede invitar a cualquiera.
+      // Bootstrap: el dueño de una clínica recién creada puede crear su ÚNICO
+      // registro de miembro admin (atado al ownerId del doc de la clínica, nunca
+      // a "si no hay miembros todavía" para evitar apropiaciones).
+      // MO añade un tercer caso: quien se registra puede auto-crear su propia
+      // membresía NO-admin si existe una invitación pendiente que coincide con
+      // su correo — así el colaborador "reclama" el lugar que el dueño le dejó.
+      allow create: if isClinicAdmin(memberId.split('_')[0])
+        || (signedIn()
+            && memberId == memberId.split('_')[0] + '_' + request.auth.uid
+            && request.resource.data.role == 'admin'
+            && get(/databases/$(database)/documents/clinics/$(memberId.split('_')[0])).data.ownerId == request.auth.uid)
+        || (signedIn()
+            && memberId == memberId.split('_')[0] + '_' + request.auth.uid
+            && request.resource.data.role != 'admin'
+            && request.resource.data.uid == request.auth.uid
+            && existsClaimableInvite(memberId.split('_')[0], request.resource.data.role));
+      // Un admin puede modificar cualquier membresía de su clínica.
+      // El propio invitado solo puede aceptar (cambiar status), nunca su rol.
+      allow update: if isClinicAdmin(memberId.split('_')[0])
+        || (memberId.split('_')[1] == request.auth.uid
+            && request.resource.data.role == resource.data.role
+            && request.resource.data.status == 'active');
+      allow delete: if isClinicAdmin(memberId.split('_')[0]);
+    }
+
+    match /patientClinicLinks/{linkId} {
+      allow read: if signedIn()
+        && (linkId.split('_')[1] == request.auth.uid || isActiveMember(linkId.split('_')[0]));
+      // El staff de la clínica puede crear/gestionar el vínculo.
+      // El propio paciente puede solicitarlo (queda en estado "pending").
+      allow write: if isActiveMember(linkId.split('_')[0])
+        || (signedIn() && linkId.split('_')[1] == request.auth.uid && request.resource.data.status == 'pending');
+    }
+
+    // ============================================================
+    // COLABORADORES DE CLÍNICA PARA MO (nuevo, aditivo)
+    // Usa el uid del dueño como clinicId (sin necesitar bootstrap de /clinics
+    // salvo el doc mínimo con ownerId), reutilizando clinicMembers de arriba.
+    // Acceso operativo del día a día para cualquier miembro activo; las
+    // subcolecciones financieras (pagos) quedan reservadas solo para admins.
+    // ============================================================
+
+    match /clinicInvites/{inviteId} {
+      allow read: if isClinicAdmin(inviteId.split('_')[0])
+        || isClinicAdmin(resource.data.clinicId)
+        || (signedIn() && resource.data.email == request.auth.token.email);
+      allow create, delete: if isClinicAdmin(inviteId.split('_')[0]);
+      // El admin puede editar libremente; quien reclama la invitación solo
+      // puede marcarla como 'claimed', sin tocar clínica/rol/correo.
+      allow update: if isClinicAdmin(inviteId.split('_')[0])
+        || (signedIn()
+            && resource.data.email == request.auth.token.email
+            && request.resource.data.status == 'claimed'
+            && request.resource.data.email == resource.data.email
+            && request.resource.data.clinicId == resource.data.clinicId
+            && request.resource.data.role == resource.data.role);
+    }
+
+    match /users/{ownerId}/pacientes/{patientId} {
+      allow read, write: if isActiveMember(ownerId);
+    }
+    match /users/{ownerId}/pacientes/{patientId}/presupuestos/{budgetId} {
+      allow read, write: if isActiveMember(ownerId);
+    }
+    match /users/{ownerId}/pacientes/{patientId}/recetas/{recetaId} {
+      allow read, write: if isActiveMember(ownerId);
+    }
+    match /users/{ownerId}/pacientes/{patientId}/pagos/{pagoId} {
+      allow read, write: if isClinicAdmin(ownerId);
+    }
+    match /users/{ownerId}/recursos/{recursoId} {
+      allow read, write: if isActiveMember(ownerId);
+    }
+    match /users/{ownerId}/citas/{citaId} {
+      allow read, write: if isActiveMember(ownerId);
+    }
+    match /users/{ownerId}/config/{configId} {
+      allow read: if isActiveMember(ownerId);
+      allow write: if isClinicAdmin(ownerId);
+    }
+
+    match /{document=**} {
+      allow read, write: if false;
     }
   }
 }

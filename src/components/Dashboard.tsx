@@ -6,8 +6,11 @@ import Inicio from "./pages/Inicio";
 import Pacientes from "./pages/Pacientes";
 import Agenda from "./pages/Agenda";
 import Recetas from "./pages/Recetas";
+import PerfilDoctor from "./pages/PerfilDoctor";
+import Colaboradores from "./pages/Colaboradores";
+import Planes from "./pages/Planes";
 import GlobalAgregarPago from "./GlobalAgregarPago";
-import { PatientDataProvider } from "@/context/PatientDataContext";
+import { PatientDataProvider, usePatientData } from "@/context/PatientDataContext";
 
 const quickActions = [
   { key: "pacientes", pageId: "pacientes", label: "Nuevo Paciente", color: "amber" },
@@ -17,6 +20,102 @@ const quickActions = [
   { key: "membresias", pageId: "membresias", label: "Nueva Membresía", color: "amber" },
   { key: "gastos", pageId: "gastos", label: "Registrar Pago", color: "green" },
 ] as const;
+
+function InvitePrompt() {
+  const { pendingInvite, aceptarInvite, rechazarInvite } = usePatientData();
+  const [enviando, setEnviando] = useState(false);
+  if (!pendingInvite) return null;
+
+  return (
+    <div className="fixed inset-0 z-[70] flex items-center justify-center bg-black/70 p-4">
+      <div className="w-full max-w-sm rounded-2xl border border-edge/10 bg-[#0a0a0a] p-6 text-center">
+        <h3 className="text-base font-semibold text-ink">Invitación de clínica</h3>
+        <p className="mt-2 text-sm text-ink/70">
+          Te invitaron a colaborar en{" "}
+          <span className="font-semibold text-accent">
+            {pendingInvite.nombreClinica || "una clínica"}
+          </span>{" "}
+          como <span className="capitalize">{pendingInvite.role}</span>.
+        </p>
+        <div className="mt-6 flex gap-3">
+          <button
+            onClick={rechazarInvite}
+            className="flex-1 rounded-lg border border-edge/15 py-2.5 text-sm font-semibold text-ink/80 transition-colors hover:bg-surface"
+          >
+            Ahora no
+          </button>
+          <button
+            onClick={async () => {
+              setEnviando(true);
+              await aceptarInvite();
+              setEnviando(false);
+            }}
+            disabled={enviando}
+            className="flex-1 rounded-lg bg-gradient-to-r from-accent to-orange-500 py-2.5 text-sm font-semibold text-black transition-opacity hover:opacity-90 disabled:opacity-40"
+          >
+            {enviando ? "Uniendo…" : "Unirme"}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function QuickActionsBar({
+  isLight,
+  onNavigate,
+  onOpenPago,
+}: {
+  isLight: boolean;
+  onNavigate: (pageId: string) => void;
+  onOpenPago: () => void;
+}) {
+  const { puedeVerFinanzas } = usePatientData();
+  const visibles = quickActions.filter((action) => action.key !== "gastos" || puedeVerFinanzas);
+
+  return (
+    <div className="flex flex-1 items-center justify-between">
+      {visibles.map((action) => {
+        const icon = navItems.find((item) => item.id === action.pageId)?.icon;
+        const badge = "badge" in action ? action.badge : undefined;
+        return (
+          <button
+            key={action.key}
+            onClick={() => (action.key === "gastos" ? onOpenPago() : onNavigate(action.pageId))}
+            title={action.label}
+            className={`relative flex h-12 w-12 items-center justify-center rounded-xl transition-colors hover:bg-surface ${
+              action.color === "green"
+                ? "text-success/80 hover:text-success"
+                : "text-accent/70 hover:text-accent"
+            }`}
+            style={
+              isLight
+                ? undefined
+                : {
+                    textShadow:
+                      action.color === "green"
+                        ? "0 0 8px rgba(52,211,153,0.4)"
+                        : "0 0 8px rgba(251,146,60,0.4)",
+                  }
+            }
+          >
+            <svg width="26" height="26" viewBox="0 0 24 24" fill="none" className="shrink-0">
+              {icon}
+            </svg>
+            {badge && (
+              <span
+                className="absolute right-1 top-1 flex h-4 w-4 items-center justify-center rounded-full bg-amber-400 text-[10px] font-bold leading-none text-black"
+                style={{ boxShadow: "0 0 6px rgba(251,146,60,0.7)" }}
+              >
+                {badge}
+              </span>
+            )}
+          </button>
+        );
+      })}
+    </div>
+  );
+}
 
 export default function Dashboard({
   uid,
@@ -39,7 +138,8 @@ export default function Dashboard({
     "";
 
   return (
-    <PatientDataProvider uid={uid} onIrAPagina={setActivePage}>
+    <PatientDataProvider uid={uid} userEmail={userEmail} onIrAPagina={setActivePage}>
+    <InvitePrompt />
     <div data-theme={theme} className="flex min-h-screen bg-app text-ink">
       <Sidebar
         active={activePage}
@@ -50,48 +150,11 @@ export default function Dashboard({
 
       <main className="flex-1">
         <header className="flex h-16 items-center gap-4 border-b border-edge/10 px-6 print:hidden">
-          <div className="flex flex-1 items-center justify-between">
-            {quickActions.map((action) => {
-              const icon = navItems.find((item) => item.id === action.pageId)?.icon;
-              const badge = "badge" in action ? action.badge : undefined;
-              return (
-                <button
-                  key={action.key}
-                  onClick={() =>
-                    action.key === "gastos" ? setShowRegistrarPago(true) : setActivePage(action.pageId)
-                  }
-                  title={action.label}
-                  className={`relative flex h-12 w-12 items-center justify-center rounded-xl transition-colors hover:bg-surface ${
-                    action.color === "green"
-                      ? "text-success/80 hover:text-success"
-                      : "text-accent/70 hover:text-accent"
-                  }`}
-                  style={
-                    isLight
-                      ? undefined
-                      : {
-                          textShadow:
-                            action.color === "green"
-                              ? "0 0 8px rgba(52,211,153,0.4)"
-                              : "0 0 8px rgba(251,146,60,0.4)",
-                        }
-                  }
-                >
-                  <svg width="26" height="26" viewBox="0 0 24 24" fill="none" className="shrink-0">
-                    {icon}
-                  </svg>
-                  {badge && (
-                    <span
-                      className="absolute right-1 top-1 flex h-4 w-4 items-center justify-center rounded-full bg-amber-400 text-[10px] font-bold leading-none text-black"
-                      style={{ boxShadow: "0 0 6px rgba(251,146,60,0.7)" }}
-                    >
-                      {badge}
-                    </span>
-                  )}
-                </button>
-              );
-            })}
-          </div>
+          <QuickActionsBar
+            isLight={isLight}
+            onNavigate={setActivePage}
+            onOpenPago={() => setShowRegistrarPago(true)}
+          />
 
           <span className="h-6 w-px bg-edge/10" />
 
@@ -112,6 +175,9 @@ export default function Dashboard({
           {activePage === "pacientes" && <Pacientes />}
           {activePage === "agenda" && <Agenda />}
           {activePage === "recetas" && <Recetas />}
+          {activePage === "administracion-perfil" && <PerfilDoctor />}
+          {activePage === "administracion-colaboradores" && <Colaboradores />}
+          {activePage === "planes" && <Planes />}
         </div>
       </main>
 
