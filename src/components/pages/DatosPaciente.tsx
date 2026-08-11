@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { formatEdad } from "@/lib/patientData";
+import { manejarCambioNombre } from "@/lib/textoNombre";
 
 type Patient = {
   id: string;
@@ -108,7 +109,7 @@ export default function DatosPaciente({
               type="text"
               value={nombreCompleto}
               onChange={(e) => {
-                setNombreCompleto(e.target.value);
+                manejarCambioNombre(e, setNombreCompleto);
                 setSaved(false);
               }}
               className={inputClass}
@@ -269,7 +270,7 @@ export default function DatosPaciente({
               type="text"
               value={responsablePago}
               onChange={(e) => {
-                setResponsablePago(e.target.value);
+                manejarCambioNombre(e, setResponsablePago);
                 setSaved(false);
               }}
               placeholder="Nombre del responsable"
@@ -365,7 +366,7 @@ export default function DatosPaciente({
                 type="text"
                 value={contactoNombre}
                 onChange={(e) => {
-                  setContactoNombre(e.target.value);
+                  manejarCambioNombre(e, setContactoNombre);
                   setSaved(false);
                 }}
                 className={inputClass}

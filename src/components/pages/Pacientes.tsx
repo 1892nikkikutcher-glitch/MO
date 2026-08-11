@@ -6,6 +6,7 @@ import { usePatientData } from "@/context/PatientDataContext";
 import { formatEdad, type Patient } from "@/lib/patientData";
 import { exportarCsv } from "@/lib/exportCsv";
 import { parseArchivoPacientes, type RegistroImportado } from "@/lib/importPacientes";
+import { manejarCambioNombre } from "@/lib/textoNombre";
 
 const avatarColors = ["#f59e0b", "#ec4899", "#3b82f6", "#22c55e", "#dc2626", "#a855f7"];
 
@@ -82,7 +83,7 @@ function NuevoPacienteDialog({
             <input
               type="text"
               value={nombre}
-              onChange={(e) => setNombre(e.target.value)}
+              onChange={(e) => manejarCambioNombre(e, setNombre)}
               placeholder="Ej. María Fernanda López"
               className={inputClass}
             />

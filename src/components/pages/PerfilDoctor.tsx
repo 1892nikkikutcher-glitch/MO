@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { usePatientData } from "@/context/PatientDataContext";
+import { manejarCambioNombre } from "@/lib/textoNombre";
 
 const inputClass =
   "w-full rounded-lg border border-edge/10 bg-field px-3 py-2 text-sm text-ink placeholder-ink/30 outline-none focus:border-accent/60";
@@ -35,7 +36,15 @@ export default function PerfilDoctor() {
       <h3 className="text-sm font-semibold uppercase tracking-wide text-ink/60">Perfil del Doctor</h3>
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
         <Field label="Nombre completo">
-          <input type="text" value={form.nombre} onChange={actualizar("nombre")} className={inputClass} />
+          <input
+            type="text"
+            value={form.nombre}
+            onChange={(e) => {
+              manejarCambioNombre(e, (v) => setForm((prev) => ({ ...prev, nombre: v })));
+              setGuardado(false);
+            }}
+            className={inputClass}
+          />
         </Field>
         <Field label="Cédula profesional">
           <input

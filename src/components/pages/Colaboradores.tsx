@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { usePatientData } from "@/context/PatientDataContext";
 import type { RolClinica } from "@/lib/patientData";
+import { manejarCambioNombre } from "@/lib/textoNombre";
 
 const inputClass =
   "w-full rounded-lg border border-edge/10 bg-field px-3 py-2 text-sm text-ink placeholder-ink/30 outline-none focus:border-accent/60";
@@ -64,7 +65,7 @@ export default function Colaboradores() {
           <input
             type="text"
             value={nombreClinica}
-            onChange={(e) => setNombreClinica(e.target.value)}
+            onChange={(e) => manejarCambioNombre(e, setNombreClinica)}
             placeholder="Ej. Sonríe X Todos Dental"
             className={inputClass}
           />
@@ -92,7 +93,7 @@ export default function Colaboradores() {
           <input
             type="text"
             value={nombre}
-            onChange={(e) => setNombre(e.target.value)}
+            onChange={(e) => manejarCambioNombre(e, setNombre)}
             placeholder="Nombre completo"
             className={inputClass}
           />
