@@ -33,3 +33,6 @@ next-env.d.ts
 
 # datos de pacientes reales — nunca en el repositorio
 pacientes_importar.json
+
+# clave de administrador de Firebase — nunca en el repositorio
+serviceAccountKey.json

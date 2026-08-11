@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import Expediente from "./Expediente";
 import { usePatientData } from "@/context/PatientDataContext";
 import { formatEdad, type Patient } from "@/lib/patientData";
+import { exportarCsv } from "@/lib/exportCsv";
 
 const avatarColors = ["#f59e0b", "#ec4899", "#3b82f6", "#22c55e", "#dc2626", "#a855f7"];
 
@@ -293,6 +294,21 @@ export default function Pacientes() {
   const [showNuevoPaciente, setShowNuevoPaciente] = useState(false);
   const [showImportar, setShowImportar] = useState(false);
 
+  const exportarPacientes = () => {
+    exportarCsv(
+      `pacientes_${new Date().toISOString().slice(0, 10)}.csv`,
+      ["Nombre completo", "Teléfono", "Correo", "Fecha de nacimiento", "Edad", "Notas"],
+      patients.map((p) => [
+        p.name,
+        p.phone,
+        p.email ?? "",
+        p.birthDate,
+        p.birthDate ? formatEdad(p.birthDate) : "",
+        p.notas ?? "",
+      ])
+    );
+  };
+
   useEffect(() => {
     if (!navegacionExpediente) return;
     const patient = patients.find((p) => p.id === navegacionExpediente.patientId);
@@ -319,7 +335,14 @@ export default function Pacientes() {
 
   return (
     <div className="space-y-4">
-      <div className="flex justify-end gap-3">
+      <div className="flex flex-wrap justify-end gap-3">
+        <button
+          onClick={exportarPacientes}
+          title="Descarga tus pacientes en un .csv que abre en Excel — tus datos siempre disponibles fuera de MO"
+          className="rounded-lg border border-edge/15 px-4 py-2.5 text-sm font-semibold text-ink/80 transition-colors hover:bg-surface"
+        >
+          Exportar a Excel
+        </button>
         <button
           onClick={() => setShowImportar(true)}
           className="rounded-lg border border-edge/15 px-4 py-2.5 text-sm font-semibold text-ink/80 transition-colors hover:bg-surface"
