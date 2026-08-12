@@ -24,7 +24,6 @@ import { db } from "@/lib/firebase";
 import {
   horarioInicial,
   perfilDoctorInicial,
-  recursosIniciales,
   type ClinicInfo,
   type ClinicInvite,
   type ClinicMember,
@@ -201,6 +200,8 @@ function useClinicInfo(clinicUid: string | null) {
   return [value, setValue] as const;
 }
 
+const RECURSO_COLOR_PALETTE = ["#22c55e", "#3b82f6", "#f59e0b", "#dc2626", "#a855f7", "#ec4899", "#14b8a6", "#64748b"];
+
 /**
  * Resuelve a qué clínica pertenecen los datos que debe ver esta sesión:
  * - Si el uid tiene una membresía activa en la clínica de alguien más, usa esa.
@@ -301,6 +302,16 @@ function useClinicResolution(authUid: string, authEmail: string) {
       role: pendingInvite.role,
       status: "active",
     } satisfies ClinicMember);
+    // Todo colaborador que se une queda también dado de alta como recurso
+    // (médico) en la Agenda, para que "el personal" y "los recursos de la
+    // agenda" sean siempre la misma lista — el uid como id hace esto
+    // idempotente si por alguna razón se acepta la invitación más de una vez.
+    await setDoc(doc(db, `users/${pendingInvite.clinicId}/recursos`, `ruid_${authUid}`), {
+      id: `ruid_${authUid}`,
+      nombre: pendingInvite.nombre,
+      color: RECURSO_COLOR_PALETTE[Math.floor(Math.random() * RECURSO_COLOR_PALETTE.length)],
+      tipo: "medico",
+    } satisfies Recurso);
     await setDoc(
       doc(db, "clinicInvites", `${pendingInvite.clinicId}_${pendingInvite.email}`),
       { ...pendingInvite, status: "claimed" },
@@ -429,7 +440,7 @@ export function PatientDataProvider({
   const [clinicInfo, setClinicInfo] = useClinicInfo(clinicUid);
 
   const [patients, setPatients] = useFirestoreList<Patient>(clinicUid, "pacientes");
-  const [recursos, setRecursos] = useFirestoreList<Recurso>(clinicUid, "recursos", recursosIniciales);
+  const [recursos, setRecursos] = useFirestoreList<Recurso>(clinicUid, "recursos");
   const [citas, setCitas] = useFirestoreList<CitaAgenda>(clinicUid, "citas");
   const [horario, setHorario] = useFirestoreDoc<HorarioAtencion>(clinicUid, "horario", horarioInicial);
   const [perfilDoctor, setPerfilDoctor] = useFirestoreDoc<PerfilDoctor>(
@@ -900,7 +911,13 @@ export function PatientDataProvider({
   };
 
   const eliminarColaborador = async (memberId: string) => {
+    const miembro = colaboradoresActivos.find((c) => `${c.clinicId}_${c.uid}` === memberId);
     await deleteDoc(doc(db, "clinicMembers", memberId));
+    if (miembro) {
+      await deleteDoc(doc(db, `users/${miembro.clinicId}/recursos`, `ruid_${miembro.uid}`)).catch(() => {
+        // El colaborador pudo no tener un recurso asociado (p. ej. si se creó antes de este cambio) — no es un error.
+      });
+    }
   };
 
   const actualizarRolColaborador = async (memberId: string, rol: RolClinica) => {

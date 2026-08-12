@@ -277,13 +277,6 @@ export type Recurso = {
   tipo: TipoRecurso;
 };
 
-export const recursosIniciales: Recurso[] = [
-  { id: "r1", nombre: "Nicolás Medina González", color: "#22c55e", tipo: "medico" },
-  { id: "r2", nombre: "Ana Paola Ríos Cervantes", color: "#3b82f6", tipo: "medico" },
-  { id: "r3", nombre: "Unidad 1 · Consultorio A", color: "#f59e0b", tipo: "unidad" },
-  { id: "r4", nombre: "Unidad 2 · Consultorio B", color: "#dc2626", tipo: "unidad" },
-];
-
 export const citaEstatusOptions = [
   "Agendada",
   "Confirmada",
