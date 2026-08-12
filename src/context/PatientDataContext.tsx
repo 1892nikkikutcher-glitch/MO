@@ -317,6 +317,8 @@ function useClinicResolution(authUid: string, authEmail: string) {
 
 export type NavegacionExpediente = { patientId: string; tab?: string } | null;
 
+export type NavegacionNuevaCita = { patientId: string; tratamiento: string } | null;
+
 type PatientDataContextValue = {
   clinicUid: string | null;
   userEmail: string;
@@ -386,6 +388,12 @@ type PatientDataContextValue = {
   navegacionExpediente: NavegacionExpediente;
   irAExpediente: (patientId: string, tab?: string) => void;
   consumirNavegacionExpediente: () => void;
+  navegacionNuevaCita: NavegacionNuevaCita;
+  sugerirNuevaCita: (patientId: string, tratamiento: string) => void;
+  consumirNavegacionNuevaCita: () => void;
+  solicitudNuevaCitaBlanco: boolean;
+  abrirNuevaCitaDesdeInicio: () => void;
+  consumirSolicitudNuevaCitaBlanco: () => void;
   miRol: RolClinica | null;
   puedeVerFinanzas: boolean;
   clinicInfo: ClinicInfo | null;
@@ -493,6 +501,8 @@ export function PatientDataProvider({
   >({});
   const subs = useRef<Record<string, Unsubscribe>>({});
   const [navegacionExpediente, setNavegacionExpediente] = useState<NavegacionExpediente>(null);
+  const [navegacionNuevaCita, setNavegacionNuevaCita] = useState<NavegacionNuevaCita>(null);
+  const [solicitudNuevaCitaBlanco, setSolicitudNuevaCitaBlanco] = useState(false);
 
   const [colaboradoresActivos, setColaboradoresActivos] = useState<ClinicMember[]>([]);
   const [invitacionesPendientes, setInvitacionesPendientes] = useState<ClinicInvite[]>([]);
@@ -624,6 +634,20 @@ export function PatientDataProvider({
   };
 
   const consumirNavegacionExpediente = () => setNavegacionExpediente(null);
+
+  const sugerirNuevaCita = (patientId: string, tratamiento: string) => {
+    setNavegacionNuevaCita({ patientId, tratamiento });
+    onIrAPagina?.("agenda");
+  };
+
+  const consumirNavegacionNuevaCita = () => setNavegacionNuevaCita(null);
+
+  const abrirNuevaCitaDesdeInicio = () => {
+    setSolicitudNuevaCitaBlanco(true);
+    onIrAPagina?.("agenda");
+  };
+
+  const consumirSolicitudNuevaCitaBlanco = () => setSolicitudNuevaCitaBlanco(false);
 
   const setPresupuestosPaciente = (patientId: string, updater: Updater<SavedBudget[]>) => {
     if (!clinicUid) return;
@@ -942,6 +966,12 @@ export function PatientDataProvider({
         navegacionExpediente,
         irAExpediente,
         consumirNavegacionExpediente,
+        navegacionNuevaCita,
+        sugerirNuevaCita,
+        consumirNavegacionNuevaCita,
+        solicitudNuevaCitaBlanco,
+        abrirNuevaCitaDesdeInicio,
+        consumirSolicitudNuevaCitaBlanco,
         miRol: rol,
         puedeVerFinanzas: rol === "admin",
         clinicInfo,

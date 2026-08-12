@@ -826,7 +826,19 @@ function CitaDialog({
 }
 
 export default function Agenda() {
-  const { recursos, setRecursos, citas, setCitas, horario, setHorario } = usePatientData();
+  const {
+    recursos,
+    setRecursos,
+    citas,
+    setCitas,
+    horario,
+    setHorario,
+    patients,
+    navegacionNuevaCita,
+    consumirNavegacionNuevaCita,
+    solicitudNuevaCitaBlanco,
+    consumirSolicitudNuevaCitaBlanco,
+  } = usePatientData();
   /** La agenda siempre se ve/agenda de 7am a 22h como base (para casos
    * extemporáneos), pero si el horario de atención configurado es más
    * amplio, se extiende para que ese horario quede disponible también. */
@@ -920,6 +932,46 @@ export default function Agenda() {
   const abrirEditarCita = (cita: CitaAgenda) => {
     setDialogState({ initial: cita, isEditing: true });
   };
+
+  /** Al registrar un paciente nuevo desde el botón rápido del encabezado,
+   * se sugiere de inmediato agendar su primera cita (consulta de
+   * valoración) — se abre el diálogo de nueva cita ya con el paciente y el
+   * tratamiento precargados, solo falta confirmar fecha/hora. */
+  useEffect(() => {
+    if (!navegacionNuevaCita) return;
+    const paciente = patients.find((p) => p.id === navegacionNuevaCita.patientId);
+    consumirNavegacionNuevaCita();
+    if (!paciente) return;
+    const ahora = new Date();
+    const inicio = Math.min(
+      Math.max(Math.round((ahora.getHours() * 60 + ahora.getMinutes()) / 30) * 30, HOUR_START * 60),
+      HOUR_END * 60 - 30
+    );
+    setDialogState({
+      initial: {
+        patientId: paciente.id,
+        paciente: paciente.name,
+        tratamientos: [navegacionNuevaCita.tratamiento],
+        fecha: toISODate(ahora),
+        horaInicio: minutesToTime(inicio),
+        horaFin: minutesToTime(inicio + 30),
+        recursoId: recursos.find((r) => !recursosOcultos.has(r.id))?.id ?? recursos[0]?.id,
+      },
+      isEditing: false,
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [navegacionNuevaCita]);
+
+  /** El botón "Nueva Cita" del encabezado no sabe a qué paciente ni hora —
+   * solo pide abrir el diálogo en blanco, igual que si se hiciera clic en un
+   * espacio vacío de la agenda ahora mismo. */
+  useEffect(() => {
+    if (!solicitudNuevaCitaBlanco) return;
+    consumirSolicitudNuevaCitaBlanco();
+    const ahora = new Date();
+    abrirNuevaCita(ahora, ahora.getHours() * 60 + ahora.getMinutes());
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [solicitudNuevaCitaBlanco]);
 
   /** Arma la agenda del día en texto (respeta los médicos/unidades ocultos
    * en el filtro de Recursos, para poder mandar la agenda de uno solo) y

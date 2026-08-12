@@ -17,6 +17,7 @@ import Medicamentos from "./pages/Medicamentos";
 import FormatosWhatsApp from "./pages/FormatosWhatsApp";
 import Planes from "./pages/Planes";
 import GlobalAgregarPago from "./GlobalAgregarPago";
+import GlobalNuevoPaciente from "./GlobalNuevoPaciente";
 import { PatientDataProvider, usePatientData } from "@/context/PatientDataContext";
 
 const quickActions = [
@@ -72,13 +73,22 @@ function QuickActionsBar({
   isLight,
   onNavigate,
   onOpenPago,
+  onOpenNuevoPaciente,
 }: {
   isLight: boolean;
   onNavigate: (pageId: string) => void;
   onOpenPago: () => void;
+  onOpenNuevoPaciente: () => void;
 }) {
-  const { puedeVerFinanzas } = usePatientData();
+  const { puedeVerFinanzas, abrirNuevaCitaDesdeInicio } = usePatientData();
   const visibles = quickActions.filter((action) => action.key !== "gastos" || puedeVerFinanzas);
+
+  const manejarClick = (key: (typeof quickActions)[number]["key"], pageId: string) => {
+    if (key === "gastos") return onOpenPago();
+    if (key === "pacientes") return onOpenNuevoPaciente();
+    if (key === "nueva-cita") return abrirNuevaCitaDesdeInicio();
+    return onNavigate(pageId);
+  };
 
   return (
     <div className="flex items-center gap-1 sm:flex-1 sm:justify-between sm:gap-0">
@@ -88,7 +98,7 @@ function QuickActionsBar({
         return (
           <button
             key={action.key}
-            onClick={() => (action.key === "gastos" ? onOpenPago() : onNavigate(action.pageId))}
+            onClick={() => manejarClick(action.key, action.pageId)}
             title={action.label}
             className={`relative flex h-12 w-12 items-center justify-center rounded-xl transition-colors hover:bg-surface ${
               action.color === "green"
@@ -135,6 +145,7 @@ export default function Dashboard({
 }) {
   const [activePage, setActivePage] = useState("inicio");
   const [showRegistrarPago, setShowRegistrarPago] = useState(false);
+  const [showNuevoPaciente, setShowNuevoPaciente] = useState(false);
   const [theme, setTheme] = useState<"dark" | "light">("dark");
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const isLight = theme === "light";
@@ -175,6 +186,7 @@ export default function Dashboard({
               isLight={isLight}
               onNavigate={setActivePage}
               onOpenPago={() => setShowRegistrarPago(true)}
+              onOpenNuevoPaciente={() => setShowNuevoPaciente(true)}
             />
           </div>
 
@@ -212,6 +224,9 @@ export default function Dashboard({
 
       {showRegistrarPago && (
         <GlobalAgregarPago onClose={() => setShowRegistrarPago(false)} />
+      )}
+      {showNuevoPaciente && (
+        <GlobalNuevoPaciente onClose={() => setShowNuevoPaciente(false)} />
       )}
     </div>
     </PatientDataProvider>
