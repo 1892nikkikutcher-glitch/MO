@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import Expediente from "./Expediente";
 import { usePatientData } from "@/context/PatientDataContext";
-import { formatEdad, type Patient } from "@/lib/patientData";
+import { coincidePaciente, formatEdad, type Patient } from "@/lib/patientData";
 import { exportarCsv } from "@/lib/exportCsv";
 import { parseArchivoPacientes, type RegistroImportado } from "@/lib/importPacientes";
 import { manejarCambioNombre } from "@/lib/textoNombre";
@@ -269,6 +269,26 @@ function ImportarPacientesDialog({
   );
 }
 
+function SearchIcon() {
+  return (
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" className="shrink-0">
+      <path
+        d="M11 19a8 8 0 1 1 0-16 8 8 0 0 1 0 16ZM21 21l-4.35-4.35"
+        stroke="currentColor"
+        strokeWidth="1.8"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+    </svg>
+  );
+}
+
+function coincideTelefono(busqueda: string, phone: string): boolean {
+  const digitos = busqueda.replace(/\D/g, "");
+  if (!digitos) return false;
+  return phone.replace(/\D/g, "").includes(digitos);
+}
+
 function ExpedienteIcon() {
   return (
     <svg width="18" height="18" viewBox="0 0 24 24" fill="none">
@@ -289,6 +309,21 @@ export default function Pacientes() {
   const [selected, setSelected] = useState<Patient | null>(null);
   const [showNuevoPaciente, setShowNuevoPaciente] = useState(false);
   const [showImportar, setShowImportar] = useState(false);
+  const [busqueda, setBusqueda] = useState("");
+
+  const busquedaTrim = busqueda.trim();
+  const pacientesFiltrados = !busquedaTrim
+    ? patients
+    : patients.filter((p) => {
+        if (coincidePaciente(busquedaTrim, p.name)) return true;
+        if (coincideTelefono(busquedaTrim, p.phone)) return true;
+        if (p.birthDate && (p.birthDate.includes(busquedaTrim) || formatDate(p.birthDate).includes(busquedaTrim))) {
+          return true;
+        }
+        const edad = p.birthDate ? calculateAge(p.birthDate) : null;
+        if (edad !== null && String(edad).includes(busquedaTrim)) return true;
+        return false;
+      });
 
   const exportarPacientes = () => {
     exportarCsv(
@@ -331,27 +366,49 @@ export default function Pacientes() {
 
   return (
     <div className="space-y-4">
-      <div className="flex flex-wrap justify-end gap-3">
-        <button
-          onClick={exportarPacientes}
-          title="Descarga tus pacientes en un .csv que abre en Excel — tus datos siempre disponibles fuera de MO"
-          className="rounded-lg border border-edge/15 px-4 py-2.5 text-sm font-semibold text-ink/80 transition-colors hover:bg-surface"
-        >
-          Exportar a Excel
-        </button>
-        <button
-          onClick={() => setShowImportar(true)}
-          className="rounded-lg border border-edge/15 px-4 py-2.5 text-sm font-semibold text-ink/80 transition-colors hover:bg-surface"
-        >
-          Importar Pacientes
-        </button>
-        <button
-          onClick={() => setShowNuevoPaciente(true)}
-          className="rounded-lg bg-gradient-to-r from-accent to-orange-500 px-4 py-2.5 text-sm font-semibold text-black transition-opacity hover:opacity-90"
-        >
-          + Nuevo Paciente
-        </button>
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <div className="relative w-full max-w-sm">
+          <span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-ink/30">
+            <SearchIcon />
+          </span>
+          <input
+            type="text"
+            value={busqueda}
+            onChange={(e) => setBusqueda(e.target.value)}
+            placeholder="Buscar por nombre, celular, fecha de nacimiento o edad..."
+            className="w-full rounded-lg border border-edge/10 bg-field py-2.5 pl-9 pr-3 text-sm text-ink placeholder-ink/30 outline-none focus:border-accent/60"
+          />
+        </div>
+        <div className="flex flex-wrap gap-3">
+          <button
+            onClick={exportarPacientes}
+            title="Descarga tus pacientes en un .csv que abre en Excel — tus datos siempre disponibles fuera de MO"
+            className="rounded-lg border border-edge/15 px-4 py-2.5 text-sm font-semibold text-ink/80 transition-colors hover:bg-surface"
+          >
+            Exportar a Excel
+          </button>
+          <button
+            onClick={() => setShowImportar(true)}
+            className="rounded-lg border border-edge/15 px-4 py-2.5 text-sm font-semibold text-ink/80 transition-colors hover:bg-surface"
+          >
+            Importar Pacientes
+          </button>
+          <button
+            onClick={() => setShowNuevoPaciente(true)}
+            className="rounded-lg bg-gradient-to-r from-accent to-orange-500 px-4 py-2.5 text-sm font-semibold text-black transition-opacity hover:opacity-90"
+          >
+            + Nuevo Paciente
+          </button>
+        </div>
       </div>
+
+      {busquedaTrim && (
+        <p className="text-xs text-ink/40">
+          {pacientesFiltrados.length === 0
+            ? "Sin resultados."
+            : `${pacientesFiltrados.length} de ${patients.length} pacientes`}
+        </p>
+      )}
 
       <div className="overflow-x-auto rounded-2xl border border-edge/10 bg-surface">
       <table className="w-full text-left text-sm">
@@ -366,7 +423,7 @@ export default function Pacientes() {
           </tr>
         </thead>
         <tbody>
-          {patients.map((p) => (
+          {pacientesFiltrados.map((p) => (
             <tr key={p.id} className="border-b border-edge/5 last:border-0 hover:bg-surface">
               <td className="px-6 py-4">
                 <div

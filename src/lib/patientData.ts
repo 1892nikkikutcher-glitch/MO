@@ -42,6 +42,33 @@ export function formatNombreConEdad(name: string, birthDate: string): string {
   return edad ? `${name} (${edad.years})` : name;
 }
 
+function normalizarBusqueda(s: string): string {
+  return Array.from(s.normalize("NFD"))
+    .filter((caracter) => {
+      const codigo = caracter.codePointAt(0) ?? 0;
+      return codigo < 0x300 || codigo > 0x36f; // fuera del rango de marcas diacríticas combinantes
+    })
+    .join("")
+    .toLowerCase()
+    .trim();
+}
+
+/** Compara sin acentos/mayúsculas, por coincidencia parcial del nombre
+ * ("mar" encuentra "María") o por iniciales ("dms" encuentra "Delia
+ * Martínez Severiano") — para buscar pacientes más rápido en listas largas. */
+export function coincidePaciente(busqueda: string, nombre: string): boolean {
+  const q = normalizarBusqueda(busqueda);
+  if (!q) return true;
+  const nombreNorm = normalizarBusqueda(nombre);
+  if (nombreNorm.includes(q)) return true;
+  const iniciales = nombreNorm
+    .split(/\s+/)
+    .filter(Boolean)
+    .map((palabra) => palabra[0])
+    .join("");
+  return iniciales.includes(q.replace(/\s+/g, ""));
+}
+
 export const patients: Patient[] = [
   { id: "1", name: "María Fernanda López", phone: "55 1234 5678", birthDate: "1990-04-12" },
   { id: "2", name: "Carlos Alberto Ramírez", phone: "55 8765 4321", birthDate: "1985-11-02" },

@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { usePatientData } from "@/context/PatientDataContext";
-import { computeTratamientosPendientes, formatNombreConEdad } from "@/lib/patientData";
+import { coincidePaciente, computeTratamientosPendientes, formatNombreConEdad } from "@/lib/patientData";
 import { AgregarPagoDialog } from "./pages/Pagos";
 
 const inputClass =
@@ -12,8 +12,12 @@ export default function GlobalAgregarPago({ onClose }: { onClose: () => void }) 
   const { patients, presupuestosPorPaciente, pagosPorPaciente, setPagosPaciente } =
     usePatientData();
   const [patientId, setPatientId] = useState("");
+  const [busqueda, setBusqueda] = useState("");
 
   if (!patientId) {
+    const coincidencias =
+      busqueda.trim().length > 0 ? patients.filter((p) => coincidePaciente(busqueda, p.name)) : [];
+
     return (
       <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4">
         <div className="w-full max-w-sm rounded-2xl border border-edge/10 bg-modal p-6">
@@ -30,18 +34,32 @@ export default function GlobalAgregarPago({ onClose }: { onClose: () => void }) 
           <label className="mb-1 block text-xs font-medium text-ink/60">
             ¿Para qué paciente es este pago?
           </label>
-          <select
-            value={patientId}
-            onChange={(e) => setPatientId(e.target.value)}
-            className={inputClass}
-          >
-            <option value="">Selecciona un paciente</option>
-            {patients.map((p) => (
-              <option key={p.id} value={p.id}>
-                {formatNombreConEdad(p.name, p.birthDate)}
-              </option>
-            ))}
-          </select>
+          <div className="relative">
+            <input
+              type="text"
+              value={busqueda}
+              onChange={(e) => setBusqueda(e.target.value)}
+              placeholder="Busca por nombre o iniciales..."
+              className={inputClass}
+              autoFocus
+            />
+            {coincidencias.length > 0 && (
+              <div className="absolute z-10 mt-1 max-h-48 w-full overflow-y-auto rounded-lg border border-edge/10 bg-field shadow-card">
+                {coincidencias.map((p) => (
+                  <button
+                    key={p.id}
+                    onClick={() => setPatientId(p.id)}
+                    className="block w-full border-b border-edge/5 px-3 py-2 text-left text-sm text-ink/80 last:border-0 hover:bg-surface"
+                  >
+                    {formatNombreConEdad(p.name, p.birthDate)}
+                  </button>
+                ))}
+              </div>
+            )}
+            {busqueda.trim().length > 0 && coincidencias.length === 0 && (
+              <p className="mt-1 text-xs text-ink/30">Sin resultados.</p>
+            )}
+          </div>
 
           <p className="mt-2 text-xs text-ink/30">
             Al elegir un paciente se abrirá directamente el formulario de pago.
