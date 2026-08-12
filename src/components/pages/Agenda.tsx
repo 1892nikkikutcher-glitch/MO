@@ -894,6 +894,7 @@ export default function Agenda() {
   const [recursosOcultos, setRecursosOcultos] = useState<Set<string>>(new Set());
   const [estatusOcultos, setEstatusOcultos] = useState<Set<CitaEstatus>>(new Set());
   const [showRecursoDialog, setShowRecursoDialog] = useState(false);
+  const [recursoParaEliminar, setRecursoParaEliminar] = useState<{ id: string; nombre: string } | null>(null);
   const [dialogState, setDialogState] = useState<{
     initial: Partial<CitaAgenda> & { fecha: string; horaInicio: string };
     isEditing: boolean;
@@ -944,8 +945,13 @@ export default function Agenda() {
   };
 
   const eliminarRecurso = (id: string, nombre: string) => {
-    if (!window.confirm(`¿Eliminar "${nombre}" de los recursos? Las citas ya agendadas con este recurso no se borran.`)) return;
-    setRecursos((prev) => prev.filter((r) => r.id !== id));
+    setRecursoParaEliminar({ id, nombre });
+  };
+
+  const confirmarEliminarRecurso = () => {
+    if (!recursoParaEliminar) return;
+    setRecursos((prev) => prev.filter((r) => r.id !== recursoParaEliminar.id));
+    setRecursoParaEliminar(null);
   };
 
   const toggleEstatus = (e: CitaEstatus) => {
@@ -1196,7 +1202,7 @@ export default function Agenda() {
                   <button
                     onClick={() => eliminarRecurso(r.id, r.nombre)}
                     title="Eliminar recurso"
-                    className="shrink-0 text-ink/20 opacity-0 transition-opacity hover:text-danger group-hover:opacity-100"
+                    className="shrink-0 px-1 text-ink/40 transition-colors hover:text-danger"
                   >
                     ✕
                   </button>
@@ -1643,6 +1649,32 @@ export default function Agenda() {
             setShowRecursoDialog(false);
           }}
         />
+      )}
+
+      {recursoParaEliminar && (
+        <div className="fixed inset-0 z-[70] flex items-center justify-center bg-black/70 p-4">
+          <div className="w-full max-w-sm rounded-2xl border border-edge/10 bg-modal p-6">
+            <h3 className="text-base font-semibold text-ink">Eliminar recurso</h3>
+            <p className="mt-2 text-sm text-ink/70">
+              ¿Eliminar <span className="font-semibold text-ink">&quot;{recursoParaEliminar.nombre}&quot;</span> de
+              los recursos? Las citas ya agendadas con este recurso no se borran.
+            </p>
+            <div className="mt-6 flex gap-3">
+              <button
+                onClick={() => setRecursoParaEliminar(null)}
+                className="flex-1 rounded-lg border border-edge/15 py-2.5 text-sm font-semibold text-ink/80 transition-colors hover:bg-surface"
+              >
+                Cancelar
+              </button>
+              <button
+                onClick={confirmarEliminarRecurso}
+                className="flex-1 rounded-lg bg-danger py-2.5 text-sm font-semibold text-black transition-opacity hover:opacity-90"
+              >
+                Eliminar
+              </button>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );
