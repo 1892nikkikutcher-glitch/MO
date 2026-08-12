@@ -7,7 +7,7 @@ import Pacientes from "./pages/Pacientes";
 import Agenda from "./pages/Agenda";
 import Recetas from "./pages/Recetas";
 import PerfilDoctor from "./pages/PerfilDoctor";
-import Personal from "./pages/Personal";
+import Colaboradores from "./pages/Colaboradores";
 import Metas from "./pages/Metas";
 import Membresias from "./pages/Membresias";
 import Asistencia from "./pages/Asistencia";
@@ -196,7 +196,7 @@ export default function Dashboard({
           {activePage === "agenda" && <Agenda />}
           {activePage === "recetas" && <Recetas />}
           {activePage === "administracion-perfil" && <PerfilDoctor />}
-          {activePage === "administracion-personal" && <Personal />}
+          {activePage === "administracion-colaboradores" && <Colaboradores />}
           {activePage === "administracion-metas" && <Metas />}
           {activePage === "administracion-formatos-whatsapp" && <FormatosWhatsApp />}
           {activePage === "membresias" && <Membresias />}

@@ -153,7 +153,6 @@ export const navItems = [
     ),
     children: [
       { id: "administracion-procedimientos", label: "Procedimientos" },
-      { id: "administracion-personal", label: "Personal" },
       { id: "administracion-historial-clinico", label: "Historial Clínico" },
       { id: "administracion-borrar-citas", label: "Borrar citas" },
       { id: "administracion-consultorio", label: "Consultorio" },
@@ -165,6 +164,7 @@ export const navItems = [
       { id: "administracion-catalogos", label: "Catálogos" },
       { id: "administracion-metas", label: "Metas" },
       { id: "administracion-perfil", label: "Perfil del Doctor" },
+      { id: "administracion-colaboradores", label: "Colaboradores" },
     ],
   },
   {

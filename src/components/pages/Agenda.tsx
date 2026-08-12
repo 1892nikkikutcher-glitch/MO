@@ -4,7 +4,6 @@ import { useMemo, useRef, useState } from "react";
 import { usePatientData } from "@/context/PatientDataContext";
 import {
   citaEstatusOptions,
-  limitesPorPlan,
   type CitaAgenda,
   type CitaEstatus,
   type FrecuenciaRecurrencia,
@@ -160,18 +159,15 @@ function IconReloj() {
 function NuevaRecursoDialog({
   onClose,
   onSave,
-  limiteUnidadAlcanzado,
 }: {
   onClose: () => void;
   onSave: (recurso: { nombre: string; tipo: "medico" | "unidad"; color: string }) => void;
-  limiteUnidadAlcanzado: boolean;
 }) {
   const [nombre, setNombre] = useState("");
   const [tipo, setTipo] = useState<"medico" | "unidad">("medico");
   const [color, setColor] = useState(colorPalette[0]);
 
-  const bloqueadoPorCupo = tipo === "unidad" && limiteUnidadAlcanzado;
-  const puedeGuardar = nombre.trim().length > 0 && !bloqueadoPorCupo;
+  const puedeGuardar = nombre.trim().length > 0;
 
   return (
     <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/70 p-4">
@@ -237,12 +233,6 @@ function NuevaRecursoDialog({
             </div>
           </div>
         </div>
-
-        {bloqueadoPorCupo && (
-          <p className="mt-3 text-xs text-danger">
-            Ya usaste todas las unidades que permite tu plan. Ve a Planes para ampliarlo.
-          </p>
-        )}
 
         <div className="mt-6 flex gap-3">
           <button
@@ -774,8 +764,7 @@ function CitaDialog({
 }
 
 export default function Agenda() {
-  const { recursos, setRecursos, citas, setCitas, horario, setHorario, suscripcion } = usePatientData();
-  const limites = limitesPorPlan[suscripcion.planActivo] ?? limitesPorPlan.prueba;
+  const { recursos, setRecursos, citas, setCitas, horario, setHorario } = usePatientData();
   /** La agenda siempre se ve/agenda de 7am a 22h como base (para casos
    * extemporáneos), pero si el horario de atención configurado es más
    * amplio, se extiende para que ese horario quede disponible también. */
@@ -1419,10 +1408,6 @@ export default function Agenda() {
       {showRecursoDialog && (
         <NuevaRecursoDialog
           onClose={() => setShowRecursoDialog(false)}
-          limiteUnidadAlcanzado={
-            limites.unidades !== null &&
-            recursos.filter((r) => r.tipo === "unidad").length >= limites.unidades
-          }
           onSave={(nuevo) => {
             setRecursos((prev) => [...prev, { id: `r${Date.now()}`, ...nuevo }]);
             setShowRecursoDialog(false);
