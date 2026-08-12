@@ -59,6 +59,7 @@ export default function NuevoPresupuesto({
   const [personalizadoPrecio, setPersonalizadoPrecio] = useState("");
   const [mostrarPersonalizado, setMostrarPersonalizado] = useState(false);
   const [selectedTeeth, setSelectedTeeth] = useState<number[]>([]);
+  const [costoPorOrgano, setCostoPorOrgano] = useState(false);
   const [items, setItems] = useState<LineItem[]>(initialBudget?.items ?? []);
 
   const toggleTooth = (tooth: number) => {
@@ -67,18 +68,34 @@ export default function NuevoPresupuesto({
     );
   };
 
-  const agregarItem = (procedure: string, price: number) => {
+  /** Cuando el costo es "por órgano dentario", el precio se multiplica por
+   * la cantidad de dientes seleccionados en el odontograma (ej. una resina
+   * en 9 piezas cuesta 9 veces el precio unitario) — igual que en el
+   * sistema anterior. Si no está marcado, el precio queda fijo aunque se
+   * hayan marcado dientes solo como referencia. */
+  const precioUnitarioDelCatalogo = procedimientos.find((p) => p.id === procedimientoSeleccionadoId)?.costoPaciente;
+  const multiplicador = costoPorOrgano ? Math.max(selectedTeeth.length, 1) : 1;
+
+  const agregarItem = (procedure: string, precioUnitario: number) => {
     setItems((prev) => [
       ...prev,
-      { id: `${Date.now()}`, procedure, price, teeth: selectedTeeth, note: notaProcedimiento.trim() },
+      {
+        id: `${Date.now()}`,
+        procedure,
+        price: precioUnitario * multiplicador,
+        teeth: selectedTeeth,
+        note: notaProcedimiento.trim(),
+      },
     ]);
     setSelectedTeeth([]);
+    setCostoPorOrgano(false);
     setNotaProcedimiento("");
   };
 
   const handleAgregarDelCatalogo = () => {
     const procedimiento = procedimientos.find((p) => p.id === procedimientoSeleccionadoId);
     if (!procedimiento) return;
+    if (costoPorOrgano && selectedTeeth.length === 0) return;
     agregarItem(procedimiento.nombre, procedimiento.costoPaciente);
     setProcedimientoSeleccionadoId("");
   };
@@ -87,6 +104,7 @@ export default function NuevoPresupuesto({
     const nombre = personalizadoNombre.trim();
     const precio = Number(personalizadoPrecio);
     if (!nombre || !precio) return;
+    if (costoPorOrgano && selectedTeeth.length === 0) return;
     agregarItem(nombre, precio);
     setPersonalizadoNombre("");
     setPersonalizadoPrecio("");
@@ -323,10 +341,33 @@ export default function NuevoPresupuesto({
             </div>
           )}
 
+          <label className="flex items-center gap-2 text-sm text-ink/70">
+            <input
+              type="checkbox"
+              checked={costoPorOrgano}
+              onChange={(e) => setCostoPorOrgano(e.target.checked)}
+              className="h-4 w-4 rounded border-edge/30 accent-accent"
+            />
+            Costo por órgano dentario (multiplica el precio × dientes marcados en el odontograma)
+          </label>
+          {costoPorOrgano && (
+            <p className="text-xs text-ink/50">
+              {selectedTeeth.length === 0
+                ? "Marca al menos un diente en el odontograma de arriba."
+                : precioUnitarioDelCatalogo !== undefined
+                  ? `${formatCurrency(precioUnitarioDelCatalogo)} × ${selectedTeeth.length} ${
+                      selectedTeeth.length === 1 ? "diente" : "dientes"
+                    } = ${formatCurrency(precioUnitarioDelCatalogo * selectedTeeth.length)}`
+                  : `Se multiplicará el precio × ${selectedTeeth.length} ${
+                      selectedTeeth.length === 1 ? "diente" : "dientes"
+                    }.`}
+            </p>
+          )}
+
           {procedimientos.length > 0 && (
             <button
               onClick={handleAgregarDelCatalogo}
-              disabled={!procedimientoSeleccionadoId}
+              disabled={!procedimientoSeleccionadoId || (costoPorOrgano && selectedTeeth.length === 0)}
               className="w-full rounded-lg border border-accent/40 py-2.5 text-sm font-semibold text-accent transition-colors hover:bg-accent/10 disabled:cursor-not-allowed disabled:opacity-40"
             >
               + Agregar procedimiento
@@ -362,7 +403,11 @@ export default function NuevoPresupuesto({
               <div className="flex gap-2">
                 <button
                   onClick={handleAgregarPersonalizado}
-                  disabled={!personalizadoNombre.trim() || !Number(personalizadoPrecio)}
+                  disabled={
+                    !personalizadoNombre.trim() ||
+                    !Number(personalizadoPrecio) ||
+                    (costoPorOrgano && selectedTeeth.length === 0)
+                  }
                   className="flex-1 rounded-lg border border-accent/40 py-2 text-xs font-semibold text-accent transition-colors hover:bg-accent/10 disabled:cursor-not-allowed disabled:opacity-40"
                 >
                   Agregar
