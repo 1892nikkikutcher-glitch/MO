@@ -12,6 +12,7 @@ import Metas from "./pages/Metas";
 import Membresias from "./pages/Membresias";
 import Asistencia from "./pages/Asistencia";
 import Procedimientos from "./pages/Procedimientos";
+import HistorialClinicoAdmin from "./pages/HistorialClinicoAdmin";
 import FormatosWhatsApp from "./pages/FormatosWhatsApp";
 import Planes from "./pages/Planes";
 import GlobalAgregarPago from "./GlobalAgregarPago";
@@ -202,6 +203,7 @@ export default function Dashboard({
           {activePage === "membresias" && <Membresias />}
           {activePage === "asistencia" && <Asistencia />}
           {activePage === "administracion-procedimientos" && <Procedimientos />}
+          {activePage === "administracion-historial-clinico" && <HistorialClinicoAdmin />}
           {activePage === "planes" && <Planes />}
         </div>
       </main>

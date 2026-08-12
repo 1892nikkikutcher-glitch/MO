@@ -50,6 +50,12 @@ import { formatosWhatsAppInicial, type FormatosWhatsApp } from "@/lib/formatosWh
 import { calcularFechaFin, type MembershipPlan, type PatientMembership, type UsoBeneficio } from "@/lib/membresias";
 import type { PersonalAsistencia, RegistroAsistencia } from "@/lib/asistencia";
 import type { Procedimiento } from "@/lib/procedimientos";
+import {
+  plantillaInicial,
+  respuestasVacias,
+  type HistoriaClinicaTemplate,
+  type RespuestasHistoriaClinica,
+} from "@/lib/historiaClinica";
 
 type Updater<T> = T | ((prev: T) => T);
 
@@ -347,6 +353,13 @@ type PatientDataContextValue = {
   marcarLlegadaCita: (citaId: string, hora: string | null) => void;
   procedimientos: Procedimiento[];
   setProcedimientos: (updater: Updater<Procedimiento[]>) => void;
+  historiaClinicaTemplate: HistoriaClinicaTemplate;
+  setHistoriaClinicaTemplate: (updater: Updater<HistoriaClinicaTemplate>) => void;
+  historiaClinicaPorPaciente: Record<string, RespuestasHistoriaClinica>;
+  setRespuestasHistoriaClinica: (
+    patientId: string,
+    updater: Updater<RespuestasHistoriaClinica>
+  ) => void;
   recursos: Recurso[];
   setRecursos: (updater: Updater<Recurso[]>) => void;
   citas: CitaAgenda[];
@@ -436,6 +449,11 @@ export function PatientDataProvider({
     "registrosAsistencia"
   );
   const [procedimientos, setProcedimientos] = useFirestoreList<Procedimiento>(clinicUid, "procedimientos");
+  const [historiaClinicaTemplate, setHistoriaClinicaTemplate] = useFirestoreDoc<HistoriaClinicaTemplate>(
+    clinicUid,
+    "historiaClinicaTemplate",
+    plantillaInicial
+  );
 
   const [presupuestosPorPaciente, setPresupuestosPorPacienteState] = useState<
     Record<string, SavedBudget[]>
@@ -444,6 +462,9 @@ export function PatientDataProvider({
   const [recetasPorPaciente, setRecetasPorPacienteState] = useState<Record<string, Receta[]>>({});
   const [membresiasPorPaciente, setMembresiasPorPacienteState] = useState<
     Record<string, PatientMembership[]>
+  >({});
+  const [historiaClinicaPorPaciente, setHistoriaClinicaPorPacienteState] = useState<
+    Record<string, RespuestasHistoriaClinica>
   >({});
   const subs = useRef<Record<string, Unsubscribe>>({});
   const [navegacionExpediente, setNavegacionExpediente] = useState<NavegacionExpediente>(null);
@@ -514,6 +535,14 @@ export function PatientDataProvider({
       subs.current[membresiasKey] = onSnapshot(collection(db, path), (snap) => {
         const next = snap.docs.map((d) => ({ ...(d.data() as PatientMembership), id: d.id }));
         setMembresiasPorPacienteState((prev) => ({ ...prev, [patientId]: next }));
+      });
+    }
+    const historiaKey = `historiaClinica:${patientId}`;
+    if (!subs.current[historiaKey]) {
+      const path = `users/${clinicUid}/pacientes/${patientId}/historiaClinica`;
+      subs.current[historiaKey] = onSnapshot(doc(db, path, "respuestas"), (snap) => {
+        const next = snap.exists() ? (snap.data() as RespuestasHistoriaClinica) : respuestasVacias;
+        setHistoriaClinicaPorPacienteState((prev) => ({ ...prev, [patientId]: next }));
       });
     }
   };
@@ -618,6 +647,19 @@ export function PatientDataProvider({
       syncFirestoreList(`users/${clinicUid}/pacientes/${patientId}/recetas`, prevArr, next);
       return { ...prev, [patientId]: next };
     });
+  };
+
+  const setRespuestasHistoriaClinica = (
+    patientId: string,
+    updater: Updater<RespuestasHistoriaClinica>
+  ) => {
+    if (!clinicUid) return;
+    const prev = historiaClinicaPorPaciente[patientId] ?? respuestasVacias;
+    const next = resolveUpdater(updater, prev);
+    setDoc(doc(db, `users/${clinicUid}/pacientes/${patientId}/historiaClinica`, "respuestas"), next).catch(
+      (err) => console.error(`No se pudo guardar historiaClinica de ${patientId}`, err)
+    );
+    setHistoriaClinicaPorPacienteState((p) => ({ ...p, [patientId]: next }));
   };
 
   const setMembresiasPaciente = (patientId: string, updater: Updater<PatientMembership[]>) => {
@@ -829,6 +871,10 @@ export function PatientDataProvider({
         marcarLlegadaCita,
         procedimientos,
         setProcedimientos,
+        historiaClinicaTemplate,
+        setHistoriaClinicaTemplate,
+        historiaClinicaPorPaciente,
+        setRespuestasHistoriaClinica,
         recursos,
         setRecursos,
         citas,

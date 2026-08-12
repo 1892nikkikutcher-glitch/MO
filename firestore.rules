@@ -184,6 +184,9 @@ service cloud.firestore {
       allow read: if isActiveMember(ownerId);
       allow write: if isClinicAdmin(ownerId);
     }
+    match /users/{ownerId}/pacientes/{patientId}/historiaClinica/{docId} {
+      allow read, write: if isActiveMember(ownerId);
+    }
 
     match /{document=**} {
       allow read, write: if false;
