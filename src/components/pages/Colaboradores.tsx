@@ -8,6 +8,23 @@ import { manejarCambioNombre } from "@/lib/textoNombre";
 const inputClass =
   "w-full rounded-lg border border-edge/10 bg-field px-3 py-2 text-sm text-ink placeholder-ink/30 outline-none focus:border-accent/60";
 
+function WhatsappCell({ valor, onGuardar }: { valor: string; onGuardar: (valor: string) => void }) {
+  const [texto, setTexto] = useState(valor);
+
+  return (
+    <input
+      type="text"
+      value={texto}
+      onChange={(e) => setTexto(e.target.value)}
+      onBlur={() => {
+        if (texto.trim() !== valor) onGuardar(texto.trim());
+      }}
+      placeholder="Sin registrar"
+      className="w-36 rounded-md border border-edge/10 bg-field px-2 py-1 text-xs text-ink placeholder-ink/30 outline-none focus:border-accent/60"
+    />
+  );
+}
+
 export default function Colaboradores() {
   const {
     miRol,
@@ -19,11 +36,13 @@ export default function Colaboradores() {
     eliminarInvitacion,
     eliminarColaborador,
     actualizarRolColaborador,
+    actualizarWhatsappColaborador,
   } = usePatientData();
 
   const [nombreClinica, setNombreClinica] = useState(clinicInfo?.nombre ?? "");
   const [nombre, setNombre] = useState("");
   const [correo, setCorreo] = useState("");
+  const [whatsapp, setWhatsapp] = useState("");
   const [rol, setRol] = useState<RolClinica>("colaborador");
   const [enviando, setEnviando] = useState(false);
 
@@ -45,9 +64,10 @@ export default function Colaboradores() {
   const invitar = async () => {
     if (!puedeInvitar) return;
     setEnviando(true);
-    await invitarColaborador({ nombre: nombre.trim(), correo: correo.trim(), rol });
+    await invitarColaborador({ nombre: nombre.trim(), correo: correo.trim(), whatsapp: whatsapp.trim(), rol });
     setNombre("");
     setCorreo("");
+    setWhatsapp("");
     setRol("colaborador");
     setEnviando(false);
   };
@@ -89,7 +109,7 @@ export default function Colaboradores() {
         <h3 className="text-sm font-semibold uppercase tracking-wide text-ink/60">
           Invitar Colaborador
         </h3>
-        <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
           <input
             type="text"
             value={nombre}
@@ -102,6 +122,13 @@ export default function Colaboradores() {
             value={correo}
             onChange={(e) => setCorreo(e.target.value)}
             placeholder="correo@ejemplo.com"
+            className={inputClass}
+          />
+          <input
+            type="text"
+            value={whatsapp}
+            onChange={(e) => setWhatsapp(e.target.value)}
+            placeholder="Número de WhatsApp (opcional)"
             className={inputClass}
           />
           <select value={rol} onChange={(e) => setRol(e.target.value as RolClinica)} className={inputClass}>
@@ -132,6 +159,7 @@ export default function Colaboradores() {
                 <div>
                   <span className="font-medium text-ink">{inv.nombre}</span>{" "}
                   <span className="text-ink/50">· {inv.email}</span>{" "}
+                  {inv.whatsapp && <span className="text-ink/50">· {inv.whatsapp}</span>}{" "}
                   <span className="capitalize text-ink/40">· {inv.role}</span>
                 </div>
                 <button
@@ -161,6 +189,7 @@ export default function Colaboradores() {
                 <tr className="border-b border-edge/10 text-xs uppercase tracking-wide text-ink/40">
                   <th className="px-6 py-3 font-medium">Nombre</th>
                   <th className="px-6 py-3 font-medium">Correo</th>
+                  <th className="px-6 py-3 font-medium">WhatsApp</th>
                   <th className="px-6 py-3 font-medium">Rol</th>
                   <th className="px-6 py-3 text-right font-medium">Quitar</th>
                 </tr>
@@ -173,6 +202,12 @@ export default function Colaboradores() {
                     <tr key={memberId} className="border-b border-edge/5 last:border-0">
                       <td className="px-6 py-3 text-ink">{c.nombre || "—"}</td>
                       <td className="px-6 py-3 text-ink/70">{c.correo}</td>
+                      <td className="px-6 py-3">
+                        <WhatsappCell
+                          valor={c.whatsapp ?? ""}
+                          onGuardar={(whatsapp) => actualizarWhatsappColaborador(memberId, whatsapp)}
+                        />
+                      </td>
                       <td className="px-6 py-3">
                         <select
                           value={c.role}

@@ -297,6 +297,7 @@ function useClinicResolution(authUid: string, authEmail: string) {
       uid: authUid,
       nombre: pendingInvite.nombre,
       correo: pendingInvite.email,
+      whatsapp: pendingInvite.whatsapp ?? "",
       role: pendingInvite.role,
       status: "active",
     } satisfies ClinicMember);
@@ -403,10 +404,11 @@ type PatientDataContextValue = {
   rechazarInvite: () => void;
   colaboradoresActivos: ClinicMember[];
   invitacionesPendientes: ClinicInvite[];
-  invitarColaborador: (data: { nombre: string; correo: string; rol: RolClinica }) => Promise<void>;
+  invitarColaborador: (data: { nombre: string; correo: string; whatsapp: string; rol: RolClinica }) => Promise<void>;
   eliminarInvitacion: (inviteId: string) => Promise<void>;
   eliminarColaborador: (memberId: string) => Promise<void>;
   actualizarRolColaborador: (memberId: string, rol: RolClinica) => Promise<void>;
+  actualizarWhatsappColaborador: (memberId: string, whatsapp: string) => Promise<void>;
 };
 
 const PatientDataContext = createContext<PatientDataContextValue | null>(null);
@@ -874,7 +876,12 @@ export function PatientDataProvider({
     setCitas((prev) => prev.map((c) => (c.id === citaId ? { ...c, horaLlegada: hora } : c)));
   };
 
-  const invitarColaborador = async (data: { nombre: string; correo: string; rol: RolClinica }) => {
+  const invitarColaborador = async (data: {
+    nombre: string;
+    correo: string;
+    whatsapp: string;
+    rol: RolClinica;
+  }) => {
     if (!clinicUid) return;
     const correo = data.correo.trim().toLowerCase();
     await setDoc(doc(db, "clinicInvites", `${clinicUid}_${correo}`), {
@@ -882,6 +889,7 @@ export function PatientDataProvider({
       nombreClinica: clinicInfo?.nombre || perfilDoctor.nombre || "",
       email: correo,
       nombre: data.nombre.trim(),
+      whatsapp: data.whatsapp.trim(),
       role: data.rol,
       status: "pending",
     } satisfies ClinicInvite);
@@ -899,6 +907,12 @@ export function PatientDataProvider({
     const miembro = colaboradoresActivos.find((c) => `${c.clinicId}_${c.uid}` === memberId);
     if (!miembro) return;
     await setDoc(doc(db, "clinicMembers", memberId), { ...miembro, role: rol }, { merge: true });
+  };
+
+  const actualizarWhatsappColaborador = async (memberId: string, whatsapp: string) => {
+    const miembro = colaboradoresActivos.find((c) => `${c.clinicId}_${c.uid}` === memberId);
+    if (!miembro) return;
+    await setDoc(doc(db, "clinicMembers", memberId), { ...miembro, whatsapp }, { merge: true });
   };
 
   if (!resolved) {
@@ -985,6 +999,7 @@ export function PatientDataProvider({
         eliminarInvitacion,
         eliminarColaborador,
         actualizarRolColaborador,
+        actualizarWhatsappColaborador,
       }}
     >
       {children}

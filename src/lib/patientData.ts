@@ -252,6 +252,7 @@ export type ClinicMember = {
   uid: string;
   nombre: string;
   correo: string;
+  whatsapp?: string;
   role: RolClinica;
   status: "active";
 };
@@ -262,6 +263,7 @@ export type ClinicInvite = {
   nombreClinica: string;
   email: string;
   nombre: string;
+  whatsapp?: string;
   role: RolClinica;
   status: "pending" | "claimed";
 };
