@@ -12,6 +12,7 @@ import {
 } from "@/lib/patientData";
 import { renderPlantilla, formatFechaLarga, formatHora12 } from "@/lib/formatosWhatsapp";
 import { manejarCambioNombre } from "@/lib/textoNombre";
+import { descargarICS } from "@/lib/exportCalendario";
 
 const PX_PER_MIN = 1.2;
 const DIAS_SEMANA = ["lun.", "mar.", "mié.", "jue.", "vie.", "sáb.", "dom."];
@@ -891,6 +892,29 @@ export default function Agenda() {
     window.open(`https://wa.me/?text=${encodeURIComponent(lineas.join("\n").trimEnd())}`, "_blank");
   };
 
+  /** Descarga un .ics con las citas de lo que se está viendo ahora mismo
+   * (día, 3 días, semana o mes) para importarlo en Google Calendar u otro
+   * calendario — sin necesitar conectar una cuenta ni credenciales de API. */
+  const exportarAGoogleCalendar = () => {
+    let citasAExportar: CitaAgenda[];
+    let etiqueta: string;
+
+    if (vista === "mes") {
+      citasAExportar = citasVisibles.filter((c) => {
+        const [anio, mes] = c.fecha.split("-").map(Number);
+        return anio === mesActual.getFullYear() && mes === mesActual.getMonth() + 1;
+      });
+      etiqueta = `${MESES[mesActual.getMonth()]}_${mesActual.getFullYear()}`;
+    } else {
+      const fechasSet = new Set(dias.map((d) => toISODate(d)));
+      citasAExportar = citasVisibles.filter((c) => fechasSet.has(c.fecha));
+      etiqueta =
+        vista === "dia" ? toISODate(diaSeleccionado) : `${toISODate(dias[0])}_a_${toISODate(dias[dias.length - 1])}`;
+    }
+
+    descargarICS(citasAExportar, "Agenda MO", `agenda_${etiqueta}.ics`);
+  };
+
   const [draggingId, setDraggingId] = useState<string | null>(null);
   const [dragOverDay, setDragOverDay] = useState<string | null>(null);
   const dragGrabOffsetRef = useRef(0);
@@ -1132,6 +1156,22 @@ export default function Agenda() {
               className="flex h-7 w-7 items-center justify-center rounded-lg border border-edge/10 text-ink/60 hover:bg-surface"
             >
               ›
+            </button>
+            <button
+              onClick={exportarAGoogleCalendar}
+              title="Descarga un archivo .ics para importar en Google Calendar (o Outlook/Apple Calendar)"
+              className="flex items-center gap-1.5 rounded-lg border border-edge/10 px-3 py-1.5 text-xs font-semibold text-ink/70 transition-colors hover:bg-surface hover:text-ink"
+            >
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" className="shrink-0">
+                <path
+                  d="M12 15V3m0 12-4-4m4 4 4-4M4 17v2a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-2"
+                  stroke="currentColor"
+                  strokeWidth="1.8"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                />
+              </svg>
+              Exportar a Google Calendar
             </button>
           </div>
         </div>
