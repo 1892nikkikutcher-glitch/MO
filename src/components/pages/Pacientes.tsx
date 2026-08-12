@@ -198,17 +198,17 @@ function ImportarPacientesDialog({
         ) : (
           <>
             <p className="mb-4 text-xs text-ink/40">
-              Sube el archivo que ya exporta tu sistema anterior — .csv o .txt (también .json).
-              Detectamos automáticamente las columnas de nombre, teléfono, fecha de nacimiento y
-              correo; todo lo demás se guarda como nota en el expediente. Revisa la vista previa
-              antes de confirmar.
+              Sube tu archivo de Excel tal como lo tienes — no necesitas convertirlo ni prepararlo
+              de ninguna forma. Detectamos automáticamente las columnas de nombre, teléfono, fecha
+              de nacimiento y correo; todo lo demás se guarda como nota en el expediente. Revisa la
+              vista previa antes de confirmar.
             </p>
 
             <label className="flex cursor-pointer flex-col items-center justify-center gap-2 rounded-lg border border-dashed border-edge/20 p-6 text-center text-sm text-ink/50 hover:border-accent/40 hover:text-ink">
-              {nombreArchivo || "Selecciona un archivo .csv, .txt o .json"}
+              {nombreArchivo || "Selecciona tu archivo de Excel"}
               <input
                 type="file"
-                accept=".csv,.txt,.tsv,.xls,.json,text/csv,application/vnd.ms-excel,application/json"
+                accept=".xlsx,.xls,.csv,.txt,.tsv,.json,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/vnd.ms-excel,text/csv,application/json"
                 className="hidden"
                 onChange={(e) => e.target.files?.[0] && handleArchivo(e.target.files[0])}
               />

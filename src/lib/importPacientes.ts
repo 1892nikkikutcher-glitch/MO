@@ -1,8 +1,11 @@
 /** Lee archivos de pacientes exportados de otros sistemas (CMP y similares):
- * CSV o TXT delimitado por coma/punto y coma/tabulador, con encabezados en
- * español y cualquier orden de columnas — o un .json ya estructurado.
- * No requiere que el doctor prepare nada especial: sube el mismo archivo
- * que ya exporta su sistema anterior. */
+ * Excel (.xlsx/.xls) tal cual, CSV o TXT delimitado por coma/punto y
+ * coma/tabulador, con encabezados en español y cualquier orden de columnas
+ * — o un .json ya estructurado. No requiere que el doctor sepa qué es un
+ * CSV o convierta nada: sube el mismo archivo que ya tiene o que exporta
+ * su sistema anterior. */
+
+import * as XLSX from "xlsx";
 
 export type RegistroImportado = {
   name: string;
@@ -51,11 +54,23 @@ function normalizar(s: string): string {
     .replace(/\s+/g, " ");
 }
 
-function esArchivoBinario(buffer: ArrayBuffer): "xlsx" | "xls-binario" | null {
+/** Detecta si el archivo es un Excel binario real (.xlsx moderno tipo ZIP,
+ * o .xls antiguo tipo OLE2) para mandarlo a SheetJS en vez de leerlo como
+ * texto plano. */
+function esArchivoBinario(buffer: ArrayBuffer): boolean {
   const b = new Uint8Array(buffer.slice(0, 4));
-  if (b[0] === 0x50 && b[1] === 0x4b) return "xlsx";
-  if (b[0] === 0xd0 && b[1] === 0xcf && b[2] === 0x11 && b[3] === 0xe0) return "xls-binario";
-  return null;
+  const esZip = b[0] === 0x50 && b[1] === 0x4b;
+  const esOle2 = b[0] === 0xd0 && b[1] === 0xcf && b[2] === 0x11 && b[3] === 0xe0;
+  return esZip || esOle2;
+}
+
+function leerFilasDeExcel(buffer: ArrayBuffer): string[][] {
+  const libro = XLSX.read(buffer, { type: "array" });
+  const hoja = libro.Sheets[libro.SheetNames[0]];
+  const filas: unknown[][] = XLSX.utils.sheet_to_json(hoja, { header: 1, raw: false, defval: "" });
+  return filas
+    .map((fila) => fila.map((celda) => (celda === null || celda === undefined ? "" : String(celda).trim())))
+    .filter((fila) => fila.some((v) => v !== ""));
 }
 
 function decodificarBuffer(buffer: ArrayBuffer): string {
@@ -153,41 +168,12 @@ export type ResultadoImportacion = {
   avisos: string[];
 };
 
-export function parseArchivoPacientes(buffer: ArrayBuffer, nombreArchivo: string): ResultadoImportacion {
-  const tipoBinario = esArchivoBinario(buffer);
-  if (tipoBinario) {
-    throw new Error(
-      'Este archivo es un Excel binario real y no se puede leer directamente. Ábrelo en Excel y usa "Guardar como" → CSV (delimitado por comas) o "CSV UTF-8", y sube ese archivo aquí.'
-    );
-  }
-
-  const texto = decodificarBuffer(buffer);
-  const textoTrim = texto.trim();
-
-  if (nombreArchivo.toLowerCase().endsWith(".json") || textoTrim.startsWith("[")) {
-    let data: unknown;
-    try {
-      data = JSON.parse(textoTrim);
-    } catch {
-      throw new Error("El archivo .json no se pudo leer — revisa que esté bien formado.");
-    }
-    if (!Array.isArray(data)) throw new Error("El archivo JSON debe ser una lista de pacientes.");
-    const registros = data.filter(esRegistroJsonValido).map((v) => ({
-      name: v.name,
-      phone: v.phone ?? "",
-      birthDate: v.birthDate ?? "",
-      email: v.email ?? "",
-      notas: v.notas ?? "",
-    }));
-    if (registros.length === 0) throw new Error("No se encontró ningún registro con al menos un nombre.");
-    return { registros, avisos: construirAvisos(registros) };
-  }
-
-  const primeraLinea = texto.split(/\r?\n/).find((l) => l.trim() !== "") ?? "";
-  const delim = detectarDelimitador(primeraLinea);
-  const filas = parseDelimitado(texto, delim);
+/** Convierte filas ya separadas en celdas (vengan de Excel o de texto
+ * delimitado) en registros de pacientes, detectando las columnas conocidas
+ * por su encabezado sin importar el orden. */
+function mapearFilas(filas: string[][]): RegistroImportado[] {
   if (filas.length < 2) {
-    throw new Error("El archivo no tiene datos reconocibles. Verifica que sea un .csv o .txt exportado de tu sistema.");
+    throw new Error("El archivo no tiene datos reconocibles.");
   }
 
   const encabezados = filas[0].map((h) => h.trim());
@@ -241,6 +227,42 @@ export function parseArchivoPacientes(buffer: ArrayBuffer, nombreArchivo: string
   }
 
   if (registros.length === 0) throw new Error("No se encontró ningún registro con nombre de paciente.");
+  return registros;
+}
+
+export function parseArchivoPacientes(buffer: ArrayBuffer, nombreArchivo: string): ResultadoImportacion {
+  if (esArchivoBinario(buffer)) {
+    const filas = leerFilasDeExcel(buffer);
+    const registros = mapearFilas(filas);
+    return { registros, avisos: construirAvisos(registros) };
+  }
+
+  const texto = decodificarBuffer(buffer);
+  const textoTrim = texto.trim();
+
+  if (nombreArchivo.toLowerCase().endsWith(".json") || textoTrim.startsWith("[")) {
+    let data: unknown;
+    try {
+      data = JSON.parse(textoTrim);
+    } catch {
+      throw new Error("El archivo .json no se pudo leer — revisa que esté bien formado.");
+    }
+    if (!Array.isArray(data)) throw new Error("El archivo JSON debe ser una lista de pacientes.");
+    const registros = data.filter(esRegistroJsonValido).map((v) => ({
+      name: v.name,
+      phone: v.phone ?? "",
+      birthDate: v.birthDate ?? "",
+      email: v.email ?? "",
+      notas: v.notas ?? "",
+    }));
+    if (registros.length === 0) throw new Error("No se encontró ningún registro con al menos un nombre.");
+    return { registros, avisos: construirAvisos(registros) };
+  }
+
+  const primeraLinea = texto.split(/\r?\n/).find((l) => l.trim() !== "") ?? "";
+  const delim = detectarDelimitador(primeraLinea);
+  const filas = parseDelimitado(texto, delim);
+  const registros = mapearFilas(filas);
   return { registros, avisos: construirAvisos(registros) };
 }
 
