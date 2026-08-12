@@ -2,9 +2,13 @@
 
 import { useState } from "react";
 import Odontograma from "./Odontograma";
+import PresupuestoImpreso from "./PresupuestoImpreso";
 import { usePatientData } from "@/context/PatientDataContext";
 import { agruparPorEspecialidad, especialidadesPredefinidas, type Procedimiento } from "@/lib/procedimientos";
-import type { BudgetData, LineItem } from "@/lib/patientData";
+import { generarPresupuestoPdf } from "@/lib/generarPresupuestoPdf";
+import { enviarPdfPorWhatsapp } from "@/lib/enviarPdfWhatsapp";
+import { slugify } from "@/lib/textoNombre";
+import type { BudgetData, LineItem, Patient } from "@/lib/patientData";
 
 export type { BudgetData };
 
@@ -26,22 +30,29 @@ function todayFormatted() {
   });
 }
 
+function fechaLargaHoy() {
+  const texto = new Date().toLocaleDateString("es-MX", { weekday: "long", day: "numeric", month: "long", year: "numeric" });
+  return texto.charAt(0).toUpperCase() + texto.slice(1);
+}
+
 export default function NuevoPresupuesto({
-  patientName,
+  patient,
   initialBudget,
   planTratamientoSugerido,
   onCancel,
   onSave,
 }: {
-  patientName: string;
+  patient: Patient;
   initialBudget?: BudgetData;
   planTratamientoSugerido?: string;
   onCancel: () => void;
   onSave: (budget: BudgetData) => void;
 }) {
-  const { recursos, procedimientos, setProcedimientos } = usePatientData();
+  const patientName = patient.name;
+  const { recursos, procedimientos, setProcedimientos, perfilDoctor } = usePatientData();
   const medicos = recursos.filter((r) => r.tipo === "medico");
   const gruposProcedimientos = agruparPorEspecialidad(procedimientos);
+  const [enviandoWhatsApp, setEnviandoWhatsApp] = useState(false);
 
   const isEditing = Boolean(initialBudget);
   const [folio] = useState(() => initialBudget?.folio ?? generateFolio());
@@ -60,6 +71,7 @@ export default function NuevoPresupuesto({
   const [mostrarPersonalizado, setMostrarPersonalizado] = useState(false);
   const [selectedTeeth, setSelectedTeeth] = useState<number[]>([]);
   const [costoPorOrgano, setCostoPorOrgano] = useState(false);
+  const [descuentoPct, setDescuentoPct] = useState("");
   const [items, setItems] = useState<LineItem[]>(initialBudget?.items ?? []);
 
   const toggleTooth = (tooth: number) => {
@@ -77,18 +89,24 @@ export default function NuevoPresupuesto({
   const multiplicador = costoPorOrgano ? Math.max(selectedTeeth.length, 1) : 1;
 
   const agregarItem = (procedure: string, precioUnitario: number) => {
+    const descuento = Math.min(100, Math.max(0, Number(descuentoPct) || 0));
+    const precioTotal = Math.round(precioUnitario * multiplicador * (1 - descuento / 100) * 100) / 100;
     setItems((prev) => [
       ...prev,
       {
         id: `${Date.now()}`,
         procedure,
-        price: precioUnitario * multiplicador,
+        price: precioTotal,
+        precioUnitario,
+        cantidad: multiplicador,
+        descuentoPct: descuento,
         teeth: selectedTeeth,
         note: notaProcedimiento.trim(),
       },
     ]);
     setSelectedTeeth([]);
     setCostoPorOrgano(false);
+    setDescuentoPct("");
     setNotaProcedimiento("");
   };
 
@@ -157,26 +175,50 @@ export default function NuevoPresupuesto({
   };
 
   const handleImprimir = () => {
+    const tituloOriginal = document.title;
+    document.title = `Presupuesto_${slugify(patientName)}_${slugify(fecha)}`;
+    const restaurarTitulo = () => {
+      document.title = tituloOriginal;
+      window.removeEventListener("afterprint", restaurarTitulo);
+    };
+    window.addEventListener("afterprint", restaurarTitulo);
     window.print();
   };
 
-  const handleEnviarWhatsApp = () => {
-    const lineas = [
-      `Presupuesto #${folio}`,
-      `Paciente: ${patientName}`,
-      `Fecha: ${fecha}`,
-      diagnostico && `Diagnóstico y tratamiento: ${diagnostico}`,
-      "",
-      ...items.map(
-        (item) =>
-          `- ${item.note || item.procedure}${item.teeth.length ? ` (dientes ${item.teeth.sort((a, b) => a - b).join(", ")})` : ""}: ${formatCurrency(item.price)}`
-      ),
-      "",
-      `Total: ${formatCurrency(total)}`,
-    ].filter(Boolean);
+  const handleEnviarWhatsApp = async () => {
+    if (enviandoWhatsApp) return;
+    const ventanaWhatsApp = window.open("", "_blank");
+    const nombreArchivo = `Presupuesto_${slugify(patientName)}_${slugify(fecha)}.pdf`;
+    const caption = `Plan de tratamiento — ${patientName} · Folio ${folio} · Total ${formatCurrency(total)}`;
 
-    const mensaje = encodeURIComponent(lineas.join("\n"));
-    window.open(`https://wa.me/?text=${mensaje}`, "_blank");
+    setEnviandoWhatsApp(true);
+    try {
+      const blob = await generarPresupuestoPdf({
+        folio,
+        fechaLarga: fechaLargaHoy(),
+        medico,
+        pacienteNombre: patientName,
+        pacienteCorreo: patient.email ?? "",
+        pacienteTelefono: patient.phone,
+        diagnostico,
+        items,
+        total,
+        perfilDoctor,
+      });
+      await enviarPdfPorWhatsapp({
+        blob,
+        nombreArchivo,
+        telefono: patient.phone,
+        caption,
+        ventanaPrevia: ventanaWhatsApp,
+      });
+    } catch (err) {
+      console.error("No se pudo generar el PDF del presupuesto", err);
+      ventanaWhatsApp?.close();
+      alert("No se pudo generar el PDF del presupuesto. Intenta de nuevo.");
+    } finally {
+      setEnviandoWhatsApp(false);
+    }
   };
 
   return (
@@ -350,17 +392,40 @@ export default function NuevoPresupuesto({
             />
             Costo por órgano dentario (multiplica el precio × dientes marcados en el odontograma)
           </label>
-          {costoPorOrgano && (
+
+          <div className="flex items-center gap-2">
+            <label className="text-xs font-medium text-ink/60">Descuento</label>
+            <input
+              type="number"
+              min={0}
+              max={100}
+              value={descuentoPct}
+              onChange={(e) => setDescuentoPct(e.target.value)}
+              placeholder="0"
+              className="w-20 rounded-lg border border-edge/10 bg-field px-2 py-1.5 text-sm text-ink outline-none focus:border-accent/60"
+            />
+            <span className="text-xs text-ink/50">%</span>
+          </div>
+
+          {(costoPorOrgano || Number(descuentoPct) > 0) && (
             <p className="text-xs text-ink/50">
-              {selectedTeeth.length === 0
-                ? "Marca al menos un diente en el odontograma de arriba."
-                : precioUnitarioDelCatalogo !== undefined
-                  ? `${formatCurrency(precioUnitarioDelCatalogo)} × ${selectedTeeth.length} ${
-                      selectedTeeth.length === 1 ? "diente" : "dientes"
-                    } = ${formatCurrency(precioUnitarioDelCatalogo * selectedTeeth.length)}`
-                  : `Se multiplicará el precio × ${selectedTeeth.length} ${
-                      selectedTeeth.length === 1 ? "diente" : "dientes"
-                    }.`}
+              {costoPorOrgano && selectedTeeth.length === 0 ? (
+                "Marca al menos un diente en el odontograma de arriba."
+              ) : precioUnitarioDelCatalogo !== undefined ? (
+                <>
+                  {formatCurrency(precioUnitarioDelCatalogo)} × {multiplicador}{" "}
+                  {multiplicador === 1 ? "unidad" : "dientes"}
+                  {Number(descuentoPct) > 0 ? ` − ${descuentoPct}%` : ""} ={" "}
+                  {formatCurrency(
+                    Math.round(precioUnitarioDelCatalogo * multiplicador * (1 - (Number(descuentoPct) || 0) / 100) * 100) /
+                      100
+                  )}
+                </>
+              ) : (
+                `Se multiplicará el precio × ${multiplicador} ${multiplicador === 1 ? "unidad" : "dientes"}${
+                  Number(descuentoPct) > 0 ? `, con ${descuentoPct}% de descuento` : ""
+                }.`
+              )}
             </p>
           )}
 
@@ -461,6 +526,15 @@ export default function NuevoPresupuesto({
                 >
                   <div>
                     <div className="text-ink">{item.procedure}</div>
+                    {(item.cantidad ?? 1) > 1 && (
+                      <div className="text-xs text-ink/40">
+                        {formatCurrency(item.precioUnitario ?? item.price)} × {item.cantidad}
+                        {item.descuentoPct ? ` − ${item.descuentoPct}%` : ""}
+                      </div>
+                    )}
+                    {(item.cantidad ?? 1) <= 1 && (item.descuentoPct ?? 0) > 0 && (
+                      <div className="text-xs text-ink/40">Descuento: {item.descuentoPct}%</div>
+                    )}
                     {item.note && (
                       <div className="text-xs text-accent/80">{item.note}</div>
                     )}
@@ -507,13 +581,25 @@ export default function NuevoPresupuesto({
           </button>
           <button
             onClick={handleEnviarWhatsApp}
-            disabled={items.length === 0}
+            disabled={items.length === 0 || enviandoWhatsApp}
             className="rounded-lg border border-success/40 px-4 py-2.5 text-sm font-semibold text-success transition-colors hover:bg-success/10 disabled:cursor-not-allowed disabled:opacity-40"
           >
-            Enviar por WhatsApp
+            {enviandoWhatsApp ? "Generando PDF…" : "Enviar por WhatsApp"}
           </button>
         </div>
       </div>
+
+      <PresupuestoImpreso
+        folio={folio}
+        fechaLarga={fechaLargaHoy()}
+        medico={medico}
+        pacienteNombre={patientName}
+        pacienteCorreo={patient.email ?? ""}
+        pacienteTelefono={patient.phone}
+        diagnostico={diagnostico}
+        items={items}
+        total={total}
+      />
     </div>
   );
 }

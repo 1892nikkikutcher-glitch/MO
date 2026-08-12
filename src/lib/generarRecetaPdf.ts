@@ -1,4 +1,5 @@
 import jsPDF from "jspdf";
+import { cargarImagen, type ImagenCargada } from "./imagenesPdf";
 import type { MedicamentoRecetado, PerfilDoctor } from "./patientData";
 
 export type DatosRecetaPdf = {
@@ -19,41 +20,6 @@ export type DatosRecetaPdf = {
   notas: string;
   perfilDoctor: PerfilDoctor;
 };
-
-type ImagenCargada = { dataUri: string; formato: string; ancho: number; alto: number };
-
-function formatoDesdeDataUri(dataUri: string): string {
-  const match = dataUri.match(/^data:image\/(\w+);/i);
-  const tipo = (match?.[1] ?? "png").toUpperCase();
-  return tipo === "JPG" ? "JPEG" : tipo;
-}
-
-async function cargarImagen(src: string): Promise<ImagenCargada | null> {
-  if (!src) return null;
-  try {
-    let dataUri = src;
-    if (!src.startsWith("data:")) {
-      const res = await fetch(src, { mode: "cors" });
-      const blob = await res.blob();
-      dataUri = await new Promise<string>((resolve, reject) => {
-        const lector = new FileReader();
-        lector.onload = () => resolve(lector.result as string);
-        lector.onerror = () => reject(new Error("No se pudo leer la imagen"));
-        lector.readAsDataURL(blob);
-      });
-    }
-    const { ancho, alto } = await new Promise<{ ancho: number; alto: number }>((resolve, reject) => {
-      const img = new Image();
-      img.onload = () => resolve({ ancho: img.naturalWidth, alto: img.naturalHeight });
-      img.onerror = () => reject(new Error("Imagen inválida"));
-      img.src = dataUri;
-    });
-    return { dataUri, formato: formatoDesdeDataUri(dataUri), ancho, alto };
-  } catch {
-    // Logo remoto no disponible (CORS, link roto, etc.) — la receta se genera sin él.
-    return null;
-  }
-}
 
 /** Genera el PDF de una receta con el formato tipo COPRISEM usado en Recetas.tsx,
  * incluyendo el logo de la escuela y, si está configurado, el de la clínica. */

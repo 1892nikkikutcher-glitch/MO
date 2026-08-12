@@ -5,6 +5,7 @@ import { usePatientData } from "@/context/PatientDataContext";
 import { formatNombreConEdad, type MedicamentoRecetado, type Receta } from "@/lib/patientData";
 import { calcularDosisPediatrica, type MedicamentoCatalogo } from "@/lib/medicamentos";
 import { generarRecetaPdf } from "@/lib/generarRecetaPdf";
+import { slugify } from "@/lib/textoNombre";
 
 const plantillasRecomendaciones = [
   "Evitar alimentos duros o muy calientes durante las primeras 24 horas.",
@@ -48,15 +49,6 @@ function horaActualFormateada() {
   return new Date().toLocaleTimeString("es-MX", { hour: "2-digit", minute: "2-digit" });
 }
 
-function slugify(texto: string) {
-  const sinAcentos = Array.from(texto.normalize("NFD"))
-    .filter((caracter) => {
-      const codigo = caracter.codePointAt(0) ?? 0;
-      return codigo < 0x300 || codigo > 0x36f; // fuera del rango de marcas diacríticas combinantes
-    })
-    .join("");
-  return sinAcentos.replace(/[^a-zA-Z0-9]+/g, "_").replace(/^_+|_+$/g, "");
-}
 
 function fechaLargaHoy() {
   const texto = new Date().toLocaleDateString("es-MX", {

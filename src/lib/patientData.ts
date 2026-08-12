@@ -80,9 +80,16 @@ export const patients: Patient[] = [
 export type LineItem = {
   id: string;
   procedure: string;
+  /** Total final de la línea (precioUnitario × cantidad, con descuento ya aplicado). */
   price: number;
   teeth: number[];
   note: string;
+  /** Desglose para el PDF/impresión — opcional por compatibilidad con
+   * presupuestos guardados antes de que existiera el desglose; si falta,
+   * se asume precioUnitario = price, cantidad = 1, descuentoPct = 0. */
+  precioUnitario?: number;
+  cantidad?: number;
+  descuentoPct?: number;
 };
 
 export type BudgetData = {

@@ -2,6 +2,7 @@
 
 import { useEffect, useState, type Dispatch, type SetStateAction } from "react";
 import NuevoPresupuesto from "./NuevoPresupuesto";
+import PresupuestoImpreso from "./PresupuestoImpreso";
 import DatosPaciente from "./DatosPaciente";
 import HistoriaClinica from "./HistoriaClinica";
 import ListadoCitas from "./ListadoCitas";
@@ -12,6 +13,9 @@ import Laboratorios from "./Laboratorios";
 import NotasEvolucion from "./NotasEvolucion";
 import MembresiaTab from "./MembresiaTab";
 import { usePatientData } from "@/context/PatientDataContext";
+import { generarPresupuestoPdf } from "@/lib/generarPresupuestoPdf";
+import { enviarPdfPorWhatsapp } from "@/lib/enviarPdfWhatsapp";
+import { slugify } from "@/lib/textoNombre";
 import {
   computeTratamientosPendientes,
   formatCurrency,
@@ -22,6 +26,11 @@ import {
   type SavedBudget,
   type Pago,
 } from "@/lib/patientData";
+
+function fechaLargaHoy() {
+  const texto = new Date().toLocaleDateString("es-MX", { weekday: "long", day: "numeric", month: "long", year: "numeric" });
+  return texto.charAt(0).toUpperCase() + texto.slice(1);
+}
 
 const expedienteTabs = [
   "Presupuestos",
@@ -38,22 +47,6 @@ const expedienteTabs = [
 
 type ExpedienteTab = (typeof expedienteTabs)[number];
 
-function buildWhatsAppMessage(patientName: string, budget: SavedBudget) {
-  const lineas = [
-    `Presupuesto #${budget.folio}`,
-    `Paciente: ${patientName}`,
-    `Fecha: ${budget.fecha}`,
-    budget.diagnostico && `Diagnóstico y tratamiento: ${budget.diagnostico}`,
-    "",
-    ...budget.items.map(
-      (item) =>
-        `- ${item.note || item.procedure}${item.teeth.length ? ` (dientes ${[...item.teeth].sort((a, b) => a - b).join(", ")})` : ""}: ${formatCurrency(item.price)}`
-    ),
-    "",
-    `Total: ${formatCurrency(budget.total)}`,
-  ].filter(Boolean);
-  return lineas.join("\n");
-}
 
 function buildResumenExpediente(
   patient: Patient,
@@ -158,19 +151,21 @@ function TrashIcon() {
 }
 
 function PresupuestosTab({
-  patientName,
+  patient,
   presupuestos,
   setPresupuestos,
   planTratamientoSugerido,
 }: {
-  patientName: string;
+  patient: Patient;
   presupuestos: SavedBudget[];
   setPresupuestos: Dispatch<SetStateAction<SavedBudget[]>>;
   planTratamientoSugerido: string;
 }) {
+  const { perfilDoctor } = usePatientData();
   const [view, setView] = useState<"list" | "form">("list");
   const [editingBudget, setEditingBudget] = useState<SavedBudget | null>(null);
   const [printTarget, setPrintTarget] = useState<SavedBudget | null>(null);
+  const [enviandoWhatsAppId, setEnviandoWhatsAppId] = useState<string | null>(null);
 
   useEffect(() => {
     if (printTarget) {
@@ -178,10 +173,46 @@ function PresupuestosTab({
     }
   }, [printTarget]);
 
+  const enviarPresupuestoGuardado = async (budget: SavedBudget) => {
+    if (enviandoWhatsAppId) return;
+    const ventanaWhatsApp = window.open("", "_blank");
+    const nombreArchivo = `Presupuesto_${slugify(patient.name)}_${slugify(budget.fecha)}.pdf`;
+    const caption = `Plan de tratamiento — ${patient.name} · Folio ${budget.folio} · Total ${formatCurrency(budget.total)}`;
+
+    setEnviandoWhatsAppId(budget.id);
+    try {
+      const blob = await generarPresupuestoPdf({
+        folio: budget.folio,
+        fechaLarga: fechaLargaHoy(),
+        medico: budget.medico,
+        pacienteNombre: patient.name,
+        pacienteCorreo: patient.email ?? "",
+        pacienteTelefono: patient.phone,
+        diagnostico: budget.diagnostico,
+        items: budget.items,
+        total: budget.total,
+        perfilDoctor,
+      });
+      await enviarPdfPorWhatsapp({
+        blob,
+        nombreArchivo,
+        telefono: patient.phone,
+        caption,
+        ventanaPrevia: ventanaWhatsApp,
+      });
+    } catch (err) {
+      console.error("No se pudo generar el PDF del presupuesto", err);
+      ventanaWhatsApp?.close();
+      alert("No se pudo generar el PDF del presupuesto. Intenta de nuevo.");
+    } finally {
+      setEnviandoWhatsAppId(null);
+    }
+  };
+
   if (view === "form") {
     return (
       <NuevoPresupuesto
-        patientName={patientName}
+        patient={patient}
         initialBudget={editingBudget ?? undefined}
         planTratamientoSugerido={planTratamientoSugerido}
         onCancel={() => setView("list")}
@@ -254,14 +285,10 @@ function PresupuestosTab({
                       <PrinterIcon />
                     </button>
                     <button
-                      onClick={() =>
-                        window.open(
-                          `https://wa.me/?text=${encodeURIComponent(buildWhatsAppMessage(patientName, p))}`,
-                          "_blank"
-                        )
-                      }
+                      onClick={() => enviarPresupuestoGuardado(p)}
+                      disabled={enviandoWhatsAppId === p.id}
                       title="Enviar por WhatsApp"
-                      className="flex h-6 w-6 items-center justify-center rounded-full border border-success/30 text-success/70 transition-colors hover:border-success hover:text-success"
+                      className="flex h-6 w-6 items-center justify-center rounded-full border border-success/30 text-success/70 transition-colors hover:border-success hover:text-success disabled:opacity-40"
                     >
                       <WhatsAppIcon />
                     </button>
@@ -294,30 +321,17 @@ function PresupuestosTab({
       )}
 
       {printTarget && (
-        <div className="hidden print:block">
-          <h2 className="text-xl font-bold">Presupuesto #{printTarget.folio}</h2>
-          <p className="mt-1 text-sm">Paciente: {patientName}</p>
-          <p className="text-sm">Fecha: {printTarget.fecha}</p>
-          {printTarget.diagnostico && (
-            <p className="mt-2 text-sm">Diagnóstico y tratamiento: {printTarget.diagnostico}</p>
-          )}
-          <div className="mt-4 space-y-1">
-            {printTarget.items.map((item) => (
-              <div key={item.id} className="flex justify-between text-sm">
-                <span>
-                  {item.note || item.procedure}
-                  {item.teeth.length > 0 &&
-                    ` (dientes ${[...item.teeth].sort((a, b) => a - b).join(", ")})`}
-                </span>
-                <span>{formatCurrency(item.price)}</span>
-              </div>
-            ))}
-          </div>
-          <div className="mt-4 flex justify-between border-t pt-2 text-sm font-bold">
-            <span>Total</span>
-            <span>{formatCurrency(printTarget.total)}</span>
-          </div>
-        </div>
+        <PresupuestoImpreso
+          folio={printTarget.folio}
+          fechaLarga={fechaLargaHoy()}
+          medico={printTarget.medico}
+          pacienteNombre={patient.name}
+          pacienteCorreo={patient.email ?? ""}
+          pacienteTelefono={patient.phone}
+          diagnostico={printTarget.diagnostico}
+          items={printTarget.items}
+          total={printTarget.total}
+        />
       )}
     </div>
   );
@@ -522,7 +536,7 @@ export default function Expediente({
         <div className="min-w-0">
           {activeTab === "Presupuestos" && (
             <PresupuestosTab
-              patientName={patient.name}
+              patient={patient}
               presupuestos={presupuestos}
               setPresupuestos={setPresupuestos}
               planTratamientoSugerido={planTratamientoSugerido}

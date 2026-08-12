@@ -895,6 +895,8 @@ export default function Agenda() {
   const [estatusOcultos, setEstatusOcultos] = useState<Set<CitaEstatus>>(new Set());
   const [showRecursoDialog, setShowRecursoDialog] = useState(false);
   const [recursoParaEliminar, setRecursoParaEliminar] = useState<{ id: string; nombre: string } | null>(null);
+  const [recursoEditandoId, setRecursoEditandoId] = useState<string | null>(null);
+  const [nombreEditando, setNombreEditando] = useState("");
   const [dialogState, setDialogState] = useState<{
     initial: Partial<CitaAgenda> & { fecha: string; horaInicio: string };
     isEditing: boolean;
@@ -946,6 +948,21 @@ export default function Agenda() {
 
   const eliminarRecurso = (id: string, nombre: string) => {
     setRecursoParaEliminar({ id, nombre });
+  };
+
+  const iniciarEdicionRecurso = (r: Recurso) => {
+    setRecursoEditandoId(r.id);
+    setNombreEditando(r.nombre);
+  };
+
+  const guardarNombreRecurso = () => {
+    const nombre = nombreEditando.trim();
+    if (recursoEditandoId && nombre) {
+      setRecursos((prev) =>
+        prev.map((r) => (r.id === recursoEditandoId ? { ...r, nombre } : r))
+      );
+    }
+    setRecursoEditandoId(null);
   };
 
   const confirmarEliminarRecurso = () => {
@@ -1182,6 +1199,7 @@ export default function Agenda() {
           <div className="space-y-1.5">
             {recursos.map((r) => {
               const oculto = recursosOcultos.has(r.id);
+              const editando = recursoEditandoId === r.id;
               return (
                 <div
                   key={r.id}
@@ -1189,16 +1207,43 @@ export default function Agenda() {
                     oculto ? "opacity-30" : ""
                   } hover:bg-surface`}
                 >
-                  <button onClick={() => toggleRecurso(r.id)} className="flex min-w-0 flex-1 items-center gap-2">
-                    <span
-                      className="h-3 w-3 shrink-0 rounded-full"
-                      style={{ backgroundColor: r.color, boxShadow: `0 0 6px ${r.color}` }}
-                    />
-                    <span className="truncate text-ink/80">{r.nombre}</span>
-                  </button>
+                  {editando ? (
+                    <span className="flex min-w-0 flex-1 items-center gap-2">
+                      <span
+                        className="h-3 w-3 shrink-0 rounded-full"
+                        style={{ backgroundColor: r.color, boxShadow: `0 0 6px ${r.color}` }}
+                      />
+                      <input
+                        autoFocus
+                        value={nombreEditando}
+                        onChange={(e) => setNombreEditando(e.target.value)}
+                        onBlur={guardarNombreRecurso}
+                        onKeyDown={(e) => {
+                          if (e.key === "Enter") guardarNombreRecurso();
+                          if (e.key === "Escape") setRecursoEditandoId(null);
+                        }}
+                        className="min-w-0 flex-1 rounded border border-accent/40 bg-field px-1.5 py-0.5 text-xs text-ink outline-none"
+                      />
+                    </span>
+                  ) : (
+                    <button onClick={() => toggleRecurso(r.id)} className="flex min-w-0 flex-1 items-center gap-2">
+                      <span
+                        className="h-3 w-3 shrink-0 rounded-full"
+                        style={{ backgroundColor: r.color, boxShadow: `0 0 6px ${r.color}` }}
+                      />
+                      <span className="truncate text-ink/80">{r.nombre}</span>
+                    </button>
+                  )}
                   <span className="shrink-0 text-[10px] uppercase text-ink/30">
                     {r.tipo === "medico" ? "Médico" : "Unidad"}
                   </span>
+                  <button
+                    onClick={() => iniciarEdicionRecurso(r)}
+                    title="Editar nombre"
+                    className="shrink-0 px-1 text-ink/40 transition-colors hover:text-accent"
+                  >
+                    ✎
+                  </button>
                   <button
                     onClick={() => eliminarRecurso(r.id, r.nombre)}
                     title="Eliminar recurso"

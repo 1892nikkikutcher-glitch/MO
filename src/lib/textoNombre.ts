@@ -32,3 +32,16 @@ export function manejarCambioNombre(
     input.setSelectionRange(nuevoCursor, nuevoCursor);
   });
 }
+
+/** Convierte texto a un nombre de archivo seguro (sin acentos ni símbolos),
+ * para nombres de PDF descargados como "Receta_Juan_Perez_12_08_2026.pdf". */
+export function slugify(texto: string): string {
+  return Array.from(texto.normalize("NFD"))
+    .filter((caracter) => {
+      const codigo = caracter.codePointAt(0) ?? 0;
+      return codigo < 0x300 || codigo > 0x36f; // fuera del rango de marcas diacríticas combinantes
+    })
+    .join("")
+    .replace(/[^a-zA-Z0-9]+/g, "_")
+    .replace(/^_+|_+$/g, "");
+}
