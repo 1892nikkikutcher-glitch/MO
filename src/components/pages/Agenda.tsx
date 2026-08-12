@@ -828,6 +828,11 @@ export default function Agenda() {
     });
   };
 
+  const eliminarRecurso = (id: string, nombre: string) => {
+    if (!window.confirm(`¿Eliminar "${nombre}" de los recursos? Las citas ya agendadas con este recurso no se borran.`)) return;
+    setRecursos((prev) => prev.filter((r) => r.id !== id));
+  };
+
   const toggleEstatus = (e: CitaEstatus) => {
     setEstatusOcultos((prev) => {
       const next = new Set(prev);
@@ -994,22 +999,30 @@ export default function Agenda() {
             {recursos.map((r) => {
               const oculto = recursosOcultos.has(r.id);
               return (
-                <button
+                <div
                   key={r.id}
-                  onClick={() => toggleRecurso(r.id)}
-                  className={`flex w-full items-center gap-2 rounded-lg px-2 py-1.5 text-left text-xs transition-opacity ${
+                  className={`group flex w-full items-center gap-2 rounded-lg px-2 py-1.5 text-left text-xs transition-opacity ${
                     oculto ? "opacity-30" : ""
                   } hover:bg-surface`}
                 >
-                  <span
-                    className="h-3 w-3 shrink-0 rounded-full"
-                    style={{ backgroundColor: r.color, boxShadow: `0 0 6px ${r.color}` }}
-                  />
-                  <span className="truncate text-ink/80">{r.nombre}</span>
-                  <span className="ml-auto shrink-0 text-[10px] uppercase text-ink/30">
+                  <button onClick={() => toggleRecurso(r.id)} className="flex min-w-0 flex-1 items-center gap-2">
+                    <span
+                      className="h-3 w-3 shrink-0 rounded-full"
+                      style={{ backgroundColor: r.color, boxShadow: `0 0 6px ${r.color}` }}
+                    />
+                    <span className="truncate text-ink/80">{r.nombre}</span>
+                  </button>
+                  <span className="shrink-0 text-[10px] uppercase text-ink/30">
                     {r.tipo === "medico" ? "Médico" : "Unidad"}
                   </span>
-                </button>
+                  <button
+                    onClick={() => eliminarRecurso(r.id, r.nombre)}
+                    title="Eliminar recurso"
+                    className="shrink-0 text-ink/20 opacity-0 transition-opacity hover:text-danger group-hover:opacity-100"
+                  >
+                    ✕
+                  </button>
+                </div>
               );
             })}
           </div>
@@ -1409,7 +1422,8 @@ export default function Agenda() {
         <NuevaRecursoDialog
           onClose={() => setShowRecursoDialog(false)}
           onSave={(nuevo) => {
-            setRecursos((prev) => [...prev, { id: `r${Date.now()}`, ...nuevo }]);
+            const recurso = { id: `r${Date.now()}`, ...nuevo };
+            setRecursos((prev) => [...prev, recurso]);
             setShowRecursoDialog(false);
           }}
         />

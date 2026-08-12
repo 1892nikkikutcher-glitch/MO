@@ -4,6 +4,7 @@ import { useState } from "react";
 import { usePatientData } from "@/context/PatientDataContext";
 import { manejarCambioNombre } from "@/lib/textoNombre";
 import { escuelasOdontologiaComunes } from "@/lib/escuelasOdontologia";
+import { archivoAImagenComprimida } from "@/lib/imagenLogo";
 
 const inputClass =
   "w-full rounded-lg border border-edge/10 bg-field px-3 py-2 text-sm text-ink placeholder-ink/30 outline-none focus:border-accent/60";
@@ -13,6 +14,69 @@ function Field({ label, children }: { label: string; children: React.ReactNode }
     <div>
       <label className="mb-1 block text-xs font-medium text-ink/60">{label}</label>
       {children}
+    </div>
+  );
+}
+
+function LogoField({
+  label,
+  ayuda,
+  valor,
+  onCambiar,
+}: {
+  label: string;
+  ayuda: string;
+  valor: string;
+  onCambiar: (dataUri: string) => void;
+}) {
+  const [subiendo, setSubiendo] = useState(false);
+  const [error, setError] = useState("");
+
+  const handleArchivo = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    e.target.value = "";
+    if (!file) return;
+    setSubiendo(true);
+    setError("");
+    try {
+      const dataUri = await archivoAImagenComprimida(file);
+      onCambiar(dataUri);
+    } catch {
+      setError("No se pudo cargar la imagen. Intenta con otro archivo.");
+    } finally {
+      setSubiendo(false);
+    }
+  };
+
+  return (
+    <div>
+      <Field label={label}>
+        <div className="flex items-center gap-3">
+          {valor && (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img
+              src={valor}
+              alt="Vista previa del logo"
+              className="h-14 w-14 shrink-0 rounded-lg border border-edge/10 bg-white object-contain p-1"
+            />
+          )}
+          <div className="flex-1 space-y-1">
+            <input type="file" accept="image/*" onChange={handleArchivo} className="text-xs text-ink/60" />
+            {subiendo && <p className="text-xs text-ink/40">Cargando imagen…</p>}
+            {error && <p className="text-xs text-danger">{error}</p>}
+            {valor && !subiendo && (
+              <button
+                type="button"
+                onClick={() => onCambiar("")}
+                className="text-xs font-semibold text-danger hover:text-danger"
+              >
+                Quitar logo
+              </button>
+            )}
+          </div>
+        </div>
+      </Field>
+      <p className="mt-1 text-xs text-ink/40">{ayuda}</p>
     </div>
   );
 }
@@ -123,30 +187,35 @@ export default function PerfilDoctor() {
           )}
         </div>
 
-        <div>
-          <Field label="URL del logo de tu escuela (opcional)">
-            <input
-              type="text"
-              value={form.logoEscuelaUrl}
-              onChange={actualizar("logoEscuelaUrl")}
-              placeholder="https://... — un link a una imagen que tengas derecho de usar"
-              className={inputClass}
-            />
-          </Field>
-          <p className="mt-1 text-xs text-ink/40">
-            No generamos ni reproducimos escudos institucionales — pega aquí el link a tu propio logo
-            (por ejemplo, súbelo a Google Drive o Imgur y comparte el link directo a la imagen).
-          </p>
-          {form.logoEscuelaUrl && (
-            // eslint-disable-next-line @next/next/no-img-element
-            <img
-              src={form.logoEscuelaUrl}
-              alt="Vista previa del logo"
-              className="mt-2 h-16 w-16 rounded-lg border border-edge/10 bg-white object-contain p-1"
-              onError={(e) => (e.currentTarget.style.display = "none")}
-            />
-          )}
-        </div>
+        <LogoField
+          label="Logo de tu escuela (opcional)"
+          ayuda="No generamos ni reproducimos escudos institucionales — sube tu propia imagen del logo (debes tener derecho de uso). Se muestra en la esquina superior izquierda de tus recetas."
+          valor={form.logoEscuelaUrl}
+          onCambiar={(dataUri) => {
+            setForm((prev) => ({ ...prev, logoEscuelaUrl: dataUri }));
+            setGuardado(false);
+          }}
+        />
+
+        <LogoField
+          label="Logo de tu clínica o consultorio (opcional)"
+          ayuda="Se muestra junto al de la escuela en tus recetas, si tu clínica o consultorio tiene su propio logotipo."
+          valor={form.logoClinicaUrl}
+          onCambiar={(dataUri) => {
+            setForm((prev) => ({ ...prev, logoClinicaUrl: dataUri }));
+            setGuardado(false);
+          }}
+        />
+
+        <LogoField
+          label="Firma digital (opcional)"
+          ayuda="Sube una foto o escaneo de tu firma. Se agrega sobre la línea de 'Firma médico' en las recetas que envíes por WhatsApp o imprimas en PDF."
+          valor={form.firmaDigitalUrl}
+          onCambiar={(dataUri) => {
+            setForm((prev) => ({ ...prev, firmaDigitalUrl: dataUri }));
+            setGuardado(false);
+          }}
+        />
 
         <Field label="Dirección de la clínica (aparece al pie de la receta)">
           <textarea

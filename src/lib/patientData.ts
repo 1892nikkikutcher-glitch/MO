@@ -102,6 +102,7 @@ export type Receta = {
   id: string;
   folio: string;
   fecha: string;
+  hora: string;
   medico: string;
   /** Foto de estos datos al momento de expedir la receta — no cambian aunque el paciente se edite después. */
   edadTexto: string;
@@ -139,6 +140,10 @@ export type PerfilDoctor = {
   escuelaEgreso: string;
   /** Link a una imagen del escudo/logo de la escuela (el usuario debe tener derecho de uso). */
   logoEscuelaUrl: string;
+  /** Logo propio de la clínica o consultorio, opcional — se usa junto al de la escuela en recetas. */
+  logoClinicaUrl: string;
+  /** Imagen de la firma del doctor, para recetas enviadas por medios digitales (PDF/WhatsApp). */
+  firmaDigitalUrl: string;
   direccionClinica: string;
   /** Ej. "Esta receta es válida durante 48h" — se imprime en cada receta. */
   textoValidezReceta: string;
@@ -152,6 +157,8 @@ export const perfilDoctorInicial: PerfilDoctor = {
   telefono: "",
   escuelaEgreso: "",
   logoEscuelaUrl: "",
+  logoClinicaUrl: "",
+  firmaDigitalUrl: "",
   direccionClinica: "",
   textoValidezReceta: "Esta receta es válida durante 48h",
 };

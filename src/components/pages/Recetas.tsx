@@ -4,6 +4,7 @@ import { useState } from "react";
 import { usePatientData } from "@/context/PatientDataContext";
 import type { MedicamentoRecetado, Receta } from "@/lib/patientData";
 import { calcularDosisPediatrica, type MedicamentoCatalogo } from "@/lib/medicamentos";
+import { generarRecetaPdf } from "@/lib/generarRecetaPdf";
 
 const plantillasRecomendaciones = [
   "Evitar alimentos duros o muy calientes durante las primeras 24 horas.",
@@ -41,6 +42,20 @@ function resaltarCoincidencia(texto: string, query: string) {
 
 function todayFormatted() {
   return new Date().toLocaleDateString("es-MX", { day: "2-digit", month: "2-digit", year: "numeric" });
+}
+
+function horaActualFormateada() {
+  return new Date().toLocaleTimeString("es-MX", { hour: "2-digit", minute: "2-digit" });
+}
+
+function slugify(texto: string) {
+  const sinAcentos = Array.from(texto.normalize("NFD"))
+    .filter((caracter) => {
+      const codigo = caracter.codePointAt(0) ?? 0;
+      return codigo < 0x300 || codigo > 0x36f; // fuera del rango de marcas diacríticas combinantes
+    })
+    .join("");
+  return sinAcentos.replace(/[^a-zA-Z0-9]+/g, "_").replace(/^_+|_+$/g, "");
 }
 
 function fechaLargaHoy() {
@@ -83,6 +98,8 @@ export default function Recetas() {
   const [plantillaSeleccionada, setPlantillaSeleccionada] = useState("");
   const [guardado, setGuardado] = useState(false);
   const [folioActual, setFolioActual] = useState<string | null>(null);
+  const [horaActual, setHoraActual] = useState<string | null>(null);
+  const [enviandoWhatsApp, setEnviandoWhatsApp] = useState(false);
 
   const patient = patients.find((p) => p.id === patientId) ?? null;
   const edad = patient ? calculateAge(patient.birthDate) : null;
@@ -152,16 +169,20 @@ export default function Recetas() {
     setPlantillaSeleccionada("");
     setGuardado(false);
     setFolioActual(null);
+    setHoraActual(null);
   };
 
   const handleGuardar = () => {
     if (!puedeGuardar) return;
     const folio = folioActual ?? consumirSiguienteFolioReceta();
+    const hora = horaActual ?? horaActualFormateada();
     if (!folioActual) setFolioActual(folio);
+    if (!horaActual) setHoraActual(hora);
     const receta: Receta = {
       id: `${Date.now()}`,
       folio,
       fecha: todayFormatted(),
+      hora,
       medico,
       edadTexto: edad !== null ? String(edad) : "",
       sexo,
@@ -179,24 +200,83 @@ export default function Recetas() {
 
   const handleImprimir = () => {
     handleGuardar();
+    if (patient) {
+      const tituloOriginal = document.title;
+      document.title = `Receta_${slugify(patient.name)}_${slugify(todayFormatted())}`;
+      const restaurarTitulo = () => {
+        document.title = tituloOriginal;
+        window.removeEventListener("afterprint", restaurarTitulo);
+      };
+      window.addEventListener("afterprint", restaurarTitulo);
+    }
     window.print();
   };
 
-  const handleEnviarWhatsApp = () => {
-    if (!patient) return;
+  const handleEnviarWhatsApp = async () => {
+    if (!patient || enviandoWhatsApp) return;
+    // Se abre la pestaña de inmediato, de forma síncrona dentro del clic, porque
+    // window.open() después de esperar la generación del PDF pierde el gesto de
+    // usuario y el navegador lo bloquea como pop-up. Se navega una vez listo el PDF.
+    const ventanaWhatsApp = window.open("", "_blank");
     handleGuardar();
-    const lineas = [
-      `Receta médica — ${patient.name}`,
-      `Folio: ${folioActual ?? ""} · Fecha: ${todayFormatted()}`,
-      medico ? `Médico: ${medico}` : "",
-      "",
-      ...medicamentosRecetados.map((m, i) => `${i + 1}. ${m.nombre}${m.instrucciones ? `\n${m.instrucciones}` : ""}`),
-      notas ? `\n${notas}` : "",
-      perfilDoctor.textoValidezReceta ? `\n${perfilDoctor.textoValidezReceta}` : "",
-    ].filter(Boolean);
-    const texto = encodeURIComponent(lineas.join("\n"));
+    const folio = folioActual ?? consumirSiguienteFolioReceta();
+    const hora = horaActual ?? horaActualFormateada();
+    const nombreArchivo = `Receta_${slugify(patient.name)}_${slugify(todayFormatted())}.pdf`;
+    const caption = `Receta médica — ${patient.name} · Folio ${folio} · ${todayFormatted()} ${hora}`;
     const telefono = patient.phone.replace(/\D/g, "");
-    window.open(`https://wa.me/${telefono}?text=${texto}`, "_blank");
+
+    setEnviandoWhatsApp(true);
+    try {
+      const blob = await generarRecetaPdf({
+        folio,
+        fecha: todayFormatted(),
+        hora,
+        fechaLarga: fechaLargaHoy(),
+        medico,
+        pacienteNombre: patient.name,
+        edadTexto: edad !== null ? String(edad) : "",
+        sexo,
+        estatura,
+        temperatura,
+        peso,
+        diagnostico,
+        alergias,
+        medicamentos: medicamentosRecetados,
+        notas,
+        perfilDoctor,
+      });
+      const archivo = new File([blob], nombreArchivo, { type: "application/pdf" });
+
+      if (navigator.canShare?.({ files: [archivo] })) {
+        ventanaWhatsApp?.close(); // no se usa la pestaña — el share sheet nativo adjunta el PDF directamente
+        try {
+          await navigator.share({ files: [archivo], title: nombreArchivo, text: caption });
+        } catch (err) {
+          if (err instanceof Error && err.name === "AbortError") return; // el usuario canceló el share sheet
+          throw err;
+        }
+        return;
+      }
+
+      // En escritorio no existe forma de adjuntar un archivo a un chat de WhatsApp
+      // mediante un link — se descarga el PDF y se abre WhatsApp con el texto para
+      // que el usuario lo adjunte manualmente.
+      const url = URL.createObjectURL(blob);
+      const enlace = document.createElement("a");
+      enlace.href = url;
+      enlace.download = nombreArchivo;
+      enlace.click();
+      URL.revokeObjectURL(url);
+      const waUrl = `https://wa.me/${telefono}?text=${encodeURIComponent(`${caption}\n\n(Adjunta el PDF que se acaba de descargar)`)}`;
+      if (ventanaWhatsApp) ventanaWhatsApp.location.href = waUrl;
+      else window.open(waUrl, "_blank");
+    } catch (err) {
+      console.error("No se pudo generar el PDF de la receta", err);
+      ventanaWhatsApp?.close();
+      alert("No se pudo generar el PDF de la receta. Intenta de nuevo.");
+    } finally {
+      setEnviandoWhatsApp(false);
+    }
   };
 
   const recetasPrevias = patientId ? recetasPorPaciente[patientId] ?? [] : [];
@@ -368,10 +448,10 @@ export default function Recetas() {
           </button>
           <button
             onClick={handleEnviarWhatsApp}
-            disabled={!puedeGuardar}
+            disabled={!puedeGuardar || enviandoWhatsApp}
             className="rounded-lg border border-success/40 px-4 py-2.5 text-sm font-semibold text-success transition-colors hover:bg-success/10 disabled:cursor-not-allowed disabled:opacity-40"
           >
-            Enviar por WhatsApp
+            {enviandoWhatsApp ? "Generando PDF…" : "Enviar por WhatsApp"}
           </button>
           {patientId && (
             <button onClick={() => irAExpediente(patientId)} className="ml-auto text-sm font-medium text-ink/50 hover:text-ink">
@@ -420,9 +500,14 @@ export default function Recetas() {
               {perfilDoctor.cedulaProfesional && <p className="text-sm">Ced. Prof. {perfilDoctor.cedulaProfesional}</p>}
               {perfilDoctor.especialidad && <p className="text-sm">{perfilDoctor.especialidad}</p>}
             </div>
-            <div className="w-32 shrink-0 text-right text-xs">
-              <p className="font-semibold text-accent">Folio: {folioActual}</p>
+            <div className="w-24 shrink-0 text-right text-xs">
+              {perfilDoctor.logoClinicaUrl && (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img src={perfilDoctor.logoClinicaUrl} alt="" className="ml-auto h-16 w-16 object-contain" />
+              )}
+              <p className="mt-1 font-semibold text-accent">Folio: {folioActual}</p>
               <p className="mt-1 font-semibold">{fechaLargaHoy()}</p>
+              {horaActual && <p className="text-gray-600">{horaActual} hrs</p>}
             </div>
           </div>
 
@@ -455,6 +540,10 @@ export default function Recetas() {
               <p className="text-sm underline">{perfilDoctor.textoValidezReceta}</p>
             )}
             <div className="text-center text-xs">
+              {perfilDoctor.firmaDigitalUrl && (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img src={perfilDoctor.firmaDigitalUrl} alt="" className="mx-auto h-10 object-contain" />
+              )}
               <div className="mb-1 w-40 border-b border-black" />
               Firma médico
             </div>
