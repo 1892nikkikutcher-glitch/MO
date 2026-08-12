@@ -13,6 +13,7 @@ import Membresias from "./pages/Membresias";
 import Asistencia from "./pages/Asistencia";
 import Procedimientos from "./pages/Procedimientos";
 import HistorialClinicoAdmin from "./pages/HistorialClinicoAdmin";
+import Medicamentos from "./pages/Medicamentos";
 import FormatosWhatsApp from "./pages/FormatosWhatsApp";
 import Planes from "./pages/Planes";
 import GlobalAgregarPago from "./GlobalAgregarPago";
@@ -204,6 +205,7 @@ export default function Dashboard({
           {activePage === "asistencia" && <Asistencia />}
           {activePage === "administracion-procedimientos" && <Procedimientos />}
           {activePage === "administracion-historial-clinico" && <HistorialClinicoAdmin />}
+          {activePage === "administracion-medicamentos" && <Medicamentos />}
           {activePage === "planes" && <Planes />}
         </div>
       </main>

@@ -50,6 +50,7 @@ import { formatosWhatsAppInicial, type FormatosWhatsApp } from "@/lib/formatosWh
 import { calcularFechaFin, type MembershipPlan, type PatientMembership, type UsoBeneficio } from "@/lib/membresias";
 import type { PersonalAsistencia, RegistroAsistencia } from "@/lib/asistencia";
 import type { Procedimiento } from "@/lib/procedimientos";
+import { catalogoInicial, type MedicamentoCatalogo } from "@/lib/medicamentos";
 import {
   plantillaInicial,
   respuestasVacias,
@@ -360,6 +361,9 @@ type PatientDataContextValue = {
     patientId: string,
     updater: Updater<RespuestasHistoriaClinica>
   ) => void;
+  consumirSiguienteFolioReceta: () => string;
+  catalogoMedicamentos: MedicamentoCatalogo[];
+  setCatalogoMedicamentos: (updater: Updater<MedicamentoCatalogo[]>) => void;
   recursos: Recurso[];
   setRecursos: (updater: Updater<Recurso[]>) => void;
   citas: CitaAgenda[];
@@ -453,6 +457,21 @@ export function PatientDataProvider({
     clinicUid,
     "historiaClinicaTemplate",
     plantillaInicial
+  );
+  const [folioReceta, setFolioReceta] = useFirestoreDoc<{ siguiente: number }>(
+    clinicUid,
+    "folioReceta",
+    { siguiente: 1 }
+  );
+  const consumirSiguienteFolioReceta = (): string => {
+    const folio = folioReceta.siguiente;
+    setFolioReceta({ siguiente: folio + 1 });
+    return String(folio);
+  };
+  const [catalogoMedicamentos, setCatalogoMedicamentos] = useFirestoreList<MedicamentoCatalogo>(
+    clinicUid,
+    "medicamentos",
+    catalogoInicial
   );
 
   const [presupuestosPorPaciente, setPresupuestosPorPacienteState] = useState<
@@ -875,6 +894,9 @@ export function PatientDataProvider({
         setHistoriaClinicaTemplate,
         historiaClinicaPorPaciente,
         setRespuestasHistoriaClinica,
+        consumirSiguienteFolioReceta,
+        catalogoMedicamentos,
+        setCatalogoMedicamentos,
         recursos,
         setRecursos,
         citas,

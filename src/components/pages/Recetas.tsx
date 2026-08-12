@@ -3,41 +3,7 @@
 import { useState } from "react";
 import { usePatientData } from "@/context/PatientDataContext";
 import type { MedicamentoRecetado, Receta } from "@/lib/patientData";
-
-type MedicamentoCatalogo = { nombre: string; instrucciones: string };
-
-const catalogoMedicamentos: MedicamentoCatalogo[] = [
-  { nombre: "PARACETAMOL TABLETAS DE 500 MG", instrucciones: "Tomar 1 tableta cada 8 horas por dolor." },
-  {
-    nombre: "CLAVULIN 12H (Amoxicilina con Ácido Clavulánico) tabletas 875/125mg",
-    instrucciones: "Tomar 1 tableta cada 12 horas durante 7 días.",
-  },
-  {
-    nombre: "CLAVULIN 12H SUSPENSIÓN (Amoxicilina con Ácido Clavulánico) Suspensión 200mg/28.5mg/5ml",
-    instrucciones: "Tomar según indicación del médico cada 12 horas durante 7 días.",
-  },
-  {
-    nombre: "DAFLOXEN F (Naproxeno Sódico/Paracetamol) tabletas 275/300mg",
-    instrucciones: "Tomar 1 tableta cada 8 horas por dolor.",
-  },
-  {
-    nombre: "DAFLOXEN F SUSPENSIÓN (Naproxeno Sódico/Paracetamol) Suspensión 2.5mg/2mg/100ml",
-    instrucciones: "Tomar según indicación del médico cada 8 horas.",
-  },
-  { nombre: "MELOXICAM 7.5 MG / METOCARBAMOL 215 MG", instrucciones: "Tomar 1 tableta cada 12 horas durante 5 días." },
-  { nombre: "IBUPROFENO TABLETAS DE 800 MG", instrucciones: "Tomar 1 tableta cada 8 horas por dolor." },
-  { nombre: "MOTRIN IBUPROFENO DE 800 MG", instrucciones: "Tomar 1 tableta cada 8 horas." },
-  { nombre: "ACTRON (Ibuprofeno) tabletas de 400 mg", instrucciones: "Tomar 1 tableta cada 8 horas." },
-  {
-    nombre: "MOTRIN SUSPENSIÓN (Ibuprofeno) Suspensión 2g/100ml",
-    instrucciones: "Tomar según indicación del médico cada 8 horas.",
-  },
-  {
-    nombre: "DALACIN C (Clindamicina) capsulas 300mg",
-    instrucciones: "Tomar una capsula cada ocho horas.\nDurante siete días.",
-  },
-  { nombre: "AMOXICILINA CÁPSULAS 500 MG", instrucciones: "Tomar 1 cápsula cada 8 horas durante 7 días." },
-];
+import { calcularDosisPediatrica, type MedicamentoCatalogo } from "@/lib/medicamentos";
 
 const plantillasRecomendaciones = [
   "Evitar alimentos duros o muy calientes durante las primeras 24 horas.",
@@ -48,6 +14,8 @@ const plantillasRecomendaciones = [
 
 const inputClass =
   "w-full rounded-lg border border-edge/10 bg-field px-3 py-2 text-sm text-ink placeholder-ink/30 outline-none focus:border-accent/60";
+
+const sexoOptions = ["", "F", "M"];
 
 function calculateAge(birthDate: string) {
   if (!birthDate) return null;
@@ -75,13 +43,33 @@ function todayFormatted() {
   return new Date().toLocaleDateString("es-MX", { day: "2-digit", month: "2-digit", year: "numeric" });
 }
 
+function fechaLargaHoy() {
+  const texto = new Date().toLocaleDateString("es-MX", {
+    weekday: "long",
+    day: "numeric",
+    month: "long",
+    year: "numeric",
+  });
+  return texto.charAt(0).toUpperCase() + texto.slice(1);
+}
+
 export default function Recetas() {
-  const { patients, recursos, recetasPorPaciente, setRecetasPaciente, cargarDatosPaciente, irAExpediente } =
-    usePatientData();
+  const {
+    patients,
+    recursos,
+    recetasPorPaciente,
+    setRecetasPaciente,
+    cargarDatosPaciente,
+    irAExpediente,
+    catalogoMedicamentos,
+    perfilDoctor,
+    consumirSiguienteFolioReceta,
+  } = usePatientData();
   const medicos = recursos.filter((r) => r.tipo === "medico");
 
   const [patientId, setPatientId] = useState("");
   const [medico, setMedico] = useState(medicos[0]?.nombre ?? "");
+  const [sexo, setSexo] = useState("");
   const [peso, setPeso] = useState("");
   const [estatura, setEstatura] = useState("");
   const [temperatura, setTemperatura] = useState("");
@@ -94,15 +82,14 @@ export default function Recetas() {
   const [notas, setNotas] = useState("");
   const [plantillaSeleccionada, setPlantillaSeleccionada] = useState("");
   const [guardado, setGuardado] = useState(false);
+  const [folioActual, setFolioActual] = useState<string | null>(null);
 
   const patient = patients.find((p) => p.id === patientId) ?? null;
   const edad = patient ? calculateAge(patient.birthDate) : null;
 
   const coincidenciasMedicamento =
     busquedaMedicamento.trim().length > 0
-      ? catalogoMedicamentos.filter((m) =>
-          m.nombre.toLowerCase().includes(busquedaMedicamento.trim().toLowerCase())
-        )
+      ? catalogoMedicamentos.filter((m) => m.nombre.toLowerCase().includes(busquedaMedicamento.trim().toLowerCase()))
       : [];
 
   const seleccionarPaciente = (id: string) => {
@@ -113,13 +100,19 @@ export default function Recetas() {
 
   const abrirConfirmarMedicamento = (m: MedicamentoCatalogo) => {
     setMedicamentoParaConfirmar(m);
-    setTextoConfirmar(`${m.nombre}\n${m.instrucciones}`);
+    if (m.tipoPaciente === "adulto") {
+      setTextoConfirmar(`${m.nombre}\n${[m.dosisFrecuencia, m.periodo].filter(Boolean).join(". ")}`);
+    } else {
+      const pesoNum = Number(peso);
+      const resultado = calcularDosisPediatrica(m, pesoNum);
+      setTextoConfirmar(resultado ? `${m.nombre}\n${resultado.texto}` : `${m.nombre}\nCaptura el peso del paciente para calcular la dosis.`);
+    }
   };
 
   const abrirNuevoMedicamento = () => {
     const nombre = busquedaMedicamento.trim();
     if (!nombre) return;
-    setMedicamentoParaConfirmar({ nombre, instrucciones: "" });
+    setMedicamentoParaConfirmar({ id: "nuevo", nombre, tipoPaciente: "adulto" });
     setTextoConfirmar(nombre);
   };
 
@@ -148,6 +141,7 @@ export default function Recetas() {
 
   const nuevaReceta = () => {
     setPatientId("");
+    setSexo("");
     setPeso("");
     setEstatura("");
     setTemperatura("");
@@ -157,14 +151,20 @@ export default function Recetas() {
     setNotas("");
     setPlantillaSeleccionada("");
     setGuardado(false);
+    setFolioActual(null);
   };
 
   const handleGuardar = () => {
     if (!puedeGuardar) return;
+    const folio = folioActual ?? consumirSiguienteFolioReceta();
+    if (!folioActual) setFolioActual(folio);
     const receta: Receta = {
       id: `${Date.now()}`,
+      folio,
       fecha: todayFormatted(),
       medico,
+      edadTexto: edad !== null ? String(edad) : "",
+      sexo,
       peso,
       estatura,
       temperatura,
@@ -173,7 +173,7 @@ export default function Recetas() {
       medicamentos: medicamentosRecetados,
       notas,
     };
-    setRecetasPaciente(patientId, (prev) => [receta, ...prev]);
+    setRecetasPaciente(patientId, (prev) => [receta, ...prev.filter((r) => r.folio !== folio)]);
     setGuardado(true);
   };
 
@@ -187,10 +187,12 @@ export default function Recetas() {
     handleGuardar();
     const lineas = [
       `Receta médica — ${patient.name}`,
+      `Folio: ${folioActual ?? ""} · Fecha: ${todayFormatted()}`,
       medico ? `Médico: ${medico}` : "",
       "",
-      ...medicamentosRecetados.map((m) => `${m.nombre}${m.instrucciones ? `\n${m.instrucciones}` : ""}`),
+      ...medicamentosRecetados.map((m, i) => `${i + 1}. ${m.nombre}${m.instrucciones ? `\n${m.instrucciones}` : ""}`),
       notas ? `\n${notas}` : "",
+      perfilDoctor.textoValidezReceta ? `\n${perfilDoctor.textoValidezReceta}` : "",
     ].filter(Boolean);
     const texto = encodeURIComponent(lineas.join("\n"));
     const telefono = patient.phone.replace(/\D/g, "");
@@ -198,6 +200,7 @@ export default function Recetas() {
   };
 
   const recetasPrevias = patientId ? recetasPorPaciente[patientId] ?? [] : [];
+  const esMedicamentoPediatrico = medicamentoParaConfirmar?.tipoPaciente === "pediatrico";
 
   return (
     <div className="space-y-6">
@@ -230,46 +233,43 @@ export default function Recetas() {
           </div>
         </div>
 
-        <div className="grid grid-cols-2 gap-4 sm:grid-cols-5">
+        <div className="grid grid-cols-2 gap-4 sm:grid-cols-6">
+          <div>
+            <label className="mb-1 block text-xs font-medium text-ink/60">Sexo</label>
+            <select value={sexo} onChange={(e) => setSexo(e.target.value)} className={inputClass}>
+              {sexoOptions.map((s) => (
+                <option key={s} value={s}>
+                  {s || "—"}
+                </option>
+              ))}
+            </select>
+          </div>
           <div>
             <label className="mb-1 block text-xs font-medium text-ink/60">Peso (Kg)</label>
-            <input type="text" value={peso} onChange={(e) => setPeso(e.target.value)} className={inputClass} />
+            <input
+              type="text"
+              value={peso}
+              onChange={(e) => setPeso(e.target.value)}
+              placeholder="Ej. 18"
+              className={inputClass}
+              title="Se usa para calcular la dosis de medicamentos pediátricos"
+            />
           </div>
           <div>
             <label className="mb-1 block text-xs font-medium text-ink/60">Estatura (mts)</label>
-            <input
-              type="text"
-              value={estatura}
-              onChange={(e) => setEstatura(e.target.value)}
-              className={inputClass}
-            />
+            <input type="text" value={estatura} onChange={(e) => setEstatura(e.target.value)} className={inputClass} />
           </div>
           <div>
             <label className="mb-1 block text-xs font-medium text-ink/60">Temperatura (°C)</label>
-            <input
-              type="text"
-              value={temperatura}
-              onChange={(e) => setTemperatura(e.target.value)}
-              className={inputClass}
-            />
+            <input type="text" value={temperatura} onChange={(e) => setTemperatura(e.target.value)} className={inputClass} />
           </div>
           <div className="col-span-2 sm:col-span-1">
             <label className="mb-1 block text-xs font-medium text-ink/60">Alergias</label>
-            <textarea
-              value={alergias}
-              onChange={(e) => setAlergias(e.target.value)}
-              rows={1}
-              className={`${inputClass} resize-none`}
-            />
+            <textarea value={alergias} onChange={(e) => setAlergias(e.target.value)} rows={1} className={`${inputClass} resize-none`} />
           </div>
           <div className="col-span-2 sm:col-span-1">
             <label className="mb-1 block text-xs font-medium text-ink/60">Diagnóstico</label>
-            <textarea
-              value={diagnostico}
-              onChange={(e) => setDiagnostico(e.target.value)}
-              rows={1}
-              className={`${inputClass} resize-none`}
-            />
+            <textarea value={diagnostico} onChange={(e) => setDiagnostico(e.target.value)} rows={1} className={`${inputClass} resize-none`} />
           </div>
         </div>
 
@@ -286,11 +286,16 @@ export default function Recetas() {
             <div className="absolute z-10 mt-1 max-h-64 w-full overflow-y-auto rounded-lg border border-edge/10 bg-field shadow-card">
               {coincidenciasMedicamento.map((m) => (
                 <button
-                  key={m.nombre}
+                  key={m.id}
                   onClick={() => abrirConfirmarMedicamento(m)}
-                  className="block w-full border-b border-edge/5 px-3 py-2 text-left text-sm text-ink/80 last:border-0 hover:bg-surface"
+                  className="flex w-full items-center justify-between border-b border-edge/5 px-3 py-2 text-left text-sm text-ink/80 last:border-0 hover:bg-surface"
                 >
-                  {resaltarCoincidencia(m.nombre, busquedaMedicamento.trim())}
+                  <span>{resaltarCoincidencia(m.nombre, busquedaMedicamento.trim())}</span>
+                  {m.tipoPaciente === "pediatrico" && (
+                    <span className="ml-2 shrink-0 rounded-full bg-info/10 px-2 py-0.5 text-[10px] font-semibold text-info">
+                      Pediátrico
+                    </span>
+                  )}
                 </button>
               ))}
               <button
@@ -311,16 +316,13 @@ export default function Recetas() {
             </div>
           ) : (
             <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-              {medicamentosRecetados.map((m) => (
+              {medicamentosRecetados.map((m, i) => (
                 <div key={m.id} className="rounded-lg border border-edge/10 p-3 text-sm">
-                  <p className="font-medium text-ink">{m.nombre}</p>
-                  {m.instrucciones && (
-                    <p className="mt-0.5 whitespace-pre-line text-accent">{m.instrucciones}</p>
-                  )}
-                  <button
-                    onClick={() => quitarMedicamento(m.id)}
-                    className="mt-1 text-xs font-semibold text-danger hover:text-danger"
-                  >
+                  <p className="font-medium text-ink">
+                    {i + 1}. {m.nombre}
+                  </p>
+                  {m.instrucciones && <p className="mt-0.5 whitespace-pre-line text-accent">{m.instrucciones}</p>}
+                  <button onClick={() => quitarMedicamento(m.id)} className="mt-1 text-xs font-semibold text-danger hover:text-danger">
                     Quitar
                   </button>
                 </div>
@@ -332,20 +334,11 @@ export default function Recetas() {
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
           <div>
             <label className="mb-1 block text-xs font-medium text-ink/60">Notas y/o recomendaciones</label>
-            <textarea
-              value={notas}
-              onChange={(e) => setNotas(e.target.value)}
-              rows={3}
-              className={`${inputClass} resize-none`}
-            />
+            <textarea value={notas} onChange={(e) => setNotas(e.target.value)} rows={3} className={`${inputClass} resize-none`} />
           </div>
           <div>
             <label className="mb-1 block text-xs font-medium text-ink/60">Plantillas recomendaciones</label>
-            <select
-              value={plantillaSeleccionada}
-              onChange={(e) => aplicarPlantilla(e.target.value)}
-              className={inputClass}
-            >
+            <select value={plantillaSeleccionada} onChange={(e) => aplicarPlantilla(e.target.value)} className={inputClass}>
               <option value="">:: Elija una plantilla ::</option>
               {plantillasRecomendaciones.map((p) => (
                 <option key={p} value={p}>
@@ -379,16 +372,13 @@ export default function Recetas() {
             Enviar por WhatsApp
           </button>
           {patientId && (
-            <button
-              onClick={() => irAExpediente(patientId)}
-              className="ml-auto text-sm font-medium text-ink/50 hover:text-ink"
-            >
+            <button onClick={() => irAExpediente(patientId)} className="ml-auto text-sm font-medium text-ink/50 hover:text-ink">
               Ir a paciente →
             </button>
           )}
           {guardado && (
             <>
-              <span className="text-sm text-success">Receta guardada</span>
+              <span className="text-sm text-success">Receta guardada · Folio {folioActual}</span>
               <button onClick={nuevaReceta} className="text-sm font-medium text-accent hover:text-accent">
                 + Nueva receta
               </button>
@@ -399,14 +389,12 @@ export default function Recetas() {
 
       {patientId && recetasPrevias.length > 0 && (
         <div className="print:hidden">
-          <h3 className="mb-3 text-sm font-semibold uppercase tracking-wide text-ink/60">
-            Recetas anteriores de {patient?.name}
-          </h3>
+          <h3 className="mb-3 text-sm font-semibold uppercase tracking-wide text-ink/60">Recetas anteriores de {patient?.name}</h3>
           <div className="space-y-2">
             {recetasPrevias.map((r) => (
               <div key={r.id} className="rounded-xl border border-edge/10 bg-surface p-3 text-sm">
                 <p className="text-xs text-ink/40">
-                  {r.fecha} · {r.medico}
+                  Folio {r.folio} · {r.fecha} · {r.medico}
                 </p>
                 <p className="mt-1 text-ink/70">{r.medicamentos.map((m) => m.nombre).join(", ")}</p>
               </div>
@@ -415,29 +403,64 @@ export default function Recetas() {
         </div>
       )}
 
-      {/* Receta imprimible */}
+      {/* Receta imprimible — formato tipo COPRISEM */}
       {patient && medicamentosRecetados.length > 0 && (
-        <div className="hidden rounded-2xl bg-white p-8 text-black print:block">
-          <h2 className="text-center text-base font-bold uppercase tracking-wide">Receta Médica</h2>
-          <p className="mt-3 text-sm">
-            Paciente: <span className="font-medium">{patient.name}</span>
-            {edad !== null && ` · Edad: ${edad} años`}
+        <div className="hidden border-4 border-black bg-white p-8 text-black print:block">
+          <div className="flex items-start justify-between">
+            <div className="w-24 shrink-0">
+              {perfilDoctor.logoEscuelaUrl && (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img src={perfilDoctor.logoEscuelaUrl} alt="" className="h-20 w-20 object-contain" />
+              )}
+            </div>
+            <div className="flex-1 text-center">
+              <p className="text-xl font-bold">{perfilDoctor.nombre || medico}</p>
+              {perfilDoctor.cedulaProfesional && <p className="text-sm">Ced. Prof. {perfilDoctor.cedulaProfesional}</p>}
+              {perfilDoctor.especialidad && <p className="text-sm">{perfilDoctor.especialidad}</p>}
+            </div>
+            <div className="w-32 shrink-0 text-right text-xs">
+              <p className="font-semibold text-accent">Folio: {folioActual}</p>
+              <p className="mt-1 font-semibold">{fechaLargaHoy()}</p>
+            </div>
+          </div>
+
+          <p className="mt-6 text-sm">
+            <span className="font-semibold">Nombre del paciente:</span> {patient.name}{" "}
+            <span className="font-semibold">Edad:</span> {edad ?? "—"}{" "}
+            <span className="font-semibold">Sexo:</span> {sexo || "—"}{" "}
+            <span className="font-semibold">Talla:</span> {estatura || "—"}{" "}
+            <span className="font-semibold">Temperatura:</span> {temperatura || "—"}{" "}
+            <span className="font-semibold">Peso:</span> {peso || "—"}
           </p>
-          <p className="text-sm">
-            Médico: <span className="font-medium">{medico}</span> · Fecha:{" "}
-            <span className="font-medium">{todayFormatted()}</span>
-          </p>
-          {diagnostico && <p className="mt-2 text-sm">Diagnóstico: {diagnostico}</p>}
+          {diagnostico && <p className="text-sm">Diagnóstico: {diagnostico}</p>}
           {alergias && <p className="text-sm">Alergias: {alergias}</p>}
-          <div className="mt-4 space-y-3 text-sm">
-            {medicamentosRecetados.map((m) => (
+
+          <p className="mt-4 text-base font-semibold">Rx.</p>
+          <div className="mt-2 space-y-3 text-sm">
+            {medicamentosRecetados.map((m, i) => (
               <div key={m.id}>
-                <p className="font-semibold">{m.nombre}</p>
+                <p className="font-semibold">
+                  {i + 1}-{m.nombre}
+                </p>
                 {m.instrucciones && <p className="whitespace-pre-line">{m.instrucciones}</p>}
               </div>
             ))}
           </div>
           {notas && <p className="mt-4 whitespace-pre-line text-sm">{notas}</p>}
+
+          <div className="mt-16 flex items-end justify-between">
+            {perfilDoctor.textoValidezReceta && (
+              <p className="text-sm underline">{perfilDoctor.textoValidezReceta}</p>
+            )}
+            <div className="text-center text-xs">
+              <div className="mb-1 w-40 border-b border-black" />
+              Firma médico
+            </div>
+          </div>
+
+          {perfilDoctor.direccionClinica && (
+            <p className="mt-8 text-center text-xs">{perfilDoctor.direccionClinica}</p>
+          )}
         </div>
       )}
 
@@ -445,6 +468,12 @@ export default function Recetas() {
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4 print:hidden">
           <div className="w-full max-w-md rounded-2xl border border-edge/10 bg-modal p-6">
             <h3 className="text-base font-semibold text-ink">Medicamento para recetar</h3>
+            {esMedicamentoPediatrico && (
+              <p className="mt-2 rounded-lg bg-info/10 px-3 py-2 text-xs text-info">
+                Dosis calculada con el peso capturado ({peso || "sin capturar"} kg). Verifica siempre antes de
+                recetar — es una referencia, no sustituye tu criterio clínico.
+              </p>
+            )}
             <label className="mb-1 mt-4 block text-xs font-medium text-ink/60">Medicamento</label>
             <textarea
               value={textoConfirmar}

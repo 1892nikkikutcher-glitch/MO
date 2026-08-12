@@ -100,8 +100,12 @@ export type MedicamentoRecetado = {
 
 export type Receta = {
   id: string;
+  folio: string;
   fecha: string;
   medico: string;
+  /** Foto de estos datos al momento de expedir la receta — no cambian aunque el paciente se edite después. */
+  edadTexto: string;
+  sexo: string;
   peso: string;
   estatura: string;
   temperatura: string;
@@ -131,6 +135,13 @@ export type PerfilDoctor = {
   especialidad: string;
   correo: string;
   telefono: string;
+  /** Escuela de egreso, para el logotipo institucional en recetas. */
+  escuelaEgreso: string;
+  /** Link a una imagen del escudo/logo de la escuela (el usuario debe tener derecho de uso). */
+  logoEscuelaUrl: string;
+  direccionClinica: string;
+  /** Ej. "Esta receta es válida durante 48h" — se imprime en cada receta. */
+  textoValidezReceta: string;
 };
 
 export const perfilDoctorInicial: PerfilDoctor = {
@@ -139,6 +150,10 @@ export const perfilDoctorInicial: PerfilDoctor = {
   especialidad: "",
   correo: "",
   telefono: "",
+  escuelaEgreso: "",
+  logoEscuelaUrl: "",
+  direccionClinica: "",
+  textoValidezReceta: "Esta receta es válida durante 48h",
 };
 
 export type PlanId = "prueba" | "consultorio" | "clinicas";
