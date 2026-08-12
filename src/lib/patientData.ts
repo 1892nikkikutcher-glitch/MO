@@ -170,7 +170,7 @@ export const planesDisponibles: {
     unidades: "Hasta 2 unidades",
     caracteristicas: [
       "Hasta 2 unidades / consultorios",
-      "Colaboradores (cupo y puestos por definir)",
+      "Hasta 3 colaboradores — especialistas sin límite",
     ],
   },
   {
@@ -179,12 +179,22 @@ export const planesDisponibles: {
     precio: "$840 cada 4 semanas",
     unidades: "3 unidades o más",
     caracteristicas: [
-      "3 unidades o más",
-      "Colaboradores (cupo y puestos por definir)",
+      "Unidades sin límite",
+      "Colaboradores y especialistas sin límite",
       "Ej. exige un odontólogo con horario específico por unidad",
     ],
   },
 ];
+
+/** Tope de unidades/colaboradores según el plan activo — null = sin límite.
+ * Los especialistas nunca tienen límite en ningún plan. */
+export type LimitesPlan = { unidades: number | null; colaboradores: number | null };
+
+export const limitesPorPlan: Record<PlanId, LimitesPlan> = {
+  prueba: { unidades: 2, colaboradores: 3 },
+  consultorio: { unidades: 2, colaboradores: 3 },
+  clinicas: { unidades: null, colaboradores: null },
+};
 
 export type SuscripcionPlan = {
   planActivo: PlanId;
@@ -196,7 +206,9 @@ export type SuscripcionPlan = {
   stripeStatus?: string;
 };
 
-export type RolClinica = "admin" | "colaborador";
+/** "especialista" (odontólogo) nunca cuenta contra el cupo de colaboradores
+ * de ningún plan; "colaborador" (personal general) sí. */
+export type RolClinica = "admin" | "especialista" | "colaborador";
 
 /** Documento `clinics/{clinicId}` — clinicId es el uid del dueño. */
 export type ClinicInfo = {

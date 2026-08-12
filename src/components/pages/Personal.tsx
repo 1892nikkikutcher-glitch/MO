@@ -2,13 +2,31 @@
 
 import { useState } from "react";
 import { usePatientData } from "@/context/PatientDataContext";
-import type { RolClinica } from "@/lib/patientData";
+import { limitesPorPlan, planesDisponibles, type RolClinica } from "@/lib/patientData";
 import { manejarCambioNombre } from "@/lib/textoNombre";
 
 const inputClass =
   "w-full rounded-lg border border-edge/10 bg-field px-3 py-2 text-sm text-ink placeholder-ink/30 outline-none focus:border-accent/60";
 
-export default function Colaboradores() {
+const rolLabel: Record<RolClinica, string> = {
+  admin: "Admin",
+  especialista: "Especialista",
+  colaborador: "Colaborador",
+};
+
+function UsoCupo({ label, usados, limite }: { label: string; usados: number; limite: number | null }) {
+  const lleno = limite !== null && usados >= limite;
+  return (
+    <div className="rounded-lg border border-edge/10 bg-inset px-4 py-3">
+      <div className="text-[11px] uppercase tracking-wide text-ink/40">{label}</div>
+      <div className={`mt-1 text-lg font-semibold ${lleno ? "text-danger" : "text-ink"}`}>
+        {usados} {limite !== null ? `de ${limite}` : "· sin límite"}
+      </div>
+    </div>
+  );
+}
+
+export default function Personal() {
   const {
     miRol,
     clinicInfo,
@@ -19,6 +37,8 @@ export default function Colaboradores() {
     eliminarInvitacion,
     eliminarColaborador,
     actualizarRolColaborador,
+    recursos,
+    suscripcion,
   } = usePatientData();
 
   const [nombreClinica, setNombreClinica] = useState(clinicInfo?.nombre ?? "");
@@ -30,12 +50,26 @@ export default function Colaboradores() {
   if (miRol !== "admin") {
     return (
       <div className="rounded-2xl border border-edge/10 bg-surface p-10 text-center text-sm text-ink/50">
-        Solo el dueño de la clínica puede administrar colaboradores.
+        Solo el dueño de la clínica puede administrar al personal.
       </div>
     );
   }
 
-  const puedeInvitar = nombre.trim().length > 0 && correo.trim().length > 0;
+  const plan = planesDisponibles.find((p) => p.id === suscripcion.planActivo);
+  const limites = limitesPorPlan[suscripcion.planActivo] ?? limitesPorPlan.prueba;
+
+  const contarPorRol = (r: RolClinica) =>
+    colaboradoresActivos.filter((c) => c.role === r).length +
+    invitacionesPendientes.filter((i) => i.role === r).length;
+
+  const colaboradoresUsados = contarPorRol("colaborador");
+  const especialistasUsados = contarPorRol("especialista");
+  const unidadesUsadas = recursos.filter((r) => r.tipo === "unidad").length;
+
+  const cupoColaboradorLleno = limites.colaboradores !== null && colaboradoresUsados >= limites.colaboradores;
+
+  const puedeInvitar =
+    nombre.trim().length > 0 && correo.trim().length > 0 && !(rol === "colaborador" && cupoColaboradorLleno);
 
   const guardarNombreClinica = () => {
     if (!nombreClinica.trim()) return;
@@ -58,9 +92,7 @@ export default function Colaboradores() {
         <h3 className="mb-3 text-sm font-semibold uppercase tracking-wide text-ink/60">
           Nombre de la clínica
         </h3>
-        <p className="mb-3 text-xs text-ink/40">
-          Así se identifica tu clínica cuando invitas a un colaborador.
-        </p>
+        <p className="mb-3 text-xs text-ink/40">Así se identifica tu clínica cuando invitas a alguien.</p>
         <div className="flex gap-3">
           <input
             type="text"
@@ -78,17 +110,33 @@ export default function Colaboradores() {
         </div>
       </div>
 
+      <div className="rounded-2xl border border-edge/10 bg-surface p-6">
+        <h3 className="mb-3 text-sm font-semibold uppercase tracking-wide text-ink/60">
+          Cupo de tu plan — {plan?.nombre ?? suscripcion.planActivo}
+        </h3>
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+          <UsoCupo label="Unidades" usados={unidadesUsadas} limite={limites.unidades} />
+          <UsoCupo label="Colaboradores" usados={colaboradoresUsados} limite={limites.colaboradores} />
+          <UsoCupo label="Especialistas" usados={especialistasUsados} limite={null} />
+        </div>
+        {cupoColaboradorLleno && (
+          <p className="mt-3 text-xs text-danger">
+            Ya usaste todo tu cupo de colaboradores de este plan. Ve a{" "}
+            <span className="font-semibold">Planes</span> para ampliarlo, o invita a esta persona como
+            Especialista si aplica (sin límite).
+          </p>
+        )}
+      </div>
+
       <div className="rounded-2xl border border-accent/30 bg-accent/10 p-4 text-sm text-accent">
-        Los colaboradores con rol &quot;Colaborador&quot; pueden ver pacientes, agenda, recetas y
-        presupuestos, pero <strong>no</strong> ven pagos ni cortes de caja — esa información queda
-        reservada al dueño (rol &quot;Admin&quot;). Al agregar un correo aquí, esa persona debe
-        registrarse en MO con ese mismo correo; en cuanto entre, verá una invitación para unirse.
+        Los <strong>especialistas</strong> y <strong>colaboradores</strong> pueden ver pacientes, agenda,
+        recetas y presupuestos, pero <strong>no</strong> ven pagos ni cortes de caja — eso queda reservado
+        al dueño. Al agregar un correo aquí, esa persona debe registrarse en MO con ese mismo correo; en
+        cuanto entre, verá una invitación para unirse.
       </div>
 
       <div className="space-y-3 rounded-2xl border border-edge/10 bg-surface p-6">
-        <h3 className="text-sm font-semibold uppercase tracking-wide text-ink/60">
-          Invitar Colaborador
-        </h3>
+        <h3 className="text-sm font-semibold uppercase tracking-wide text-ink/60">Agregar Personal</h3>
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
           <input
             type="text"
@@ -106,7 +154,7 @@ export default function Colaboradores() {
           />
           <select value={rol} onChange={(e) => setRol(e.target.value as RolClinica)} className={inputClass}>
             <option value="colaborador">Colaborador</option>
-            <option value="admin">Admin</option>
+            <option value="especialista">Especialista</option>
           </select>
         </div>
         <button
@@ -114,7 +162,7 @@ export default function Colaboradores() {
           disabled={!puedeInvitar || enviando}
           className="rounded-lg bg-gradient-to-r from-accent to-orange-500 px-4 py-2 text-sm font-semibold text-black transition-opacity hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-40"
         >
-          {enviando ? "Enviando…" : "+ Invitar"}
+          {enviando ? "Enviando…" : "+ Agregar"}
         </button>
       </div>
 
@@ -132,7 +180,7 @@ export default function Colaboradores() {
                 <div>
                   <span className="font-medium text-ink">{inv.nombre}</span>{" "}
                   <span className="text-ink/50">· {inv.email}</span>{" "}
-                  <span className="capitalize text-ink/40">· {inv.role}</span>
+                  <span className="text-ink/40">· {rolLabel[inv.role]}</span>
                 </div>
                 <button
                   onClick={() => eliminarInvitacion(`${inv.clinicId}_${inv.email}`)}
@@ -148,11 +196,11 @@ export default function Colaboradores() {
 
       <div>
         <h3 className="mb-3 text-sm font-semibold uppercase tracking-wide text-ink/60">
-          Colaboradores Activos
+          Personal Activo
         </h3>
         {colaboradoresActivos.length === 0 ? (
           <div className="rounded-2xl border border-dashed border-edge/15 bg-surface p-10 text-center text-sm text-ink/40">
-            No hay colaboradores registrados
+            No hay personal registrado todavía
           </div>
         ) : (
           <div className="overflow-x-auto rounded-2xl border border-edge/10 bg-surface">
@@ -161,7 +209,7 @@ export default function Colaboradores() {
                 <tr className="border-b border-edge/10 text-xs uppercase tracking-wide text-ink/40">
                   <th className="px-6 py-3 font-medium">Nombre</th>
                   <th className="px-6 py-3 font-medium">Correo</th>
-                  <th className="px-6 py-3 font-medium">Rol</th>
+                  <th className="px-6 py-3 font-medium">Perfil</th>
                   <th className="px-6 py-3 text-right font-medium">Quitar</th>
                 </tr>
               </thead>
@@ -174,15 +222,20 @@ export default function Colaboradores() {
                       <td className="px-6 py-3 text-ink">{c.nombre || "—"}</td>
                       <td className="px-6 py-3 text-ink/70">{c.correo}</td>
                       <td className="px-6 py-3">
-                        <select
-                          value={c.role}
-                          onChange={(e) => actualizarRolColaborador(memberId, e.target.value as RolClinica)}
-                          disabled={esUnoMismo}
-                          className="rounded-md border border-edge/10 bg-field px-2 py-1 text-xs text-ink disabled:opacity-40"
-                        >
-                          <option value="colaborador">Colaborador</option>
-                          <option value="admin">Admin</option>
-                        </select>
+                        {esUnoMismo ? (
+                          <span className="text-xs text-ink/50">Dueño (Admin)</span>
+                        ) : (
+                          <select
+                            value={c.role}
+                            onChange={(e) =>
+                              actualizarRolColaborador(memberId, e.target.value as RolClinica)
+                            }
+                            className="rounded-md border border-edge/10 bg-field px-2 py-1 text-xs text-ink"
+                          >
+                            <option value="colaborador">Colaborador</option>
+                            <option value="especialista">Especialista</option>
+                          </select>
+                        )}
                       </td>
                       <td className="px-6 py-3 text-right">
                         {!esUnoMismo && (

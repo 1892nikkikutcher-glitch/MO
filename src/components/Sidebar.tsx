@@ -165,7 +165,6 @@ export const navItems = [
       { id: "administracion-catalogos", label: "Catálogos" },
       { id: "administracion-metas", label: "Metas" },
       { id: "administracion-perfil", label: "Perfil del Doctor" },
-      { id: "administracion-colaboradores", label: "Colaboradores" },
     ],
   },
   {
