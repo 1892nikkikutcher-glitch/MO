@@ -35,6 +35,13 @@ export function formatEdad(birthDate: string): string {
   return partes.join(", ");
 }
 
+/** Ej. "Delia Martínez Severiano (57)" — formato estándar para mostrar un
+ * paciente por nombre junto con su edad, usado en selectores y listados. */
+export function formatNombreConEdad(name: string, birthDate: string): string {
+  const edad = calcularEdadDetallada(birthDate);
+  return edad ? `${name} (${edad.years})` : name;
+}
+
 export const patients: Patient[] = [
   { id: "1", name: "María Fernanda López", phone: "55 1234 5678", birthDate: "1990-04-12" },
   { id: "2", name: "Carlos Alberto Ramírez", phone: "55 8765 4321", birthDate: "1985-11-02" },

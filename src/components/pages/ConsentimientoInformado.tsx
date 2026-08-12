@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { usePatientData } from "@/context/PatientDataContext";
 
 type Patient = {
   id: string;
@@ -29,10 +30,19 @@ Comprendo los posibles riesgos y complicaciones involucradas en los tratamientos
 Así mismo, que existen riesgos imprevistos que pueden alterar el buen resultado del tratamiento.
 Sabiendo que siempre se buscará el bienestar, seguridad y calidad de los procedimientos clínicos realizados. Me han explicado de otros problemas y complicaciones poco frecuentes, derivadas del tratamiento bucal que consiste en:`;
 
-const parrafoAceptacion = `Acepto que después de explicar procedimientos, elijo el procedimiento clínico que se detalla a realizar. Acepto y me comprometo a seguir responsablemente las recomendaciones e indicaciones recibidas, antes, durante y después del tratamiento, así como, acudir a las citas para las revisiones durante el tiempo pertinente. Acepto y reconozco que no se me pueden dar garantías o seguridad absoluta respecto a que el resultado del procedimiento clínico sea el más satisfactorio, por lo que acepto la posibilidad de necesitar cualquier posterior intervención para mejorar el resultado final. Comprendo que la medicina no es una ciencia exacta. Si surgiese cualquier situación inesperada o sobrevenida durante la intervención o tratamiento, autorizo al profesional a realizar cualquier procedimiento o maniobra distinta de las proyectadas o usuales que a su juicio estimase oportuna para la resolución, en su caso, de la complicación surgida. Acepto no obligar al cirujano dentista a realizar un procedimiento cuando ello implique mayor riesgo que beneficio. Acepto firmar este consentimiento informado y manifiesto que el C.D. Nicolás Medina González y/o su equipo de ayudantes me han informado del procedimiento clínico al que deseo ser sometida/o.
+function parrafoAceptacion(nombreDoctor: string) {
+  return `Acepto que después de explicar procedimientos, elijo el procedimiento clínico que se detalla a realizar. Acepto y me comprometo a seguir responsablemente las recomendaciones e indicaciones recibidas, antes, durante y después del tratamiento, así como, acudir a las citas para las revisiones durante el tiempo pertinente. Acepto y reconozco que no se me pueden dar garantías o seguridad absoluta respecto a que el resultado del procedimiento clínico sea el más satisfactorio, por lo que acepto la posibilidad de necesitar cualquier posterior intervención para mejorar el resultado final. Comprendo que la medicina no es una ciencia exacta. Si surgiese cualquier situación inesperada o sobrevenida durante la intervención o tratamiento, autorizo al profesional a realizar cualquier procedimiento o maniobra distinta de las proyectadas o usuales que a su juicio estimase oportuna para la resolución, en su caso, de la complicación surgida. Acepto no obligar al cirujano dentista a realizar un procedimiento cuando ello implique mayor riesgo que beneficio. Acepto firmar este consentimiento informado y manifiesto que ${nombreDoctor || "el profesional que me atiende"} y/o su equipo de ayudantes me han informado del procedimiento clínico al que deseo ser sometida/o.
 Si tiene alguna duda sobre el procedimiento, no dude en preguntar. Estamos aquí para ayudarle a obtener la asistencia que quiere y necesita.`;
+}
 
-export default function ConsentimientoInformado({ patient }: { patient: Patient }) {
+export default function ConsentimientoInformado({
+  patient,
+  onVolver,
+}: {
+  patient: Patient;
+  onVolver?: () => void;
+}) {
+  const { perfilDoctor } = usePatientData();
   const fechaInicial = todayFormatted();
   const [dia, setDia] = useState(fechaInicial.dia);
   const [mes, setMes] = useState(fechaInicial.mes);
@@ -132,10 +142,15 @@ export default function ConsentimientoInformado({ patient }: { patient: Patient 
           />
         </div>
 
-        <div className="sm:col-span-2">
+        <div className="flex flex-wrap items-center gap-3 sm:col-span-2">
+          {onVolver && (
+            <button onClick={onVolver} className="text-sm font-medium text-accent hover:text-accent">
+              ← Volver a Documentos
+            </button>
+          )}
           <button
             onClick={handleImprimir}
-            className="w-full rounded-lg bg-gradient-to-r from-accent to-orange-500 py-2.5 text-sm font-semibold text-black transition-opacity hover:opacity-90 sm:w-auto sm:px-6"
+            className="ml-auto rounded-lg bg-gradient-to-r from-accent to-orange-500 py-2.5 px-6 text-sm font-semibold text-black transition-opacity hover:opacity-90"
           >
             Imprimir para firmar con pluma
           </button>
@@ -147,12 +162,9 @@ export default function ConsentimientoInformado({ patient }: { patient: Patient 
           Carta de Consentimiento Informado General
         </h2>
         <div className="mt-3 text-center text-sm leading-snug">
-          <p className="font-semibold">C.D. Nicolás Medina González</p>
-          <p>Cédula profesional 12 65 61 38</p>
-          <p>
-            Consultorio dental ubicado en calle Hermenegildo Galeana #14, San Francisco
-            Tlalcilalcalpan Centro. Almoloya de Juárez. Estado de México.
-          </p>
+          <p className="font-semibold">{perfilDoctor.nombre || "Consultorio dental"}</p>
+          {perfilDoctor.cedulaProfesional && <p>Cédula profesional {perfilDoctor.cedulaProfesional}</p>}
+          {perfilDoctor.direccionClinica && <p>{perfilDoctor.direccionClinica}</p>}
         </div>
 
         <p className="mt-4 text-sm">
@@ -174,13 +186,13 @@ export default function ConsentimientoInformado({ patient }: { patient: Patient 
 
         <h3 className="mt-5 text-sm font-bold uppercase">Aceptación del paciente</h3>
         <p className="mt-1 whitespace-pre-line text-justify text-[13px] leading-relaxed">
-          {parrafoAceptacion}
+          {parrafoAceptacion(perfilDoctor.nombre)}
         </p>
 
         <div className="mt-10 grid grid-cols-2 gap-x-10 gap-y-10 text-center text-[11px]">
           <div>
             <div className="mb-1 h-12 border-b border-black" />
-            <p>Firma C.D. Nicolás Medina González</p>
+            <p>Firma {perfilDoctor.nombre || "del profesional"}</p>
           </div>
           <div>
             <div className="mb-1 h-12 border-b border-black" />

@@ -16,6 +16,7 @@ import {
   computeTratamientosPendientes,
   formatCurrency,
   formatEdad,
+  formatNombreConEdad,
   type CitaAgenda,
   type Patient,
   type SavedBudget,
@@ -474,7 +475,7 @@ export default function Expediente({
           {initials}
         </div>
         <div className="flex-1">
-          <h2 className="text-xl font-semibold text-ink">{patient.name}</h2>
+          <h2 className="text-xl font-semibold text-ink">{formatNombreConEdad(patient.name, patient.birthDate)}</h2>
           <p className="mt-1 text-sm text-ink/50">
             {patient.phone} · {formatDate(patient.birthDate)}
             {patient.birthDate && ` · ${formatEdad(patient.birthDate)}`}

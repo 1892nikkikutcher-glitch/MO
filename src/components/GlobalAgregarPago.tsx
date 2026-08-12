@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { usePatientData } from "@/context/PatientDataContext";
-import { computeTratamientosPendientes } from "@/lib/patientData";
+import { computeTratamientosPendientes, formatNombreConEdad } from "@/lib/patientData";
 import { AgregarPagoDialog } from "./pages/Pagos";
 
 const inputClass =
@@ -38,7 +38,7 @@ export default function GlobalAgregarPago({ onClose }: { onClose: () => void }) 
             <option value="">Selecciona un paciente</option>
             {patients.map((p) => (
               <option key={p.id} value={p.id}>
-                {p.name}
+                {formatNombreConEdad(p.name, p.birthDate)}
               </option>
             ))}
           </select>

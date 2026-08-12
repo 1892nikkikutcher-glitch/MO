@@ -5,6 +5,7 @@ import { usePatientData } from "@/context/PatientDataContext";
 import {
   citaEstatusOptions,
   computeTratamientosPendientes,
+  formatNombreConEdad,
   type CitaAgenda,
   type CitaEstatus,
   type FrecuenciaRecurrencia,
@@ -536,7 +537,7 @@ function CitaDialog({
                         onClick={() => seleccionarPaciente(p.id)}
                         className="block w-full rounded-md px-2 py-1.5 text-left text-sm text-ink/80 hover:bg-surface"
                       >
-                        {p.name}
+                        {formatNombreConEdad(p.name, p.birthDate)}
                         <span className="ml-2 text-xs text-ink/40">{p.phone}</span>
                       </button>
                     ))}

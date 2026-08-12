@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { usePatientData } from "@/context/PatientDataContext";
-import type { MedicamentoRecetado, Receta } from "@/lib/patientData";
+import { formatNombreConEdad, type MedicamentoRecetado, type Receta } from "@/lib/patientData";
 import { calcularDosisPediatrica, type MedicamentoCatalogo } from "@/lib/medicamentos";
 import { generarRecetaPdf } from "@/lib/generarRecetaPdf";
 
@@ -300,15 +300,11 @@ export default function Recetas() {
             <label className="mb-1 block text-xs font-medium text-ink/60">Paciente</label>
             <select value={patientId} onChange={(e) => seleccionarPaciente(e.target.value)} className={inputClass}>
               <option value="">Selecciona un paciente...</option>
-              {patients.map((p) => {
-                const a = calculateAge(p.birthDate);
-                return (
-                  <option key={p.id} value={p.id}>
-                    {p.name}
-                    {a !== null ? ` - Edad: ${a} años` : ""}
-                  </option>
-                );
-              })}
+              {patients.map((p) => (
+                <option key={p.id} value={p.id}>
+                  {formatNombreConEdad(p.name, p.birthDate)}
+                </option>
+              ))}
             </select>
           </div>
         </div>
