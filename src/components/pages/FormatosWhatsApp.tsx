@@ -12,6 +12,8 @@ const VISTA_PREVIA_VARS = {
   paciente: "María Fernanda López",
   fecha: "12 de agosto de 2026",
   hora: "05:30 PM",
+  procedimiento: "Limpieza dental",
+  costo: "$1,200",
 };
 
 export default function FormatosWhatsApp() {
@@ -40,10 +42,14 @@ export default function FormatosWhatsApp() {
         </h3>
         <p className="text-xs text-ink/40">
           Este es el mensaje que se envía al paciente desde el ícono de WhatsApp en Nueva Cita y
-          Editar Cita. Usa <code className="text-accent">{"{{clinica}}"}</code>,{" "}
+          Editar Cita — se manda de forma individual, paciente por paciente, para poder
+          especificar su hora, fecha, procedimiento y costo exactos. Usa{" "}
+          <code className="text-accent">{"{{clinica}}"}</code>,{" "}
           <code className="text-accent">{"{{paciente}}"}</code>,{" "}
-          <code className="text-accent">{"{{fecha}}"}</code> y{" "}
-          <code className="text-accent">{"{{hora}}"}</code> — se rellenan solos con los datos
+          <code className="text-accent">{"{{fecha}}"}</code>,{" "}
+          <code className="text-accent">{"{{hora}}"}</code>,{" "}
+          <code className="text-accent">{"{{procedimiento}}"}</code> y{" "}
+          <code className="text-accent">{"{{costo}}"}</code> — se rellenan solos con los datos
           reales de la cita. Un asterisco antes y después de una palabra la pone en{" "}
           <strong>negritas</strong> en WhatsApp.
         </p>

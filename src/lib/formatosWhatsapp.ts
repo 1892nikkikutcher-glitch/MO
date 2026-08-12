@@ -7,7 +7,9 @@ export type FormatosWhatsApp = {
 };
 
 export const formatosWhatsAppInicial: FormatosWhatsApp = {
-  confirmacionCita: `¡Hola, qué tal! Escribimos de *{{clinica}}* para confirmar la cita de *{{paciente}}* programada para el día *{{fecha}}* a las *{{hora}}* para continuar con su tratamiento bucodental.
+  confirmacionCita: `¡Hola, qué tal! Escribimos de *{{clinica}}* para confirmar la cita de *{{paciente}}* programada para el día *{{fecha}}* a las *{{hora}}* para *{{procedimiento}}*.
+
+Costo estimado: *{{costo}}*
 
 Le pedimos confirmar su asistencia respondiendo este mensaje. En caso de no confirmar, la cita podría ser cancelada sin previo aviso.
 

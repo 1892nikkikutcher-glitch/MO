@@ -281,6 +281,8 @@ export type CitaAgenda = {
   patientId: string | null;
   paciente: string;
   tratamientos: string[];
+  /** Costo estimado del procedimiento, texto libre (ej. "$1,200") — se usa en el recordatorio de WhatsApp. */
+  costo?: string;
   comentarios: string;
   fecha: string;
   horaInicio: string;

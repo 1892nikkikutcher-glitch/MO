@@ -291,6 +291,7 @@ function CitaDialog({
   const [correo, setCorreo] = useState(patientData?.email ?? "");
   const [tratamientos, setTratamientos] = useState<string[]>(initial.tratamientos ?? []);
   const [procedimientoInput, setProcedimientoInput] = useState("");
+  const [costo, setCosto] = useState(initial.costo ?? "");
   const [comentarios, setComentarios] = useState(initial.comentarios ?? "");
   const [fecha, setFecha] = useState(initial.fecha);
   const [horaInicio, setHoraInicio] = useState(initial.horaInicio);
@@ -357,6 +358,8 @@ function CitaDialog({
       paciente: nombrePacienteActual,
       fecha: formatFechaLarga(fecha),
       hora: formatHora12(horaInicio),
+      procedimiento: tratamientos.join(", ") || "su tratamiento",
+      costo: costo.trim() || "por confirmar",
     });
     window.open(`https://wa.me/${telefonoLimpio}?text=${encodeURIComponent(texto)}`, "_blank");
   };
@@ -384,6 +387,7 @@ function CitaDialog({
       patientId: patientId || null,
       paciente: nombrePaciente,
       tratamientos,
+      costo: costo.trim(),
       comentarios: comentarios.trim(),
       fecha,
       horaInicio,
@@ -626,6 +630,17 @@ function CitaDialog({
                 ))}
               </div>
             )}
+          </div>
+
+          <div>
+            <label className="mb-1 block text-xs font-medium text-ink/60">Costo estimado (aparece en el recordatorio de WhatsApp)</label>
+            <input
+              type="text"
+              value={costo}
+              onChange={(e) => setCosto(e.target.value)}
+              placeholder="Ej. $1,200"
+              className={inputClass}
+            />
           </div>
 
           <div>
@@ -906,7 +921,11 @@ export default function Agenda() {
         vista === "dia" ? toISODate(diaSeleccionado) : `${toISODate(dias[0])}_a_${toISODate(dias[dias.length - 1])}`;
     }
 
-    descargarICS(citasAExportar, "Agenda MO", `agenda_${etiqueta}.ics`);
+    // Se distingue en el nombre del calendario (lo que Google Calendar muestra al
+    // importar) si es la agenda diaria o la agenda general de la clínica, para uso
+    // interno del personal — evita confusión sobre qué tanto abarca el archivo.
+    const nombreCalendario = vista === "dia" ? "Agenda Diaria MO" : "Agenda General MO";
+    descargarICS(citasAExportar, nombreCalendario, `agenda_${etiqueta}.ics`);
   };
 
   const [draggingId, setDraggingId] = useState<string | null>(null);
@@ -1161,7 +1180,11 @@ export default function Agenda() {
             </button>
             <button
               onClick={exportarAGoogleCalendar}
-              title="Descarga un archivo .ics para importar en Google Calendar (o Outlook/Apple Calendar)"
+              title={
+                vista === "dia"
+                  ? "Descarga la agenda diaria (.ics) para importar en Google Calendar u otro calendario — uso interno de la clínica"
+                  : "Descarga la agenda general de la clínica (.ics) para importar en Google Calendar u otro calendario — uso interno"
+              }
               className="flex items-center gap-1.5 rounded-lg border border-edge/10 px-3 py-1.5 text-xs font-semibold text-ink/70 transition-colors hover:bg-surface hover:text-ink"
             >
               <svg width="14" height="14" viewBox="0 0 24 24" fill="none" className="shrink-0">
