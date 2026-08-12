@@ -14,6 +14,7 @@ import {
 import { renderPlantilla, formatFechaLarga, formatHora12 } from "@/lib/formatosWhatsapp";
 import { manejarCambioNombre } from "@/lib/textoNombre";
 import { descargarICS } from "@/lib/exportCalendario";
+import { formatDuracion } from "@/lib/procedimientos";
 
 const PX_PER_MIN = 1.2;
 const DIAS_SEMANA = ["lun.", "mar.", "mié.", "jue.", "vie.", "sáb.", "dom."];
@@ -32,7 +33,7 @@ const estatusColor: Record<CitaEstatus, { bg: string; text: string; dot: string 
 };
 
 const colorPalette = ["#22c55e", "#3b82f6", "#f59e0b", "#dc2626", "#a855f7", "#ec4899", "#14b8a6", "#64748b"];
-const duracionOptions = [15, 20, 25, 30, 45, 60, 90];
+const duracionOptions = [15, 20, 25, 30, 45, 60, 75, 90, 105, 120, 150, 180, 210, 240];
 
 function getMonday(d: Date) {
   const date = new Date(d);
@@ -730,7 +731,7 @@ function CitaDialog({
               >
                 {duracionOptions.map((d) => (
                   <option key={d} value={d}>
-                    {d} min
+                    {formatDuracion(d)}
                   </option>
                 ))}
               </select>
