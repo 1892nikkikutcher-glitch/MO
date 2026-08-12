@@ -3,7 +3,7 @@
 import { useState } from "react";
 import Odontograma from "./Odontograma";
 import { usePatientData } from "@/context/PatientDataContext";
-import { agruparPorEspecialidad, especialidadesPredefinidas } from "@/lib/procedimientos";
+import { agruparPorEspecialidad, especialidadesPredefinidas, type Procedimiento } from "@/lib/procedimientos";
 import type { BudgetData, LineItem } from "@/lib/patientData";
 
 export type { BudgetData };
@@ -39,7 +39,7 @@ export default function NuevoPresupuesto({
   onCancel: () => void;
   onSave: (budget: BudgetData) => void;
 }) {
-  const { recursos, procedimientos } = usePatientData();
+  const { recursos, procedimientos, setProcedimientos } = usePatientData();
   const medicos = recursos.filter((r) => r.tipo === "medico");
   const gruposProcedimientos = agruparPorEspecialidad(procedimientos);
 
@@ -52,6 +52,7 @@ export default function NuevoPresupuesto({
     initialBudget?.especialidad ?? especialidadesPredefinidas[0]
   );
   const [diagnostico, setDiagnostico] = useState(initialBudget?.diagnostico ?? "");
+  const [mostrarSugerenciasDiagnostico, setMostrarSugerenciasDiagnostico] = useState(false);
   const [notaProcedimiento, setNotaProcedimiento] = useState("");
   const [procedimientoSeleccionadoId, setProcedimientoSeleccionadoId] = useState("");
   const [personalizadoNombre, setPersonalizadoNombre] = useState("");
@@ -98,8 +99,42 @@ export default function NuevoPresupuesto({
 
   const total = items.reduce((sum, item) => sum + item.price, 0);
 
+  const diagnosticoTrim = diagnostico.trim();
+  const sugerenciasDiagnostico =
+    diagnosticoTrim.length > 0
+      ? procedimientos
+          .filter(
+            (p) =>
+              p.nombre.toLowerCase().includes(diagnosticoTrim.toLowerCase()) &&
+              p.nombre.trim().toLowerCase() !== diagnosticoTrim.toLowerCase()
+          )
+          .slice(0, 6)
+      : [];
+
+  /** El diagnóstico y tratamiento se guarda como un procedimiento más del
+   * catálogo (mismo concepto, solo con nombre distinto) para poder
+   * consultarlo y reutilizarlo en presupuestos futuros — como una "skill"
+   * que se va acumulando con el uso, sin tener que volver a redactarlo. */
+  const guardarDiagnosticoEnCatalogoSiEsNuevo = () => {
+    if (!diagnosticoTrim) return;
+    const yaExiste = procedimientos.some(
+      (p) => p.nombre.trim().toLowerCase() === diagnosticoTrim.toLowerCase()
+    );
+    if (yaExiste) return;
+    const nuevo: Procedimiento = {
+      id: `diag${Date.now()}`,
+      nombre: diagnosticoTrim,
+      especialidad,
+      costoPaciente: 0,
+      costoOdontologo: 0,
+      duracionMinutos: 0,
+    };
+    setProcedimientos((prev) => [...prev, nuevo]);
+  };
+
   const handleGuardar = () => {
     if (items.length === 0) return;
+    guardarDiagnosticoEnCatalogoSiEsNuevo();
     onSave({ folio, fecha, medico, tipoDePrecio, especialidad, diagnostico, items, total });
   };
 
@@ -213,17 +248,33 @@ export default function NuevoPresupuesto({
             </div>
           )}
 
-          <div>
+          <div className="relative">
             <label className="mb-1 block text-xs font-medium text-ink/60">
               Diagnóstico y tratamiento
             </label>
             <textarea
               value={diagnostico}
               onChange={(e) => setDiagnostico(e.target.value)}
-              placeholder="Describe el diagnóstico y el plan de tratamiento..."
+              onFocus={() => setMostrarSugerenciasDiagnostico(true)}
+              onBlur={() => setTimeout(() => setMostrarSugerenciasDiagnostico(false), 150)}
+              placeholder="Describe el diagnóstico y el plan de tratamiento... — se guarda para poder reutilizarlo después"
               rows={3}
               className="w-full resize-none rounded-lg border border-edge/10 bg-field px-3 py-2 text-sm text-ink placeholder-ink/30 outline-none focus:border-accent/60"
             />
+            {mostrarSugerenciasDiagnostico && sugerenciasDiagnostico.length > 0 && (
+              <div className="absolute z-10 mt-1 max-h-48 w-full overflow-y-auto rounded-lg border border-edge/10 bg-field shadow-card">
+                {sugerenciasDiagnostico.map((p) => (
+                  <button
+                    key={p.id}
+                    type="button"
+                    onClick={() => setDiagnostico(p.nombre)}
+                    className="block w-full border-b border-edge/5 px-3 py-2 text-left text-sm text-ink/80 last:border-0 hover:bg-surface"
+                  >
+                    {p.nombre}
+                  </button>
+                ))}
+              </div>
+            )}
           </div>
         </div>
 

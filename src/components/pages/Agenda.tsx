@@ -33,6 +33,41 @@ const estatusColor: Record<CitaEstatus, { bg: string; text: string; dot: string 
 };
 
 const colorPalette = ["#22c55e", "#3b82f6", "#f59e0b", "#dc2626", "#a855f7", "#ec4899", "#14b8a6", "#64748b"];
+
+/** WhatsApp no soporta texto de color, así que se usa el círculo de color
+ * emoji más parecido (por distancia RGB) al color asignado al recurso, para
+ * poder distinguir de un vistazo a qué médico corresponde cada cita. */
+const EMOJI_COLOR_REFS: { emoji: string; hex: string }[] = [
+  { emoji: "🔴", hex: "#ef4444" },
+  { emoji: "🟠", hex: "#f97316" },
+  { emoji: "🟡", hex: "#eab308" },
+  { emoji: "🟢", hex: "#22c55e" },
+  { emoji: "🔵", hex: "#3b82f6" },
+  { emoji: "🟣", hex: "#a855f7" },
+  { emoji: "🟤", hex: "#92400e" },
+  { emoji: "⚫", hex: "#000000" },
+  { emoji: "⚪", hex: "#ffffff" },
+];
+
+function hexToRgb(hex: string) {
+  const n = parseInt(hex.replace("#", ""), 16);
+  return { r: (n >> 16) & 255, g: (n >> 8) & 255, b: n & 255 };
+}
+
+function emojiParaColor(hex: string): string {
+  const c = hexToRgb(hex);
+  let mejor = EMOJI_COLOR_REFS[0];
+  let mejorDist = Infinity;
+  for (const ref of EMOJI_COLOR_REFS) {
+    const r = hexToRgb(ref.hex);
+    const dist = (c.r - r.r) ** 2 + (c.g - r.g) ** 2 + (c.b - r.b) ** 2;
+    if (dist < mejorDist) {
+      mejorDist = dist;
+      mejor = ref;
+    }
+  }
+  return mejor.emoji;
+}
 const duracionOptions = [15, 20, 25, 30, 45, 60, 75, 90, 105, 120, 150, 180, 210, 240];
 
 function getMonday(d: Date) {
@@ -840,6 +875,7 @@ export default function Agenda() {
     consumirNavegacionNuevaCita,
     solicitudNuevaCitaBlanco,
     consumirSolicitudNuevaCitaBlanco,
+    colaboradoresActivos,
   } = usePatientData();
   /** La agenda siempre se ve/agenda de 7am a 22h como base (para casos
    * extemporáneos), pero si el horario de atención configurado es más
@@ -860,6 +896,7 @@ export default function Agenda() {
     initial: Partial<CitaAgenda> & { fecha: string; horaInicio: string };
     isEditing: boolean;
   } | null>(null);
+  const [menuEnviarAgenda, setMenuEnviarAgenda] = useState<string | null>(null);
 
   const dias = useMemo(() => {
     if (vista === "dia") return [diaSeleccionado];
@@ -975,11 +1012,18 @@ export default function Agenda() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [solicitudNuevaCitaBlanco]);
 
+  useEffect(() => {
+    if (!menuEnviarAgenda) return;
+    const cerrar = () => setMenuEnviarAgenda(null);
+    document.addEventListener("click", cerrar);
+    return () => document.removeEventListener("click", cerrar);
+  }, [menuEnviarAgenda]);
+
   /** Arma la agenda del día en texto (respeta los médicos/unidades ocultos
    * en el filtro de Recursos, para poder mandar la agenda de uno solo) y
    * abre WhatsApp para elegir a quién enviarla — el grupo de la clínica o
    * el médico correspondiente. */
-  const enviarAgendaDelDia = (dia: Date) => {
+  const enviarAgendaDelDia = (dia: Date, telefono?: string) => {
     const fechaISO = toISODate(dia);
     const citasDelDia = citasVisibles
       .filter((c) => c.fecha === fechaISO && c.estatus !== "Cancelada")
@@ -991,15 +1035,27 @@ export default function Agenda() {
     if (citasDelDia.length === 0) {
       lineas.push("Sin citas agendadas.");
     } else {
+      const medicosDelDia = recursos.filter(
+        (r) => r.tipo === "medico" && citasDelDia.some((c) => c.recursoId === r.id)
+      );
+      if (medicosDelDia.length > 0) {
+        lineas.push(medicosDelDia.map((r) => `${emojiParaColor(r.color)} ${r.nombre}`).join(" · "));
+        lineas.push("🔴 No confirmada");
+        lineas.push("");
+      }
       citasDelDia.forEach((c) => {
-        const emoji = c.estatus === "Confirmada" || c.estatus === "Atendida" ? "🟢" : c.estatus === "En espera" ? "🟡" : "🔴";
+        const confirmada = c.estatus === "Confirmada" || c.estatus === "Atendida";
+        const colorRecurso = recursoPorId(c.recursoId)?.color;
+        const emoji = confirmada && colorRecurso ? emojiParaColor(colorRecurso) : confirmada ? "🟢" : "🔴";
         lineas.push(`${emoji} ${c.horaInicio}-${c.horaFin} ${c.paciente}`);
         if (c.tratamientos?.length) lineas.push(c.tratamientos.join(", "));
         lineas.push("");
       });
     }
 
-    window.open(`https://wa.me/?text=${encodeURIComponent(lineas.join("\n").trimEnd())}`, "_blank");
+    const telefonoLimpio = telefono?.replace(/\D/g, "");
+    const destino = telefonoLimpio ? `/${telefonoLimpio}` : "/";
+    window.open(`https://wa.me${destino}?text=${encodeURIComponent(lineas.join("\n").trimEnd())}`, "_blank");
   };
 
   /** Descarga un .ics con las citas de lo que se está viendo ahora mismo
@@ -1411,9 +1467,9 @@ export default function Agenda() {
                     <button
                       onClick={(e) => {
                         e.stopPropagation();
-                        enviarAgendaDelDia(dia);
+                        setMenuEnviarAgenda((prev) => (prev === toISODate(dia) ? null : toISODate(dia)));
                       }}
-                      title="Enviar agenda del día por WhatsApp (al grupo de la clínica o al médico)"
+                      title="Enviar agenda del día por WhatsApp"
                       className="absolute right-1 top-1 flex h-5 w-5 items-center justify-center rounded-full text-success/70 transition-colors hover:bg-success/15 hover:text-success"
                     >
                       <svg width="13" height="13" viewBox="0 0 24 24" fill="none" className="shrink-0">
@@ -1426,6 +1482,39 @@ export default function Agenda() {
                         />
                       </svg>
                     </button>
+                    {menuEnviarAgenda === toISODate(dia) && (
+                      <div
+                        onClick={(e) => e.stopPropagation()}
+                        className="absolute right-1 top-7 z-20 w-44 rounded-lg border border-edge/10 bg-modal py-1 text-left shadow-card"
+                      >
+                        {colaboradoresActivos
+                          .filter((c) => c.whatsapp)
+                          .map((c) => (
+                            <button
+                              key={`${c.clinicId}_${c.uid}`}
+                              onClick={() => {
+                                enviarAgendaDelDia(dia, c.whatsapp);
+                                setMenuEnviarAgenda(null);
+                              }}
+                              className="block w-full truncate px-3 py-1.5 text-left text-xs text-ink/80 hover:bg-surface"
+                            >
+                              {c.nombre || c.correo}
+                            </button>
+                          ))}
+                        {colaboradoresActivos.some((c) => c.whatsapp) && (
+                          <div className="my-1 border-t border-edge/10" />
+                        )}
+                        <button
+                          onClick={() => {
+                            enviarAgendaDelDia(dia);
+                            setMenuEnviarAgenda(null);
+                          }}
+                          className="block w-full px-3 py-1.5 text-left text-xs text-ink/60 hover:bg-surface"
+                        >
+                          Elegir en WhatsApp…
+                        </button>
+                      </div>
+                    )}
                   </div>
                   <div
                     className={`relative cursor-pointer transition-colors ${
