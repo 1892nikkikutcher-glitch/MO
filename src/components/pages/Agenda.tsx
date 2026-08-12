@@ -6,6 +6,8 @@ import {
   citaEstatusOptions,
   computeTratamientosPendientes,
   formatNombreConEdad,
+  elegirColorDisponible,
+  RECURSO_COLOR_PALETTE,
   type CitaAgenda,
   type CitaEstatus,
   type FrecuenciaRecurrencia,
@@ -31,8 +33,6 @@ const estatusColor: Record<CitaEstatus, { bg: string; text: string; dot: string 
   Atendida: { bg: "bg-success/10", text: "text-success", dot: "bg-success" },
   Cancelada: { bg: "bg-danger/10", text: "text-danger", dot: "bg-danger" },
 };
-
-const colorPalette = ["#22c55e", "#3b82f6", "#f59e0b", "#dc2626", "#a855f7", "#ec4899", "#14b8a6", "#64748b"];
 
 /** WhatsApp no soporta texto de color, así que se usa el círculo de color
  * emoji más parecido (por distancia RGB) al color asignado al recurso, para
@@ -195,15 +195,17 @@ function IconReloj() {
 }
 
 function NuevaRecursoDialog({
+  coloresEnUso,
   onClose,
   onSave,
 }: {
+  coloresEnUso: string[];
   onClose: () => void;
   onSave: (recurso: { nombre: string; tipo: "medico" | "unidad"; color: string }) => void;
 }) {
   const [nombre, setNombre] = useState("");
   const [tipo, setTipo] = useState<"medico" | "unidad">("medico");
-  const [color, setColor] = useState(colorPalette[0]);
+  const [color, setColor] = useState(() => elegirColorDisponible(coloresEnUso));
 
   const puedeGuardar = nombre.trim().length > 0;
 
@@ -256,7 +258,7 @@ function NuevaRecursoDialog({
           <div>
             <label className="mb-1 block text-xs font-medium text-ink/60">Color</label>
             <div className="flex flex-wrap gap-2">
-              {colorPalette.map((c) => (
+              {RECURSO_COLOR_PALETTE.map((c) => (
                 <button
                   key={c}
                   onClick={() => setColor(c)}
@@ -1633,6 +1635,7 @@ export default function Agenda() {
 
       {showRecursoDialog && (
         <NuevaRecursoDialog
+          coloresEnUso={recursos.map((r) => r.color)}
           onClose={() => setShowRecursoDialog(false)}
           onSave={(nuevo) => {
             const recurso = { id: `r${Date.now()}`, ...nuevo };

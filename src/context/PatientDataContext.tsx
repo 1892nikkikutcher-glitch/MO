@@ -24,6 +24,7 @@ import { db } from "@/lib/firebase";
 import {
   horarioInicial,
   perfilDoctorInicial,
+  elegirColorDisponible,
   type ClinicInfo,
   type ClinicInvite,
   type ClinicMember,
@@ -200,8 +201,6 @@ function useClinicInfo(clinicUid: string | null) {
   return [value, setValue] as const;
 }
 
-const RECURSO_COLOR_PALETTE = ["#22c55e", "#3b82f6", "#f59e0b", "#dc2626", "#a855f7", "#ec4899", "#14b8a6", "#64748b"];
-
 /**
  * Resuelve a qué clínica pertenecen los datos que debe ver esta sesión:
  * - Si el uid tiene una membresía activa en la clínica de alguien más, usa esa.
@@ -306,10 +305,13 @@ function useClinicResolution(authUid: string, authEmail: string) {
     // (médico) en la Agenda, para que "el personal" y "los recursos de la
     // agenda" sean siempre la misma lista — el uid como id hace esto
     // idempotente si por alguna razón se acepta la invitación más de una vez.
+    // Se consultan los colores ya usados para no repetir el de otro recurso.
+    const snapRecursos = await getDocs(collection(db, `users/${pendingInvite.clinicId}/recursos`));
+    const coloresEnUso = snapRecursos.docs.map((d) => (d.data() as Recurso).color);
     await setDoc(doc(db, `users/${pendingInvite.clinicId}/recursos`, `ruid_${authUid}`), {
       id: `ruid_${authUid}`,
       nombre: pendingInvite.nombre,
-      color: RECURSO_COLOR_PALETTE[Math.floor(Math.random() * RECURSO_COLOR_PALETTE.length)],
+      color: elegirColorDisponible(coloresEnUso),
       tipo: "medico",
     } satisfies Recurso);
     await setDoc(

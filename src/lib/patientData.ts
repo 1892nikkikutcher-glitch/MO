@@ -277,6 +277,27 @@ export type Recurso = {
   tipo: TipoRecurso;
 };
 
+export const RECURSO_COLOR_PALETTE = [
+  "#22c55e",
+  "#3b82f6",
+  "#f59e0b",
+  "#dc2626",
+  "#a855f7",
+  "#ec4899",
+  "#14b8a6",
+  "#64748b",
+];
+
+/** Da un color que ningún recurso existente esté usando todavía, para que
+ * cada médico/unidad se distinga a simple vista (y en los emojis de color
+ * de la agenda por WhatsApp). Si ya se usaron todos, se reparten de forma
+ * predecible en vez de repetir siempre el primero. */
+export function elegirColorDisponible(coloresEnUso: string[]): string {
+  const disponible = RECURSO_COLOR_PALETTE.find((c) => !coloresEnUso.includes(c));
+  if (disponible) return disponible;
+  return RECURSO_COLOR_PALETTE[coloresEnUso.length % RECURSO_COLOR_PALETTE.length];
+}
+
 export const citaEstatusOptions = [
   "Agendada",
   "Confirmada",
