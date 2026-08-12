@@ -1,9 +1,10 @@
 "use client";
 
-import { useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { usePatientData } from "@/context/PatientDataContext";
 import {
   citaEstatusOptions,
+  computeTratamientosPendientes,
   type CitaAgenda,
   type CitaEstatus,
   type FrecuenciaRecurrencia,
@@ -281,12 +282,27 @@ function CitaDialog({
   onSave: (citas: CitaAgenda[]) => void;
   onDelete?: () => void;
 }) {
-  const { patients, addPatient, updatePatient, irAExpediente, clinicInfo, formatosWhatsapp } =
-    usePatientData();
+  const {
+    patients,
+    addPatient,
+    updatePatient,
+    irAExpediente,
+    clinicInfo,
+    formatosWhatsapp,
+    cargarDatosPaciente,
+    presupuestosPorPaciente,
+    pagosPorPaciente,
+  } = usePatientData();
   const [recursoId, setRecursoId] = useState(initial.recursoId ?? recursos[0]?.id ?? "");
   const [patientId, setPatientId] = useState(initial.patientId ?? "");
   const [searchText, setSearchText] = useState(initial.paciente ?? "");
   const patientData = initial.patientId ? patients.find((p) => p.id === initial.patientId) : undefined;
+
+  useEffect(() => {
+    if (initial.patientId) cargarDatosPaciente(initial.patientId);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [initial.patientId]);
+
   const [telefono, setTelefono] = useState(patientData?.phone ?? "");
   const [correo, setCorreo] = useState(patientData?.email ?? "");
   const [tratamientos, setTratamientos] = useState<string[]>(initial.tratamientos ?? []);
@@ -320,6 +336,7 @@ function CitaDialog({
     setSearchText(p.name);
     setTelefono(p.phone);
     setCorreo(p.email ?? "");
+    cargarDatosPaciente(id);
   };
 
   const cambiarPaciente = () => {
@@ -340,6 +357,18 @@ function CitaDialog({
     if (!val) return;
     setTratamientos((prev) => [...prev, val]);
     setProcedimientoInput("");
+  };
+
+  const tratamientosPendientes = patientId
+    ? computeTratamientosPendientes(
+        presupuestosPorPaciente[patientId] ?? [],
+        pagosPorPaciente[patientId] ?? []
+      )
+    : [];
+
+  const agregarDelPresupuesto = (label: string) => {
+    if (tratamientos.includes(label)) return;
+    setTratamientos((prev) => [...prev, label]);
   };
 
   const quitarProcedimiento = (idx: number) => {
@@ -589,6 +618,24 @@ function CitaDialog({
 
           <div>
             <label className="mb-1 block text-xs font-medium text-ink/60">Procedimiento(s) de la cita</label>
+            {tratamientosPendientes.length > 0 && (
+              <div className="mb-2 space-y-1">
+                <p className="text-[11px] text-ink/40">Del presupuesto de este paciente:</p>
+                <div className="flex flex-wrap gap-1.5">
+                  {tratamientosPendientes.map((t) => (
+                    <button
+                      key={t.id}
+                      type="button"
+                      onClick={() => agregarDelPresupuesto(t.label)}
+                      disabled={tratamientos.includes(t.label)}
+                      className="rounded-full border border-accent/30 px-2.5 py-1 text-xs font-medium text-accent transition-colors hover:bg-accent/10 disabled:cursor-not-allowed disabled:opacity-40"
+                    >
+                      + {t.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
             <div className="flex gap-2">
               <input
                 type="text"

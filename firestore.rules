@@ -154,6 +154,9 @@ service cloud.firestore {
     match /users/{ownerId}/pacientes/{patientId}/recetas/{recetaId} {
       allow read, write: if isActiveMember(ownerId);
     }
+    match /users/{ownerId}/pacientes/{patientId}/notasEvolucion/{notaId} {
+      allow read, write: if isActiveMember(ownerId);
+    }
     match /users/{ownerId}/pacientes/{patientId}/pagos/{pagoId} {
       allow read, write: if isClinicAdmin(ownerId);
     }

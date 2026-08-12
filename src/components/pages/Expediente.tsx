@@ -160,10 +160,12 @@ function PresupuestosTab({
   patientName,
   presupuestos,
   setPresupuestos,
+  planTratamientoSugerido,
 }: {
   patientName: string;
   presupuestos: SavedBudget[];
   setPresupuestos: Dispatch<SetStateAction<SavedBudget[]>>;
+  planTratamientoSugerido: string;
 }) {
   const [view, setView] = useState<"list" | "form">("list");
   const [editingBudget, setEditingBudget] = useState<SavedBudget | null>(null);
@@ -180,6 +182,7 @@ function PresupuestosTab({
       <NuevoPresupuesto
         patientName={patientName}
         initialBudget={editingBudget ?? undefined}
+        planTratamientoSugerido={planTratamientoSugerido}
         onCancel={() => setView("list")}
         onSave={(budget) => {
           setPresupuestos((prev) => {
@@ -319,42 +322,42 @@ function PresupuestosTab({
   );
 }
 
-const citasResumen = [
-  { id: "1", fecha: "12/08/2026", hora: "10:00", tipo: "Limpieza dental", estado: "Confirmada" },
-  { id: "2", fecha: "28/08/2026", hora: "16:30", tipo: "Revisión de ortodoncia", estado: "Pendiente" },
-  { id: "3", fecha: "02/07/2026", hora: "09:00", tipo: "Consulta general", estado: "Atendida" },
-] as const;
-
-const estadoColor: Record<string, string> = {
+const estadoColorResumen: Record<string, string> = {
+  Agendada: "bg-ink/10 text-ink/60",
   Confirmada: "bg-info/10 text-info",
-  Pendiente: "bg-accent/10 text-accent",
+  "En espera": "bg-accent/10 text-accent",
   Atendida: "bg-success/10 text-success",
+  Cancelada: "bg-danger/10 text-danger",
 };
 
-function ExpedienteSidePanel() {
+function ExpedienteSidePanel({ citasFuturas }: { citasFuturas: CitaAgenda[] }) {
   return (
     <div className="space-y-6 print:hidden">
       <div className="rounded-2xl border border-edge/10 bg-surface p-5">
         <h3 className="mb-4 text-xs font-semibold uppercase tracking-wide text-ink/50">
           Resumen de Citas
         </h3>
-        <div className="space-y-3">
-          {citasResumen.map((cita) => (
-            <div key={cita.id} className="rounded-lg border border-edge/10 bg-inset p-3">
-              <div className="flex items-center justify-between">
-                <span className="text-sm font-medium text-ink">
-                  {cita.fecha} · {cita.hora}
-                </span>
-                <span
-                  className={`rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide ${estadoColor[cita.estado]}`}
-                >
-                  {cita.estado}
-                </span>
+        {citasFuturas.length === 0 ? (
+          <p className="text-xs text-ink/40">Sin próximas citas agendadas</p>
+        ) : (
+          <div className="space-y-3">
+            {citasFuturas.map((cita) => (
+              <div key={cita.id} className="rounded-lg border border-edge/10 bg-inset p-3">
+                <div className="flex items-center justify-between">
+                  <span className="text-sm font-medium text-ink">
+                    {cita.fecha} · {cita.horaInicio}
+                  </span>
+                  <span
+                    className={`rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide ${estadoColorResumen[cita.estatus]}`}
+                  >
+                    {cita.estatus}
+                  </span>
+                </div>
+                <p className="mt-1 text-xs text-ink/50">{cita.tratamientos.join(", ") || "—"}</p>
               </div>
-              <p className="mt-1 text-xs text-ink/50">{cita.tipo}</p>
-            </div>
-          ))}
-        </div>
+            ))}
+          </div>
+        )}
       </div>
     </div>
   );
@@ -387,7 +390,10 @@ export default function Expediente({
     setPagosPaciente,
     cargarDatosPaciente,
     citas,
+    recursos,
     puedeVerFinanzas,
+    historiaClinicaTemplate,
+    historiaClinicaPorPaciente,
   } = usePatientData();
 
   useEffect(() => {
@@ -414,9 +420,26 @@ export default function Expediente({
   const setPagos: Dispatch<SetStateAction<Pago[]>> = (updater) =>
     setPagosPaciente(patient.id, updater);
 
+  const preguntaPlanTratamiento = historiaClinicaTemplate.secciones
+    .flatMap((s) => s.preguntas)
+    .find((p) => p.tipo === "listaPrioridad");
+  const planTratamientoSugerido = preguntaPlanTratamiento
+    ? (
+        ((historiaClinicaPorPaciente[patient.id]?.porPregunta[preguntaPlanTratamiento.id] as unknown as {
+          id: string;
+          texto: string;
+        }[]) ?? []) as { id: string; texto: string }[]
+      )
+        .map((punto, i) => `${i + 1}. ${punto.texto}`)
+        .join("\n")
+    : "";
+
   const hoyISO = new Date().toISOString().slice(0, 10);
-  const citasFuturas = citas
-    .filter((c) => c.patientId === patient.id && c.fecha >= hoyISO)
+  const citasPaciente = citas
+    .filter((c) => c.patientId === patient.id)
+    .sort((a, b) => b.fecha.localeCompare(a.fecha) || b.horaInicio.localeCompare(a.horaInicio));
+  const citasFuturas = citasPaciente
+    .filter((c) => c.fecha >= hoyISO)
     .sort((a, b) => a.fecha.localeCompare(b.fecha) || a.horaInicio.localeCompare(b.horaInicio));
 
   const enviarResumen = () => {
@@ -501,13 +524,14 @@ export default function Expediente({
               patientName={patient.name}
               presupuestos={presupuestos}
               setPresupuestos={setPresupuestos}
+              planTratamientoSugerido={planTratamientoSugerido}
             />
           )}
           {activeTab === "Datos del Paciente" && (
             <DatosPaciente patient={patient} formatDate={formatDate} />
           )}
           {activeTab === "Historia Clínica" && <HistoriaClinica patientId={patient.id} />}
-          {activeTab === "Listado de Citas" && <ListadoCitas />}
+          {activeTab === "Listado de Citas" && <ListadoCitas citas={citasPaciente} recursos={recursos} />}
           {activeTab === "Fotografías" && <Fotografias />}
           {activeTab === "Pagos" && (
             <Pagos
@@ -521,7 +545,7 @@ export default function Expediente({
             <ConsentimientoInformado patient={patient} />
           )}
           {activeTab === "Laboratorios" && <Laboratorios />}
-          {activeTab === "Notas de Evolución y Seguimiento" && <NotasEvolucion />}
+          {activeTab === "Notas de Evolución y Seguimiento" && <NotasEvolucion patientId={patient.id} />}
           {activeTab === "Membresía" && (
             <MembresiaTab patientId={patient.id} patientName={patient.name} />
           )}
@@ -541,7 +565,7 @@ export default function Expediente({
             )}
         </div>
 
-        <ExpedienteSidePanel />
+        <ExpedienteSidePanel citasFuturas={citasFuturas} />
       </div>
     </div>
   );

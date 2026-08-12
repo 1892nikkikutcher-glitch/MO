@@ -116,6 +116,18 @@ export type Receta = {
   notas: string;
 };
 
+/** Nota de evolución clínica en formato PSOAP, una por visita/seguimiento. */
+export type NotaEvolucion = {
+  id: string;
+  fecha: string;
+  medico: string;
+  presentacion: string;
+  subjetivo: string;
+  objetivo: string;
+  analisis: string;
+  pronostico: string;
+};
+
 export type HorarioAtencion = {
   apertura: string;
   comidaInicio: string;

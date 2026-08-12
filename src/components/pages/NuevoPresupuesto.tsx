@@ -2,34 +2,13 @@
 
 import { useState } from "react";
 import Odontograma from "./Odontograma";
+import { usePatientData } from "@/context/PatientDataContext";
+import { agruparPorEspecialidad, especialidadesPredefinidas } from "@/lib/procedimientos";
 import type { BudgetData, LineItem } from "@/lib/patientData";
 
 export type { BudgetData };
 
-const medicos = ["Dr. Nicolás Medina González", "Dra. Ana Paola Ríos Cervantes"];
-
 const tiposDePrecios = ["Consultorio", "Convenio", "Particular", "Seguro Dental"];
-
-const especialidades = [
-  "Odontología General",
-  "Ortodoncia",
-  "Endodoncia",
-  "Prótesis",
-  "Cirugía Oral",
-  "Periodoncia",
-  "Estética Dental",
-];
-
-const catalogoProcedimientos = [
-  { name: "Consulta y diagnóstico", price: 300 },
-  { name: "Limpieza dental (profilaxis)", price: 600 },
-  { name: "Resina dental", price: 850 },
-  { name: "Extracción simple", price: 700 },
-  { name: "Corona de porcelana", price: 4500 },
-  { name: "Prótesis removible", price: 6800 },
-  { name: "Tratamiento de conducto (endodoncia)", price: 3200 },
-  { name: "Blanqueamiento dental", price: 2500 },
-];
 
 function formatCurrency(value: number) {
   return `$${value.toLocaleString("es-MX")}`;
@@ -50,23 +29,34 @@ function todayFormatted() {
 export default function NuevoPresupuesto({
   patientName,
   initialBudget,
+  planTratamientoSugerido,
   onCancel,
   onSave,
 }: {
   patientName: string;
   initialBudget?: BudgetData;
+  planTratamientoSugerido?: string;
   onCancel: () => void;
   onSave: (budget: BudgetData) => void;
 }) {
+  const { recursos, procedimientos } = usePatientData();
+  const medicos = recursos.filter((r) => r.tipo === "medico");
+  const gruposProcedimientos = agruparPorEspecialidad(procedimientos);
+
   const isEditing = Boolean(initialBudget);
   const [folio] = useState(() => initialBudget?.folio ?? generateFolio());
   const [fecha] = useState(() => initialBudget?.fecha ?? todayFormatted());
-  const [medico, setMedico] = useState(initialBudget?.medico ?? medicos[0]);
+  const [medico, setMedico] = useState(initialBudget?.medico ?? medicos[0]?.nombre ?? "");
   const [tipoDePrecio, setTipoDePrecio] = useState(initialBudget?.tipoDePrecio ?? tiposDePrecios[0]);
-  const [especialidad, setEspecialidad] = useState(initialBudget?.especialidad ?? especialidades[0]);
+  const [especialidad, setEspecialidad] = useState(
+    initialBudget?.especialidad ?? especialidadesPredefinidas[0]
+  );
   const [diagnostico, setDiagnostico] = useState(initialBudget?.diagnostico ?? "");
   const [notaProcedimiento, setNotaProcedimiento] = useState("");
-  const [procedimientoSeleccionado, setProcedimientoSeleccionado] = useState("");
+  const [procedimientoSeleccionadoId, setProcedimientoSeleccionadoId] = useState("");
+  const [personalizadoNombre, setPersonalizadoNombre] = useState("");
+  const [personalizadoPrecio, setPersonalizadoPrecio] = useState("");
+  const [mostrarPersonalizado, setMostrarPersonalizado] = useState(false);
   const [selectedTeeth, setSelectedTeeth] = useState<number[]>([]);
   const [items, setItems] = useState<LineItem[]>(initialBudget?.items ?? []);
 
@@ -76,23 +66,30 @@ export default function NuevoPresupuesto({
     );
   };
 
-  const handleAgregarProcedimiento = () => {
-    const procedimiento = catalogoProcedimientos.find((p) => p.name === procedimientoSeleccionado);
-    if (!procedimiento) return;
-
+  const agregarItem = (procedure: string, price: number) => {
     setItems((prev) => [
       ...prev,
-      {
-        id: `${Date.now()}`,
-        procedure: procedimiento.name,
-        price: procedimiento.price,
-        teeth: selectedTeeth,
-        note: notaProcedimiento.trim(),
-      },
+      { id: `${Date.now()}`, procedure, price, teeth: selectedTeeth, note: notaProcedimiento.trim() },
     ]);
-    setProcedimientoSeleccionado("");
     setSelectedTeeth([]);
     setNotaProcedimiento("");
+  };
+
+  const handleAgregarDelCatalogo = () => {
+    const procedimiento = procedimientos.find((p) => p.id === procedimientoSeleccionadoId);
+    if (!procedimiento) return;
+    agregarItem(procedimiento.nombre, procedimiento.costoPaciente);
+    setProcedimientoSeleccionadoId("");
+  };
+
+  const handleAgregarPersonalizado = () => {
+    const nombre = personalizadoNombre.trim();
+    const precio = Number(personalizadoPrecio);
+    if (!nombre || !precio) return;
+    agregarItem(nombre, precio);
+    setPersonalizadoNombre("");
+    setPersonalizadoPrecio("");
+    setMostrarPersonalizado(false);
   };
 
   const handleRemoveItem = (id: string) => {
@@ -157,8 +154,8 @@ export default function NuevoPresupuesto({
               className="w-full rounded-lg border border-edge/10 bg-field px-3 py-2 text-sm text-ink outline-none focus:border-accent/60"
             >
               {medicos.map((m) => (
-                <option key={m} value={m}>
-                  {m}
+                <option key={m.id} value={m.nombre}>
+                  {m.nombre}
                 </option>
               ))}
             </select>
@@ -191,7 +188,7 @@ export default function NuevoPresupuesto({
                 onChange={(e) => setEspecialidad(e.target.value)}
                 className="w-full rounded-lg border border-edge/10 bg-field px-3 py-2 text-sm text-ink outline-none focus:border-accent/60"
               >
-                {especialidades.map((e) => (
+                {especialidadesPredefinidas.map((e) => (
                   <option key={e} value={e}>
                     {e}
                   </option>
@@ -199,6 +196,22 @@ export default function NuevoPresupuesto({
               </select>
             </div>
           </div>
+
+          {!isEditing && planTratamientoSugerido && !diagnostico && (
+            <div className="rounded-lg border border-accent/30 bg-accent/5 p-3 text-xs text-ink/70">
+              <p className="mb-1 font-semibold text-accent">
+                Hay un plan de tratamiento en la Historia Clínica de este paciente
+              </p>
+              <p className="whitespace-pre-line text-ink/60">{planTratamientoSugerido}</p>
+              <button
+                type="button"
+                onClick={() => setDiagnostico(planTratamientoSugerido)}
+                className="mt-2 rounded-lg border border-accent/40 px-3 py-1.5 text-xs font-semibold text-accent transition-colors hover:bg-accent/10"
+              >
+                Usarlo como diagnóstico y tratamiento
+              </button>
+            </div>
+          )}
 
           <div>
             <label className="mb-1 block text-xs font-medium text-ink/60">
@@ -230,31 +243,92 @@ export default function NuevoPresupuesto({
             />
           </div>
 
-          <div>
-            <label className="mb-1 block text-xs font-medium text-ink/60">
-              Listado de procedimiento
-            </label>
-            <select
-              value={procedimientoSeleccionado}
-              onChange={(e) => setProcedimientoSeleccionado(e.target.value)}
-              className="w-full rounded-lg border border-edge/10 bg-field px-3 py-2 text-sm text-ink outline-none focus:border-accent/60"
-            >
-              <option value="">Elige un procedimiento</option>
-              {catalogoProcedimientos.map((p) => (
-                <option key={p.name} value={p.name}>
-                  {p.name} — {formatCurrency(p.price)}
-                </option>
-              ))}
-            </select>
-          </div>
+          {procedimientos.length === 0 ? (
+            <p className="rounded-lg border border-dashed border-edge/15 p-3 text-xs text-ink/40">
+              Aún no hay procedimientos en tu catálogo — configúralos en Administración →
+              Procedimientos para que aparezcan aquí. Por ahora puedes agregar uno personalizado.
+            </p>
+          ) : (
+            <div>
+              <label className="mb-1 block text-xs font-medium text-ink/60">
+                Listado de procedimiento
+              </label>
+              <select
+                value={procedimientoSeleccionadoId}
+                onChange={(e) => setProcedimientoSeleccionadoId(e.target.value)}
+                className="w-full rounded-lg border border-edge/10 bg-field px-3 py-2 text-sm text-ink outline-none focus:border-accent/60"
+              >
+                <option value="">Elige un procedimiento</option>
+                {gruposProcedimientos.map((grupo) => (
+                  <optgroup key={grupo.especialidad} label={grupo.especialidad}>
+                    {grupo.procedimientos.map((p) => (
+                      <option key={p.id} value={p.id}>
+                        {p.nombre} — {formatCurrency(p.costoPaciente)}
+                      </option>
+                    ))}
+                  </optgroup>
+                ))}
+              </select>
+            </div>
+          )}
 
-          <button
-            onClick={handleAgregarProcedimiento}
-            disabled={!procedimientoSeleccionado}
-            className="w-full rounded-lg border border-accent/40 py-2.5 text-sm font-semibold text-accent transition-colors hover:bg-accent/10 disabled:cursor-not-allowed disabled:opacity-40"
-          >
-            + Agregar procedimiento
-          </button>
+          {procedimientos.length > 0 && (
+            <button
+              onClick={handleAgregarDelCatalogo}
+              disabled={!procedimientoSeleccionadoId}
+              className="w-full rounded-lg border border-accent/40 py-2.5 text-sm font-semibold text-accent transition-colors hover:bg-accent/10 disabled:cursor-not-allowed disabled:opacity-40"
+            >
+              + Agregar procedimiento
+            </button>
+          )}
+
+          {!mostrarPersonalizado ? (
+            <button
+              onClick={() => setMostrarPersonalizado(true)}
+              className="text-xs font-semibold text-ink/50 hover:text-ink"
+            >
+              + Agregar procedimiento personalizado (no está en el catálogo)
+            </button>
+          ) : (
+            <div className="space-y-2 rounded-lg border border-dashed border-edge/15 p-3">
+              <div className="grid grid-cols-[1fr_120px] gap-2">
+                <input
+                  type="text"
+                  value={personalizadoNombre}
+                  onChange={(e) => setPersonalizadoNombre(e.target.value)}
+                  placeholder="Nombre del procedimiento"
+                  className="w-full rounded-lg border border-edge/10 bg-field px-3 py-2 text-sm text-ink placeholder-ink/30 outline-none focus:border-accent/60"
+                />
+                <input
+                  type="number"
+                  min={0}
+                  value={personalizadoPrecio}
+                  onChange={(e) => setPersonalizadoPrecio(e.target.value)}
+                  placeholder="Precio"
+                  className="w-full rounded-lg border border-edge/10 bg-field px-3 py-2 text-sm text-ink placeholder-ink/30 outline-none focus:border-accent/60"
+                />
+              </div>
+              <div className="flex gap-2">
+                <button
+                  onClick={handleAgregarPersonalizado}
+                  disabled={!personalizadoNombre.trim() || !Number(personalizadoPrecio)}
+                  className="flex-1 rounded-lg border border-accent/40 py-2 text-xs font-semibold text-accent transition-colors hover:bg-accent/10 disabled:cursor-not-allowed disabled:opacity-40"
+                >
+                  Agregar
+                </button>
+                <button
+                  onClick={() => {
+                    setMostrarPersonalizado(false);
+                    setPersonalizadoNombre("");
+                    setPersonalizadoPrecio("");
+                  }}
+                  className="rounded-lg border border-edge/15 px-3 py-2 text-xs font-semibold text-ink/60 hover:bg-surface"
+                >
+                  Cancelar
+                </button>
+              </div>
+            </div>
+          )}
         </div>
       </div>
 

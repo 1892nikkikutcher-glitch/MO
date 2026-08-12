@@ -35,6 +35,7 @@ import {
   type SavedBudget,
   type Pago,
   type Receta,
+  type NotaEvolucion,
   type Recurso,
   type SuscripcionPlan,
   type CitaAgenda,
@@ -332,6 +333,8 @@ type PatientDataContextValue = {
   setPagosPaciente: (patientId: string, updater: Updater<Pago[]>) => void;
   recetasPorPaciente: Record<string, Receta[]>;
   setRecetasPaciente: (patientId: string, updater: Updater<Receta[]>) => void;
+  notasEvolucionPorPaciente: Record<string, NotaEvolucion[]>;
+  setNotasEvolucionPaciente: (patientId: string, updater: Updater<NotaEvolucion[]>) => void;
   membershipPlanes: MembershipPlan[];
   setMembershipPlanes: (updater: Updater<MembershipPlan[]>) => void;
   membresiasPorPaciente: Record<string, PatientMembership[]>;
@@ -479,6 +482,9 @@ export function PatientDataProvider({
   >({});
   const [pagosPorPaciente, setPagosPorPacienteState] = useState<Record<string, Pago[]>>({});
   const [recetasPorPaciente, setRecetasPorPacienteState] = useState<Record<string, Receta[]>>({});
+  const [notasEvolucionPorPaciente, setNotasEvolucionPorPacienteState] = useState<
+    Record<string, NotaEvolucion[]>
+  >({});
   const [membresiasPorPaciente, setMembresiasPorPacienteState] = useState<
     Record<string, PatientMembership[]>
   >({});
@@ -554,6 +560,14 @@ export function PatientDataProvider({
       subs.current[membresiasKey] = onSnapshot(collection(db, path), (snap) => {
         const next = snap.docs.map((d) => ({ ...(d.data() as PatientMembership), id: d.id }));
         setMembresiasPorPacienteState((prev) => ({ ...prev, [patientId]: next }));
+      });
+    }
+    const notasEvolucionKey = `notasEvolucion:${patientId}`;
+    if (!subs.current[notasEvolucionKey]) {
+      const path = `users/${clinicUid}/pacientes/${patientId}/notasEvolucion`;
+      subs.current[notasEvolucionKey] = onSnapshot(collection(db, path), (snap) => {
+        const next = snap.docs.map((d) => ({ ...(d.data() as NotaEvolucion), id: d.id }));
+        setNotasEvolucionPorPacienteState((prev) => ({ ...prev, [patientId]: next }));
       });
     }
     const historiaKey = `historiaClinica:${patientId}`;
@@ -664,6 +678,16 @@ export function PatientDataProvider({
       const prevArr = prev[patientId] ?? [];
       const next = resolveUpdater(updater, prevArr);
       syncFirestoreList(`users/${clinicUid}/pacientes/${patientId}/recetas`, prevArr, next);
+      return { ...prev, [patientId]: next };
+    });
+  };
+
+  const setNotasEvolucionPaciente = (patientId: string, updater: Updater<NotaEvolucion[]>) => {
+    if (!clinicUid) return;
+    setNotasEvolucionPorPacienteState((prev) => {
+      const prevArr = prev[patientId] ?? [];
+      const next = resolveUpdater(updater, prevArr);
+      syncFirestoreList(`users/${clinicUid}/pacientes/${patientId}/notasEvolucion`, prevArr, next);
       return { ...prev, [patientId]: next };
     });
   };
@@ -876,6 +900,8 @@ export function PatientDataProvider({
         setPagosPaciente,
         recetasPorPaciente,
         setRecetasPaciente,
+        notasEvolucionPorPaciente,
+        setNotasEvolucionPaciente,
         membershipPlanes,
         setMembershipPlanes,
         membresiasPorPaciente,

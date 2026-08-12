@@ -1,8 +1,8 @@
 "use client";
 
 import { useState } from "react";
-
-const medicos = ["Dr. Nicolás Medina González", "Dra. Ana Paola Ríos Cervantes"];
+import { usePatientData } from "@/context/PatientDataContext";
+import type { NotaEvolucion } from "@/lib/patientData";
 
 const psoapCampos = [
   {
@@ -39,35 +39,6 @@ const psoapCampos = [
 
 type PsoapKey = (typeof psoapCampos)[number]["key"];
 
-type Nota = {
-  id: string;
-  fecha: string;
-  medico: string;
-} & Record<PsoapKey, string>;
-
-const notasIniciales: Nota[] = [
-  {
-    id: "1",
-    fecha: "02/07/2026",
-    medico: "Dr. Nicolás Medina González",
-    presentacion: "Paciente acude a revisión de rutina, sin dolor referido.",
-    subjetivo: "Refiere leve sangrado al cepillado.",
-    objetivo: "Encías con mejoría visible respecto a la visita anterior, sin placa acumulada.",
-    analisis: "Gingivitis leve en remisión por buena higiene.",
-    pronostico: "Favorable. Continuar con la higiene actual y revisión en 3 meses.",
-  },
-  {
-    id: "2",
-    fecha: "15/05/2026",
-    medico: "Dra. Ana Paola Ríos Cervantes",
-    presentacion: "Cita programada para limpieza profunda.",
-    subjetivo: "Sin molestias reportadas.",
-    objetivo: "Se realizó profilaxis y raspado sin complicaciones.",
-    analisis: "Buena respuesta al tratamiento periodontal.",
-    pronostico: "Próxima revisión en 3 meses.",
-  },
-];
-
 const emptyForm: Record<PsoapKey, string> = {
   presentacion: "",
   subjetivo: "",
@@ -87,33 +58,34 @@ function todayFormatted() {
   });
 }
 
-export default function NotasEvolucion() {
-  const [notas, setNotas] = useState<Nota[]>(notasIniciales);
-  const [medico, setMedico] = useState(medicos[0]);
+export default function NotasEvolucion({ patientId }: { patientId: string }) {
+  const { recursos, notasEvolucionPorPaciente, setNotasEvolucionPaciente } = usePatientData();
+  const medicos = recursos.filter((r) => r.tipo === "medico");
+  const notas = notasEvolucionPorPaciente[patientId] ?? [];
+
+  const [medico, setMedico] = useState(medicos[0]?.nombre ?? "");
   const [form, setForm] = useState<Record<PsoapKey, string>>(emptyForm);
 
   const puedeAgregar = Object.values(form).some((v) => v.trim().length > 0);
 
   const handleAgregar = () => {
     if (!puedeAgregar) return;
-    setNotas((prev) => [
-      {
-        id: `${Date.now()}`,
-        fecha: todayFormatted(),
-        medico,
-        presentacion: form.presentacion.trim(),
-        subjetivo: form.subjetivo.trim(),
-        objetivo: form.objetivo.trim(),
-        analisis: form.analisis.trim(),
-        pronostico: form.pronostico.trim(),
-      },
-      ...prev,
-    ]);
+    const nota: NotaEvolucion = {
+      id: `${Date.now()}`,
+      fecha: todayFormatted(),
+      medico,
+      presentacion: form.presentacion.trim(),
+      subjetivo: form.subjetivo.trim(),
+      objetivo: form.objetivo.trim(),
+      analisis: form.analisis.trim(),
+      pronostico: form.pronostico.trim(),
+    };
+    setNotasEvolucionPaciente(patientId, (prev) => [nota, ...prev]);
     setForm(emptyForm);
   };
 
   const handleEliminar = (id: string) => {
-    setNotas((prev) => prev.filter((n) => n.id !== id));
+    setNotasEvolucionPaciente(patientId, (prev) => prev.filter((n) => n.id !== id));
   };
 
   return (
@@ -132,8 +104,8 @@ export default function NotasEvolucion() {
           <label className="mb-1 block text-xs font-medium text-ink/60">Médico</label>
           <select value={medico} onChange={(e) => setMedico(e.target.value)} className={inputClass}>
             {medicos.map((m) => (
-              <option key={m} value={m}>
-                {m}
+              <option key={m.id} value={m.nombre}>
+                {m.nombre}
               </option>
             ))}
           </select>
