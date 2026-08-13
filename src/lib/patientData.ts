@@ -245,7 +245,7 @@ export const planesDisponibles: {
     unidades: "Hasta 2 unidades",
     caracteristicas: [
       "Hasta 2 unidades / consultorios",
-      "Colaboradores (cupo y puestos por definir)",
+      "Colaboradores — se agregan desde Administración → Colaboradores",
     ],
   },
   {
@@ -255,7 +255,7 @@ export const planesDisponibles: {
     unidades: "3 unidades o más",
     caracteristicas: [
       "3 unidades o más",
-      "Colaboradores (cupo y puestos por definir)",
+      "Colaboradores — se agregan desde Administración → Colaboradores",
       "Ej. exige un odontólogo con horario específico por unidad",
     ],
   },
