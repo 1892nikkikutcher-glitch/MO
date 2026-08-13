@@ -21,9 +21,34 @@ import Gastos from "./pages/Gastos";
 import RegulacionSanitaria from "./pages/RegulacionSanitaria";
 import Educacion from "./pages/Educacion";
 import DepositoDental from "./pages/DepositoDental";
+import ProximamenteStub from "./pages/ProximamenteStub";
+import Contrasena from "./pages/Contrasena";
 import GlobalAgregarPago from "./GlobalAgregarPago";
 import GlobalNuevoPaciente from "./GlobalNuevoPaciente";
 import { PatientDataProvider, usePatientData } from "@/context/PatientDataContext";
+
+const paginasConstruidas = new Set([
+  "inicio",
+  "pacientes",
+  "agenda",
+  "recetas",
+  "administracion-perfil",
+  "administracion-colaboradores",
+  "administracion-metas",
+  "administracion-formatos-whatsapp",
+  "membresias",
+  "asistencia",
+  "administracion-procedimientos",
+  "administracion-historial-clinico",
+  "administracion-medicamentos",
+  "planes",
+  "documentos",
+  "gastos",
+  "regulacion-sanitaria",
+  "educacion",
+  "deposito-dental",
+  "contrasena",
+]);
 
 const quickActions = [
   { key: "pacientes", pageId: "pacientes", label: "Nuevo Paciente", color: "amber" },
@@ -229,6 +254,8 @@ export default function Dashboard({
           {activePage === "regulacion-sanitaria" && <RegulacionSanitaria />}
           {activePage === "educacion" && <Educacion />}
           {activePage === "deposito-dental" && <DepositoDental />}
+          {activePage === "contrasena" && <Contrasena />}
+          {!paginasConstruidas.has(activePage) && <ProximamenteStub label={activeLabel} />}
         </div>
       </main>
 
