@@ -483,7 +483,7 @@ function CitaDialog({
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4">
-      <div className="max-h-[90vh] w-full max-w-md overflow-y-auto rounded-2xl border border-edge/10 bg-modal p-6">
+      <div className="max-h-[90vh] w-full max-w-4xl overflow-y-auto rounded-2xl border border-edge/10 bg-modal p-6">
         <div className="mb-4 flex items-center justify-between">
           <div>
             <h2 className="text-lg font-semibold text-ink">
@@ -515,6 +515,7 @@ function CitaDialog({
         </div>
 
         <div className="space-y-4">
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
           <div>
             <label className="mb-1 block text-xs font-medium text-ink/60">
               Responsable (médico o unidad)
@@ -601,7 +602,9 @@ function CitaDialog({
               </>
             )}
           </div>
+          </div>
 
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
           <div className="grid grid-cols-[1fr_auto] items-end gap-2">
             <div>
               <label className="mb-1 block text-xs font-medium text-ink/60">
@@ -654,9 +657,12 @@ function CitaDialog({
               className={inputClass}
             />
           </div>
+          </div>
 
           <div>
-            <label className="mb-1 block text-xs font-medium text-ink/60">Procedimiento(s) de la cita</label>
+            <label className="mb-1 block text-xs font-medium text-ink/60">
+              Procedimiento(s) de la cita o Motivo de Consulta
+            </label>
             {tratamientosPendientes.length > 0 && (
               <div className="mb-2 space-y-1">
                 <p className="text-[11px] text-ink/40">Del presupuesto de este paciente:</p>
@@ -718,6 +724,7 @@ function CitaDialog({
             )}
           </div>
 
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
           <div>
             <label className="mb-1 block text-xs font-medium text-ink/60">Costo estimado (aparece en el recordatorio de WhatsApp)</label>
             <input
@@ -738,6 +745,7 @@ function CitaDialog({
               rows={2}
               className={`${inputClass} resize-none`}
             />
+          </div>
           </div>
 
           <div className="grid grid-cols-3 gap-3">

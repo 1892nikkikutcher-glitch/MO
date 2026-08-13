@@ -18,6 +18,8 @@ import FormatosWhatsApp from "./pages/FormatosWhatsApp";
 import Planes from "./pages/Planes";
 import Documentos from "./pages/Documentos";
 import Gastos from "./pages/Gastos";
+import RegulacionSanitaria from "./pages/RegulacionSanitaria";
+import Educacion from "./pages/Educacion";
 import GlobalAgregarPago from "./GlobalAgregarPago";
 import GlobalNuevoPaciente from "./GlobalNuevoPaciente";
 import { PatientDataProvider, usePatientData } from "@/context/PatientDataContext";
@@ -223,6 +225,8 @@ export default function Dashboard({
           {activePage === "planes" && <Planes />}
           {activePage === "documentos" && <Documentos />}
           {activePage === "gastos" && <Gastos />}
+          {activePage === "regulacion-sanitaria" && <RegulacionSanitaria />}
+          {activePage === "educacion" && <Educacion />}
         </div>
       </main>
 

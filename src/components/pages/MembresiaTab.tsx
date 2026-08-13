@@ -110,6 +110,7 @@ function ActivarMembresiaDialog({
   onClose: () => void;
   onActivar: (plan: MembershipPlan, datosPago: { medico: string; formaPago: string; facturar: boolean }) => void;
 }) {
+  const { irAPagina } = usePatientData();
   const [planId, setPlanId] = useState(planes[0]?.id ?? "");
   const [mostrarPago, setMostrarPago] = useState(false);
   const plan = planes.find((p) => p.id === planId);
@@ -139,7 +140,14 @@ function ActivarMembresiaDialog({
         </div>
         {planes.length === 0 ? (
           <p className="text-sm text-ink/50">
-            No hay membresías configuradas. Créalas en Administración → Membresías.
+            No hay membresías configuradas. Créalas en{" "}
+            <button
+              onClick={() => irAPagina("membresias")}
+              className="font-semibold text-accent underline decoration-accent/40 underline-offset-2 hover:decoration-accent"
+            >
+              Membresías
+            </button>
+            .
           </p>
         ) : (
           <>

@@ -6,7 +6,7 @@ import { usePatientData } from "@/context/PatientDataContext";
 import { coincidePaciente, formatEdad, type Patient } from "@/lib/patientData";
 import { exportarCsv } from "@/lib/exportCsv";
 import { parseArchivoPacientes, type RegistroImportado } from "@/lib/importPacientes";
-import { manejarCambioNombre } from "@/lib/textoNombre";
+import { capitalizarNombre, manejarCambioNombre } from "@/lib/textoNombre";
 
 const avatarColors = ["#f59e0b", "#ec4899", "#3b82f6", "#22c55e", "#dc2626", "#a855f7"];
 
@@ -346,6 +346,15 @@ export default function Pacientes() {
     if (patient) setSelected(patient);
   }, [navegacionExpediente, patients]);
 
+  // `selected` es una foto tomada al abrir el expediente; sin esto, guardar
+  // cambios (nombre, sexo, etc.) actualiza `patients` en el contexto pero el
+  // encabezado del expediente sigue mostrando los datos viejos.
+  useEffect(() => {
+    if (!selected) return;
+    const actualizado = patients.find((p) => p.id === selected.id);
+    if (actualizado && actualizado !== selected) setSelected(actualizado);
+  }, [patients, selected]);
+
   if (selected) {
     return (
       <Expediente
@@ -438,7 +447,7 @@ export default function Pacientes() {
                   onClick={() => setSelected(p)}
                   className="font-medium text-ink transition-colors hover:text-accent"
                 >
-                  {p.name}
+                  {capitalizarNombre(p.name)}
                 </button>
               </td>
               <td className="px-6 py-4 text-ink/70">{p.phone}</td>

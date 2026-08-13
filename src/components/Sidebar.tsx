@@ -194,6 +194,19 @@ export const navItems = [
     ),
   },
   {
+    id: "regulacion-sanitaria",
+    label: "Regulación Sanitaria",
+    icon: (
+      <path
+        d="M12 2 4 5v6c0 5 3.4 8.7 8 11 4.6-2.3 8-6 8-11V5l-8-3ZM9 12l2 2 4-4"
+        stroke="currentColor"
+        strokeWidth="1.8"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+    ),
+  },
+  {
     id: "contrasena",
     label: "Contraseña",
     icon: (

@@ -1,3 +1,5 @@
+import { capitalizarNombre } from "./textoNombre";
+
 export type Patient = {
   id: string;
   name: string;
@@ -11,6 +13,25 @@ export type Patient = {
    * creados antes de este campo o importados en bloque; se usa para el KPI
    * "Nuevos Pacientes (Mes)". */
   createdAt?: string;
+
+  // Ficha de identificación / estudio socioeconómico / contacto — todos
+  // opcionales porque los pacientes existentes no los tienen capturados.
+  sexo?: string;
+  estadoCivil?: string;
+  ocupacion?: string;
+  escolaridad?: string;
+  lugarNacimiento?: string;
+  nivelSocioeconomico?: string;
+  ingresoFamiliar?: string;
+  dependientes?: string;
+  tipoVivienda?: string;
+  servicios?: string[];
+  responsablePago?: string;
+  telefonoFijo?: string;
+  direccion?: string;
+  contactoNombre?: string;
+  contactoParentesco?: string;
+  contactoTelefono?: string;
 };
 
 export function calcularEdadDetallada(birthDate: string): { years: number; months: number } | null {
@@ -40,10 +61,14 @@ export function formatEdad(birthDate: string): string {
 }
 
 /** Ej. "Delia Martínez Severiano (57)" — formato estándar para mostrar un
- * paciente por nombre junto con su edad, usado en selectores y listados. */
+ * paciente por nombre junto con su edad, usado en selectores y listados.
+ * Capitaliza el nombre al vuelo (sin tocar lo guardado en Firestore) para
+ * que expedientes importados con el nombre en minúsculas se vean como
+ * nombres propios en toda la plataforma. */
 export function formatNombreConEdad(name: string, birthDate: string): string {
   const edad = calcularEdadDetallada(birthDate);
-  return edad ? `${name} (${edad.years})` : name;
+  const nombreCapitalizado = capitalizarNombre(name);
+  return edad ? `${nombreCapitalizado} (${edad.years})` : nombreCapitalizado;
 }
 
 function normalizarBusqueda(s: string): string {
@@ -124,6 +149,12 @@ export type LineaPago = {
   folio: string | null;
   label: string;
   monto: number;
+  /** true solo en líneas "extra" de un pago (sin tratamiento de un
+   * presupuesto existente) que sí representan un tratamiento/consulta —
+   * generan automáticamente su propio presupuesto para no quedar
+   * desincronizadas. Pagos que no son tratamientos (ej. membresías) no
+   * deben marcar esto. */
+  generarPresupuesto?: boolean;
 };
 
 export type Pago = {

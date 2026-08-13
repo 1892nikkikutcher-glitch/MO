@@ -33,6 +33,7 @@ import {
   type PerfilDoctor,
   type RolClinica,
   type SavedBudget,
+  type LineItem,
   type Pago,
   type Receta,
   type NotaEvolucion,
@@ -51,8 +52,10 @@ import {
   type EstadisticasGlobales,
 } from "@/lib/metas";
 import type { Gasto } from "@/lib/gastos";
+import { estadoRegulacionInicial, type EstadoRegulacionSanitaria } from "@/lib/regulacionSanitaria";
 import { formatosWhatsAppInicial, type FormatosWhatsApp } from "@/lib/formatosWhatsapp";
 import { calcularFechaFin, type MembershipPlan, type PatientMembership, type UsoBeneficio } from "@/lib/membresias";
+import type { Lamina } from "@/lib/laminas";
 import type { PersonalAsistencia, RegistroAsistencia } from "@/lib/asistencia";
 import type { Procedimiento } from "@/lib/procedimientos";
 import { catalogoInicial, type MedicamentoCatalogo } from "@/lib/medicamentos";
@@ -359,6 +362,8 @@ type PatientDataContextValue = {
   setNotasEvolucionPaciente: (patientId: string, updater: Updater<NotaEvolucion[]>) => void;
   membershipPlanes: MembershipPlan[];
   setMembershipPlanes: (updater: Updater<MembershipPlan[]>) => void;
+  laminas: Lamina[];
+  setLaminas: (updater: Updater<Lamina[]>) => void;
   membresiasPorPaciente: Record<string, PatientMembership[]>;
   activarMembresia: (
     patientId: string,
@@ -405,6 +410,8 @@ type PatientDataContextValue = {
   setMetas: (updater: Updater<MetaConfig>) => void;
   finanzas: FinanzasConfig;
   estadisticas: EstadisticasGlobales;
+  regulacionSanitaria: EstadoRegulacionSanitaria;
+  setRegulacionSanitaria: (updater: Updater<EstadoRegulacionSanitaria>) => void;
   formatosWhatsapp: FormatosWhatsApp;
   setFormatosWhatsapp: (updater: Updater<FormatosWhatsApp>) => void;
   cargarDatosPaciente: (patientId: string) => void;
@@ -417,6 +424,7 @@ type PatientDataContextValue = {
   solicitudNuevaCitaBlanco: boolean;
   abrirNuevaCitaDesdeInicio: () => void;
   consumirSolicitudNuevaCitaBlanco: () => void;
+  irAPagina: (pageId: string) => void;
   miRol: RolClinica | null;
   puedeVerFinanzas: boolean;
   clinicInfo: ClinicInfo | null;
@@ -476,6 +484,11 @@ export function PatientDataProvider({
     "estadisticas",
     estadisticasInicial
   );
+  const [regulacionSanitaria, setRegulacionSanitaria] = useFirestoreDoc<EstadoRegulacionSanitaria>(
+    clinicUid,
+    "regulacionSanitaria",
+    estadoRegulacionInicial
+  );
   const [formatosWhatsapp, setFormatosWhatsapp] = useFirestoreDoc<FormatosWhatsApp>(
     clinicUid,
     "formatosWhatsapp",
@@ -485,6 +498,7 @@ export function PatientDataProvider({
     clinicUid,
     "membresiaPlanes"
   );
+  const [laminas, setLaminas] = useFirestoreList<Lamina>(clinicUid, "laminas");
   const [personalAsistencia, setPersonalAsistencia] = useFirestoreList<PersonalAsistencia>(
     clinicUid,
     "personalAsistencia"
@@ -691,6 +705,8 @@ export function PatientDataProvider({
 
   const consumirSolicitudNuevaCitaBlanco = () => setSolicitudNuevaCitaBlanco(false);
 
+  const irAPagina = (pageId: string) => onIrAPagina?.(pageId);
+
   /** Refleja en `config/estadisticas` el total presupuestado y el conteo por
    * mes (alta, edición o baja de un presupuesto) para que los KPIs "Saldo
    * Pendiente" y "Presupuestos del Mes" del Dashboard sean reales sin
@@ -756,10 +772,65 @@ export function PatientDataProvider({
    * los updaters funcionales se invocan dos veces, y como el delta de
    * finanzas es acumulativo (no una sobreescritura idempotente como
    * syncFirestoreList), duplicarlo inflaría el ingreso registrado. */
+  /** Todo pago que llegue con líneas "extra" (sin tratamiento asociado a un
+   * presupuesto existente — ej. el paciente paga su consulta antes de que
+   * exista un presupuesto formal) genera automáticamente un presupuesto que
+   * cubre exactamente esas líneas, y el pago se reescribe para apuntar a
+   * ese presupuesto nuevo. Así el presupuesto y lo realmente cobrado nunca
+   * quedan desincronizados: por defecto, todo pago se refleja en el
+   * presupuesto del paciente, y no aparece como saldo pendiente. */
+  const generarPresupuestosDesdeExtras = (patientId: string, prevArr: Pago[], next: Pago[]) => {
+    const prevIds = new Set(prevArr.map((p) => p.id));
+    const pagosNuevos = next.filter((p) => !prevIds.has(p.id));
+    let nextConLigas = next;
+
+    pagosNuevos.forEach((pago) => {
+      const lineasExtra = pago.lineas.filter((l) => l.generarPresupuesto);
+      if (lineasExtra.length === 0) return;
+
+      const items: LineItem[] = lineasExtra.map((l) => ({
+        id: `item-${l.id}`,
+        procedure: l.label,
+        price: l.monto,
+        teeth: [],
+        note: "",
+      }));
+      const total = items.reduce((sum, i) => sum + i.price, 0);
+      const folio = pago.id.slice(-6);
+      const nuevoPresupuesto: SavedBudget = {
+        id: `pres-${pago.id}`,
+        folio,
+        fecha: pago.fecha,
+        medico: pago.medico,
+        tipoDePrecio: "Consultorio",
+        especialidad: "Odontología General",
+        diagnostico: "Generado automáticamente a partir de un pago sin presupuesto previo.",
+        items,
+        total,
+      };
+      setPresupuestosPaciente(patientId, (prevPres) => [nuevoPresupuesto, ...prevPres]);
+
+      const idPorLinea = new Map(lineasExtra.map((l, i) => [l.id, items[i].id]));
+      nextConLigas = nextConLigas.map((p) =>
+        p.id !== pago.id
+          ? p
+          : {
+              ...p,
+              lineas: p.lineas.map((l) =>
+                idPorLinea.has(l.id) ? { ...l, tratamientoId: idPorLinea.get(l.id)!, folio } : l
+              ),
+            }
+      );
+    });
+
+    return nextConLigas;
+  };
+
   const setPagosPaciente = (patientId: string, updater: Updater<Pago[]>) => {
     if (!clinicUid) return;
     const prevArr = pagosPorPaciente[patientId] ?? [];
-    const next = resolveUpdater(updater, prevArr);
+    const generado = resolveUpdater(updater, prevArr);
+    const next = generarPresupuestosDesdeExtras(patientId, prevArr, generado);
     syncFirestoreList(`users/${clinicUid}/pacientes/${patientId}/pagos`, prevArr, next);
     registrarDeltaFinanzas(prevArr, next);
     const deltaCount = next.length - prevArr.length;
@@ -1038,6 +1109,8 @@ export function PatientDataProvider({
         setNotasEvolucionPaciente,
         membershipPlanes,
         setMembershipPlanes,
+        laminas,
+        setLaminas,
         membresiasPorPaciente,
         activarMembresia,
         renovarMembresia,
@@ -1073,6 +1146,8 @@ export function PatientDataProvider({
         setMetas,
         finanzas,
         estadisticas,
+        regulacionSanitaria,
+        setRegulacionSanitaria,
         formatosWhatsapp,
         setFormatosWhatsapp,
         cargarDatosPaciente,
@@ -1085,6 +1160,7 @@ export function PatientDataProvider({
         solicitudNuevaCitaBlanco,
         abrirNuevaCitaDesdeInicio,
         consumirSolicitudNuevaCitaBlanco,
+        irAPagina,
         miRol: rol,
         puedeVerFinanzas: rol === "admin",
         clinicInfo,

@@ -225,7 +225,8 @@ function formatFechaHora(iso: string) {
 }
 
 export default function HistoriaClinica({ patientId }: { patientId: string }) {
-  const { historiaClinicaTemplate, historiaClinicaPorPaciente, setRespuestasHistoriaClinica } = usePatientData();
+  const { historiaClinicaTemplate, historiaClinicaPorPaciente, setRespuestasHistoriaClinica, irAPagina } =
+    usePatientData();
   const guardadas = historiaClinicaPorPaciente[patientId] ?? respuestasVacias;
 
   const [borrador, setBorrador] = useState<RespuestasHistoriaClinica>(guardadas);
@@ -292,7 +293,14 @@ export default function HistoriaClinica({ patientId }: { patientId: string }) {
 
       {historiaClinicaTemplate.secciones.length === 0 && (
         <div className="rounded-2xl border border-dashed border-edge/15 bg-surface p-10 text-center text-sm text-ink/40">
-          Aún no hay secciones configuradas. Ve a Administración → Historial Clínico para crearlas.
+          Aún no hay secciones configuradas. Ve a{" "}
+          <button
+            onClick={() => irAPagina("administracion-historial-clinico")}
+            className="font-semibold text-accent underline decoration-accent/40 underline-offset-2 hover:decoration-accent"
+          >
+            Administración → Historial Clínico
+          </button>{" "}
+          para crearlas.
         </div>
       )}
 

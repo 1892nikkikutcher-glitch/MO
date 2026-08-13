@@ -6,6 +6,7 @@
  * su sistema anterior. */
 
 import * as XLSX from "xlsx";
+import { capitalizarNombre } from "./textoNombre";
 
 export type RegistroImportado = {
   name: string;
@@ -188,7 +189,7 @@ function mapearFilas(filas: string[][]): RegistroImportado[] {
   const registros: RegistroImportado[] = [];
   for (let f = 1; f < filas.length; f++) {
     const fila = filas[f];
-    const name = (fila[idxName] ?? "").trim();
+    const name = capitalizarNombre((fila[idxName] ?? "").trim());
     if (!name) continue;
 
     let birthDate = "";
@@ -249,7 +250,7 @@ export function parseArchivoPacientes(buffer: ArrayBuffer, nombreArchivo: string
     }
     if (!Array.isArray(data)) throw new Error("El archivo JSON debe ser una lista de pacientes.");
     const registros = data.filter(esRegistroJsonValido).map((v) => ({
-      name: v.name,
+      name: capitalizarNombre(v.name),
       phone: v.phone ?? "",
       birthDate: v.birthDate ?? "",
       email: v.email ?? "",

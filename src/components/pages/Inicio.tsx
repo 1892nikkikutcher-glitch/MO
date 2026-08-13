@@ -111,7 +111,7 @@ function CardShell({ title, children }: { title: string; children: React.ReactNo
 }
 
 export default function Inicio() {
-  const { puedeVerFinanzas, patients, citas, finanzas, metas, estadisticas } = usePatientData();
+  const { puedeVerFinanzas, patients, citas, finanzas, metas, estadisticas, irAPagina } = usePatientData();
 
   const hoy = new Date();
   const hoyISO = `${hoy.getFullYear()}-${String(hoy.getMonth() + 1).padStart(2, "0")}-${String(
@@ -268,7 +268,14 @@ export default function Inicio() {
         <CardShell title="Metas">
           {metas.metaMensual <= 0 ? (
             <p className="text-sm text-ink/40">
-              Aún no configuras tu meta mensual. Ve a Administración → Metas para definirla.
+              Aún no configuras tu meta mensual. Ve a{" "}
+              <button
+                onClick={() => irAPagina("administracion-metas")}
+                className="font-semibold text-accent underline decoration-accent/40 underline-offset-2 hover:decoration-accent"
+              >
+                Administración → Metas
+              </button>{" "}
+              para definirla.
             </p>
           ) : (
             <div className="space-y-4">

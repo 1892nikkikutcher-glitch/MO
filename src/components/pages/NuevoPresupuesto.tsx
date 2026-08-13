@@ -49,7 +49,7 @@ export default function NuevoPresupuesto({
   onSave: (budget: BudgetData) => void;
 }) {
   const patientName = patient.name;
-  const { recursos, procedimientos, setProcedimientos, perfilDoctor } = usePatientData();
+  const { recursos, procedimientos, setProcedimientos, perfilDoctor, irAPagina } = usePatientData();
   const medicos = recursos.filter((r) => r.tipo === "medico");
   const gruposProcedimientos = agruparPorEspecialidad(procedimientos);
   const [enviandoWhatsApp, setEnviandoWhatsApp] = useState(false);
@@ -356,8 +356,14 @@ export default function NuevoPresupuesto({
 
           {procedimientos.length === 0 ? (
             <p className="rounded-lg border border-dashed border-edge/15 p-3 text-xs text-ink/40">
-              Aún no hay procedimientos en tu catálogo — configúralos en Administración →
-              Procedimientos para que aparezcan aquí. Por ahora puedes agregar uno personalizado.
+              Aún no hay procedimientos en tu catálogo — configúralos en{" "}
+              <button
+                onClick={() => irAPagina("administracion-procedimientos")}
+                className="font-semibold text-accent underline decoration-accent/40 underline-offset-2 hover:decoration-accent"
+              >
+                Administración → Procedimientos
+              </button>{" "}
+              para que aparezcan aquí. Por ahora puedes agregar uno personalizado.
             </p>
           ) : (
             <div>

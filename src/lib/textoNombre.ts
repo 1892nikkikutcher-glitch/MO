@@ -24,13 +24,16 @@ export function manejarCambioNombre(
 ) {
   const input = e.target;
   const cursor = input.selectionStart ?? input.value.length;
-  const antesDelCursor = input.value.slice(0, cursor);
   const nuevoValor = capitalizarNombre(input.value);
+  // Aplicamos el valor y la posición del cursor directamente en el DOM,
+  // de forma síncrona, antes de que React vuelva a renderizar. Así, cuando
+  // React reconcilie con el mismo valor que ya está en el input, el
+  // navegador no reinicia el cursor al final — evita el "salto" de cursor
+  // sin depender de requestAnimationFrame, que con tecleo rápido podía
+  // ejecutarse fuera de orden entre pulsaciones y duplicar/mezclar letras.
+  input.value = nuevoValor;
+  input.setSelectionRange(cursor, cursor);
   setter(nuevoValor);
-  const nuevoCursor = capitalizarNombre(antesDelCursor).length;
-  requestAnimationFrame(() => {
-    input.setSelectionRange(nuevoCursor, nuevoCursor);
-  });
 }
 
 /** Convierte texto a un nombre de archivo seguro (sin acentos ni símbolos),

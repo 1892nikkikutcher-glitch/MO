@@ -1,15 +1,9 @@
 "use client";
 
-import { useState } from "react";
-import { formatEdad } from "@/lib/patientData";
+import { useEffect, useState } from "react";
+import { formatEdad, type Patient } from "@/lib/patientData";
 import { manejarCambioNombre } from "@/lib/textoNombre";
-
-type Patient = {
-  id: string;
-  name: string;
-  phone: string;
-  birthDate: string;
-};
+import { usePatientData } from "@/context/PatientDataContext";
 
 const sexoOptions = ["Femenino", "Masculino", "Otro"];
 const estadoCivilOptions = ["Soltero(a)", "Casado(a)", "Unión libre", "Divorciado(a)", "Viudo(a)"];
@@ -69,35 +63,95 @@ export default function DatosPaciente({
   patient: Patient;
   formatDate: (date: string) => string;
 }) {
-  const [nombreCompleto, setNombreCompleto] = useState(patient.name);
-  const [sexo, setSexo] = useState(sexoOptions[0]);
-  const [estadoCivil, setEstadoCivil] = useState(estadoCivilOptions[0]);
-  const [ocupacion, setOcupacion] = useState("");
-  const [escolaridad, setEscolaridad] = useState(escolaridadOptions[0]);
-  const [lugarNacimiento, setLugarNacimiento] = useState("");
+  const { updatePatient } = usePatientData();
 
-  const [nivelSocioeconomico, setNivelSocioeconomico] = useState(nivelSocioeconomicoOptions[0]);
-  const [ingresoFamiliar, setIngresoFamiliar] = useState(ingresoFamiliarOptions[0]);
-  const [dependientes, setDependientes] = useState("");
-  const [tipoVivienda, setTipoVivienda] = useState(tipoViviendaOptions[0]);
-  const [servicios, setServicios] = useState<string[]>([]);
-  const [responsablePago, setResponsablePago] = useState("");
+  const [nombreCompleto, setNombreCompleto] = useState(patient.name);
+  const [sexo, setSexo] = useState(patient.sexo ?? sexoOptions[0]);
+  const [estadoCivil, setEstadoCivil] = useState(patient.estadoCivil ?? estadoCivilOptions[0]);
+  const [ocupacion, setOcupacion] = useState(patient.ocupacion ?? "");
+  const [escolaridad, setEscolaridad] = useState(patient.escolaridad ?? escolaridadOptions[0]);
+  const [lugarNacimiento, setLugarNacimiento] = useState(patient.lugarNacimiento ?? "");
+
+  const [nivelSocioeconomico, setNivelSocioeconomico] = useState(
+    patient.nivelSocioeconomico ?? nivelSocioeconomicoOptions[0]
+  );
+  const [ingresoFamiliar, setIngresoFamiliar] = useState(
+    patient.ingresoFamiliar ?? ingresoFamiliarOptions[0]
+  );
+  const [dependientes, setDependientes] = useState(patient.dependientes ?? "");
+  const [tipoVivienda, setTipoVivienda] = useState(patient.tipoVivienda ?? tipoViviendaOptions[0]);
+  const [servicios, setServicios] = useState<string[]>(patient.servicios ?? []);
+  const [responsablePago, setResponsablePago] = useState(patient.responsablePago ?? "");
 
   const [celular, setCelular] = useState(patient.phone);
-  const [telefonoFijo, setTelefonoFijo] = useState("");
-  const [correo, setCorreo] = useState("");
-  const [direccion, setDireccion] = useState("");
-  const [contactoNombre, setContactoNombre] = useState("");
-  const [contactoParentesco, setContactoParentesco] = useState(parentescoOptions[0]);
-  const [contactoTelefono, setContactoTelefono] = useState("");
+  const [telefonoFijo, setTelefonoFijo] = useState(patient.telefonoFijo ?? "");
+  const [correo, setCorreo] = useState(patient.email ?? "");
+  const [direccion, setDireccion] = useState(patient.direccion ?? "");
+  const [contactoNombre, setContactoNombre] = useState(patient.contactoNombre ?? "");
+  const [contactoParentesco, setContactoParentesco] = useState(
+    patient.contactoParentesco ?? parentescoOptions[0]
+  );
+  const [contactoTelefono, setContactoTelefono] = useState(patient.contactoTelefono ?? "");
 
   const [saved, setSaved] = useState(false);
+
+  // Al cambiar de paciente (navegar a otro expediente), recargar el
+  // formulario con los datos de ese paciente en vez de arrastrar los del
+  // paciente anterior.
+  useEffect(() => {
+    setNombreCompleto(patient.name);
+    setSexo(patient.sexo ?? sexoOptions[0]);
+    setEstadoCivil(patient.estadoCivil ?? estadoCivilOptions[0]);
+    setOcupacion(patient.ocupacion ?? "");
+    setEscolaridad(patient.escolaridad ?? escolaridadOptions[0]);
+    setLugarNacimiento(patient.lugarNacimiento ?? "");
+    setNivelSocioeconomico(patient.nivelSocioeconomico ?? nivelSocioeconomicoOptions[0]);
+    setIngresoFamiliar(patient.ingresoFamiliar ?? ingresoFamiliarOptions[0]);
+    setDependientes(patient.dependientes ?? "");
+    setTipoVivienda(patient.tipoVivienda ?? tipoViviendaOptions[0]);
+    setServicios(patient.servicios ?? []);
+    setResponsablePago(patient.responsablePago ?? "");
+    setCelular(patient.phone);
+    setTelefonoFijo(patient.telefonoFijo ?? "");
+    setCorreo(patient.email ?? "");
+    setDireccion(patient.direccion ?? "");
+    setContactoNombre(patient.contactoNombre ?? "");
+    setContactoParentesco(patient.contactoParentesco ?? parentescoOptions[0]);
+    setContactoTelefono(patient.contactoTelefono ?? "");
+    setSaved(false);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [patient.id]);
 
   const toggleServicio = (servicio: string) => {
     setServicios((prev) =>
       prev.includes(servicio) ? prev.filter((s) => s !== servicio) : [...prev, servicio]
     );
     setSaved(false);
+  };
+
+  const guardarCambios = () => {
+    updatePatient(patient.id, {
+      name: nombreCompleto.trim(),
+      phone: celular,
+      sexo,
+      estadoCivil,
+      ocupacion,
+      escolaridad,
+      lugarNacimiento,
+      nivelSocioeconomico,
+      ingresoFamiliar,
+      dependientes,
+      tipoVivienda,
+      servicios,
+      responsablePago,
+      telefonoFijo,
+      email: correo,
+      direccion,
+      contactoNombre,
+      contactoParentesco,
+      contactoTelefono,
+    });
+    setSaved(true);
   };
 
   return (
@@ -405,7 +459,7 @@ export default function DatosPaciente({
 
       <div className="flex items-center gap-3">
         <button
-          onClick={() => setSaved(true)}
+          onClick={guardarCambios}
           className="rounded-lg bg-gradient-to-r from-accent to-orange-500 px-5 py-2.5 text-sm font-semibold text-black transition-opacity hover:opacity-90"
         >
           Guardar Cambios

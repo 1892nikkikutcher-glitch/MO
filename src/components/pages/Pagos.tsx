@@ -45,6 +45,20 @@ function WhatsAppIcon() {
   );
 }
 
+function TrashIcon() {
+  return (
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none">
+      <path
+        d="M4 7h16M9 7V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v3m-8 0 .8 12.1a2 2 0 0 0 2 1.9h4.4a2 2 0 0 0 2-1.9L18 7"
+        stroke="currentColor"
+        strokeWidth="1.8"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+    </svg>
+  );
+}
+
 function AgregarPagoExtraDialog({
   onClose,
   onAdd,
@@ -381,6 +395,10 @@ export function AgregarPagoDialog({
       folio: null,
       label: e.label,
       monto: e.monto,
+      // Por defecto, todo pago que no venga de un presupuesto existente se
+      // refleja como su propio presupuesto — así nunca queda como saldo
+      // pendiente algo que el paciente ya pagó.
+      generarPresupuesto: true,
     }));
 
     const pago: Pago = {
@@ -737,6 +755,7 @@ export default function Pagos({
                 <th className="px-6 py-3 font-medium">Firma</th>
                 <th className="px-6 py-3 font-medium">Comprobante</th>
                 <th className="px-6 py-3 text-right font-medium">Monto</th>
+                <th className="px-6 py-3 text-right font-medium">Acción</th>
               </tr>
             </thead>
             <tbody>
@@ -795,6 +814,15 @@ export default function Pagos({
                   </td>
                   <td className="px-6 py-3 text-right font-semibold text-success">
                     {formatCurrency(pago.total)}
+                  </td>
+                  <td className="px-6 py-3 text-right">
+                    <button
+                      onClick={() => setPagos((prev) => prev.filter((p) => p.id !== pago.id))}
+                      title="Eliminar pago"
+                      className="ml-auto flex h-7 w-7 items-center justify-center rounded-full border border-danger/20 text-danger/50 transition-colors hover:border-danger/60 hover:text-danger"
+                    >
+                      <TrashIcon />
+                    </button>
                   </td>
                 </tr>
               ))}
