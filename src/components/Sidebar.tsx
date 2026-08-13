@@ -307,7 +307,7 @@ export default function Sidebar({
         />
       )}
       <aside
-        className={`fixed inset-y-0 left-0 z-50 flex h-screen flex-col border-r border-edge/10 bg-surface transition-transform duration-200 print:hidden md:static md:translate-x-0 md:transition-[width] ${
+        className={`fixed inset-y-0 left-0 z-50 flex h-screen flex-col border-r border-edge/10 bg-app transition-transform duration-200 print:hidden md:static md:translate-x-0 md:transition-[width] ${
           mobileOpen ? "translate-x-0" : "-translate-x-full"
         } ${collapsed ? "md:w-[4.5rem]" : "w-64"}`}
       >

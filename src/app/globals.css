@@ -103,3 +103,26 @@ body {
 .bg-modal.rounded-lg {
   box-shadow: var(--shadow-modal);
 }
+
+/* Los <select> nativos usan un menú desplegable pintado por el sistema
+   operativo, no por el CSS de la página — sin esto, las opciones se veían
+   en blanco (texto invisible) hasta pasar el cursor encima, porque solo la
+   opción resaltada por el navegador recibía un color de fondo que
+   contrastara con el texto claro del tema oscuro. */
+select {
+  color-scheme: dark;
+}
+
+select option {
+  background-color: #161a26;
+  color: #f5f6fa;
+}
+
+[data-theme="light"] select {
+  color-scheme: light;
+}
+
+[data-theme="light"] select option {
+  background-color: #ffffff;
+  color: #1c1d22;
+}

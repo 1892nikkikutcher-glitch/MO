@@ -4,13 +4,17 @@ import { useState } from "react";
 import { usePatientData } from "@/context/PatientDataContext";
 import {
   tipoFaltanteOptions,
+  urgenciaFaltanteOptions,
   estadoCaducidad,
   limpiarTelefono,
   buildMensajeDeposito,
+  buildMensajeRecordatorio,
+  urgenciaDe,
   type Deposito,
   type ArticuloFaltante,
   type ArticuloCaducidad,
   type TipoFaltante,
+  type UrgenciaFaltante,
 } from "@/lib/depositoDental";
 
 const inputClass =
@@ -158,6 +162,7 @@ function AgregarFaltanteDialog({
   const [nombre, setNombre] = useState("");
   const [tipo, setTipo] = useState<TipoFaltante>(tipoFaltanteOptions[0]);
   const [cantidad, setCantidad] = useState("");
+  const [urgencia, setUrgencia] = useState<UrgenciaFaltante>("Media");
   const [depositoId, setDepositoId] = useState("");
 
   const puedeGuardar = nombre.trim().length > 0;
@@ -213,6 +218,22 @@ function AgregarFaltanteDialog({
           </div>
           <div>
             <label className="mb-1 block text-xs font-medium text-ink/60">
+              Urgencia de compra
+            </label>
+            <select
+              value={urgencia}
+              onChange={(e) => setUrgencia(e.target.value as UrgenciaFaltante)}
+              className={inputClass}
+            >
+              {urgenciaFaltanteOptions.map((u) => (
+                <option key={u} value={u}>
+                  {u}
+                </option>
+              ))}
+            </select>
+          </div>
+          <div>
+            <label className="mb-1 block text-xs font-medium text-ink/60">
               Depósito (opcional)
             </label>
             <select
@@ -239,7 +260,7 @@ function AgregarFaltanteDialog({
           <button
             onClick={() =>
               puedeGuardar &&
-              onAdd({ nombre: nombre.trim(), tipo, cantidad: cantidad.trim(), depositoId })
+              onAdd({ nombre: nombre.trim(), tipo, cantidad: cantidad.trim(), urgencia, depositoId })
             }
             disabled={!puedeGuardar}
             className="rounded-lg bg-gradient-to-r from-accent to-orange-500 px-5 py-2 text-sm font-semibold text-black transition-opacity hover:opacity-90 disabled:opacity-40"
@@ -333,6 +354,12 @@ function AgregarCaducidadDialog({
   );
 }
 
+const urgenciaEstilos: Record<UrgenciaFaltante, string> = {
+  Alta: "bg-danger/10 text-danger",
+  Media: "bg-accent/10 text-accent",
+  Baja: "bg-success/10 text-success",
+};
+
 const estadoCaducidadEstilos: Record<string, string> = {
   vigente: "bg-success/10 text-success",
   "por-vencer": "bg-accent/10 text-accent",
@@ -372,6 +399,12 @@ export default function DepositoDental() {
       `https://wa.me/${limpiarTelefono(deposito.telefono)}?text=${encodeURIComponent(texto)}`,
       "_blank"
     );
+  };
+
+  const enviarRecordatorio = () => {
+    const pendientes = articulosFaltantes.filter((a) => !a.surtido);
+    const texto = buildMensajeRecordatorio(pendientes);
+    window.open(`https://wa.me/?text=${encodeURIComponent(texto)}`, "_blank");
   };
 
   return (
@@ -425,12 +458,21 @@ export default function DepositoDental() {
         title="Faltantes por Surtir"
         subtitle="Instrumental, material o equipo que necesitas reponer."
         action={
-          <button
-            onClick={() => setShowFaltante(true)}
-            className="rounded-lg bg-gradient-to-r from-accent to-orange-500 px-4 py-2 text-xs font-semibold text-black transition-opacity hover:opacity-90"
-          >
-            + Agregar Faltante
-          </button>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={enviarRecordatorio}
+              className="flex items-center gap-1.5 rounded-lg border border-success/30 px-3 py-2 text-xs font-semibold text-success/80 transition-colors hover:border-success hover:text-success"
+            >
+              <WhatsAppIcon />
+              Enviar Recordatorio
+            </button>
+            <button
+              onClick={() => setShowFaltante(true)}
+              className="rounded-lg bg-gradient-to-r from-accent to-orange-500 px-4 py-2 text-xs font-semibold text-black transition-opacity hover:opacity-90"
+            >
+              + Agregar Faltante
+            </button>
+          </div>
         }
       >
         {articulosFaltantes.length === 0 ? (
@@ -445,6 +487,7 @@ export default function DepositoDental() {
                   <th className="px-4 py-3 font-medium">Artículo</th>
                   <th className="px-4 py-3 font-medium">Tipo</th>
                   <th className="px-4 py-3 font-medium">Cantidad</th>
+                  <th className="px-4 py-3 font-medium">Urgencia</th>
                   <th className="px-4 py-3 font-medium">Depósito</th>
                   <th className="px-4 py-3 font-medium">Estatus</th>
                   <th className="px-4 py-3 text-right font-medium">Acción</th>
@@ -456,6 +499,13 @@ export default function DepositoDental() {
                     <td className="px-4 py-3 text-ink/80">{a.nombre}</td>
                     <td className="px-4 py-3 text-ink/60">{a.tipo}</td>
                     <td className="px-4 py-3 text-ink/60">{a.cantidad || "—"}</td>
+                    <td className="px-4 py-3">
+                      <span
+                        className={`rounded-full px-2 py-0.5 text-[11px] font-semibold uppercase tracking-wide ${urgenciaEstilos[urgenciaDe(a)]}`}
+                      >
+                        {urgenciaDe(a)}
+                      </span>
+                    </td>
                     <td className="px-4 py-3 text-ink/60">
                       {depositos.find((d) => d.id === a.depositoId)?.nombre ?? "Sin asignar"}
                     </td>
