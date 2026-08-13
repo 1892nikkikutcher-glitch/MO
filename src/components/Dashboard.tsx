@@ -20,6 +20,7 @@ import Documentos from "./pages/Documentos";
 import Gastos from "./pages/Gastos";
 import RegulacionSanitaria from "./pages/RegulacionSanitaria";
 import Educacion from "./pages/Educacion";
+import DepositoDental from "./pages/DepositoDental";
 import GlobalAgregarPago from "./GlobalAgregarPago";
 import GlobalNuevoPaciente from "./GlobalNuevoPaciente";
 import { PatientDataProvider, usePatientData } from "@/context/PatientDataContext";
@@ -28,7 +29,7 @@ const quickActions = [
   { key: "pacientes", pageId: "pacientes", label: "Nuevo Paciente", color: "amber" },
   { key: "agenda", pageId: "agenda", label: "Agenda", color: "amber" },
   { key: "nueva-cita", pageId: "agenda", label: "Nueva Cita", color: "amber", badge: "+" },
-  { key: "material", pageId: "material", label: "Nuevo Material", color: "amber" },
+  { key: "material", pageId: "deposito-dental", label: "Depósito Dental", color: "amber" },
   { key: "membresias", pageId: "membresias", label: "Nueva Membresía", color: "amber" },
   { key: "gastos", pageId: "gastos", label: "Registrar Pago", color: "green" },
 ] as const;
@@ -227,6 +228,7 @@ export default function Dashboard({
           {activePage === "gastos" && <Gastos />}
           {activePage === "regulacion-sanitaria" && <RegulacionSanitaria />}
           {activePage === "educacion" && <Educacion />}
+          {activePage === "deposito-dental" && <DepositoDental />}
         </div>
       </main>
 

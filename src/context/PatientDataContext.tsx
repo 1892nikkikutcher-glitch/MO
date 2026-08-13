@@ -56,6 +56,7 @@ import { estadoRegulacionInicial, type EstadoRegulacionSanitaria } from "@/lib/r
 import { formatosWhatsAppInicial, type FormatosWhatsApp } from "@/lib/formatosWhatsapp";
 import { calcularFechaFin, type MembershipPlan, type PatientMembership, type UsoBeneficio } from "@/lib/membresias";
 import type { Lamina } from "@/lib/laminas";
+import type { Deposito, ArticuloFaltante, ArticuloCaducidad } from "@/lib/depositoDental";
 import type { PersonalAsistencia, RegistroAsistencia } from "@/lib/asistencia";
 import type { Procedimiento } from "@/lib/procedimientos";
 import { catalogoInicial, type MedicamentoCatalogo } from "@/lib/medicamentos";
@@ -364,6 +365,12 @@ type PatientDataContextValue = {
   setMembershipPlanes: (updater: Updater<MembershipPlan[]>) => void;
   laminas: Lamina[];
   setLaminas: (updater: Updater<Lamina[]>) => void;
+  depositos: Deposito[];
+  setDepositos: (updater: Updater<Deposito[]>) => void;
+  articulosFaltantes: ArticuloFaltante[];
+  setArticulosFaltantes: (updater: Updater<ArticuloFaltante[]>) => void;
+  articulosCaducidad: ArticuloCaducidad[];
+  setArticulosCaducidad: (updater: Updater<ArticuloCaducidad[]>) => void;
   membresiasPorPaciente: Record<string, PatientMembership[]>;
   activarMembresia: (
     patientId: string,
@@ -499,6 +506,15 @@ export function PatientDataProvider({
     "membresiaPlanes"
   );
   const [laminas, setLaminas] = useFirestoreList<Lamina>(clinicUid, "laminas");
+  const [depositos, setDepositos] = useFirestoreList<Deposito>(clinicUid, "depositosDentales");
+  const [articulosFaltantes, setArticulosFaltantes] = useFirestoreList<ArticuloFaltante>(
+    clinicUid,
+    "articulosFaltantes"
+  );
+  const [articulosCaducidad, setArticulosCaducidad] = useFirestoreList<ArticuloCaducidad>(
+    clinicUid,
+    "articulosCaducidad"
+  );
   const [personalAsistencia, setPersonalAsistencia] = useFirestoreList<PersonalAsistencia>(
     clinicUid,
     "personalAsistencia"
@@ -1111,6 +1127,12 @@ export function PatientDataProvider({
         setMembershipPlanes,
         laminas,
         setLaminas,
+        depositos,
+        setDepositos,
+        articulosFaltantes,
+        setArticulosFaltantes,
+        articulosCaducidad,
+        setArticulosCaducidad,
         membresiasPorPaciente,
         activarMembresia,
         renovarMembresia,

@@ -56,8 +56,8 @@ export const navItems = [
     ),
   },
   {
-    id: "material",
-    label: "Material",
+    id: "deposito-dental",
+    label: "Depósito Dental",
     icon: (
       <path
         d="M21 8 12 3 3 8l9 5 9-5ZM3 8v9l9 5M21 8v9l-9 5M12 13v9"
