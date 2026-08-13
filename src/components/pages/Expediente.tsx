@@ -434,6 +434,7 @@ export default function Expediente({
   const pagos = pagosPorPaciente[patient.id] ?? [];
   const setPagos: Dispatch<SetStateAction<Pago[]>> = (updater) =>
     setPagosPaciente(patient.id, updater);
+  const patientAlergias = historiaClinicaPorPaciente[patient.id]?.alergias?.trim() || "";
 
   const preguntaPlanTratamiento = historiaClinicaTemplate.secciones
     .flatMap((s) => s.preguntas)
@@ -504,6 +505,16 @@ export default function Expediente({
           Enviar resumen al paciente
         </button>
       </div>
+
+      {patientAlergias && (
+        <div className="flex items-start gap-3 rounded-2xl border border-danger bg-danger/15 p-4 text-sm text-danger print:hidden">
+          <span className="mt-0.5 text-lg">⚠️</span>
+          <p>
+            <span className="font-bold uppercase tracking-wide">Alergias: </span>
+            {patientAlergias}
+          </p>
+        </div>
+      )}
 
       <div className="flex flex-wrap gap-2 border-b border-edge/10 pb-4 print:hidden">
         {expedienteTabs

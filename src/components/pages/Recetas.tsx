@@ -1,11 +1,12 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { usePatientData } from "@/context/PatientDataContext";
 import { formatNombreConEdad, type MedicamentoRecetado, type Receta } from "@/lib/patientData";
 import { calcularDosisPediatrica, type MedicamentoCatalogo } from "@/lib/medicamentos";
 import { generarRecetaPdf } from "@/lib/generarRecetaPdf";
 import { slugify } from "@/lib/textoNombre";
+import { coincideAlergia } from "@/lib/historiaClinica";
 
 const plantillasRecomendaciones = [
   "Evitar alimentos duros o muy calientes durante las primeras 24 horas.",
@@ -71,6 +72,7 @@ export default function Recetas() {
     catalogoMedicamentos,
     perfilDoctor,
     consumirSiguienteFolioReceta,
+    historiaClinicaPorPaciente,
   } = usePatientData();
   const medicos = recursos.filter((r) => r.tipo === "medico");
 
@@ -95,6 +97,15 @@ export default function Recetas() {
 
   const patient = patients.find((p) => p.id === patientId) ?? null;
   const edad = patient ? calculateAge(patient.birthDate) : null;
+  const alergiasHistoria = patientId ? historiaClinicaPorPaciente[patientId]?.alergias?.trim() ?? "" : "";
+
+  // Precarga el campo de alergias con lo capturado en la Historia Clínica del
+  // paciente (llega de forma asíncrona desde Firestore) — solo si el campo
+  // sigue vacío, para no pisar algo que el usuario ya haya escrito a mano.
+  useEffect(() => {
+    if (alergiasHistoria) setAlergias((prev) => prev || alergiasHistoria);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [alergiasHistoria]);
 
   const coincidenciasMedicamento =
     busquedaMedicamento.trim().length > 0
@@ -300,6 +311,16 @@ export default function Recetas() {
             </select>
           </div>
         </div>
+
+        {alergiasHistoria && (
+          <div className="flex items-start gap-3 rounded-2xl border border-danger bg-danger/15 p-4 text-sm text-danger">
+            <span className="mt-0.5 text-lg">⚠️</span>
+            <p>
+              <span className="font-bold uppercase tracking-wide">Alergias: </span>
+              {alergiasHistoria} — verifica antes de recetar.
+            </p>
+          </div>
+        )}
 
         <div className="grid grid-cols-2 gap-4 sm:grid-cols-6">
           <div>
@@ -547,6 +568,19 @@ export default function Recetas() {
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4 print:hidden">
           <div className="w-full max-w-md rounded-2xl border border-edge/10 bg-modal p-6">
             <h3 className="text-base font-semibold text-ink">Medicamento para recetar</h3>
+            {(() => {
+              const conflicto = coincideAlergia(alergias, medicamentoParaConfirmar.nombre);
+              if (conflicto.length === 0) return null;
+              return (
+                <p className="mt-2 flex items-start gap-2 rounded-lg border border-danger bg-danger/20 px-3 py-2 text-xs font-semibold text-danger">
+                  <span>⚠️</span>
+                  <span>
+                    ¡Cuidado! El paciente es alérgico a &quot;{conflicto.join(", ")}&quot; y este
+                    medicamento coincide. Verifica antes de recetar.
+                  </span>
+                </p>
+              );
+            })()}
             {esMedicamentoPediatrico && (
               <p className="mt-2 rounded-lg bg-info/10 px-3 py-2 text-xs text-info">
                 Dosis calculada con el peso capturado ({peso || "sin capturar"} kg). Verifica siempre antes de

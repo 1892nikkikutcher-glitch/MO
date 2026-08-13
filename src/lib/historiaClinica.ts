@@ -187,6 +187,38 @@ export type RespuestaValor = string | string[] | number[];
 
 export type RespuestasHistoriaClinica = {
   porPregunta: Record<string, RespuestaValor>;
+  /** Campo fijo, siempre presente sin importar cómo se configure la
+   * plantilla — texto libre con las sustancias a las que el paciente es
+   * alérgico (ej. "Penicilina, Aspirina"). Se usa para mostrar una alerta
+   * de seguridad en el expediente y al recetar. */
+  alergias?: string;
+  /** ISO datetime de la última vez que se guardó/actualizó este historial —
+   * el expediente debe conservarse mínimo 5 años por ley, así que queda
+   * registro de cuándo se capturó o modificó cada vez. */
+  actualizadoEn?: string;
 };
 
-export const respuestasVacias: RespuestasHistoriaClinica = { porPregunta: {} };
+export const respuestasVacias: RespuestasHistoriaClinica = { porPregunta: {}, alergias: "" };
+
+/** Compara sin acentos/mayúsculas si `texto` menciona alguna de las
+ * sustancias listadas en `alergias` (separadas por coma) — para advertir
+ * antes de recetar un medicamento al que el paciente es alérgico. */
+export function coincideAlergia(alergias: string, texto: string): string[] {
+  const normalizar = (s: string) =>
+    Array.from(s.normalize("NFD"))
+      .filter((c) => {
+        const code = c.codePointAt(0) ?? 0;
+        return code < 0x300 || code > 0x36f;
+      })
+      .join("")
+      .toLowerCase()
+      .trim();
+
+  const textoNorm = normalizar(texto);
+  if (!textoNorm) return [];
+  return alergias
+    .split(",")
+    .map((a) => a.trim())
+    .filter(Boolean)
+    .filter((a) => textoNorm.includes(normalizar(a)));
+}

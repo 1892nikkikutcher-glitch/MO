@@ -1,9 +1,14 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import Odontograma from "./Odontograma";
 import { usePatientData } from "@/context/PatientDataContext";
-import { respuestasVacias, type PreguntaTemplate, type RespuestaValor } from "@/lib/historiaClinica";
+import {
+  respuestasVacias,
+  type PreguntaTemplate,
+  type RespuestaValor,
+  type RespuestasHistoriaClinica,
+} from "@/lib/historiaClinica";
 
 type SiNo = "" | "si" | "no";
 type PuntoPrioridad = { id: string; texto: string };
@@ -207,26 +212,79 @@ function PreguntaRenderer({
   return null;
 }
 
+function formatFechaHora(iso: string) {
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return "";
+  return d.toLocaleString("es-MX", {
+    day: "2-digit",
+    month: "2-digit",
+    year: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+  });
+}
+
 export default function HistoriaClinica({ patientId }: { patientId: string }) {
   const { historiaClinicaTemplate, historiaClinicaPorPaciente, setRespuestasHistoriaClinica } = usePatientData();
-  const respuestas = historiaClinicaPorPaciente[patientId] ?? respuestasVacias;
+  const guardadas = historiaClinicaPorPaciente[patientId] ?? respuestasVacias;
 
-  const actualizar = (preguntaId: string, valor: RespuestaValor) => {
-    setRespuestasHistoriaClinica(patientId, (prev) => ({
-      porPregunta: { ...prev.porPregunta, [preguntaId]: valor },
-    }));
+  const [borrador, setBorrador] = useState<RespuestasHistoriaClinica>(guardadas);
+  const [guardando, setGuardando] = useState(false);
+
+  // Al cambiar de paciente (o cuando llegan datos guardados por primera vez
+  // desde Firestore), se recarga el borrador local desde lo guardado — pero
+  // sin pisar ediciones que el usuario todavía no ha guardado.
+  useEffect(() => {
+    setBorrador(guardadas);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [patientId]);
+
+  const yaGuardado = Boolean(guardadas.actualizadoEn);
+  const hayCambiosSinGuardar = JSON.stringify(borrador) !== JSON.stringify(guardadas);
+
+  const actualizarPregunta = (preguntaId: string, valor: RespuestaValor) => {
+    setBorrador((prev) => ({ ...prev, porPregunta: { ...prev.porPregunta, [preguntaId]: valor } }));
+  };
+
+  const guardar = () => {
+    setGuardando(true);
+    const conFecha: RespuestasHistoriaClinica = {
+      ...borrador,
+      actualizadoEn: new Date().toISOString(),
+    };
+    setRespuestasHistoriaClinica(patientId, conFecha);
+    setBorrador(conFecha);
+    setGuardando(false);
   };
 
   return (
     <div className="space-y-6">
+      <div className="space-y-3 rounded-2xl border border-danger/40 bg-danger/10 p-6">
+        <label className="block text-sm font-semibold text-danger">
+          ⚠ Alergias conocidas (medicamentos, alimentos, anestesia, etc.)
+        </label>
+        <textarea
+          value={borrador.alergias ?? ""}
+          onChange={(e) => setBorrador((prev) => ({ ...prev, alergias: e.target.value }))}
+          placeholder="Ej. Penicilina, Aspirina — sepáralas por comas. Este campo se muestra como alerta en todo el expediente y al recetar."
+          rows={2}
+          className="w-full resize-none rounded-lg border border-danger/30 bg-field px-3 py-2 text-sm text-ink placeholder-ink/30 outline-none focus:border-danger/60"
+        />
+        <p className="text-xs text-danger/80">
+          Muy importante: si el paciente tiene alguna alergia, regístrala aquí exactamente como se
+          llama la sustancia — se usará para alertar antes de recetar un medicamento al que sea
+          alérgico.
+        </p>
+      </div>
+
       {historiaClinicaTemplate.secciones.map((seccion, i) => (
         <Section key={seccion.id} number={i + 1} title={seccion.titulo}>
           {seccion.preguntas.map((pregunta) => (
             <PreguntaRenderer
               key={pregunta.id}
               pregunta={pregunta}
-              valor={respuestas.porPregunta[pregunta.id]}
-              onChange={(v) => actualizar(pregunta.id, v)}
+              valor={borrador.porPregunta[pregunta.id]}
+              onChange={(v) => actualizarPregunta(pregunta.id, v)}
             />
           ))}
         </Section>
@@ -237,6 +295,24 @@ export default function HistoriaClinica({ patientId }: { patientId: string }) {
           Aún no hay secciones configuradas. Ve a Administración → Historial Clínico para crearlas.
         </div>
       )}
+
+      <div className="sticky bottom-4 z-10 flex items-center justify-between gap-4 rounded-2xl border border-edge/10 bg-modal p-4 shadow-card">
+        <p className="text-xs text-ink/40">
+          {guardadas.actualizadoEn
+            ? `Última actualización: ${formatFechaHora(guardadas.actualizadoEn)}`
+            : "Este historial todavía no se ha guardado."}
+          {hayCambiosSinGuardar && (
+            <span className="ml-2 font-semibold text-accent">Tienes cambios sin guardar.</span>
+          )}
+        </p>
+        <button
+          onClick={guardar}
+          disabled={guardando || !hayCambiosSinGuardar}
+          className="shrink-0 rounded-lg bg-gradient-to-r from-accent to-orange-500 px-5 py-2.5 text-sm font-semibold text-black transition-opacity hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-40"
+        >
+          {guardando ? "Guardando…" : yaGuardado ? "Actualizar Historial" : "Guardar Historial"}
+        </button>
+      </div>
     </div>
   );
 }
