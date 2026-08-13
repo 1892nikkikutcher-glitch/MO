@@ -2,24 +2,17 @@
 
 import { useState } from "react";
 import Odontograma from "./Odontograma";
+import { usePatientData } from "@/context/PatientDataContext";
+import {
+  laboratorioTipoOptions,
+  laboratorioEstatusOptions,
+  type LaboratorioEstatus as Estatus,
+  type SolicitudLaboratorio as Solicitud,
+  type TipoLaboratorio,
+} from "@/lib/patientData";
 
 const medicos = ["Dr. Nicolás Medina González", "Dra. Ana Paola Ríos Cervantes"];
-const estatusOptions = ["Enviado", "En proceso", "Recibido"] as const;
-type Estatus = (typeof estatusOptions)[number];
-type TipoLaboratorio = "Dental" | "Químico";
-
-type Solicitud = {
-  id: string;
-  tipo: TipoLaboratorio;
-  laboratorio: string;
-  medico: string;
-  trabajo: string;
-  dientes: number[];
-  fechaEnvio: string;
-  fechaEntrega: string;
-  costo: number;
-  estatus: Estatus;
-};
+const estatusOptions = laboratorioEstatusOptions;
 
 const inputClass =
   "w-full rounded-lg border border-edge/10 bg-field px-3 py-2 text-sm text-ink placeholder-ink/30 outline-none focus:border-accent/60";
@@ -99,7 +92,7 @@ function NuevaSolicitudDialog({
               Tipo de laboratorio
             </label>
             <div className="flex gap-2">
-              {(["Dental", "Químico"] as TipoLaboratorio[]).map((t) => (
+              {laboratorioTipoOptions.map((t) => (
                 <button
                   key={t}
                   type="button"
@@ -226,9 +219,20 @@ function NuevaSolicitudDialog({
   );
 }
 
-export default function Laboratorios() {
+export default function Laboratorios({ patientId }: { patientId: string }) {
+  const { laboratoriosPorPaciente, setLaboratoriosPaciente } = usePatientData();
   const [showDialog, setShowDialog] = useState(false);
-  const [solicitudes, setSolicitudes] = useState<Solicitud[]>([]);
+  const solicitudes = laboratoriosPorPaciente[patientId] ?? [];
+
+  const cambiarEstatus = (id: string, estatus: Estatus) => {
+    setLaboratoriosPaciente(patientId, (prev) =>
+      prev.map((s) => (s.id === id ? { ...s, estatus } : s))
+    );
+  };
+
+  const eliminarSolicitud = (id: string) => {
+    setLaboratoriosPaciente(patientId, (prev) => prev.filter((s) => s.id !== id));
+  };
 
   return (
     <div className="space-y-4">
@@ -259,6 +263,7 @@ export default function Laboratorios() {
                 <th className="px-6 py-3 font-medium">Entrega estimada</th>
                 <th className="px-6 py-3 font-medium">Estatus</th>
                 <th className="px-6 py-3 text-right font-medium">Costo</th>
+                <th className="px-6 py-3 text-right font-medium">Quitar</th>
               </tr>
             </thead>
             <tbody>
@@ -288,14 +293,28 @@ export default function Laboratorios() {
                   <td className="px-6 py-3 whitespace-nowrap text-ink/70">{s.fechaEnvio}</td>
                   <td className="px-6 py-3 whitespace-nowrap text-ink/70">{s.fechaEntrega || "—"}</td>
                   <td className="px-6 py-3">
-                    <span
-                      className={`rounded-full px-2 py-0.5 text-[11px] font-semibold uppercase tracking-wide ${estatusColor[s.estatus]}`}
+                    <select
+                      value={s.estatus}
+                      onChange={(e) => cambiarEstatus(s.id, e.target.value as Estatus)}
+                      className={`rounded-full border-0 px-2 py-0.5 text-[11px] font-semibold uppercase tracking-wide outline-none ${estatusColor[s.estatus]}`}
                     >
-                      {s.estatus}
-                    </span>
+                      {estatusOptions.map((op) => (
+                        <option key={op} value={op}>
+                          {op}
+                        </option>
+                      ))}
+                    </select>
                   </td>
                   <td className="px-6 py-3 text-right font-semibold text-accent">
                     {formatCurrency(s.costo)}
+                  </td>
+                  <td className="px-6 py-3 text-right">
+                    <button
+                      onClick={() => eliminarSolicitud(s.id)}
+                      className="text-xs font-semibold text-danger hover:text-danger"
+                    >
+                      Eliminar
+                    </button>
                   </td>
                 </tr>
               ))}
@@ -308,7 +327,7 @@ export default function Laboratorios() {
         <NuevaSolicitudDialog
           onClose={() => setShowDialog(false)}
           onSave={(solicitud) => {
-            setSolicitudes((prev) => [solicitud, ...prev]);
+            setLaboratoriosPaciente(patientId, (prev) => [solicitud, ...prev]);
             setShowDialog(false);
           }}
         />

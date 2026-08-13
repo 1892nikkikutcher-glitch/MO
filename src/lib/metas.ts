@@ -15,6 +15,29 @@ export type FinanzasConfig = {
 
 export const finanzasInicial: FinanzasConfig = { porFecha: {} };
 
+/** Estadísticas agregadas de todo el consultorio, mantenidas de forma
+ * incremental (a diferencia de presupuestos/pagos/laboratorios, que solo se
+ * cargan por paciente cuando se abre su expediente) para que los KPIs del
+ * Dashboard reflejen datos reales desde el primer momento, sin depender de
+ * qué expedientes se hayan visitado en la sesión. */
+export type EstadisticasGlobales = {
+  /** Suma histórica de presupuesto.total de todos los presupuestos creados. */
+  totalPresupuestado: number;
+  /** Conteo histórico de pagos registrados (para el ticket promedio). */
+  pagosCount: number;
+  /** "YYYY-MM" -> cantidad de presupuestos creados ese mes. */
+  presupuestosPorMes: Record<string, number>;
+  /** Solicitudes de laboratorio con estatus distinto de "Recibido". */
+  laboratoriosPendientesCount: number;
+};
+
+export const estadisticasInicial: EstadisticasGlobales = {
+  totalPresupuestado: 0,
+  pagosCount: 0,
+  presupuestosPorMes: {},
+  laboratoriosPendientesCount: 0,
+};
+
 const SEMANAS_POR_MES = 4.345;
 
 export function metaSemanalDe(metaMensual: number) {

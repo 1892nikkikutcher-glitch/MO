@@ -559,7 +559,7 @@ export default function Expediente({
           {activeTab === "Consentimientos Informados y Recetas" && (
             <ConsentimientoInformado patient={patient} />
           )}
-          {activeTab === "Laboratorios" && <Laboratorios />}
+          {activeTab === "Laboratorios" && <Laboratorios patientId={patient.id} />}
           {activeTab === "Notas de Evolución y Seguimiento" && <NotasEvolucion patientId={patient.id} />}
           {activeTab === "Membresía" && (
             <MembresiaTab patientId={patient.id} patientName={patient.name} />

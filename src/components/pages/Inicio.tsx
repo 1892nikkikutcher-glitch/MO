@@ -23,29 +23,13 @@ function WhatsAppIcon() {
   );
 }
 
-const patientTypeData = [
-  { label: "Primera vez", value: 24, color: "#3b82f6" },
-  { label: "Subsecuentes", value: 58, color: "#f59e0b" },
-  { label: "Emergencias", value: 10, color: "#dc2626" },
-];
-
-const genderData = [
-  { label: "Femenino", value: 55, color: "#ec4899" },
-  { label: "Masculino", value: 45, color: "#3b82f6" },
-];
-
-const averageAge = 34;
-
-const kpis = [
-  { label: "Ticket Promedio", value: "$820", color: "#f59e0b", financiero: true },
-  { label: "Saldo Pendiente", value: "$6,500", color: "#dc2626", financiero: true },
-  { label: "Nuevos Pacientes (Mes)", value: "12", color: "#ec4899", financiero: false },
-  { label: "Citas por Mes", value: "96", color: "#3b82f6", financiero: false },
-  { label: "Citas Atendidas", value: "81", color: "#22c55e", financiero: false },
-  { label: "Laboratorios Pendientes", value: "7", color: "#f59e0b", financiero: false },
-  { label: "Presupuestos Activos", value: "15", color: "#dc2626", financiero: false },
-  { label: "Promedio Citas Reagendadas", value: "4", color: "#dc2626", financiero: false },
-];
+const estatusColor: Record<string, string> = {
+  Agendada: "#94a3b8",
+  Confirmada: "#3b82f6",
+  "En espera": "#f59e0b",
+  Atendida: "#22c55e",
+  Cancelada: "#dc2626",
+};
 
 function DonutChart({
   data,
@@ -68,24 +52,25 @@ function DonutChart({
   });
 
   return (
-    <div className="flex items-center gap-8">
+    <div className="flex flex-wrap items-center gap-8">
       <div className="relative h-[180px] w-[180px] shrink-0">
         <svg width="180" height="180" viewBox="0 0 180 180" className="-rotate-90">
           <circle cx="90" cy="90" r={radius} fill="none" stroke="rgba(255,255,255,0.06)" strokeWidth="24" />
-          {segments.map((s) => (
-            <circle
-              key={s.label}
-              cx="90"
-              cy="90"
-              r={radius}
-              fill="none"
-              stroke={s.color}
-              strokeWidth="24"
-              strokeDasharray={`${s.dash} ${circumference - s.dash}`}
-              strokeDashoffset={s.offset}
-              strokeLinecap="butt"
-            />
-          ))}
+          {total > 0 &&
+            segments.map((s) => (
+              <circle
+                key={s.label}
+                cx="90"
+                cy="90"
+                r={radius}
+                fill="none"
+                stroke={s.color}
+                strokeWidth="24"
+                strokeDasharray={`${s.dash} ${circumference - s.dash}`}
+                strokeDashoffset={s.offset}
+                strokeLinecap="butt"
+              />
+            ))}
         </svg>
         {center && (
           <div className="absolute inset-0 flex flex-col items-center justify-center">{center}</div>
@@ -93,20 +78,24 @@ function DonutChart({
       </div>
 
       <div className="space-y-3">
-        {segments.map((s) => (
-          <div key={s.label} className="flex items-center gap-3">
-            <span
-              className="h-3 w-3 shrink-0 rounded-full"
-              style={{ backgroundColor: s.color, boxShadow: `0 0 8px ${s.color}` }}
-            />
-            <div>
-              <div className="text-sm font-medium text-ink">{s.label}</div>
-              <div className="text-xs text-ink/40">
-                {s.value} · {Math.round(s.fraction * 100)}%
+        {total === 0 ? (
+          <p className="text-sm text-ink/40">Aún no hay datos suficientes.</p>
+        ) : (
+          segments.map((s) => (
+            <div key={s.label} className="flex items-center gap-3">
+              <span
+                className="h-3 w-3 shrink-0 rounded-full"
+                style={{ backgroundColor: s.color, boxShadow: `0 0 8px ${s.color}` }}
+              />
+              <div>
+                <div className="text-sm font-medium text-ink">{s.label}</div>
+                <div className="text-xs text-ink/40">
+                  {s.value} · {Math.round(s.fraction * 100)}%
+                </div>
               </div>
             </div>
-          </div>
-        ))}
+          ))
+        )}
       </div>
     </div>
   );
@@ -122,17 +111,79 @@ function CardShell({ title, children }: { title: string; children: React.ReactNo
 }
 
 export default function Inicio() {
-  const { puedeVerFinanzas, patients, finanzas, metas } = usePatientData();
-  const kpisVisibles = kpis.filter((kpi) => puedeVerFinanzas || !kpi.financiero);
+  const { puedeVerFinanzas, patients, citas, finanzas, metas, estadisticas } = usePatientData();
 
   const hoy = new Date();
   const hoyISO = `${hoy.getFullYear()}-${String(hoy.getMonth() + 1).padStart(2, "0")}-${String(
     hoy.getDate()
   ).padStart(2, "0")}`;
+  const mesActualKey = hoyISO.slice(0, 7); // "YYYY-MM"
+
   const avanceMetas = calcularAvanceMetas(finanzas.porFecha, metas.metaMensual);
   const corteDiario = finanzas.porFecha[hoyISO] ?? 0;
   const corteSemanal = avanceMetas.find((a) => a.label === "Semanal")?.actual ?? 0;
   const corteMensual = avanceMetas.find((a) => a.label === "Mensual")?.actual ?? 0;
+  const totalPagadoHistorico = Object.values(finanzas.porFecha).reduce((sum, v) => sum + v, 0);
+
+  const ticketPromedio =
+    estadisticas.pagosCount > 0 ? Math.round(totalPagadoHistorico / estadisticas.pagosCount) : 0;
+  const saldoPendiente = Math.max(0, estadisticas.totalPresupuestado - totalPagadoHistorico);
+  const nuevosPacientesMes = patients.filter((p) => p.createdAt?.slice(0, 7) === mesActualKey).length;
+
+  const citasDelMes = citas.filter((c) => c.fecha.slice(0, 7) === mesActualKey);
+  const citasPorMes = citasDelMes.length;
+  const citasAtendidas = citasDelMes.filter((c) => c.estatus === "Atendida").length;
+  const citasCanceladas = citasDelMes.filter((c) => c.estatus === "Cancelada").length;
+  const presupuestosDelMes = estadisticas.presupuestosPorMes[mesActualKey] ?? 0;
+
+  const kpisVisibles = [
+    ...(puedeVerFinanzas
+      ? [
+          { label: "Ticket Promedio", value: formatCurrency(ticketPromedio), color: "#f59e0b" },
+          { label: "Saldo Pendiente", value: formatCurrency(saldoPendiente), color: "#dc2626" },
+        ]
+      : []),
+    { label: "Nuevos Pacientes (Mes)", value: String(nuevosPacientesMes), color: "#ec4899" },
+    { label: "Citas por Mes", value: String(citasPorMes), color: "#3b82f6" },
+    { label: "Citas Atendidas (Mes)", value: String(citasAtendidas), color: "#22c55e" },
+    { label: "Laboratorios Pendientes", value: String(estadisticas.laboratoriosPendientesCount), color: "#f59e0b" },
+    { label: "Presupuestos del Mes", value: String(presupuestosDelMes), color: "#a855f7" },
+    { label: "Citas Canceladas (Mes)", value: String(citasCanceladas), color: "#dc2626" },
+  ];
+
+  const edades = patients
+    .map((p) => calcularEdadDetallada(p.birthDate)?.years)
+    .filter((y): y is number => typeof y === "number");
+  const edadPromedio = edades.length > 0 ? Math.round(edades.reduce((s, y) => s + y, 0) / edades.length) : null;
+
+  const citasPorPaciente = new Map<string, number>();
+  citas.forEach((c) => {
+    if (!c.patientId) return;
+    citasPorPaciente.set(c.patientId, (citasPorPaciente.get(c.patientId) ?? 0) + 1);
+  });
+  let primeraVez = 0;
+  let subsecuentes = 0;
+  let sinCitas = 0;
+  patients.forEach((p) => {
+    const n = citasPorPaciente.get(p.id) ?? 0;
+    if (n === 0) sinCitas++;
+    else if (n === 1) primeraVez++;
+    else subsecuentes++;
+  });
+  const patientTypeData = [
+    { label: "Sin citas aún", value: sinCitas, color: "#64748b" },
+    { label: "Primera vez", value: primeraVez, color: "#3b82f6" },
+    { label: "Subsecuentes", value: subsecuentes, color: "#f59e0b" },
+  ];
+
+  const citasPorEstatusData = ["Agendada", "Confirmada", "En espera", "Atendida", "Cancelada"].map(
+    (estatus) => ({
+      label: estatus,
+      value: citasDelMes.filter((c) => c.estatus === estatus).length,
+      color: estatusColor[estatus],
+    })
+  );
+
   const cumpleanerosDelMes = patients
     .filter((p) => p.birthDate)
     .map((p) => {
@@ -204,6 +255,13 @@ export default function Inicio() {
             Cumpleaños Este Mes
           </div>
         </div>
+        <div
+          className="rounded-xl border border-edge/10 bg-surface p-4"
+          style={{ boxShadow: "inset 3px 0 0 0 #a855f7" }}
+        >
+          <div className="text-xl font-bold text-ink">{edadPromedio ?? "—"}</div>
+          <div className="mt-1 text-[11px] uppercase tracking-wide text-ink/40">Edad Promedio</div>
+        </div>
       </div>
 
       {puedeVerFinanzas && (
@@ -241,14 +299,14 @@ export default function Inicio() {
           <DonutChart data={patientTypeData} />
         </CardShell>
 
-        <CardShell title="Edad Promedio y Género">
+        <CardShell title={`Citas por Estatus de ${MESES[hoy.getMonth()]}`}>
           <DonutChart
-            data={genderData}
+            data={citasPorEstatusData}
             center={
               <>
-                <span className="text-4xl font-bold text-ink">{averageAge}</span>
+                <span className="text-4xl font-bold text-ink">{citasPorMes}</span>
                 <span className="mt-1 text-[10px] uppercase tracking-wide text-ink/40">
-                  años promedio
+                  citas este mes
                 </span>
               </>
             }

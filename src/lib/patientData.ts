@@ -7,6 +7,10 @@ export type Patient = {
   /** Texto libre para datos importados de un sistema anterior que no tienen
    * todavía un campo estructurado propio (domicilio, ocupación, etc.). */
   notas?: string;
+  /** Fecha ISO ("YYYY-MM-DD") en que se dio de alta — ausente en pacientes
+   * creados antes de este campo o importados en bloque; se usa para el KPI
+   * "Nuevos Pacientes (Mes)". */
+  createdAt?: string;
 };
 
 export function calcularEdadDetallada(birthDate: string): { years: number; months: number } | null {
@@ -360,6 +364,25 @@ export type CitaAgenda = {
   recurrenciaId: string | null;
   /** Hora real (HH:MM) en que el paciente se presentó — asistencia de pacientes. */
   horaLlegada?: string | null;
+};
+
+export const laboratorioTipoOptions = ["Dental", "Químico"] as const;
+export type TipoLaboratorio = (typeof laboratorioTipoOptions)[number];
+
+export const laboratorioEstatusOptions = ["Enviado", "En proceso", "Recibido"] as const;
+export type LaboratorioEstatus = (typeof laboratorioEstatusOptions)[number];
+
+export type SolicitudLaboratorio = {
+  id: string;
+  tipo: TipoLaboratorio;
+  laboratorio: string;
+  medico: string;
+  trabajo: string;
+  dientes: number[];
+  fechaEnvio: string;
+  fechaEntrega: string;
+  costo: number;
+  estatus: LaboratorioEstatus;
 };
 
 export function formatCurrency(value: number) {

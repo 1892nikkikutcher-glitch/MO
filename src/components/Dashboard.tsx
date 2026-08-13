@@ -17,6 +17,7 @@ import Medicamentos from "./pages/Medicamentos";
 import FormatosWhatsApp from "./pages/FormatosWhatsApp";
 import Planes from "./pages/Planes";
 import Documentos from "./pages/Documentos";
+import Gastos from "./pages/Gastos";
 import GlobalAgregarPago from "./GlobalAgregarPago";
 import GlobalNuevoPaciente from "./GlobalNuevoPaciente";
 import { PatientDataProvider, usePatientData } from "@/context/PatientDataContext";
@@ -221,6 +222,7 @@ export default function Dashboard({
           {activePage === "administracion-medicamentos" && <Medicamentos />}
           {activePage === "planes" && <Planes />}
           {activePage === "documentos" && <Documentos />}
+          {activePage === "gastos" && <Gastos />}
         </div>
       </main>
 

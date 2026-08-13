@@ -39,14 +39,18 @@ import {
   type Recurso,
   type SuscripcionPlan,
   type CitaAgenda,
+  type SolicitudLaboratorio,
 } from "@/lib/patientData";
 import {
   metaConfigInicial,
   finanzasInicial,
+  estadisticasInicial,
   fechaPagoAIso,
   type MetaConfig,
   type FinanzasConfig,
+  type EstadisticasGlobales,
 } from "@/lib/metas";
+import type { Gasto } from "@/lib/gastos";
 import { formatosWhatsAppInicial, type FormatosWhatsApp } from "@/lib/formatosWhatsapp";
 import { calcularFechaFin, type MembershipPlan, type PatientMembership, type UsoBeneficio } from "@/lib/membresias";
 import type { PersonalAsistencia, RegistroAsistencia } from "@/lib/asistencia";
@@ -349,6 +353,8 @@ type PatientDataContextValue = {
   setPagosPaciente: (patientId: string, updater: Updater<Pago[]>) => void;
   recetasPorPaciente: Record<string, Receta[]>;
   setRecetasPaciente: (patientId: string, updater: Updater<Receta[]>) => void;
+  laboratoriosPorPaciente: Record<string, SolicitudLaboratorio[]>;
+  setLaboratoriosPaciente: (patientId: string, updater: Updater<SolicitudLaboratorio[]>) => void;
   notasEvolucionPorPaciente: Record<string, NotaEvolucion[]>;
   setNotasEvolucionPaciente: (patientId: string, updater: Updater<NotaEvolucion[]>) => void;
   membershipPlanes: MembershipPlan[];
@@ -387,6 +393,8 @@ type PatientDataContextValue = {
   setRecursos: (updater: Updater<Recurso[]>) => void;
   citas: CitaAgenda[];
   setCitas: (updater: Updater<CitaAgenda[]>) => void;
+  gastos: Gasto[];
+  setGastos: (updater: Updater<Gasto[]>) => void;
   horario: HorarioAtencion;
   setHorario: (updater: Updater<HorarioAtencion>) => void;
   perfilDoctor: PerfilDoctor;
@@ -396,6 +404,7 @@ type PatientDataContextValue = {
   metas: MetaConfig;
   setMetas: (updater: Updater<MetaConfig>) => void;
   finanzas: FinanzasConfig;
+  estadisticas: EstadisticasGlobales;
   formatosWhatsapp: FormatosWhatsApp;
   setFormatosWhatsapp: (updater: Updater<FormatosWhatsApp>) => void;
   cargarDatosPaciente: (patientId: string) => void;
@@ -444,6 +453,7 @@ export function PatientDataProvider({
   const [patients, setPatients] = useFirestoreList<Patient>(clinicUid, "pacientes");
   const [recursos, setRecursos] = useFirestoreList<Recurso>(clinicUid, "recursos");
   const [citas, setCitas] = useFirestoreList<CitaAgenda>(clinicUid, "citas");
+  const [gastos, setGastos] = useFirestoreList<Gasto>(clinicUid, "gastos");
   const [horario, setHorario] = useFirestoreDoc<HorarioAtencion>(clinicUid, "horario", horarioInicial);
   const [perfilDoctor, setPerfilDoctor] = useFirestoreDoc<PerfilDoctor>(
     clinicUid,
@@ -461,6 +471,11 @@ export function PatientDataProvider({
   );
   const [metas, setMetas] = useFirestoreDoc<MetaConfig>(clinicUid, "metas", metaConfigInicial);
   const [finanzas, setFinanzas] = useFirestoreDoc<FinanzasConfig>(clinicUid, "finanzas", finanzasInicial);
+  const [estadisticas, setEstadisticas] = useFirestoreDoc<EstadisticasGlobales>(
+    clinicUid,
+    "estadisticas",
+    estadisticasInicial
+  );
   const [formatosWhatsapp, setFormatosWhatsapp] = useFirestoreDoc<FormatosWhatsApp>(
     clinicUid,
     "formatosWhatsapp",
@@ -505,6 +520,9 @@ export function PatientDataProvider({
   >({});
   const [pagosPorPaciente, setPagosPorPacienteState] = useState<Record<string, Pago[]>>({});
   const [recetasPorPaciente, setRecetasPorPacienteState] = useState<Record<string, Receta[]>>({});
+  const [laboratoriosPorPaciente, setLaboratoriosPorPacienteState] = useState<
+    Record<string, SolicitudLaboratorio[]>
+  >({});
   const [notasEvolucionPorPaciente, setNotasEvolucionPorPacienteState] = useState<
     Record<string, NotaEvolucion[]>
   >({});
@@ -579,6 +597,14 @@ export function PatientDataProvider({
         setRecetasPorPacienteState((prev) => ({ ...prev, [patientId]: next }));
       });
     }
+    const laboratoriosKey = `laboratorios:${patientId}`;
+    if (!subs.current[laboratoriosKey]) {
+      const path = `users/${clinicUid}/pacientes/${patientId}/laboratorios`;
+      subs.current[laboratoriosKey] = onSnapshot(collection(db, path), (snap) => {
+        const next = snap.docs.map((d) => ({ ...(d.data() as SolicitudLaboratorio), id: d.id }));
+        setLaboratoriosPorPacienteState((prev) => ({ ...prev, [patientId]: next }));
+      });
+    }
     const membresiasKey = `membresias:${patientId}`;
     if (!subs.current[membresiasKey]) {
       const path = `users/${clinicUid}/pacientes/${patientId}/membresias`;
@@ -611,6 +637,7 @@ export function PatientDataProvider({
       name: data.name,
       phone: data.phone,
       birthDate: data.birthDate ?? "",
+      createdAt: new Date().toISOString().slice(0, 10),
     };
     setPatients((prev) => [...prev, nuevo]);
     return nuevo;
@@ -664,14 +691,41 @@ export function PatientDataProvider({
 
   const consumirSolicitudNuevaCitaBlanco = () => setSolicitudNuevaCitaBlanco(false);
 
+  /** Refleja en `config/estadisticas` el total presupuestado y el conteo por
+   * mes (alta, edición o baja de un presupuesto) para que los KPIs "Saldo
+   * Pendiente" y "Presupuestos del Mes" del Dashboard sean reales sin
+   * depender de tener cada expediente de paciente cargado — mismo patrón que
+   * `registrarDeltaFinanzas` usa para los pagos. */
+  const registrarDeltaPresupuestos = (prevArr: SavedBudget[], next: SavedBudget[]) => {
+    const deltaTotal = next.reduce((s, p) => s + p.total, 0) - prevArr.reduce((s, p) => s + p.total, 0);
+    const conMes = (arr: SavedBudget[]) =>
+      arr.map((p) => (fechaPagoAIso(p.fecha) ?? "").slice(0, 7)).filter(Boolean);
+    const mesesPrev = conMes(prevArr);
+    const mesesNext = conMes(next);
+    const meses = new Set([...mesesPrev, ...mesesNext]);
+    if (deltaTotal === 0 && meses.size === 0) return;
+    setEstadisticas((prevEst) => {
+      const presupuestosPorMes = { ...prevEst.presupuestosPorMes };
+      meses.forEach((mes) => {
+        const deltaMes =
+          mesesNext.filter((m) => m === mes).length - mesesPrev.filter((m) => m === mes).length;
+        if (deltaMes !== 0) presupuestosPorMes[mes] = (presupuestosPorMes[mes] ?? 0) + deltaMes;
+      });
+      return {
+        ...prevEst,
+        totalPresupuestado: prevEst.totalPresupuestado + deltaTotal,
+        presupuestosPorMes,
+      };
+    });
+  };
+
   const setPresupuestosPaciente = (patientId: string, updater: Updater<SavedBudget[]>) => {
     if (!clinicUid) return;
-    setPresupuestosPorPacienteState((prev) => {
-      const prevArr = prev[patientId] ?? [];
-      const next = resolveUpdater(updater, prevArr);
-      syncFirestoreList(`users/${clinicUid}/pacientes/${patientId}/presupuestos`, prevArr, next);
-      return { ...prev, [patientId]: next };
-    });
+    const prevArr = presupuestosPorPaciente[patientId] ?? [];
+    const next = resolveUpdater(updater, prevArr);
+    syncFirestoreList(`users/${clinicUid}/pacientes/${patientId}/presupuestos`, prevArr, next);
+    registrarDeltaPresupuestos(prevArr, next);
+    setPresupuestosPorPacienteState((prev) => ({ ...prev, [patientId]: next }));
   };
 
   /** Refleja en `config/finanzas` el neto por fecha (alta, edición o baja de
@@ -708,6 +762,10 @@ export function PatientDataProvider({
     const next = resolveUpdater(updater, prevArr);
     syncFirestoreList(`users/${clinicUid}/pacientes/${patientId}/pagos`, prevArr, next);
     registrarDeltaFinanzas(prevArr, next);
+    const deltaCount = next.length - prevArr.length;
+    if (deltaCount !== 0) {
+      setEstadisticas((prevEst) => ({ ...prevEst, pagosCount: prevEst.pagosCount + deltaCount }));
+    }
     setPagosPorPacienteState((prev) => ({ ...prev, [patientId]: next }));
   };
 
@@ -719,6 +777,23 @@ export function PatientDataProvider({
       syncFirestoreList(`users/${clinicUid}/pacientes/${patientId}/recetas`, prevArr, next);
       return { ...prev, [patientId]: next };
     });
+  };
+
+  const setLaboratoriosPaciente = (patientId: string, updater: Updater<SolicitudLaboratorio[]>) => {
+    if (!clinicUid) return;
+    const prevArr = laboratoriosPorPaciente[patientId] ?? [];
+    const next = resolveUpdater(updater, prevArr);
+    syncFirestoreList(`users/${clinicUid}/pacientes/${patientId}/laboratorios`, prevArr, next);
+    const contarPendientes = (arr: SolicitudLaboratorio[]) =>
+      arr.filter((s) => s.estatus !== "Recibido").length;
+    const deltaPendientes = contarPendientes(next) - contarPendientes(prevArr);
+    if (deltaPendientes !== 0) {
+      setEstadisticas((prevEst) => ({
+        ...prevEst,
+        laboratoriosPendientesCount: prevEst.laboratoriosPendientesCount + deltaPendientes,
+      }));
+    }
+    setLaboratoriosPorPacienteState((prev) => ({ ...prev, [patientId]: next }));
   };
 
   const setNotasEvolucionPaciente = (patientId: string, updater: Updater<NotaEvolucion[]>) => {
@@ -957,6 +1032,8 @@ export function PatientDataProvider({
         setPagosPaciente,
         recetasPorPaciente,
         setRecetasPaciente,
+        laboratoriosPorPaciente,
+        setLaboratoriosPaciente,
         notasEvolucionPorPaciente,
         setNotasEvolucionPaciente,
         membershipPlanes,
@@ -984,6 +1061,8 @@ export function PatientDataProvider({
         setRecursos,
         citas,
         setCitas,
+        gastos,
+        setGastos,
         horario,
         setHorario,
         perfilDoctor,
@@ -993,6 +1072,7 @@ export function PatientDataProvider({
         metas,
         setMetas,
         finanzas,
+        estadisticas,
         formatosWhatsapp,
         setFormatosWhatsapp,
         cargarDatosPaciente,
