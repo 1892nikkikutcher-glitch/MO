@@ -125,6 +125,15 @@ export default function Planes() {
           );
         })}
       </div>
+
+      <div className="flex items-start gap-3 rounded-2xl border border-edge/10 bg-surface p-4 text-xs text-ink/50">
+        <span className="mt-0.5 text-success">🔒</span>
+        <p>
+          Toda tu información está blindada y es segura: los pagos se procesan directamente por Stripe
+          (cifrado y cumplimiento PCI-DSS) — MO nunca ve ni guarda los datos de tu tarjeta — y los datos de
+          tu consultorio y pacientes se almacenan cifrados en Firebase.
+        </p>
+      </div>
     </div>
   );
 }
