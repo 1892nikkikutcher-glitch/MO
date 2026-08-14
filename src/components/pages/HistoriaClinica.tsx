@@ -11,7 +11,20 @@ import {
 } from "@/lib/historiaClinica";
 
 type SiNo = "" | "si" | "no";
-type PuntoPrioridad = { id: string; texto: string };
+
+const fasesTratamiento = ["I", "II", "III", "Ortodoncia"] as const;
+type FaseTratamiento = (typeof fasesTratamiento)[number];
+type PuntoPrioridad = { id: string; texto: string; fase?: FaseTratamiento };
+
+const faseInfo: Record<FaseTratamiento, { titulo: string; descripcion: string }> = {
+  I: { titulo: "Fase I", descripcion: "Remoción de procesos infecciosos" },
+  II: { titulo: "Fase II", descripcion: "Rehabilitación" },
+  III: { titulo: "Fase III", descripcion: "Mantenimiento" },
+  Ortodoncia: {
+    titulo: "Etapa de Ortodoncia",
+    descripcion: "Independiente de las fases I-III — solo si el caso lo requiere",
+  },
+};
 
 const inputClass =
   "w-full rounded-lg border border-edge/10 bg-field px-3 py-2 text-sm text-ink placeholder-ink/30 outline-none focus:border-accent/60";
@@ -93,32 +106,47 @@ function ChipGroup({
   );
 }
 
-function ListaPrioridad({ valor, onChange }: { valor: PuntoPrioridad[]; onChange: (v: PuntoPrioridad[]) => void }) {
+function FaseSection({
+  fase,
+  puntos,
+  onAgregar,
+  onQuitar,
+}: {
+  fase: FaseTratamiento;
+  puntos: PuntoPrioridad[];
+  onAgregar: (texto: string) => void;
+  onQuitar: (id: string) => void;
+}) {
   const [nuevo, setNuevo] = useState("");
+  const info = faseInfo[fase];
 
   const agregar = () => {
     if (!nuevo.trim()) return;
-    onChange([...valor, { id: `${Date.now()}`, texto: nuevo.trim() }]);
+    onAgregar(nuevo.trim());
     setNuevo("");
   };
 
-  const quitar = (id: string) => onChange(valor.filter((p) => p.id !== id));
-
   return (
-    <div className="space-y-2">
-      {valor.map((punto, index) => (
-        <div key={punto.id} className="flex items-center justify-between gap-3 rounded-lg border border-edge/10 bg-inset px-3 py-2 text-sm">
-          <span className="text-ink">
-            <span className="mr-2 font-semibold text-accent">{index + 1}.</span>
-            {punto.texto}
-          </span>
-          <button onClick={() => quitar(punto.id)} className="text-ink/30 hover:text-danger" title="Quitar">
-            ✕
-          </button>
-        </div>
-      ))}
-      {valor.length === 0 && <p className="text-sm text-ink/30">Aún no hay puntos en el plan de tratamiento.</p>}
-      <div className="flex gap-2">
+    <div className={`rounded-xl border p-4 ${fase === "Ortodoncia" ? "border-info/25 bg-info/5" : "border-edge/10 bg-inset"}`}>
+      <p className="text-sm font-semibold text-ink">{info.titulo}</p>
+      <p className="mb-3 text-xs text-ink/50">{info.descripcion}</p>
+
+      <div className="space-y-2">
+        {puntos.map((punto, index) => (
+          <div key={punto.id} className="flex items-center justify-between gap-3 rounded-lg border border-edge/10 bg-field px-3 py-2 text-sm">
+            <span className="text-ink">
+              <span className="mr-2 font-semibold text-accent">{index + 1}.</span>
+              {punto.texto}
+            </span>
+            <button onClick={() => onQuitar(punto.id)} className="text-ink/30 hover:text-danger" title="Quitar">
+              ✕
+            </button>
+          </div>
+        ))}
+        {puntos.length === 0 && <p className="text-xs text-ink/30">Sin puntos capturados todavía.</p>}
+      </div>
+
+      <div className="mt-2 flex gap-2">
         <input
           type="text"
           value={nuevo}
@@ -136,6 +164,31 @@ function ListaPrioridad({ valor, onChange }: { valor: PuntoPrioridad[]; onChange
           + Agregar
         </button>
       </div>
+    </div>
+  );
+}
+
+function ListaPrioridad({ valor, onChange }: { valor: PuntoPrioridad[]; onChange: (v: PuntoPrioridad[]) => void }) {
+  const puntosPorFase = (fase: FaseTratamiento) =>
+    valor.filter((p) => (p.fase ?? "I") === fase);
+
+  const agregar = (fase: FaseTratamiento, texto: string) => {
+    onChange([...valor, { id: `${Date.now()}`, texto, fase }]);
+  };
+
+  const quitar = (id: string) => onChange(valor.filter((p) => p.id !== id));
+
+  return (
+    <div className="space-y-3">
+      {fasesTratamiento.map((fase) => (
+        <FaseSection
+          key={fase}
+          fase={fase}
+          puntos={puntosPorFase(fase)}
+          onAgregar={(texto) => agregar(fase, texto)}
+          onQuitar={quitar}
+        />
+      ))}
     </div>
   );
 }

@@ -444,15 +444,29 @@ export default function Expediente({
   const preguntaPlanTratamiento = historiaClinicaTemplate.secciones
     .flatMap((s) => s.preguntas)
     .find((p) => p.tipo === "listaPrioridad");
+  const faseTituloResumen: Record<string, string> = {
+    I: "Fase I — Remoción de procesos infecciosos",
+    II: "Fase II — Rehabilitación",
+    III: "Fase III — Mantenimiento",
+    Ortodoncia: "Etapa de Ortodoncia",
+  };
   const planTratamientoSugerido = preguntaPlanTratamiento
-    ? (
-        ((historiaClinicaPorPaciente[patient.id]?.porPregunta[preguntaPlanTratamiento.id] as unknown as {
+    ? (() => {
+        const puntos = ((historiaClinicaPorPaciente[patient.id]?.porPregunta[preguntaPlanTratamiento.id] as unknown as {
           id: string;
           texto: string;
-        }[]) ?? []) as { id: string; texto: string }[]
-      )
-        .map((punto, i) => `${i + 1}. ${punto.texto}`)
-        .join("\n")
+          fase?: string;
+        }[]) ?? []) as { id: string; texto: string; fase?: string }[];
+        return ["I", "II", "III", "Ortodoncia"]
+          .map((fase) => {
+            const delFase = puntos.filter((p) => (p.fase ?? "I") === fase);
+            if (delFase.length === 0) return "";
+            const lineas = delFase.map((punto, i) => `${i + 1}. ${punto.texto}`).join("\n");
+            return `${faseTituloResumen[fase]}:\n${lineas}`;
+          })
+          .filter(Boolean)
+          .join("\n\n");
+      })()
     : "";
 
   const hoyISO = new Date().toISOString().slice(0, 10);

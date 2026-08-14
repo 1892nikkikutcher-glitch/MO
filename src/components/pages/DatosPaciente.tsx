@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { formatEdad, type Patient } from "@/lib/patientData";
 import { manejarCambioNombre } from "@/lib/textoNombre";
+import { sugerirNivelSocioeconomico } from "@/lib/nivelSocioeconomico";
 import { usePatientData } from "@/context/PatientDataContext";
 
 const sexoOptions = ["Femenino", "Masculino", "Otro"];
@@ -66,6 +67,7 @@ export default function DatosPaciente({
   const { updatePatient } = usePatientData();
 
   const [nombreCompleto, setNombreCompleto] = useState(patient.name);
+  const [birthDate, setBirthDate] = useState(patient.birthDate ?? "");
   const [sexo, setSexo] = useState(patient.sexo ?? sexoOptions[0]);
   const [estadoCivil, setEstadoCivil] = useState(patient.estadoCivil ?? estadoCivilOptions[0]);
   const [ocupacion, setOcupacion] = useState(patient.ocupacion ?? "");
@@ -100,6 +102,7 @@ export default function DatosPaciente({
   // paciente anterior.
   useEffect(() => {
     setNombreCompleto(patient.name);
+    setBirthDate(patient.birthDate ?? "");
     setSexo(patient.sexo ?? sexoOptions[0]);
     setEstadoCivil(patient.estadoCivil ?? estadoCivilOptions[0]);
     setOcupacion(patient.ocupacion ?? "");
@@ -122,6 +125,14 @@ export default function DatosPaciente({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [patient.id]);
 
+  const nivelSugerido = sugerirNivelSocioeconomico({
+    ingresoFamiliar,
+    escolaridad,
+    tipoVivienda,
+    servicios,
+    ocupacion,
+  });
+
   const toggleServicio = (servicio: string) => {
     setServicios((prev) =>
       prev.includes(servicio) ? prev.filter((s) => s !== servicio) : [...prev, servicio]
@@ -132,6 +143,7 @@ export default function DatosPaciente({
   const guardarCambios = () => {
     updatePatient(patient.id, {
       name: nombreCompleto.trim(),
+      birthDate,
       phone: celular,
       sexo,
       estadoCivil,
@@ -171,15 +183,15 @@ export default function DatosPaciente({
           </Field>
           <Field label="Fecha de nacimiento">
             <input
-              type="text"
-              readOnly
-              value={
-                patient.birthDate
-                  ? `${formatDate(patient.birthDate)} (${formatEdad(patient.birthDate)})`
-                  : formatDate(patient.birthDate)
-              }
-              className={`${inputClass} cursor-not-allowed text-ink/50`}
+              type="date"
+              value={birthDate}
+              onChange={(e) => {
+                setBirthDate(e.target.value);
+                setSaved(false);
+              }}
+              className={inputClass}
             />
+            {birthDate && <p className="mt-1 text-xs text-ink/40">{formatEdad(birthDate)}</p>}
           </Field>
           <Field label="Sexo">
             <select
@@ -273,6 +285,22 @@ export default function DatosPaciente({
                 </option>
               ))}
             </select>
+            {nivelSugerido !== nivelSocioeconomico && (
+              <p className="mt-1 text-xs text-ink/40">
+                Sugerido según ingreso, escolaridad, vivienda y servicios:{" "}
+                <span className="font-semibold text-accent">{nivelSugerido}</span>{" "}
+                <button
+                  type="button"
+                  onClick={() => {
+                    setNivelSocioeconomico(nivelSugerido);
+                    setSaved(false);
+                  }}
+                  className="font-semibold text-accent underline decoration-accent/40 underline-offset-2 hover:decoration-accent"
+                >
+                  Usar sugerencia
+                </button>
+              </p>
+            )}
           </Field>
           <Field label="Ingreso familiar mensual">
             <select

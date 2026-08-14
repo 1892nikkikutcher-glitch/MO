@@ -12,6 +12,8 @@ import {
   type CitaEstatus,
   type FrecuenciaRecurrencia,
   type Recurso,
+  type LineItem,
+  type SavedBudget,
 } from "@/lib/patientData";
 import { renderPlantilla, formatFechaLarga, formatHora12 } from "@/lib/formatosWhatsapp";
 import { manejarCambioNombre } from "@/lib/textoNombre";
@@ -142,9 +144,9 @@ function addMonths(d: Date, n: number) {
   return date;
 }
 
-function IconExpediente() {
+function IconExpediente({ size = 16 }: { size?: number }) {
   return (
-    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" className="shrink-0">
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" className="shrink-0">
       <path
         d="M4 4h11l5 5v11a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V5a1 1 0 0 1 1-1ZM14 4v6h6"
         stroke="currentColor"
@@ -156,9 +158,9 @@ function IconExpediente() {
   );
 }
 
-function IconNotas() {
+function IconNotas({ size = 16 }: { size?: number }) {
   return (
-    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" className="shrink-0">
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" className="shrink-0">
       <path
         d="M5 4h14v16l-3-2-3 2-3-2-3 2V4Z"
         stroke="currentColor"
@@ -171,9 +173,9 @@ function IconNotas() {
   );
 }
 
-function IconWhatsApp() {
+function IconWhatsApp({ size = 22 }: { size?: number }) {
   return (
-    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" className="shrink-0">
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" className="shrink-0">
       <path
         d="M3 21l1.4-4.2A8.5 8.5 0 1 1 8.3 20.5L3 21ZM8.5 8.3c.2-.5.4-.5.6-.5h.5c.2 0 .4 0 .5.3.2.4.6 1.4.7 1.5.1.1.1.3 0 .4-.1.2-.2.3-.3.4-.2.2-.3.3-.1.6.7 1.1 1.4 1.7 2.5 2.3.2.1.3.1.4-.1.2-.2.5-.6.7-.8.1-.2.3-.2.5-.1.5.2 1.3.6 1.5.7.2.1.3.1.4.3.1.2.1.9-.2 1.4-.3.5-1.1.9-1.6 1-.5 0-1.1.1-3.4-.9-2.4-1.1-3.9-3.5-4.1-3.7-.1-.2-1-1.3-1-2.5s.6-1.7.8-2Z"
         stroke="currentColor"
@@ -330,6 +332,7 @@ function CitaDialog({
     formatosWhatsapp,
     cargarDatosPaciente,
     presupuestosPorPaciente,
+    setPresupuestosPaciente,
     pagosPorPaciente,
   } = usePatientData();
   const [recursoId, setRecursoId] = useState(initial.recursoId ?? recursos[0]?.id ?? "");
@@ -464,6 +467,46 @@ function CitaDialog({
       recurrenciaId: initial.recurrenciaId ?? (recurrente ? `rec${Date.now()}` : null),
     };
 
+    // Si la cita queda ligada a un paciente y trae un costo estimado, se
+    // refleja de una vez en su Presupuesto — así el presupuesto y los pagos
+    // (que ya se calculan contra el presupuesto) quedan conectados desde
+    // el momento en que se agenda, sin esperar a que alguien lo capture a
+    // mano por separado. Corre tanto al crear como al editar/reguardar una
+    // cita (por ejemplo, una cita agendada antes de que existiera esto),
+    // pero solo agrega un presupuesto si ningún procedimiento capturado ya
+    // aparece en uno existente de este paciente, para no duplicar montos.
+    if (patientId && tratamientos.length > 0) {
+      const montoCosto = Number(costo.replace(/[^\d.]/g, "")) || 0;
+      if (montoCosto > 0) {
+        const itemsExistentes = (presupuestosPorPaciente[patientId] ?? []).flatMap((p) => p.items);
+        const normalizar = (s: string) => s.toLowerCase().trim();
+        const yaExiste = tratamientos.some((t) =>
+          itemsExistentes.some((item) => normalizar(item.procedure) === normalizar(t))
+        );
+        if (!yaExiste) {
+          const items: LineItem[] = tratamientos.map((t, idx) => ({
+            id: `item-cita-${base.id}-${idx}`,
+            procedure: t,
+            price: idx === 0 ? montoCosto - Math.floor(montoCosto / tratamientos.length) * (tratamientos.length - 1) : Math.floor(montoCosto / tratamientos.length),
+            teeth: [],
+            note: "",
+          }));
+          const nuevoPresupuesto: SavedBudget = {
+            id: `pres-cita-${base.id}`,
+            folio: base.id.slice(-6),
+            fecha,
+            medico: recursos.find((r) => r.id === recursoId)?.nombre ?? "",
+            tipoDePrecio: "Consultorio",
+            especialidad: "Odontología General",
+            diagnostico: "Generado automáticamente a partir de una cita agendada.",
+            items,
+            total: montoCosto,
+          };
+          setPresupuestosPaciente(patientId, (prev) => [nuevoPresupuesto, ...prev]);
+        }
+      }
+    }
+
     const citasAGuardar: CitaAgenda[] = [base];
     if (!isEditing && recurrente && repeticiones > 0) {
       const meses = frecuenciaMeses[frecuencia];
@@ -491,7 +534,25 @@ function CitaDialog({
             </h2>
             <p className="text-xs text-ink/40">Folio: {initial.folio ?? folioRef}</p>
           </div>
-          <div className="flex items-center gap-1">
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={() => patientId && irAExpediente(patientId)}
+              disabled={!patientId}
+              title={patientId ? "Ver expediente" : "Selecciona un paciente primero"}
+              className="flex h-11 w-11 items-center justify-center rounded-full text-success transition-colors hover:bg-success/15 disabled:cursor-not-allowed disabled:opacity-30 disabled:hover:bg-transparent"
+            >
+              <IconExpediente size={22} />
+            </button>
+            <button
+              type="button"
+              onClick={() => patientId && irAExpediente(patientId, "Notas de Evolución y Seguimiento")}
+              disabled={!patientId}
+              title={patientId ? "Notas de evolución" : "Selecciona un paciente primero"}
+              className="flex h-11 w-11 items-center justify-center rounded-full text-success transition-colors hover:bg-success/15 disabled:cursor-not-allowed disabled:opacity-30 disabled:hover:bg-transparent"
+            >
+              <IconNotas size={22} />
+            </button>
             <button
               type="button"
               onClick={enviarConfirmacion}
@@ -501,13 +562,13 @@ function CitaDialog({
                   ? "Enviar confirmación de cita por WhatsApp"
                   : "Falta teléfono, paciente, fecha u hora para poder enviar"
               }
-              className="flex h-9 w-9 items-center justify-center rounded-full text-success transition-colors hover:bg-success/15 disabled:cursor-not-allowed disabled:opacity-30 disabled:hover:bg-transparent"
+              className="flex h-11 w-11 items-center justify-center rounded-full text-success transition-colors hover:bg-success/15 disabled:cursor-not-allowed disabled:opacity-30 disabled:hover:bg-transparent"
             >
-              <IconWhatsApp />
+              <IconWhatsApp size={24} />
             </button>
             <button
               onClick={onClose}
-              className="flex h-7 w-7 items-center justify-center rounded-full text-ink/50 hover:bg-surface hover:text-ink"
+              className="ml-1 flex h-7 w-7 items-center justify-center rounded-full text-ink/50 hover:bg-surface hover:text-ink"
             >
               ✕
             </button>
@@ -534,30 +595,12 @@ function CitaDialog({
             {patientId ? (
               <div className="flex items-center justify-between rounded-lg border border-success/30 bg-success/10 px-3 py-2 text-sm">
                 <span className="text-ink">{searchText}</span>
-                <div className="flex items-center gap-1">
-                  <button
-                    type="button"
-                    onClick={() => irAExpediente(patientId)}
-                    title="Ver expediente"
-                    className="flex h-7 w-7 items-center justify-center rounded-md text-success/80 transition-colors hover:bg-success/15 hover:text-success"
-                  >
-                    <IconExpediente />
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => irAExpediente(patientId, "Notas de Evolución y Seguimiento")}
-                    title="Notas de evolución"
-                    className="flex h-7 w-7 items-center justify-center rounded-md text-success/80 transition-colors hover:bg-success/15 hover:text-success"
-                  >
-                    <IconNotas />
-                  </button>
-                  <button
-                    onClick={cambiarPaciente}
-                    className="ml-1 text-xs font-semibold text-success hover:text-success"
-                  >
-                    Cambiar
-                  </button>
-                </div>
+                <button
+                  onClick={cambiarPaciente}
+                  className="text-xs font-semibold text-success hover:text-success"
+                >
+                  Cambiar
+                </button>
               </div>
             ) : (
               <>

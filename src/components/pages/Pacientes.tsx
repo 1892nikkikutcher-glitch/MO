@@ -310,6 +310,7 @@ export default function Pacientes() {
   const [showNuevoPaciente, setShowNuevoPaciente] = useState(false);
   const [showImportar, setShowImportar] = useState(false);
   const [busqueda, setBusqueda] = useState("");
+  const [orden, setOrden] = useState<"reciente" | "alfabetico" | "edad">("reciente");
 
   const busquedaTrim = busqueda.trim();
   const pacientesFiltrados = !busquedaTrim
@@ -324,6 +325,24 @@ export default function Pacientes() {
         if (edad !== null && String(edad).includes(busquedaTrim)) return true;
         return false;
       });
+
+  const pacientesOrdenados = [...pacientesFiltrados].sort((a, b) => {
+    if (orden === "alfabetico") {
+      return capitalizarNombre(a.name).localeCompare(capitalizarNombre(b.name), "es");
+    }
+    if (orden === "edad") {
+      const edadA = a.birthDate ? calculateAge(a.birthDate) ?? 9999 : 9999;
+      const edadB = b.birthDate ? calculateAge(b.birthDate) ?? 9999 : 9999;
+      return edadA - edadB;
+    }
+    // "reciente": los pacientes sin createdAt (dados de alta antes de que
+    // existiera este campo, o importados en bloque) se quedan al final, en
+    // vez de mezclarse en un orden arbitrario con los que sí lo tienen.
+    if (!a.createdAt && !b.createdAt) return 0;
+    if (!a.createdAt) return 1;
+    if (!b.createdAt) return -1;
+    return b.createdAt.localeCompare(a.createdAt);
+  });
 
   const exportarPacientes = () => {
     exportarCsv(
@@ -388,7 +407,16 @@ export default function Pacientes() {
             className="w-full rounded-lg border border-edge/10 bg-field py-2.5 pl-9 pr-3 text-sm text-ink placeholder-ink/30 outline-none focus:border-accent/60"
           />
         </div>
-        <div className="flex flex-wrap gap-3">
+        <div className="flex flex-wrap items-center gap-3">
+          <select
+            value={orden}
+            onChange={(e) => setOrden(e.target.value as typeof orden)}
+            className="rounded-lg border border-edge/10 bg-field px-3 py-2.5 text-sm text-ink outline-none focus:border-accent/60"
+          >
+            <option value="reciente">Más reciente primero</option>
+            <option value="alfabetico">Alfabético (A-Z)</option>
+            <option value="edad">Edad (menor a mayor)</option>
+          </select>
           <button
             onClick={exportarPacientes}
             title="Descarga tus pacientes en un .csv que abre en Excel — tus datos siempre disponibles fuera de MO"
@@ -432,7 +460,7 @@ export default function Pacientes() {
           </tr>
         </thead>
         <tbody>
-          {pacientesFiltrados.map((p) => (
+          {pacientesOrdenados.map((p) => (
             <tr key={p.id} className="border-b border-edge/5 last:border-0 hover:bg-surface">
               <td className="px-6 py-4">
                 <div
