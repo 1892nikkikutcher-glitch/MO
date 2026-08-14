@@ -20,6 +20,7 @@ import {
   computeTratamientosPendientes,
   formatCurrency,
   formatEdad,
+  formatFechaCita,
   formatNombreConEdad,
   type CitaAgenda,
   type Patient,
@@ -70,7 +71,7 @@ function buildResumenExpediente(
     lineas.push("Próximas citas:");
     citasFuturas.forEach((c) =>
       lineas.push(
-        `- ${c.fecha} ${c.horaInicio}${c.tratamientos?.length ? ` · ${c.tratamientos.join(", ")}` : ""}`
+        `- ${formatFechaCita(c.fecha)} ${c.horaInicio}${c.tratamientos?.length ? ` · ${c.tratamientos.join(", ")}` : ""}`
       )
     );
     lineas.push("");
@@ -361,7 +362,7 @@ function ExpedienteSidePanel({ citasFuturas }: { citasFuturas: CitaAgenda[] }) {
               <div key={cita.id} className="rounded-lg border border-edge/10 bg-inset p-3">
                 <div className="flex items-center justify-between">
                   <span className="text-sm font-medium text-ink">
-                    {cita.fecha} · {cita.horaInicio}
+                    {formatFechaCita(cita.fecha)} · {cita.horaInicio}
                   </span>
                   <span
                     className={`rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide ${estadoColorResumen[cita.estatus]}`}

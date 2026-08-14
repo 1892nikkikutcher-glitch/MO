@@ -1,6 +1,7 @@
 "use client";
 
 import type { CitaAgenda, CitaEstatus, Recurso } from "@/lib/patientData";
+import { formatFechaCita } from "@/lib/patientData";
 
 const estadoColor: Record<CitaEstatus, string> = {
   Agendada: "bg-ink/10 text-ink/60",
@@ -35,7 +36,7 @@ export default function ListadoCitas({ citas, recursos }: { citas: CitaAgenda[];
           {citas.map((cita) => (
             <tr key={cita.id} className="border-b border-edge/5 last:border-0 hover:bg-surface">
               <td className="px-6 py-4 whitespace-nowrap text-ink/80">
-                {cita.fecha} · {cita.horaInicio}
+                {formatFechaCita(cita.fecha)} · {cita.horaInicio}
               </td>
               <td className="px-6 py-4 text-ink/80">{cita.tratamientos.join(", ") || "—"}</td>
               <td className="px-6 py-4">

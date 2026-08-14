@@ -8,12 +8,15 @@ export type MetaConfig = {
 
 export const metaConfigInicial: MetaConfig = { metaMensual: 0 };
 
-/** Acumulado real de pagos por fecha (YYYY-MM-DD → total del día). */
+/** Acumulado real de pagos por fecha (YYYY-MM-DD → total del día), y el
+ * mismo total desglosado por forma de pago para el Corte de Caja
+ * (YYYY-MM-DD → forma de pago → monto). */
 export type FinanzasConfig = {
   porFecha: Record<string, number>;
+  porFechaYFormaPago: Record<string, Record<string, number>>;
 };
 
-export const finanzasInicial: FinanzasConfig = { porFecha: {} };
+export const finanzasInicial: FinanzasConfig = { porFecha: {}, porFechaYFormaPago: {} };
 
 /** Estadísticas agregadas de todo el consultorio, mantenidas de forma
  * incremental (a diferencia de presupuestos/pagos/laboratorios, que solo se

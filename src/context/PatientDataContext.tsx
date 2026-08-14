@@ -784,15 +784,34 @@ export function PatientDataProvider({
     const nextConIso = conIso(next);
     const fechas = new Set([...prevConIso, ...nextConIso].map((p) => p._iso as string));
     if (fechas.size === 0) return;
+    const formasDePago = new Set([...prevConIso, ...nextConIso].map((p) => p.formaPago));
     setFinanzas((prevFin) => {
       const porFecha = { ...prevFin.porFecha };
+      // porFechaYFormaPago no existía antes de este campo — los documentos
+      // ya guardados en Firestore no lo traen hasta la primera vez que se
+      // escribe aquí, así que siempre se respalda con {} en vez de asumir
+      // que existe.
+      const porFechaYFormaPago = { ...(prevFin.porFechaYFormaPago ?? {}) };
       fechas.forEach((iso) => {
         const sumPrev = prevConIso.filter((p) => p._iso === iso).reduce((s, p) => s + p.total, 0);
         const sumNext = nextConIso.filter((p) => p._iso === iso).reduce((s, p) => s + p.total, 0);
         const delta = sumNext - sumPrev;
         if (delta !== 0) porFecha[iso] = (porFecha[iso] ?? 0) + delta;
+
+        const porForma = { ...(porFechaYFormaPago[iso] ?? {}) };
+        formasDePago.forEach((forma) => {
+          const sumPrevForma = prevConIso
+            .filter((p) => p._iso === iso && p.formaPago === forma)
+            .reduce((s, p) => s + p.total, 0);
+          const sumNextForma = nextConIso
+            .filter((p) => p._iso === iso && p.formaPago === forma)
+            .reduce((s, p) => s + p.total, 0);
+          const deltaForma = sumNextForma - sumPrevForma;
+          if (deltaForma !== 0) porForma[forma] = (porForma[forma] ?? 0) + deltaForma;
+        });
+        porFechaYFormaPago[iso] = porForma;
       });
-      return { porFecha };
+      return { porFecha, porFechaYFormaPago };
     });
   };
 

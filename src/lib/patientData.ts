@@ -34,6 +34,14 @@ export type Patient = {
   contactoTelefono?: string;
 };
 
+/** Convierte la fecha ISO ("YYYY-MM-DD") de una cita a formato día/mes/año
+ * ("DD/MM/YYYY"), como el resto de la plataforma — nunca se muestra la
+ * fecha de una cita en formato ISO crudo a un usuario o paciente. */
+export function formatFechaCita(iso: string): string {
+  const m = iso.match(/^(\d{4})-(\d{2})-(\d{2})/);
+  return m ? `${m[3]}/${m[2]}/${m[1]}` : iso;
+}
+
 export function calcularEdadDetallada(birthDate: string): { years: number; months: number } | null {
   if (!birthDate) return null;
   const today = new Date();

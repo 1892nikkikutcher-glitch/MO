@@ -2,6 +2,7 @@
 
 import { usePatientData } from "@/context/PatientDataContext";
 import { renderPlantilla, formatFechaLarga, formatHora12 } from "@/lib/formatosWhatsapp";
+import { formatFechaCita } from "@/lib/patientData";
 
 function WhatsAppIcon() {
   return (
@@ -77,7 +78,7 @@ export default function Recordatorios() {
                 <div>
                   <p className="text-sm font-semibold text-ink">{c.paciente}</p>
                   <p className="text-xs text-ink/50">
-                    {c.fecha} · {c.horaInicio} — {c.tratamientos.join(", ") || "Sin procedimiento"}
+                    {formatFechaCita(c.fecha)} · {c.horaInicio} — {c.tratamientos.join(", ") || "Sin procedimiento"}
                   </p>
                 </div>
                 <button

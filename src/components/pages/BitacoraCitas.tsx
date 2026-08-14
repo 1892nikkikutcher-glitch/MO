@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { usePatientData } from "@/context/PatientDataContext";
-import { citaEstatusOptions, type CitaEstatus } from "@/lib/patientData";
+import { citaEstatusOptions, formatFechaCita, type CitaEstatus } from "@/lib/patientData";
 import { enRangoFecha } from "@/lib/reportes";
 
 const inputClass =
@@ -102,7 +102,7 @@ export default function BitacoraCitas() {
             <tbody>
               {filtradas.map((c) => (
                 <tr key={c.id} className="border-b border-edge/5 last:border-0">
-                  <td className="px-4 py-3 whitespace-nowrap text-ink/70">{c.fecha}</td>
+                  <td className="px-4 py-3 whitespace-nowrap text-ink/70">{formatFechaCita(c.fecha)}</td>
                   <td className="px-4 py-3 whitespace-nowrap text-ink/70">{c.horaInicio}</td>
                   <td className="px-4 py-3 text-ink/80">{c.paciente}</td>
                   <td className="px-4 py-3 text-ink/70">

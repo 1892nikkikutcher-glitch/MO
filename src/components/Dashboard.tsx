@@ -36,6 +36,8 @@ import Comisiones from "./pages/Comisiones";
 import AvisoPrivacidad from "./pages/AvisoPrivacidad";
 import Aseguradoras from "./pages/Aseguradoras";
 import SeguimientoAsistencia from "./pages/SeguimientoAsistencia";
+import ReporteCorteDiario from "./pages/ReporteCorteDiario";
+import ReporteCorteCaja from "./pages/ReporteCorteCaja";
 import GlobalAgregarPago from "./GlobalAgregarPago";
 import GlobalNuevoPaciente from "./GlobalNuevoPaciente";
 import { PatientDataProvider, usePatientData } from "@/context/PatientDataContext";
@@ -74,6 +76,8 @@ const paginasConstruidas = new Set([
   "reportes-aseguradoras",
   "reportes-seguimiento-asistencia",
   "reportes-pagos",
+  "reportes-corte-diario",
+  "reportes-corte-caja",
 ]);
 
 const quickActions = [
@@ -294,6 +298,8 @@ export default function Dashboard({
           {activePage === "reportes-aseguradoras" && <Aseguradoras />}
           {activePage === "reportes-seguimiento-asistencia" && <SeguimientoAsistencia />}
           {activePage === "reportes-pagos" && <ReportePagos />}
+          {activePage === "reportes-corte-diario" && <ReporteCorteDiario />}
+          {activePage === "reportes-corte-caja" && <ReporteCorteCaja />}
           {!paginasConstruidas.has(activePage) && <ProximamenteStub label={activeLabel} />}
         </div>
       </main>
