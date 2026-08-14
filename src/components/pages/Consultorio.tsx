@@ -11,18 +11,37 @@ export default function Consultorio() {
   const [nombre, setNombre] = useState(clinicInfo?.nombre ?? "");
   const [direccion, setDireccion] = useState(clinicInfo?.direccion ?? "");
   const [telefono, setTelefono] = useState(clinicInfo?.telefono ?? "");
+  const [correoContacto, setCorreoContacto] = useState(clinicInfo?.correoContacto ?? "");
+  const [rfc, setRfc] = useState(clinicInfo?.rfc ?? "");
+  const [responsableSanitario, setResponsableSanitario] = useState(clinicInfo?.responsableSanitario ?? "");
+  const [cedulaResponsableSanitario, setCedulaResponsableSanitario] = useState(
+    clinicInfo?.cedulaResponsableSanitario ?? ""
+  );
   const [guardado, setGuardado] = useState(false);
 
   useEffect(() => {
     setNombre(clinicInfo?.nombre ?? "");
     setDireccion(clinicInfo?.direccion ?? "");
     setTelefono(clinicInfo?.telefono ?? "");
+    setCorreoContacto(clinicInfo?.correoContacto ?? "");
+    setRfc(clinicInfo?.rfc ?? "");
+    setResponsableSanitario(clinicInfo?.responsableSanitario ?? "");
+    setCedulaResponsableSanitario(clinicInfo?.cedulaResponsableSanitario ?? "");
   }, [clinicInfo]);
 
   const soloLectura = miRol !== "admin";
 
   const guardar = () => {
-    setClinicInfo((prev) => ({ ...prev, nombre: nombre.trim(), direccion: direccion.trim(), telefono: telefono.trim() }));
+    setClinicInfo((prev) => ({
+      ...prev,
+      nombre: nombre.trim(),
+      direccion: direccion.trim(),
+      telefono: telefono.trim(),
+      correoContacto: correoContacto.trim(),
+      rfc: rfc.trim(),
+      responsableSanitario: responsableSanitario.trim(),
+      cedulaResponsableSanitario: cedulaResponsableSanitario.trim(),
+    }));
     setGuardado(true);
   };
 
@@ -73,7 +92,74 @@ export default function Consultorio() {
               className={inputClass}
             />
           </div>
+          <div>
+            <label className="mb-1 block text-xs font-medium text-ink/60">Correo de contacto</label>
+            <input
+              type="email"
+              value={correoContacto}
+              onChange={(e) => {
+                setCorreoContacto(e.target.value);
+                setGuardado(false);
+              }}
+              placeholder="contacto@tuconsultorio.com"
+              disabled={soloLectura}
+              className={inputClass}
+            />
+          </div>
+          <div>
+            <label className="mb-1 block text-xs font-medium text-ink/60">RFC</label>
+            <input
+              type="text"
+              value={rfc}
+              onChange={(e) => {
+                setRfc(e.target.value.toUpperCase());
+                setGuardado(false);
+              }}
+              placeholder="Para facturación"
+              disabled={soloLectura}
+              className={inputClass}
+            />
+          </div>
         </div>
+
+        <div className="mt-6 border-t border-edge/10 pt-4">
+          <h4 className="text-xs font-semibold uppercase tracking-wide text-ink/40">
+            Responsable Sanitario
+          </h4>
+          <p className="mt-1 text-xs text-ink/40">
+            Persona registrada ante COFEPRIS/COPRISEM como responsable sanitario del consultorio
+            — no siempre es quien atiende a los pacientes.
+          </p>
+          <div className="mt-3 grid grid-cols-1 gap-4 sm:grid-cols-2">
+            <div>
+              <label className="mb-1 block text-xs font-medium text-ink/60">Nombre</label>
+              <input
+                type="text"
+                value={responsableSanitario}
+                onChange={(e) => {
+                  setResponsableSanitario(e.target.value);
+                  setGuardado(false);
+                }}
+                disabled={soloLectura}
+                className={inputClass}
+              />
+            </div>
+            <div>
+              <label className="mb-1 block text-xs font-medium text-ink/60">Cédula profesional</label>
+              <input
+                type="text"
+                value={cedulaResponsableSanitario}
+                onChange={(e) => {
+                  setCedulaResponsableSanitario(e.target.value);
+                  setGuardado(false);
+                }}
+                disabled={soloLectura}
+                className={inputClass}
+              />
+            </div>
+          </div>
+        </div>
+
         {!soloLectura && (
           <div className="mt-4 flex items-center gap-3">
             <button

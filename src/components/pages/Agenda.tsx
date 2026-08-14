@@ -922,13 +922,13 @@ export default function Agenda() {
     citas,
     setCitas,
     horario,
-    setHorario,
     patients,
     navegacionNuevaCita,
     consumirNavegacionNuevaCita,
     solicitudNuevaCitaBlanco,
     consumirSolicitudNuevaCitaBlanco,
     colaboradoresActivos,
+    irAPagina,
   } = usePatientData();
   /** La agenda siempre se ve/agenda de 7am a 22h como base (para casos
    * extemporáneos), pero si el horario de atención configurado es más
@@ -1309,49 +1309,21 @@ export default function Agenda() {
         </div>
 
         <div className="rounded-2xl border border-edge/10 bg-surface p-4">
-          <h3 className="mb-3 text-xs font-semibold uppercase tracking-wide text-ink/50">
+          <h3 className="mb-2 text-xs font-semibold uppercase tracking-wide text-ink/50">
             Horario de Atención
           </h3>
-          <div className="space-y-2.5">
-            <div>
-              <label className="mb-1 block text-[11px] text-ink/50">Hora de apertura</label>
-              <input
-                type="time"
-                value={horario.apertura}
-                onChange={(e) => setHorario((prev) => ({ ...prev, apertura: e.target.value }))}
-                className={inputClass}
-              />
-            </div>
-            <div className="grid grid-cols-2 gap-2">
-              <div>
-                <label className="mb-1 block text-[11px] text-ink/50">Comida (de)</label>
-                <input
-                  type="time"
-                  value={horario.comidaInicio}
-                  onChange={(e) => setHorario((prev) => ({ ...prev, comidaInicio: e.target.value }))}
-                  className={inputClass}
-                />
-              </div>
-              <div>
-                <label className="mb-1 block text-[11px] text-ink/50">Comida (a)</label>
-                <input
-                  type="time"
-                  value={horario.comidaFin}
-                  onChange={(e) => setHorario((prev) => ({ ...prev, comidaFin: e.target.value }))}
-                  className={inputClass}
-                />
-              </div>
-            </div>
-            <div>
-              <label className="mb-1 block text-[11px] text-ink/50">Hora de cierre</label>
-              <input
-                type="time"
-                value={horario.cierre}
-                onChange={(e) => setHorario((prev) => ({ ...prev, cierre: e.target.value }))}
-                className={inputClass}
-              />
-            </div>
-          </div>
+          <p className="text-sm text-ink">
+            {horario.apertura} – {horario.cierre}
+          </p>
+          <p className="text-xs text-ink/40">
+            Comida: {horario.comidaInicio} – {horario.comidaFin}
+          </p>
+          <button
+            onClick={() => irAPagina("administracion-consultorio")}
+            className="mt-2 text-xs font-semibold text-accent underline decoration-accent/40 underline-offset-2 hover:decoration-accent"
+          >
+            Cambiar en Administración → Consultorio
+          </button>
         </div>
       </aside>
 

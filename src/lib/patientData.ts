@@ -314,6 +314,12 @@ export type ClinicInfo = {
   nombre: string;
   direccion?: string;
   telefono?: string;
+  correoContacto?: string;
+  rfc?: string;
+  /** Persona designada como responsable sanitario ante COFEPRIS/COPRISEM —
+   * no siempre es el mismo doctor que atiende, así que se captura aparte. */
+  responsableSanitario?: string;
+  cedulaResponsableSanitario?: string;
 };
 
 /** Documento `clinicMembers/{clinicId}_{uid}`. Campo `role` en inglés para

@@ -2,6 +2,7 @@
 
 import { usePatientData } from "@/context/PatientDataContext";
 import { calcularEdadDetallada, formatCurrency } from "@/lib/patientData";
+import { capitalizarNombre } from "@/lib/textoNombre";
 import { calcularAvanceMetas } from "@/lib/metas";
 
 const MESES = [
@@ -111,7 +112,8 @@ function CardShell({ title, children }: { title: string; children: React.ReactNo
 }
 
 export default function Inicio() {
-  const { puedeVerFinanzas, patients, citas, finanzas, metas, estadisticas, irAPagina } = usePatientData();
+  const { puedeVerFinanzas, patients, citas, finanzas, metas, estadisticas, irAPagina, irAExpediente } =
+    usePatientData();
 
   const hoy = new Date();
   const hoyISO = `${hoy.getFullYear()}-${String(hoy.getMonth() + 1).padStart(2, "0")}-${String(
@@ -134,7 +136,10 @@ export default function Inicio() {
   const citasPorMes = citasDelMes.length;
   const citasAtendidas = citasDelMes.filter((c) => c.estatus === "Atendida").length;
   const citasCanceladas = citasDelMes.filter((c) => c.estatus === "Cancelada").length;
-  const presupuestosDelMes = estadisticas.presupuestosPorMes[mesActualKey] ?? 0;
+  // Math.max(0, ...): es un contador acumulado desde que existe el campo,
+  // no un conteo real recalculado — crear y borrar presupuestos de prueba
+  // en meses distintos puede dejarlo en negativo; nunca debe mostrarse así.
+  const presupuestosDelMes = Math.max(0, estadisticas.presupuestosPorMes[mesActualKey] ?? 0);
 
   const kpisVisibles = [
     ...(puedeVerFinanzas
@@ -339,7 +344,13 @@ export default function Inicio() {
                   }`}
                 >
                   <div>
-                    <span className="font-medium text-ink">{patient.name}</span>
+                    <button
+                      onClick={() => irAExpediente(patient.id)}
+                      title="Ver expediente"
+                      className="font-medium text-ink underline decoration-ink/20 underline-offset-2 hover:text-accent hover:decoration-accent/50"
+                    >
+                      {capitalizarNombre(patient.name)}
+                    </button>
                     <span className="ml-2 text-ink/40">
                       {nacimiento.getDate()} de {MESES[nacimiento.getMonth()]}
                       {edadQueCumple !== null && ` · cumple ${edadQueCumple} años`}
@@ -348,7 +359,7 @@ export default function Inicio() {
                   </div>
                   {patient.phone && (
                     <button
-                      onClick={() => enviarSaludo(patient.name, patient.phone)}
+                      onClick={() => enviarSaludo(capitalizarNombre(patient.name), patient.phone)}
                       title="Enviar felicitación por WhatsApp"
                       className="flex items-center gap-1.5 rounded-lg border border-success/40 px-2.5 py-1.5 text-xs font-semibold text-success transition-colors hover:bg-success/10"
                     >
