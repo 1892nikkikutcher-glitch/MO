@@ -268,3 +268,45 @@ export function coincideAlergia(alergias: string, texto: string): string[] {
     .filter(Boolean)
     .filter((a) => textoNorm.includes(normalizar(a)));
 }
+
+const NEGACIONES_ALERGIA = [
+  "negado",
+  "niega",
+  "ninguna",
+  "ninguno",
+  "ninguna conocida",
+  "ninguna referida",
+  "no refiere",
+  "no presenta",
+  "sin alergias",
+  "sin alergias conocidas",
+  "no",
+  "n/a",
+  "na",
+];
+
+function normalizarAlergiaTexto(alergias: string | undefined): string {
+  return (alergias ?? "")
+    .trim()
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[̀-ͯ]/g, "");
+}
+
+/** true si el campo de alergias dice explícitamente que el paciente no
+ * tiene ninguna (ej. "Negado", "Ninguna") — distinto de estar vacío, que
+ * significa que todavía no se ha preguntado. */
+export function esNegacionExplicita(alergias: string | undefined): boolean {
+  const t = normalizarAlergiaTexto(alergias);
+  if (!t) return false;
+  return NEGACIONES_ALERGIA.some((p) => t === p);
+}
+
+/** true si el campo de alergias está vacío o solo dice que el paciente no
+ * tiene ninguna — en esos casos no hay nada que alertar en rojo; el color
+ * de alerta se reserva para cuando sí hay una sustancia registrada. */
+export function esNegacionAlergia(alergias: string | undefined): boolean {
+  const t = normalizarAlergiaTexto(alergias);
+  if (!t) return true;
+  return NEGACIONES_ALERGIA.some((p) => t === p);
+}

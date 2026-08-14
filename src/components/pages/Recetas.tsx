@@ -6,7 +6,7 @@ import { formatNombreConEdad, type MedicamentoRecetado, type Receta } from "@/li
 import { calcularDosisPediatrica, type MedicamentoCatalogo } from "@/lib/medicamentos";
 import { generarRecetaPdf } from "@/lib/generarRecetaPdf";
 import { slugify } from "@/lib/textoNombre";
-import { coincideAlergia, condicionesSistemicasPositivas } from "@/lib/historiaClinica";
+import { coincideAlergia, condicionesSistemicasPositivas, esNegacionAlergia } from "@/lib/historiaClinica";
 
 const plantillasRecomendaciones = [
   "Evitar alimentos duros o muy calientes durante las primeras 24 horas.",
@@ -319,7 +319,7 @@ export default function Recetas() {
           </div>
         </div>
 
-        {alergiasHistoria && (
+        {alergiasHistoria && !esNegacionAlergia(alergiasHistoria) && (
           <div className="flex items-start gap-3 rounded-2xl border border-danger bg-danger/15 p-4 text-sm text-danger">
             <span className="mt-0.5 text-lg">⚠️</span>
             <p>

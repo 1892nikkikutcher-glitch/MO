@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import Odontograma from "./Odontograma";
 import { usePatientData } from "@/context/PatientDataContext";
 import {
+  esNegacionExplicita,
   respuestasVacias,
   type PreguntaTemplate,
   type RespuestaValor,
@@ -313,23 +314,54 @@ export default function HistoriaClinica({ patientId }: { patientId: string }) {
 
   return (
     <div className="space-y-6">
-      <div className="space-y-3 rounded-2xl border border-danger/40 bg-danger/10 p-6">
-        <label className="block text-sm font-semibold text-danger">
-          ⚠ Alergias conocidas (medicamentos, alimentos, anestesia, etc.)
-        </label>
-        <textarea
-          value={borrador.alergias ?? ""}
-          onChange={(e) => setBorrador((prev) => ({ ...prev, alergias: e.target.value }))}
-          placeholder="Ej. Penicilina, Aspirina — sepáralas por comas. Este campo se muestra como alerta en todo el expediente y al recetar."
-          rows={2}
-          className="w-full resize-none rounded-lg border border-danger/30 bg-field px-3 py-2 text-sm text-ink placeholder-ink/30 outline-none focus:border-danger/60"
-        />
-        <p className="text-xs text-danger/80">
-          Muy importante: si el paciente tiene alguna alergia, regístrala aquí exactamente como se
-          llama la sustancia — se usará para alertar antes de recetar un medicamento al que sea
-          alérgico.
-        </p>
-      </div>
+      {(() => {
+        const texto = borrador.alergias ?? "";
+        const negado = esNegacionExplicita(texto);
+        const hayAlergia = texto.trim().length > 0 && !negado;
+        const estado = hayAlergia ? "danger" : negado ? "success" : "neutro";
+        const estilos = {
+          danger: {
+            card: "border-danger/40 bg-danger/10",
+            label: "text-danger",
+            campo: "border-danger/30 focus:border-danger/60",
+            nota: "text-danger/80",
+            icono: "⚠ ",
+          },
+          success: {
+            card: "border-success/40 bg-success/10",
+            label: "text-success",
+            campo: "border-success/30 focus:border-success/60",
+            nota: "text-success/80",
+            icono: "✓ ",
+          },
+          neutro: {
+            card: "border-edge/10 bg-surface",
+            label: "text-ink/70",
+            campo: "border-edge/10 focus:border-accent/60",
+            nota: "text-ink/40",
+            icono: "",
+          },
+        }[estado];
+        return (
+          <div className={`space-y-3 rounded-2xl border p-6 ${estilos.card}`}>
+            <label className={`block text-sm font-semibold ${estilos.label}`}>
+              {estilos.icono}Alergias conocidas (medicamentos, alimentos, anestesia, etc.)
+            </label>
+            <textarea
+              value={texto}
+              onChange={(e) => setBorrador((prev) => ({ ...prev, alergias: e.target.value }))}
+              placeholder="Ej. Penicilina, Aspirina — sepáralas por comas. Este campo se muestra como alerta en todo el expediente y al recetar."
+              rows={2}
+              className={`w-full resize-none rounded-lg border bg-field px-3 py-2 text-sm text-ink placeholder-ink/30 outline-none ${estilos.campo}`}
+            />
+            <p className={`text-xs ${estilos.nota}`}>
+              Muy importante: si el paciente tiene alguna alergia, regístrala aquí exactamente como
+              se llama la sustancia — se usará para alertar antes de recetar un medicamento al que
+              sea alérgico.
+            </p>
+          </div>
+        );
+      })()}
 
       {historiaClinicaTemplate.secciones.map((seccion, i) => (
         <Section key={seccion.id} number={i + 1} title={seccion.titulo}>

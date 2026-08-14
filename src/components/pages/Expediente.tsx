@@ -27,7 +27,7 @@ import {
   type SavedBudget,
   type Pago,
 } from "@/lib/patientData";
-import { condicionesSistemicasPositivas } from "@/lib/historiaClinica";
+import { condicionesSistemicasPositivas, esNegacionAlergia } from "@/lib/historiaClinica";
 
 function fechaLargaHoy() {
   const texto = new Date().toLocaleDateString("es-MX", { weekday: "long", day: "numeric", month: "long", year: "numeric" });
@@ -526,7 +526,7 @@ export default function Expediente({
         </button>
       </div>
 
-      {patientAlergias && (
+      {patientAlergias && !esNegacionAlergia(patientAlergias) && (
         <div className="flex items-start gap-3 rounded-2xl border border-danger bg-danger/15 p-4 text-sm text-danger print:hidden">
           <span className="mt-0.5 text-lg">⚠️</span>
           <p>
