@@ -58,6 +58,7 @@ import { calcularFechaFin, type MembershipPlan, type PatientMembership, type Uso
 import type { Lamina } from "@/lib/laminas";
 import type { Deposito, ArticuloFaltante, ArticuloCaducidad } from "@/lib/depositoDental";
 import type { PagoEliminado } from "@/lib/pagosEliminados";
+import { saldosPendientesInicial, type SaldosPendientesConfig } from "@/lib/saldosPendientes";
 import type { Promocion, Aseguradora } from "@/lib/catalogosVarios";
 import type { PersonalAsistencia, RegistroAsistencia } from "@/lib/asistencia";
 import type { Procedimiento } from "@/lib/procedimientos";
@@ -375,6 +376,7 @@ type PatientDataContextValue = {
   setArticulosCaducidad: (updater: Updater<ArticuloCaducidad[]>) => void;
   pagosEliminados: PagoEliminado[];
   setPagosEliminados: (updater: Updater<PagoEliminado[]>) => void;
+  saldosPendientes: SaldosPendientesConfig;
   promociones: Promocion[];
   setPromociones: (updater: Updater<Promocion[]>) => void;
   aseguradoras: Aseguradora[];
@@ -498,6 +500,11 @@ export function PatientDataProvider({
     clinicUid,
     "estadisticas",
     estadisticasInicial
+  );
+  const [saldosPendientes, setSaldosPendientes] = useFirestoreDoc<SaldosPendientesConfig>(
+    clinicUid,
+    "saldosPendientes",
+    saldosPendientesInicial
   );
   const [regulacionSanitaria, setRegulacionSanitaria] = useFirestoreDoc<EstadoRegulacionSanitaria>(
     clinicUid,
@@ -765,12 +772,40 @@ export function PatientDataProvider({
     });
   };
 
+  /** Refleja en `config/saldosPendientes` cuánto debe cada paciente (mismo
+   * patrón incremental que el resto de los rollups) para poder listarlos en
+   * Reportes → Saldos Pendientes sin tener que cargar los 1006 expedientes.
+   * Se quita del mapa al paciente que ya no debe nada, para que el reporte
+   * solo muestre saldos reales. */
+  const registrarSaldoPendiente = (patientId: string, presupuestos: SavedBudget[], pagos: Pago[]) => {
+    const totalPresupuestado = presupuestos.reduce((s, p) => s + p.total, 0);
+    const totalPagado = pagos.reduce((s, p) => s + p.total, 0);
+    const saldo = totalPresupuestado - totalPagado;
+    const patientName = patients.find((p) => p.id === patientId)?.name ?? "";
+    setSaldosPendientes((prev) => {
+      const porPaciente = { ...prev.porPaciente };
+      if (saldo <= 0) {
+        delete porPaciente[patientId];
+      } else {
+        porPaciente[patientId] = {
+          patientId,
+          patientName,
+          totalPresupuestado,
+          totalPagado,
+          actualizadoEn: new Date().toISOString(),
+        };
+      }
+      return { porPaciente };
+    });
+  };
+
   const setPresupuestosPaciente = (patientId: string, updater: Updater<SavedBudget[]>) => {
     if (!clinicUid) return;
     const prevArr = presupuestosPorPaciente[patientId] ?? [];
     const next = resolveUpdater(updater, prevArr);
     syncFirestoreList(`users/${clinicUid}/pacientes/${patientId}/presupuestos`, prevArr, next);
     registrarDeltaPresupuestos(prevArr, next);
+    registrarSaldoPendiente(patientId, next, pagosPorPaciente[patientId] ?? []);
     setPresupuestosPorPacienteState((prev) => ({ ...prev, [patientId]: next }));
   };
 
@@ -828,10 +863,16 @@ export function PatientDataProvider({
    * ese presupuesto nuevo. Así el presupuesto y lo realmente cobrado nunca
    * quedan desincronizados: por defecto, todo pago se refleja en el
    * presupuesto del paciente, y no aparece como saldo pendiente. */
+  /** Además de las citas ligadas, devuelve los presupuestos que acaba de
+   * generar (no solo los guarda vía setPresupuestosPaciente) para que quien
+   * llama pueda calcular el saldo pendiente correcto en el mismo tick, sin
+   * depender de `presupuestosPorPaciente` del contexto — que en este punto
+   * todavía no refleja el presupuesto recién creado. */
   const generarPresupuestosDesdeExtras = (patientId: string, prevArr: Pago[], next: Pago[]) => {
     const prevIds = new Set(prevArr.map((p) => p.id));
     const pagosNuevos = next.filter((p) => !prevIds.has(p.id));
     let nextConLigas = next;
+    const presupuestosAgregados: SavedBudget[] = [];
 
     pagosNuevos.forEach((pago) => {
       const lineasExtra = pago.lineas.filter((l) => l.generarPresupuesto);
@@ -858,6 +899,7 @@ export function PatientDataProvider({
         total,
       };
       setPresupuestosPaciente(patientId, (prevPres) => [nuevoPresupuesto, ...prevPres]);
+      presupuestosAgregados.push(nuevoPresupuesto);
 
       const idPorLinea = new Map(lineasExtra.map((l, i) => [l.id, items[i].id]));
       nextConLigas = nextConLigas.map((p) =>
@@ -872,20 +914,29 @@ export function PatientDataProvider({
       );
     });
 
-    return nextConLigas;
+    return { nextConLigas, presupuestosAgregados };
   };
 
   const setPagosPaciente = (patientId: string, updater: Updater<Pago[]>) => {
     if (!clinicUid) return;
     const prevArr = pagosPorPaciente[patientId] ?? [];
     const generado = resolveUpdater(updater, prevArr);
-    const next = generarPresupuestosDesdeExtras(patientId, prevArr, generado);
+    const { nextConLigas: next, presupuestosAgregados } = generarPresupuestosDesdeExtras(
+      patientId,
+      prevArr,
+      generado
+    );
     syncFirestoreList(`users/${clinicUid}/pacientes/${patientId}/pagos`, prevArr, next);
     registrarDeltaFinanzas(prevArr, next);
     const deltaCount = next.length - prevArr.length;
     if (deltaCount !== 0) {
       setEstadisticas((prevEst) => ({ ...prevEst, pagosCount: prevEst.pagosCount + deltaCount }));
     }
+    const presupuestosActuales = [
+      ...presupuestosAgregados,
+      ...(presupuestosPorPaciente[patientId] ?? []),
+    ];
+    registrarSaldoPendiente(patientId, presupuestosActuales, next);
     setPagosPorPacienteState((prev) => ({ ...prev, [patientId]: next }));
   };
 
@@ -1168,6 +1219,7 @@ export function PatientDataProvider({
         setArticulosCaducidad,
         pagosEliminados,
         setPagosEliminados,
+        saldosPendientes,
         promociones,
         setPromociones,
         aseguradoras,
