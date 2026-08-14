@@ -29,6 +29,7 @@ export type Patient = {
   responsablePago?: string;
   telefonoFijo?: string;
   direccion?: string;
+  codigoPostal?: string;
   contactoNombre?: string;
   contactoParentesco?: string;
   contactoTelefono?: string;

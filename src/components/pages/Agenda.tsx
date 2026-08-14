@@ -1261,6 +1261,32 @@ export default function Agenda() {
           </div>
 
           <div className="flex items-center gap-2">
+            <input
+              type="date"
+              value={toISODate(
+                vista === "dia" || vista === "3dias" ? diaSeleccionado : vista === "mes" ? mesActual : weekStart
+              )}
+              onChange={(e) => {
+                const d = new Date(`${e.target.value}T00:00:00`);
+                setWeekStart(getMonday(d));
+                setDiaSeleccionado(d);
+                setMesActual(new Date(d.getFullYear(), d.getMonth(), 1));
+              }}
+              title="Ir a fecha"
+              className="rounded-lg border border-edge/10 bg-field px-2.5 py-1.5 text-xs text-ink outline-none focus:border-accent/60"
+            />
+            <button
+              onClick={() => {
+                const hoy = new Date();
+                setWeekStart(getMonday(hoy));
+                setDiaSeleccionado(hoy);
+                setMesActual(new Date(hoy.getFullYear(), hoy.getMonth(), 1));
+              }}
+              className="rounded-lg border border-accent/40 px-3 py-1.5 text-xs font-semibold text-accent transition-colors hover:bg-accent/10"
+            >
+              Hoy
+            </button>
+
             <div className="flex rounded-lg border border-edge/10 p-0.5">
               <button
                 onClick={() => setVista("semana")}
@@ -1608,35 +1634,7 @@ export default function Agenda() {
         )}
       </div>
 
-      <div className="grid grid-cols-1 gap-4 print:hidden sm:grid-cols-3">
-        <div className="rounded-2xl border border-edge/10 bg-surface p-4">
-          <label className="mb-2 block text-xs font-medium text-ink/60">Ir a fecha</label>
-          <input
-            type="date"
-            value={toISODate(
-              vista === "dia" || vista === "3dias" ? diaSeleccionado : vista === "mes" ? mesActual : weekStart
-            )}
-            onChange={(e) => {
-              const d = new Date(`${e.target.value}T00:00:00`);
-              setWeekStart(getMonday(d));
-              setDiaSeleccionado(d);
-              setMesActual(new Date(d.getFullYear(), d.getMonth(), 1));
-            }}
-            className={inputClass}
-          />
-          <button
-            onClick={() => {
-              const hoy = new Date();
-              setWeekStart(getMonday(hoy));
-              setDiaSeleccionado(hoy);
-              setMesActual(new Date(hoy.getFullYear(), hoy.getMonth(), 1));
-            }}
-            className="mt-2 w-full rounded-lg border border-accent/40 py-1.5 text-xs font-semibold text-accent transition-colors hover:bg-accent/10"
-          >
-            Hoy
-          </button>
-        </div>
-
+      <div className="grid grid-cols-1 gap-4 print:hidden sm:grid-cols-2">
         <div className="rounded-2xl border border-edge/10 bg-surface p-4">
           <div className="mb-3 flex items-center justify-between">
             <h3 className="text-xs font-semibold uppercase tracking-wide text-ink/50">Recursos</h3>

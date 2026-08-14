@@ -39,6 +39,7 @@ import SeguimientoAsistencia from "./pages/SeguimientoAsistencia";
 import ReporteCorteDiario from "./pages/ReporteCorteDiario";
 import ReporteCorteCaja from "./pages/ReporteCorteCaja";
 import ReporteGraficas from "./pages/ReporteGraficas";
+import ReporteCP from "./pages/ReporteCP";
 import GlobalAgregarPago from "./GlobalAgregarPago";
 import GlobalNuevoPaciente from "./GlobalNuevoPaciente";
 import { PatientDataProvider, usePatientData } from "@/context/PatientDataContext";
@@ -80,6 +81,7 @@ const paginasConstruidas = new Set([
   "reportes-corte-diario",
   "reportes-corte-caja",
   "reportes-graficas",
+  "reportes-cp",
 ]);
 
 const quickActions = [
@@ -303,6 +305,7 @@ export default function Dashboard({
           {activePage === "reportes-corte-diario" && <ReporteCorteDiario />}
           {activePage === "reportes-corte-caja" && <ReporteCorteCaja />}
           {activePage === "reportes-graficas" && <ReporteGraficas />}
+          {activePage === "reportes-cp" && <ReporteCP />}
           {!paginasConstruidas.has(activePage) && <ProximamenteStub label={activeLabel} />}
         </div>
       </main>

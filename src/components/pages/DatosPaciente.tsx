@@ -89,6 +89,7 @@ export default function DatosPaciente({
   const [telefonoFijo, setTelefonoFijo] = useState(patient.telefonoFijo ?? "");
   const [correo, setCorreo] = useState(patient.email ?? "");
   const [direccion, setDireccion] = useState(patient.direccion ?? "");
+  const [codigoPostal, setCodigoPostal] = useState(patient.codigoPostal ?? "");
   const [contactoNombre, setContactoNombre] = useState(patient.contactoNombre ?? "");
   const [contactoParentesco, setContactoParentesco] = useState(
     patient.contactoParentesco ?? parentescoOptions[0]
@@ -118,6 +119,7 @@ export default function DatosPaciente({
     setTelefonoFijo(patient.telefonoFijo ?? "");
     setCorreo(patient.email ?? "");
     setDireccion(patient.direccion ?? "");
+    setCodigoPostal(patient.codigoPostal ?? "");
     setContactoNombre(patient.contactoNombre ?? "");
     setContactoParentesco(patient.contactoParentesco ?? parentescoOptions[0]);
     setContactoTelefono(patient.contactoTelefono ?? "");
@@ -159,6 +161,7 @@ export default function DatosPaciente({
       telefonoFijo,
       email: correo,
       direccion,
+      codigoPostal,
       contactoNombre,
       contactoParentesco,
       contactoTelefono,
@@ -433,6 +436,20 @@ export default function DatosPaciente({
                 setSaved(false);
               }}
               placeholder="Calle, número, colonia"
+              className={inputClass}
+            />
+          </Field>
+          <Field label="Código postal">
+            <input
+              type="text"
+              inputMode="numeric"
+              maxLength={5}
+              value={codigoPostal}
+              onChange={(e) => {
+                setCodigoPostal(e.target.value.replace(/\D/g, "").slice(0, 5));
+                setSaved(false);
+              }}
+              placeholder="Ej. 50000"
               className={inputClass}
             />
           </Field>
