@@ -21,6 +21,24 @@ function formatCurrency(value: number) {
   return `$${value.toLocaleString("es-MX")}`;
 }
 
+const trabajoLabel: Record<TipoLaboratorio, string> = {
+  Dental: "Trabajo solicitado",
+  Químico: "Estudio o análisis solicitado",
+  Radiografía: "Estudio radiográfico solicitado",
+};
+
+const trabajoPlaceholder: Record<TipoLaboratorio, string> = {
+  Dental: "Ej. Corona de zirconia OD 16",
+  Químico: "Ej. Biopsia de tejido blando, cultivo bacteriano...",
+  Radiografía: "Ej. Radiografía panorámica, periapical OD 36...",
+};
+
+const laboratorioPlaceholder: Record<TipoLaboratorio, string> = {
+  Dental: "Ej. Laboratorio Dental Ortiz",
+  Químico: "Ej. Laboratorio Clínico Central",
+  Radiografía: "Ej. Centro de Radiología Dental",
+};
+
 function todayFormatted() {
   return new Date().toLocaleDateString("es-MX", {
     day: "2-digit",
@@ -28,6 +46,18 @@ function todayFormatted() {
     year: "numeric",
   });
 }
+
+const tipoLabel: Record<TipoLaboratorio, string> = {
+  Dental: "Laboratorio Dental",
+  Químico: "Laboratorio Químico",
+  Radiografía: "Radiografía",
+};
+
+const tipoColor: Record<TipoLaboratorio, string> = {
+  Dental: "bg-info/10 text-info",
+  Químico: "bg-pink-400/10 text-pink-400",
+  Radiografía: "bg-accent/10 text-accent",
+};
 
 const estatusColor: Record<Estatus, string> = {
   Enviado: "bg-accent/10 text-accent",
@@ -103,7 +133,7 @@ function NuevaSolicitudDialog({
                       : "border-edge/15 text-ink/50 hover:border-accent/40 hover:text-ink"
                   }`}
                 >
-                  Laboratorio {t}
+                  {tipoLabel[t]}
                 </button>
               ))}
             </div>
@@ -116,7 +146,7 @@ function NuevaSolicitudDialog({
                 type="text"
                 value={laboratorio}
                 onChange={(e) => setLaboratorio(e.target.value)}
-                placeholder={tipo === "Dental" ? "Ej. Laboratorio Dental Ortiz" : "Ej. Laboratorio Clínico Central"}
+                placeholder={laboratorioPlaceholder[tipo]}
                 className={inputClass}
               />
             </div>
@@ -133,17 +163,11 @@ function NuevaSolicitudDialog({
           </div>
 
           <div>
-            <label className="mb-1 block text-xs font-medium text-ink/60">
-              {tipo === "Dental" ? "Trabajo solicitado" : "Estudio o análisis solicitado"}
-            </label>
+            <label className="mb-1 block text-xs font-medium text-ink/60">{trabajoLabel[tipo]}</label>
             <textarea
               value={trabajo}
               onChange={(e) => setTrabajo(e.target.value)}
-              placeholder={
-                tipo === "Dental"
-                  ? "Ej. Corona de zirconia OD 16"
-                  : "Ej. Biopsia de tejido blando, cultivo bacteriano..."
-              }
+              placeholder={trabajoPlaceholder[tipo]}
               rows={3}
               className={`${inputClass} resize-none`}
             />
@@ -271,11 +295,7 @@ export default function Laboratorios({ patientId }: { patientId: string }) {
                 <tr key={s.id} className="border-b border-edge/5 last:border-0">
                   <td className="px-6 py-3">
                     <span
-                      className={`rounded-full px-2 py-0.5 text-[11px] font-semibold uppercase tracking-wide ${
-                        s.tipo === "Dental"
-                          ? "bg-info/10 text-info"
-                          : "bg-pink-400/10 text-pink-400"
-                      }`}
+                      className={`rounded-full px-2 py-0.5 text-[11px] font-semibold uppercase tracking-wide ${tipoColor[s.tipo]}`}
                     >
                       {s.tipo}
                     </span>

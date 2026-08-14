@@ -60,6 +60,7 @@ import type { Deposito, ArticuloFaltante, ArticuloCaducidad } from "@/lib/deposi
 import type { PagoEliminado } from "@/lib/pagosEliminados";
 import { saldosPendientesInicial, type SaldosPendientesConfig } from "@/lib/saldosPendientes";
 import type { PresupuestoLogEntry } from "@/lib/presupuestosLog";
+import type { OtLogEntry } from "@/lib/otsLog";
 import type { Promocion, Aseguradora } from "@/lib/catalogosVarios";
 import type { PersonalAsistencia, RegistroAsistencia } from "@/lib/asistencia";
 import type { Procedimiento } from "@/lib/procedimientos";
@@ -380,6 +381,8 @@ type PatientDataContextValue = {
   saldosPendientes: SaldosPendientesConfig;
   presupuestosLog: PresupuestoLogEntry[];
   setPresupuestosLog: (updater: Updater<PresupuestoLogEntry[]>) => void;
+  otsLog: OtLogEntry[];
+  setOtsLog: (updater: Updater<OtLogEntry[]>) => void;
   promociones: Promocion[];
   setPromociones: (updater: Updater<Promocion[]>) => void;
   aseguradoras: Aseguradora[];
@@ -541,6 +544,7 @@ export function PatientDataProvider({
     clinicUid,
     "presupuestosLog"
   );
+  const [otsLog, setOtsLog] = useFirestoreList<OtLogEntry>(clinicUid, "otsLog");
   const [promociones, setPromociones] = useFirestoreList<Promocion>(clinicUid, "promociones");
   const [aseguradoras, setAseguradoras] = useFirestoreList<Aseguradora>(clinicUid, "aseguradoras");
   const [personalAsistencia, setPersonalAsistencia] = useFirestoreList<PersonalAsistencia>(
@@ -980,6 +984,28 @@ export function PatientDataProvider({
     });
   };
 
+  /** Agrega a `otsLog` (Reportes → OTs) cada solicitud de laboratorio nueva
+   * — bitácora de creación, mismo patrón que `presupuestosLog`. */
+  const registrarLogOts = (patientId: string, prevArr: SolicitudLaboratorio[], next: SolicitudLaboratorio[]) => {
+    const prevIds = new Set(prevArr.map((s) => s.id));
+    const nuevas = next.filter((s) => !prevIds.has(s.id));
+    if (nuevas.length === 0) return;
+    const patientName = patients.find((p) => p.id === patientId)?.name ?? "";
+    const entradas: OtLogEntry[] = nuevas.map((s) => ({
+      id: s.id,
+      patientId,
+      patientName,
+      tipo: s.tipo,
+      laboratorio: s.laboratorio,
+      trabajo: s.trabajo,
+      medico: s.medico,
+      fechaEnvio: s.fechaEnvio,
+      costo: s.costo,
+      creadoEn: new Date().toISOString(),
+    }));
+    setOtsLog((prev) => [...entradas, ...prev]);
+  };
+
   const setLaboratoriosPaciente = (patientId: string, updater: Updater<SolicitudLaboratorio[]>) => {
     if (!clinicUid) return;
     const prevArr = laboratoriosPorPaciente[patientId] ?? [];
@@ -994,6 +1020,7 @@ export function PatientDataProvider({
         laboratoriosPendientesCount: prevEst.laboratoriosPendientesCount + deltaPendientes,
       }));
     }
+    registrarLogOts(patientId, prevArr, next);
     setLaboratoriosPorPacienteState((prev) => ({ ...prev, [patientId]: next }));
   };
 
@@ -1252,6 +1279,8 @@ export function PatientDataProvider({
         saldosPendientes,
         presupuestosLog,
         setPresupuestosLog,
+        otsLog,
+        setOtsLog,
         promociones,
         setPromociones,
         aseguradoras,

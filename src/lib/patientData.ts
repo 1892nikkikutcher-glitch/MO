@@ -414,7 +414,7 @@ export type CitaAgenda = {
   horaLlegada?: string | null;
 };
 
-export const laboratorioTipoOptions = ["Dental", "Químico"] as const;
+export const laboratorioTipoOptions = ["Dental", "Químico", "Radiografía"] as const;
 export type TipoLaboratorio = (typeof laboratorioTipoOptions)[number];
 
 export const laboratorioEstatusOptions = ["Enviado", "En proceso", "Recibido"] as const;
