@@ -19,6 +19,7 @@ import { renderPlantilla, formatFechaLarga, formatHora12 } from "@/lib/formatosW
 import { manejarCambioNombre } from "@/lib/textoNombre";
 import { descargarICS } from "@/lib/exportCalendario";
 import { formatDuracion } from "@/lib/procedimientos";
+import GlobalAgregarPago from "@/components/GlobalAgregarPago";
 
 const PX_PER_MIN = 1.2;
 const DIAS_SEMANA = ["lun.", "mar.", "mié.", "jue.", "vie.", "sáb.", "dom."];
@@ -196,6 +197,20 @@ function IconReloj() {
   );
 }
 
+function IconPago({ size = 22 }: { size?: number }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" className="shrink-0">
+      <path
+        d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"
+        stroke="currentColor"
+        strokeWidth="1.8"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+    </svg>
+  );
+}
+
 function NuevaRecursoDialog({
   coloresEnUso,
   onClose,
@@ -338,6 +353,7 @@ function CitaDialog({
   const [recursoId, setRecursoId] = useState(initial.recursoId ?? recursos[0]?.id ?? "");
   const [patientId, setPatientId] = useState(initial.patientId ?? "");
   const [searchText, setSearchText] = useState(initial.paciente ?? "");
+  const [showAgregarPago, setShowAgregarPago] = useState(false);
   const patientData = initial.patientId ? patients.find((p) => p.id === initial.patientId) : undefined;
 
   useEffect(() => {
@@ -565,6 +581,15 @@ function CitaDialog({
               className="flex h-11 w-11 items-center justify-center rounded-full text-success transition-colors hover:bg-success/15 disabled:cursor-not-allowed disabled:opacity-30 disabled:hover:bg-transparent"
             >
               <IconWhatsApp size={24} />
+            </button>
+            <button
+              type="button"
+              onClick={() => patientId && setShowAgregarPago(true)}
+              disabled={!patientId}
+              title={patientId ? "Registrar pago" : "Selecciona un paciente primero"}
+              className="flex h-11 w-11 items-center justify-center rounded-full text-success transition-colors hover:bg-success/15 disabled:cursor-not-allowed disabled:opacity-30 disabled:hover:bg-transparent"
+            >
+              <IconPago size={22} />
             </button>
             <button
               onClick={onClose}
@@ -911,6 +936,10 @@ function CitaDialog({
           </button>
         </div>
       </div>
+
+      {showAgregarPago && patientId && (
+        <GlobalAgregarPago initialPatientId={patientId} onClose={() => setShowAgregarPago(false)} />
+      )}
     </div>
   );
 }

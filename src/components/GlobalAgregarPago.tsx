@@ -9,10 +9,16 @@ import { AgregarPagoDialog } from "./pages/Pagos";
 const inputClass =
   "w-full rounded-lg border border-edge/10 bg-field px-3 py-2 text-sm text-ink outline-none focus:border-accent/60";
 
-export default function GlobalAgregarPago({ onClose }: { onClose: () => void }) {
+export default function GlobalAgregarPago({
+  onClose,
+  initialPatientId,
+}: {
+  onClose: () => void;
+  initialPatientId?: string;
+}) {
   const { patients, presupuestosPorPaciente, pagosPorPaciente, setPagosPaciente, addPatient } =
     usePatientData();
-  const [patientId, setPatientId] = useState("");
+  const [patientId, setPatientId] = useState(initialPatientId ?? "");
   const [busqueda, setBusqueda] = useState("");
   const [mostrarNuevoPaciente, setMostrarNuevoPaciente] = useState(false);
   const [nombreNuevo, setNombreNuevo] = useState("");
