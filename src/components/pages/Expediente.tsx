@@ -26,6 +26,7 @@ import {
   type SavedBudget,
   type Pago,
 } from "@/lib/patientData";
+import { condicionesSistemicasPositivas } from "@/lib/historiaClinica";
 
 function fechaLargaHoy() {
   const texto = new Date().toLocaleDateString("es-MX", { weekday: "long", day: "numeric", month: "long", year: "numeric" });
@@ -435,6 +436,10 @@ export default function Expediente({
   const setPagos: Dispatch<SetStateAction<Pago[]>> = (updater) =>
     setPagosPaciente(patient.id, updater);
   const patientAlergias = historiaClinicaPorPaciente[patient.id]?.alergias?.trim() || "";
+  const condicionesSistemicas = condicionesSistemicasPositivas(
+    historiaClinicaTemplate,
+    historiaClinicaPorPaciente[patient.id] ?? { porPregunta: {} }
+  );
 
   const preguntaPlanTratamiento = historiaClinicaTemplate.secciones
     .flatMap((s) => s.preguntas)
@@ -513,6 +518,20 @@ export default function Expediente({
             <span className="font-bold uppercase tracking-wide">Alergias: </span>
             {patientAlergias}
           </p>
+        </div>
+      )}
+
+      {condicionesSistemicas.length > 0 && (
+        <div className="flex items-start gap-3 rounded-2xl border border-accent bg-accent/15 p-4 text-sm text-accent print:hidden">
+          <span className="mt-0.5 text-lg">⚕️</span>
+          <div>
+            <span className="font-bold uppercase tracking-wide">
+              Diagnóstico sistémico / antecedentes relevantes:{" "}
+            </span>
+            {condicionesSistemicas
+              .map((c) => (c.detalle === "Sí" ? c.etiqueta : `${c.etiqueta}: ${c.detalle}`))
+              .join(" · ")}
+          </div>
         </div>
       )}
 

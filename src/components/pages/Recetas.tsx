@@ -6,7 +6,7 @@ import { formatNombreConEdad, type MedicamentoRecetado, type Receta } from "@/li
 import { calcularDosisPediatrica, type MedicamentoCatalogo } from "@/lib/medicamentos";
 import { generarRecetaPdf } from "@/lib/generarRecetaPdf";
 import { slugify } from "@/lib/textoNombre";
-import { coincideAlergia } from "@/lib/historiaClinica";
+import { coincideAlergia, condicionesSistemicasPositivas } from "@/lib/historiaClinica";
 
 const plantillasRecomendaciones = [
   "Evitar alimentos duros o muy calientes durante las primeras 24 horas.",
@@ -73,6 +73,7 @@ export default function Recetas() {
     perfilDoctor,
     consumirSiguienteFolioReceta,
     historiaClinicaPorPaciente,
+    historiaClinicaTemplate,
   } = usePatientData();
   const medicos = recursos.filter((r) => r.tipo === "medico");
 
@@ -98,6 +99,12 @@ export default function Recetas() {
   const patient = patients.find((p) => p.id === patientId) ?? null;
   const edad = patient ? calculateAge(patient.birthDate) : null;
   const alergiasHistoria = patientId ? historiaClinicaPorPaciente[patientId]?.alergias?.trim() ?? "" : "";
+  const condicionesSistemicas = patientId
+    ? condicionesSistemicasPositivas(
+        historiaClinicaTemplate,
+        historiaClinicaPorPaciente[patientId] ?? { porPregunta: {} }
+      )
+    : [];
 
   // Precarga el campo de alergias con lo capturado en la Historia Clínica del
   // paciente (llega de forma asíncrona desde Firestore) — solo si el campo
@@ -319,6 +326,20 @@ export default function Recetas() {
               <span className="font-bold uppercase tracking-wide">Alergias: </span>
               {alergiasHistoria} — verifica antes de recetar.
             </p>
+          </div>
+        )}
+
+        {condicionesSistemicas.length > 0 && (
+          <div className="flex items-start gap-3 rounded-2xl border border-accent bg-accent/15 p-4 text-sm text-accent">
+            <span className="mt-0.5 text-lg">⚕️</span>
+            <div>
+              <span className="font-bold uppercase tracking-wide">
+                Diagnóstico sistémico / antecedentes relevantes:{" "}
+              </span>
+              {condicionesSistemicas
+                .map((c) => (c.detalle === "Sí" ? c.etiqueta : `${c.etiqueta}: ${c.detalle}`))
+                .join(" · ")}
+            </div>
           </div>
         )}
 

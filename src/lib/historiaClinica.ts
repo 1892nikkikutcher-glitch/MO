@@ -200,6 +200,52 @@ export type RespuestasHistoriaClinica = {
 
 export const respuestasVacias: RespuestasHistoriaClinica = { porPregunta: {}, alergias: "" };
 
+/** Secciones de la historia clínica que representan antecedentes o
+ * diagnóstico sistémico (enfermedades crónico-degenerativas, alergias,
+ * etc.) — se usan para armar la alerta del expediente. Se detectan por
+ * título en vez de por id fijo porque la plantilla es editable por el
+ * doctor, así que también atrapa secciones renombradas o agregadas que
+ * seguían el mismo patrón ("Antecedentes Patológicos...", "Diagnóstico
+ * Sistémico"). */
+function esSeccionSistemica(titulo: string): boolean {
+  const t = titulo.toLowerCase();
+  return (
+    t.includes("antecedente") && t.includes("patol") ||
+    t.includes("diagnóstico sistémico") ||
+    t.includes("diagnostico sistemico")
+  );
+}
+
+export type CondicionSistemica = { etiqueta: string; detalle: string };
+
+/** Antecedentes patológicos marcados "Sí" y el texto del Diagnóstico
+ * Sistémico (si tiene contenido) — para alertar de enfermedades
+ * crónico-degenerativas u otros diagnósticos sistémicos relevantes antes
+ * de tratar o recetar a un paciente. No incluye alergias específicas: esas
+ * ya tienen su propia alerta dedicada (`alergias`). */
+export function condicionesSistemicasPositivas(
+  template: HistoriaClinicaTemplate,
+  respuestas: RespuestasHistoriaClinica
+): CondicionSistemica[] {
+  const resultado: CondicionSistemica[] = [];
+  for (const seccion of template.secciones) {
+    if (!esSeccionSistemica(seccion.titulo)) continue;
+    for (const pregunta of seccion.preguntas) {
+      const valor = respuestas.porPregunta[pregunta.id];
+      if (pregunta.tipo === "sino" && valor === "si") {
+        resultado.push({ etiqueta: pregunta.etiqueta, detalle: "Sí" });
+      } else if (
+        (pregunta.tipo === "texto" || pregunta.tipo === "textarea") &&
+        typeof valor === "string" &&
+        valor.trim().length > 0
+      ) {
+        resultado.push({ etiqueta: pregunta.etiqueta, detalle: valor.trim() });
+      }
+    }
+  }
+  return resultado;
+}
+
 /** Compara sin acentos/mayúsculas si `texto` menciona alguna de las
  * sustancias listadas en `alergias` (separadas por coma) — para advertir
  * antes de recetar un medicamento al que el paciente es alérgico. */
