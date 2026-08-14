@@ -57,6 +57,7 @@ import { formatosWhatsAppInicial, type FormatosWhatsApp } from "@/lib/formatosWh
 import { calcularFechaFin, type MembershipPlan, type PatientMembership, type UsoBeneficio } from "@/lib/membresias";
 import type { Lamina } from "@/lib/laminas";
 import type { Deposito, ArticuloFaltante, ArticuloCaducidad } from "@/lib/depositoDental";
+import type { PagoEliminado } from "@/lib/pagosEliminados";
 import type { Promocion, Aseguradora } from "@/lib/catalogosVarios";
 import type { PersonalAsistencia, RegistroAsistencia } from "@/lib/asistencia";
 import type { Procedimiento } from "@/lib/procedimientos";
@@ -372,6 +373,8 @@ type PatientDataContextValue = {
   setArticulosFaltantes: (updater: Updater<ArticuloFaltante[]>) => void;
   articulosCaducidad: ArticuloCaducidad[];
   setArticulosCaducidad: (updater: Updater<ArticuloCaducidad[]>) => void;
+  pagosEliminados: PagoEliminado[];
+  setPagosEliminados: (updater: Updater<PagoEliminado[]>) => void;
   promociones: Promocion[];
   setPromociones: (updater: Updater<Promocion[]>) => void;
   aseguradoras: Aseguradora[];
@@ -519,6 +522,10 @@ export function PatientDataProvider({
   const [articulosCaducidad, setArticulosCaducidad] = useFirestoreList<ArticuloCaducidad>(
     clinicUid,
     "articulosCaducidad"
+  );
+  const [pagosEliminados, setPagosEliminados] = useFirestoreList<PagoEliminado>(
+    clinicUid,
+    "pagosEliminados"
   );
   const [promociones, setPromociones] = useFirestoreList<Promocion>(clinicUid, "promociones");
   const [aseguradoras, setAseguradoras] = useFirestoreList<Aseguradora>(clinicUid, "aseguradoras");
@@ -1140,6 +1147,8 @@ export function PatientDataProvider({
         setArticulosFaltantes,
         articulosCaducidad,
         setArticulosCaducidad,
+        pagosEliminados,
+        setPagosEliminados,
         promociones,
         setPromociones,
         aseguradoras,

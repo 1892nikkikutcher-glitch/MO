@@ -23,6 +23,7 @@ import Educacion from "./pages/Educacion";
 import DepositoDental from "./pages/DepositoDental";
 import ProximamenteStub from "./pages/ProximamenteStub";
 import Contrasena from "./pages/Contrasena";
+import ReportePagos from "./pages/ReportePagos";
 import BitacoraCitas from "./pages/BitacoraCitas";
 import ReporteProcedimientos from "./pages/ReporteProcedimientos";
 import MedicosPacientes from "./pages/MedicosPacientes";
@@ -72,6 +73,7 @@ const paginasConstruidas = new Set([
   "reportes-aviso-privacidad",
   "reportes-aseguradoras",
   "reportes-seguimiento-asistencia",
+  "reportes-pagos",
 ]);
 
 const quickActions = [
@@ -291,6 +293,7 @@ export default function Dashboard({
           {activePage === "reportes-aviso-privacidad" && <AvisoPrivacidad />}
           {activePage === "reportes-aseguradoras" && <Aseguradoras />}
           {activePage === "reportes-seguimiento-asistencia" && <SeguimientoAsistencia />}
+          {activePage === "reportes-pagos" && <ReportePagos />}
           {!paginasConstruidas.has(activePage) && <ProximamenteStub label={activeLabel} />}
         </div>
       </main>

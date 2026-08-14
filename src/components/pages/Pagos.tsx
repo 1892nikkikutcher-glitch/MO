@@ -10,6 +10,7 @@ import {
   type LineaPago,
   type Pago,
 } from "@/lib/patientData";
+import { usePatientData } from "@/context/PatientDataContext";
 
 const medicos = ["Dr. Nicolás Medina González", "Dra. Ana Paola Ríos Cervantes"];
 const formasDePago = ["Efectivo", "Tarjeta de crédito", "Tarjeta de débito", "Transferencia", "Cheque"];
@@ -56,6 +57,57 @@ function TrashIcon() {
         strokeLinejoin="round"
       />
     </svg>
+  );
+}
+
+function EliminarPagoDialog({
+  pago,
+  onClose,
+  onConfirm,
+}: {
+  pago: Pago;
+  onClose: () => void;
+  onConfirm: (motivo: string) => void;
+}) {
+  const [motivo, setMotivo] = useState("");
+  const puedeEliminar = motivo.trim().length > 0;
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4">
+      <div className="w-full max-w-sm rounded-2xl border border-edge/10 bg-modal p-6">
+        <h3 className="text-base font-semibold text-ink">Eliminar pago</h3>
+        <p className="mt-2 text-sm text-ink/70">
+          Vas a eliminar el pago de <span className="font-semibold text-ink">{formatCurrency(pago.total)}</span>{" "}
+          del {pago.fecha}. Este registro se guarda en Reportes → Pagos para poder auditarlo después.
+        </p>
+        <label className="mb-1 mt-4 block text-xs font-medium text-ink/60">
+          Motivo de la eliminación
+        </label>
+        <textarea
+          autoFocus
+          value={motivo}
+          onChange={(e) => setMotivo(e.target.value)}
+          placeholder="Ej. Se registró por error / Pago duplicado / El paciente canceló..."
+          rows={3}
+          className={inputClass}
+        />
+        <div className="mt-6 flex gap-3">
+          <button
+            onClick={onClose}
+            className="flex-1 rounded-lg border border-edge/15 py-2.5 text-sm font-semibold text-ink/80 transition-colors hover:bg-surface"
+          >
+            Cancelar
+          </button>
+          <button
+            onClick={() => puedeEliminar && onConfirm(motivo.trim())}
+            disabled={!puedeEliminar}
+            className="flex-1 rounded-lg bg-danger py-2.5 text-sm font-semibold text-black transition-opacity hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-40"
+          >
+            Eliminar
+          </button>
+        </div>
+      </div>
+    </div>
   );
 }
 
@@ -671,18 +723,37 @@ export function AgregarPagoDialog({
 }
 
 export default function Pagos({
+  patientId,
   patientName,
   presupuestos,
   pagos,
   setPagos,
 }: {
+  patientId: string;
   patientName: string;
   presupuestos: SavedBudget[];
   pagos: Pago[];
   setPagos: Dispatch<SetStateAction<Pago[]>>;
 }) {
+  const { userEmail, setPagosEliminados } = usePatientData();
   const [showDialog, setShowDialog] = useState(false);
   const [printTarget, setPrintTarget] = useState<Pago | null>(null);
+  const [pagoAEliminar, setPagoAEliminar] = useState<Pago | null>(null);
+
+  const eliminarPagoConMotivo = (pago: Pago, motivo: string) => {
+    const registro = {
+      id: `pe${Date.now()}`,
+      patientId,
+      patientName,
+      pago,
+      motivo,
+      eliminadoEn: new Date().toISOString(),
+      eliminadoPor: userEmail,
+    };
+    setPagosEliminados((prev) => [registro, ...prev]);
+    setPagos((prev) => prev.filter((p) => p.id !== pago.id));
+    setPagoAEliminar(null);
+  };
 
   useEffect(() => {
     if (printTarget) {
@@ -817,7 +888,7 @@ export default function Pagos({
                   </td>
                   <td className="px-6 py-3 text-right">
                     <button
-                      onClick={() => setPagos((prev) => prev.filter((p) => p.id !== pago.id))}
+                      onClick={() => setPagoAEliminar(pago)}
                       title="Eliminar pago"
                       className="ml-auto flex h-7 w-7 items-center justify-center rounded-full border border-danger/20 text-danger/50 transition-colors hover:border-danger/60 hover:text-danger"
                     >
@@ -864,6 +935,14 @@ export default function Pagos({
           tratamientosPendientes={tratamientosPendientes}
           onClose={() => setShowDialog(false)}
           onSave={upsertPago}
+        />
+      )}
+
+      {pagoAEliminar && (
+        <EliminarPagoDialog
+          pago={pagoAEliminar}
+          onClose={() => setPagoAEliminar(null)}
+          onConfirm={(motivo) => eliminarPagoConMotivo(pagoAEliminar, motivo)}
         />
       )}
     </div>

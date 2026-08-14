@@ -487,39 +487,42 @@ function CitaDialog({
     // refleja de una vez en su Presupuesto — así el presupuesto y los pagos
     // (que ya se calculan contra el presupuesto) quedan conectados desde
     // el momento en que se agenda, sin esperar a que alguien lo capture a
-    // mano por separado. Corre tanto al crear como al editar/reguardar una
-    // cita (por ejemplo, una cita agendada antes de que existiera esto),
-    // pero solo agrega un presupuesto si ningún procedimiento capturado ya
-    // aparece en uno existente de este paciente, para no duplicar montos.
+    // mano por separado. El presupuesto queda ligado 1 a 1 a esta cita
+    // (mismo id, "pres-cita-<id de la cita>"): si se vuelve a guardar la
+    // misma cita con otro costo o tratamientos, se actualiza ese mismo
+    // presupuesto en vez de crear uno nuevo. Antes se evitaba duplicar
+    // comparando el NOMBRE del procedimiento contra todo el historial del
+    // paciente, pero eso hacía que una limpieza (o cualquier tratamiento
+    // recurrente) ya facturada alguna vez dejara de generar presupuesto en
+    // citas futuras — quedaban sin nada pendiente por cobrar.
     if (patientId && tratamientos.length > 0) {
       const montoCosto = Number(costo.replace(/[^\d.]/g, "")) || 0;
       if (montoCosto > 0) {
-        const itemsExistentes = (presupuestosPorPaciente[patientId] ?? []).flatMap((p) => p.items);
-        const normalizar = (s: string) => s.toLowerCase().trim();
-        const yaExiste = tratamientos.some((t) =>
-          itemsExistentes.some((item) => normalizar(item.procedure) === normalizar(t))
-        );
-        if (!yaExiste) {
-          const items: LineItem[] = tratamientos.map((t, idx) => ({
-            id: `item-cita-${base.id}-${idx}`,
-            procedure: t,
-            price: idx === 0 ? montoCosto - Math.floor(montoCosto / tratamientos.length) * (tratamientos.length - 1) : Math.floor(montoCosto / tratamientos.length),
-            teeth: [],
-            note: "",
-          }));
-          const nuevoPresupuesto: SavedBudget = {
-            id: `pres-cita-${base.id}`,
-            folio: base.id.slice(-6),
-            fecha,
-            medico: recursos.find((r) => r.id === recursoId)?.nombre ?? "",
-            tipoDePrecio: "Consultorio",
-            especialidad: "Odontología General",
-            diagnostico: "Generado automáticamente a partir de una cita agendada.",
-            items,
-            total: montoCosto,
-          };
-          setPresupuestosPaciente(patientId, (prev) => [nuevoPresupuesto, ...prev]);
-        }
+        const presupuestoId = `pres-cita-${base.id}`;
+        const items: LineItem[] = tratamientos.map((t, idx) => ({
+          id: `item-cita-${base.id}-${idx}`,
+          procedure: t,
+          price: idx === 0 ? montoCosto - Math.floor(montoCosto / tratamientos.length) * (tratamientos.length - 1) : Math.floor(montoCosto / tratamientos.length),
+          teeth: [],
+          note: "",
+        }));
+        const presupuestoDeCita: SavedBudget = {
+          id: presupuestoId,
+          folio: base.id.slice(-6),
+          fecha,
+          medico: recursos.find((r) => r.id === recursoId)?.nombre ?? "",
+          tipoDePrecio: "Consultorio",
+          especialidad: "Odontología General",
+          diagnostico: "Generado automáticamente a partir de una cita agendada.",
+          items,
+          total: montoCosto,
+        };
+        setPresupuestosPaciente(patientId, (prev) => {
+          const existe = prev.some((p) => p.id === presupuestoId);
+          return existe
+            ? prev.map((p) => (p.id === presupuestoId ? presupuestoDeCita : p))
+            : [presupuestoDeCita, ...prev];
+        });
       }
     }
 

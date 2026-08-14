@@ -594,6 +594,7 @@ export default function Expediente({
           {activeTab === "Fotografías" && <Fotografias />}
           {activeTab === "Pagos" && (
             <Pagos
+              patientId={patient.id}
               patientName={patient.name}
               presupuestos={presupuestos}
               pagos={pagos}
