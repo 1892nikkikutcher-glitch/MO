@@ -1206,127 +1206,7 @@ export default function Agenda() {
   };
 
   return (
-    <div className="flex flex-col gap-6 md:flex-row">
-      <aside className="w-full space-y-6 print:hidden md:w-60 md:shrink-0">
-        <div className="rounded-2xl border border-edge/10 bg-surface p-4">
-          <label className="mb-2 block text-xs font-medium text-ink/60">Ir a fecha</label>
-          <input
-            type="date"
-            value={toISODate(
-              vista === "dia" || vista === "3dias" ? diaSeleccionado : vista === "mes" ? mesActual : weekStart
-            )}
-            onChange={(e) => {
-              const d = new Date(`${e.target.value}T00:00:00`);
-              setWeekStart(getMonday(d));
-              setDiaSeleccionado(d);
-              setMesActual(new Date(d.getFullYear(), d.getMonth(), 1));
-            }}
-            className={inputClass}
-          />
-          <button
-            onClick={() => {
-              const hoy = new Date();
-              setWeekStart(getMonday(hoy));
-              setDiaSeleccionado(hoy);
-              setMesActual(new Date(hoy.getFullYear(), hoy.getMonth(), 1));
-            }}
-            className="mt-2 w-full rounded-lg border border-accent/40 py-1.5 text-xs font-semibold text-accent transition-colors hover:bg-accent/10"
-          >
-            Hoy
-          </button>
-        </div>
-
-        <div className="rounded-2xl border border-edge/10 bg-surface p-4">
-          <div className="mb-3 flex items-center justify-between">
-            <h3 className="text-xs font-semibold uppercase tracking-wide text-ink/50">Recursos</h3>
-            <button
-              onClick={() => setShowRecursoDialog(true)}
-              title="Agregar recurso"
-              className="flex h-6 w-6 items-center justify-center rounded-full border border-accent/40 text-accent transition-colors hover:bg-accent/10"
-            >
-              +
-            </button>
-          </div>
-          <div className="space-y-1.5">
-            {recursos.map((r) => {
-              const oculto = recursosOcultos.has(r.id);
-              const editando = recursoEditandoId === r.id;
-              return (
-                <div
-                  key={r.id}
-                  className={`group flex w-full items-center gap-2 rounded-lg px-2 py-1.5 text-left text-xs transition-opacity ${
-                    oculto ? "opacity-30" : ""
-                  } hover:bg-surface`}
-                >
-                  {editando ? (
-                    <span className="flex min-w-0 flex-1 items-center gap-2">
-                      <span
-                        className="h-3 w-3 shrink-0 rounded-full"
-                        style={{ backgroundColor: r.color, boxShadow: `0 0 6px ${r.color}` }}
-                      />
-                      <input
-                        autoFocus
-                        value={nombreEditando}
-                        onChange={(e) => setNombreEditando(e.target.value)}
-                        onBlur={guardarNombreRecurso}
-                        onKeyDown={(e) => {
-                          if (e.key === "Enter") guardarNombreRecurso();
-                          if (e.key === "Escape") setRecursoEditandoId(null);
-                        }}
-                        className="min-w-0 flex-1 rounded border border-accent/40 bg-field px-1.5 py-0.5 text-xs text-ink outline-none"
-                      />
-                    </span>
-                  ) : (
-                    <button onClick={() => toggleRecurso(r.id)} className="flex min-w-0 flex-1 items-center gap-2">
-                      <span
-                        className="h-3 w-3 shrink-0 rounded-full"
-                        style={{ backgroundColor: r.color, boxShadow: `0 0 6px ${r.color}` }}
-                      />
-                      <span className="truncate text-ink/80">{r.nombre}</span>
-                    </button>
-                  )}
-                  <span className="shrink-0 text-[10px] uppercase text-ink/30">
-                    {r.tipo === "medico" ? "Médico" : "Unidad"}
-                  </span>
-                  <button
-                    onClick={() => iniciarEdicionRecurso(r)}
-                    title="Editar nombre"
-                    className="shrink-0 px-1 text-ink/40 transition-colors hover:text-accent"
-                  >
-                    ✎
-                  </button>
-                  <button
-                    onClick={() => eliminarRecurso(r.id, r.nombre)}
-                    title="Eliminar recurso"
-                    className="shrink-0 px-1 text-ink/40 transition-colors hover:text-danger"
-                  >
-                    ✕
-                  </button>
-                </div>
-              );
-            })}
-          </div>
-        </div>
-
-        <div className="rounded-2xl border border-edge/10 bg-surface p-4">
-          <h3 className="mb-2 text-xs font-semibold uppercase tracking-wide text-ink/50">
-            Horario de Atención
-          </h3>
-          <p className="text-sm text-ink">
-            {horario.apertura} – {horario.cierre}
-          </p>
-          <p className="text-xs text-ink/40">
-            Comida: {horario.comidaInicio} – {horario.comidaFin}
-          </p>
-          <button
-            onClick={() => irAPagina("administracion-consultorio")}
-            className="mt-2 text-xs font-semibold text-accent underline decoration-accent/40 underline-offset-2 hover:decoration-accent"
-          >
-            Cambiar en Administración → Consultorio
-          </button>
-        </div>
-      </aside>
-
+    <div className="flex flex-col gap-6">
       <div className="min-w-0 flex-1 space-y-4">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div className="flex flex-wrap gap-2">
@@ -1694,6 +1574,126 @@ export default function Agenda() {
           </div>
         </div>
         )}
+      </div>
+
+      <div className="grid grid-cols-1 gap-4 print:hidden sm:grid-cols-3">
+        <div className="rounded-2xl border border-edge/10 bg-surface p-4">
+          <label className="mb-2 block text-xs font-medium text-ink/60">Ir a fecha</label>
+          <input
+            type="date"
+            value={toISODate(
+              vista === "dia" || vista === "3dias" ? diaSeleccionado : vista === "mes" ? mesActual : weekStart
+            )}
+            onChange={(e) => {
+              const d = new Date(`${e.target.value}T00:00:00`);
+              setWeekStart(getMonday(d));
+              setDiaSeleccionado(d);
+              setMesActual(new Date(d.getFullYear(), d.getMonth(), 1));
+            }}
+            className={inputClass}
+          />
+          <button
+            onClick={() => {
+              const hoy = new Date();
+              setWeekStart(getMonday(hoy));
+              setDiaSeleccionado(hoy);
+              setMesActual(new Date(hoy.getFullYear(), hoy.getMonth(), 1));
+            }}
+            className="mt-2 w-full rounded-lg border border-accent/40 py-1.5 text-xs font-semibold text-accent transition-colors hover:bg-accent/10"
+          >
+            Hoy
+          </button>
+        </div>
+
+        <div className="rounded-2xl border border-edge/10 bg-surface p-4">
+          <div className="mb-3 flex items-center justify-between">
+            <h3 className="text-xs font-semibold uppercase tracking-wide text-ink/50">Recursos</h3>
+            <button
+              onClick={() => setShowRecursoDialog(true)}
+              title="Agregar recurso"
+              className="flex h-6 w-6 items-center justify-center rounded-full border border-accent/40 text-accent transition-colors hover:bg-accent/10"
+            >
+              +
+            </button>
+          </div>
+          <div className="space-y-1.5">
+            {recursos.map((r) => {
+              const oculto = recursosOcultos.has(r.id);
+              const editando = recursoEditandoId === r.id;
+              return (
+                <div
+                  key={r.id}
+                  className={`group flex w-full items-center gap-2 rounded-lg px-2 py-1.5 text-left text-xs transition-opacity ${
+                    oculto ? "opacity-30" : ""
+                  } hover:bg-surface`}
+                >
+                  {editando ? (
+                    <span className="flex min-w-0 flex-1 items-center gap-2">
+                      <span
+                        className="h-3 w-3 shrink-0 rounded-full"
+                        style={{ backgroundColor: r.color, boxShadow: `0 0 6px ${r.color}` }}
+                      />
+                      <input
+                        autoFocus
+                        value={nombreEditando}
+                        onChange={(e) => setNombreEditando(e.target.value)}
+                        onBlur={guardarNombreRecurso}
+                        onKeyDown={(e) => {
+                          if (e.key === "Enter") guardarNombreRecurso();
+                          if (e.key === "Escape") setRecursoEditandoId(null);
+                        }}
+                        className="min-w-0 flex-1 rounded border border-accent/40 bg-field px-1.5 py-0.5 text-xs text-ink outline-none"
+                      />
+                    </span>
+                  ) : (
+                    <button onClick={() => toggleRecurso(r.id)} className="flex min-w-0 flex-1 items-center gap-2">
+                      <span
+                        className="h-3 w-3 shrink-0 rounded-full"
+                        style={{ backgroundColor: r.color, boxShadow: `0 0 6px ${r.color}` }}
+                      />
+                      <span className="truncate text-ink/80">{r.nombre}</span>
+                    </button>
+                  )}
+                  <span className="shrink-0 text-[10px] uppercase text-ink/30">
+                    {r.tipo === "medico" ? "Médico" : "Unidad"}
+                  </span>
+                  <button
+                    onClick={() => iniciarEdicionRecurso(r)}
+                    title="Editar nombre"
+                    className="shrink-0 px-1 text-ink/40 transition-colors hover:text-accent"
+                  >
+                    ✎
+                  </button>
+                  <button
+                    onClick={() => eliminarRecurso(r.id, r.nombre)}
+                    title="Eliminar recurso"
+                    className="shrink-0 px-1 text-ink/40 transition-colors hover:text-danger"
+                  >
+                    ✕
+                  </button>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+
+        <div className="rounded-2xl border border-edge/10 bg-surface p-4">
+          <h3 className="mb-2 text-xs font-semibold uppercase tracking-wide text-ink/50">
+            Horario de Atención
+          </h3>
+          <p className="text-sm text-ink">
+            {horario.apertura} – {horario.cierre}
+          </p>
+          <p className="text-xs text-ink/40">
+            Comida: {horario.comidaInicio} – {horario.comidaFin}
+          </p>
+          <button
+            onClick={() => irAPagina("administracion-consultorio")}
+            className="mt-2 text-xs font-semibold text-accent underline decoration-accent/40 underline-offset-2 hover:decoration-accent"
+          >
+            Cambiar en Administración → Consultorio
+          </button>
+        </div>
       </div>
 
       {dialogState && (
