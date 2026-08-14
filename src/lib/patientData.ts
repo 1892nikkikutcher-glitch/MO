@@ -312,6 +312,8 @@ export type RolClinica = "admin" | "colaborador";
 export type ClinicInfo = {
   ownerId: string;
   nombre: string;
+  direccion?: string;
+  telefono?: string;
 };
 
 /** Documento `clinicMembers/{clinicId}_{uid}`. Campo `role` en inglés para

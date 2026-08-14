@@ -23,6 +23,18 @@ import Educacion from "./pages/Educacion";
 import DepositoDental from "./pages/DepositoDental";
 import ProximamenteStub from "./pages/ProximamenteStub";
 import Contrasena from "./pages/Contrasena";
+import BitacoraCitas from "./pages/BitacoraCitas";
+import ReporteProcedimientos from "./pages/ReporteProcedimientos";
+import MedicosPacientes from "./pages/MedicosPacientes";
+import BorrarCitas from "./pages/BorrarCitas";
+import Clasificacion from "./pages/Clasificacion";
+import Recordatorios from "./pages/Recordatorios";
+import Consultorio from "./pages/Consultorio";
+import Promociones from "./pages/Promociones";
+import Comisiones from "./pages/Comisiones";
+import AvisoPrivacidad from "./pages/AvisoPrivacidad";
+import Aseguradoras from "./pages/Aseguradoras";
+import SeguimientoAsistencia from "./pages/SeguimientoAsistencia";
 import GlobalAgregarPago from "./GlobalAgregarPago";
 import GlobalNuevoPaciente from "./GlobalNuevoPaciente";
 import { PatientDataProvider, usePatientData } from "@/context/PatientDataContext";
@@ -48,6 +60,18 @@ const paginasConstruidas = new Set([
   "educacion",
   "deposito-dental",
   "contrasena",
+  "reportes-bitacora-citas",
+  "reportes-procedimientos",
+  "administracion-medicos-pacientes",
+  "administracion-borrar-citas",
+  "reportes-clasificacion",
+  "reportes-recordatorios",
+  "administracion-consultorio",
+  "administracion-promociones",
+  "administracion-comisiones",
+  "reportes-aviso-privacidad",
+  "reportes-aseguradoras",
+  "reportes-seguimiento-asistencia",
 ]);
 
 const quickActions = [
@@ -255,6 +279,18 @@ export default function Dashboard({
           {activePage === "educacion" && <Educacion />}
           {activePage === "deposito-dental" && <DepositoDental />}
           {activePage === "contrasena" && <Contrasena />}
+          {activePage === "reportes-bitacora-citas" && <BitacoraCitas />}
+          {activePage === "reportes-procedimientos" && <ReporteProcedimientos />}
+          {activePage === "administracion-medicos-pacientes" && <MedicosPacientes />}
+          {activePage === "administracion-borrar-citas" && <BorrarCitas />}
+          {activePage === "reportes-clasificacion" && <Clasificacion />}
+          {activePage === "reportes-recordatorios" && <Recordatorios />}
+          {activePage === "administracion-consultorio" && <Consultorio />}
+          {activePage === "administracion-promociones" && <Promociones />}
+          {activePage === "administracion-comisiones" && <Comisiones />}
+          {activePage === "reportes-aviso-privacidad" && <AvisoPrivacidad />}
+          {activePage === "reportes-aseguradoras" && <Aseguradoras />}
+          {activePage === "reportes-seguimiento-asistencia" && <SeguimientoAsistencia />}
           {!paginasConstruidas.has(activePage) && <ProximamenteStub label={activeLabel} />}
         </div>
       </main>
