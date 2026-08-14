@@ -59,6 +59,7 @@ import type { Lamina } from "@/lib/laminas";
 import type { Deposito, ArticuloFaltante, ArticuloCaducidad } from "@/lib/depositoDental";
 import type { PagoEliminado } from "@/lib/pagosEliminados";
 import { saldosPendientesInicial, type SaldosPendientesConfig } from "@/lib/saldosPendientes";
+import type { PresupuestoLogEntry } from "@/lib/presupuestosLog";
 import type { Promocion, Aseguradora } from "@/lib/catalogosVarios";
 import type { PersonalAsistencia, RegistroAsistencia } from "@/lib/asistencia";
 import type { Procedimiento } from "@/lib/procedimientos";
@@ -377,6 +378,8 @@ type PatientDataContextValue = {
   pagosEliminados: PagoEliminado[];
   setPagosEliminados: (updater: Updater<PagoEliminado[]>) => void;
   saldosPendientes: SaldosPendientesConfig;
+  presupuestosLog: PresupuestoLogEntry[];
+  setPresupuestosLog: (updater: Updater<PresupuestoLogEntry[]>) => void;
   promociones: Promocion[];
   setPromociones: (updater: Updater<Promocion[]>) => void;
   aseguradoras: Aseguradora[];
@@ -533,6 +536,10 @@ export function PatientDataProvider({
   const [pagosEliminados, setPagosEliminados] = useFirestoreList<PagoEliminado>(
     clinicUid,
     "pagosEliminados"
+  );
+  const [presupuestosLog, setPresupuestosLog] = useFirestoreList<PresupuestoLogEntry>(
+    clinicUid,
+    "presupuestosLog"
   );
   const [promociones, setPromociones] = useFirestoreList<Promocion>(clinicUid, "promociones");
   const [aseguradoras, setAseguradoras] = useFirestoreList<Aseguradora>(clinicUid, "aseguradoras");
@@ -799,6 +806,28 @@ export function PatientDataProvider({
     });
   };
 
+  /** Agrega a `presupuestosLog` (Reportes → Presupuestos) cada presupuesto
+   * nuevo — es una bitácora de creación, no un espejo en vivo de ediciones o
+   * borrados posteriores. */
+  const registrarLogPresupuestos = (patientId: string, prevArr: SavedBudget[], next: SavedBudget[]) => {
+    const prevIds = new Set(prevArr.map((p) => p.id));
+    const nuevos = next.filter((p) => !prevIds.has(p.id));
+    if (nuevos.length === 0) return;
+    const patientName = patients.find((p) => p.id === patientId)?.name ?? "";
+    const entradas: PresupuestoLogEntry[] = nuevos.map((p) => ({
+      id: p.id,
+      patientId,
+      patientName,
+      folio: p.folio,
+      fecha: p.fecha,
+      medico: p.medico,
+      total: p.total,
+      procedimientos: p.items.map((i) => i.procedure),
+      creadoEn: new Date().toISOString(),
+    }));
+    setPresupuestosLog((prev) => [...entradas, ...prev]);
+  };
+
   const setPresupuestosPaciente = (patientId: string, updater: Updater<SavedBudget[]>) => {
     if (!clinicUid) return;
     const prevArr = presupuestosPorPaciente[patientId] ?? [];
@@ -806,6 +835,7 @@ export function PatientDataProvider({
     syncFirestoreList(`users/${clinicUid}/pacientes/${patientId}/presupuestos`, prevArr, next);
     registrarDeltaPresupuestos(prevArr, next);
     registrarSaldoPendiente(patientId, next, pagosPorPaciente[patientId] ?? []);
+    registrarLogPresupuestos(patientId, prevArr, next);
     setPresupuestosPorPacienteState((prev) => ({ ...prev, [patientId]: next }));
   };
 
@@ -1220,6 +1250,8 @@ export function PatientDataProvider({
         pagosEliminados,
         setPagosEliminados,
         saldosPendientes,
+        presupuestosLog,
+        setPresupuestosLog,
         promociones,
         setPromociones,
         aseguradoras,
