@@ -4,6 +4,7 @@ import { usePatientData } from "@/context/PatientDataContext";
 import { calcularEdadDetallada, formatCurrency } from "@/lib/patientData";
 import { capitalizarNombre } from "@/lib/textoNombre";
 import { calcularAvanceMetas } from "@/lib/metas";
+import PendientesConsultorio from "@/components/PendientesConsultorio";
 
 const MESES = [
   "enero", "febrero", "marzo", "abril", "mayo", "junio",
@@ -268,6 +269,8 @@ export default function Inicio() {
           <div className="mt-1 text-[11px] uppercase tracking-wide text-ink/40">Edad Promedio</div>
         </div>
       </div>
+
+      <PendientesConsultorio />
 
       {puedeVerFinanzas && (
         <CardShell title="Metas">

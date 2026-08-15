@@ -62,6 +62,7 @@ import { saldosPendientesInicial, type SaldosPendientesConfig } from "@/lib/sald
 import type { PresupuestoLogEntry } from "@/lib/presupuestosLog";
 import type { OtLogEntry } from "@/lib/otsLog";
 import type { EncuestaEnviada } from "@/lib/encuestas";
+import type { Pendiente } from "@/lib/pendientes";
 import type { Domiciliacion } from "@/lib/domiciliacion";
 import type { Promocion, Aseguradora } from "@/lib/catalogosVarios";
 import type { PersonalAsistencia, RegistroAsistencia } from "@/lib/asistencia";
@@ -389,6 +390,8 @@ type PatientDataContextValue = {
   setDomiciliaciones: (updater: Updater<Domiciliacion[]>) => void;
   encuestas: EncuestaEnviada[];
   setEncuestas: (updater: Updater<EncuestaEnviada[]>) => void;
+  pendientes: Pendiente[];
+  setPendientes: (updater: Updater<Pendiente[]>) => void;
   promociones: Promocion[];
   setPromociones: (updater: Updater<Promocion[]>) => void;
   aseguradoras: Aseguradora[];
@@ -556,6 +559,7 @@ export function PatientDataProvider({
     "domiciliaciones"
   );
   const [encuestas, setEncuestas] = useFirestoreList<EncuestaEnviada>(clinicUid, "encuestas");
+  const [pendientes, setPendientes] = useFirestoreList<Pendiente>(clinicUid, "pendientes");
   const [promociones, setPromociones] = useFirestoreList<Promocion>(clinicUid, "promociones");
   const [aseguradoras, setAseguradoras] = useFirestoreList<Aseguradora>(clinicUid, "aseguradoras");
   const [personalAsistencia, setPersonalAsistencia] = useFirestoreList<PersonalAsistencia>(
@@ -1301,6 +1305,8 @@ export function PatientDataProvider({
         setDomiciliaciones,
         encuestas,
         setEncuestas,
+        pendientes,
+        setPendientes,
         promociones,
         setPromociones,
         aseguradoras,
