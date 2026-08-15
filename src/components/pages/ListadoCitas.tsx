@@ -10,6 +10,7 @@ const estadoColor: Record<CitaEstatus, string> = {
   Atendida: "bg-success/10 text-success",
   Reagendada: "bg-warning/10 text-warning",
   Cancelada: "bg-danger/10 text-danger",
+  "No Asistió": "bg-danger/20 text-danger",
 };
 
 export default function ListadoCitas({ citas, recursos }: { citas: CitaAgenda[]; recursos: Recurso[] }) {

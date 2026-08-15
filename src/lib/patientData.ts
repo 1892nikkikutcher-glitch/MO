@@ -147,7 +147,15 @@ export type BudgetData = {
   total: number;
 };
 
-export type SavedBudget = BudgetData & { id: string };
+export const presupuestoEstadoOptions = ["pendiente", "aceptado", "rechazado", "expirado"] as const;
+export type EstadoPresupuesto = (typeof presupuestoEstadoOptions)[number];
+
+export type SavedBudget = BudgetData & {
+  id: string;
+  /** Ausente en presupuestos guardados antes de que existiera este campo —
+   * tratar como "pendiente" en todo cálculo/UI (`p.estado ?? "pendiente"`). */
+  estado?: EstadoPresupuesto;
+};
 
 export type Tratamiento = {
   id: string;
@@ -397,6 +405,7 @@ export const citaEstatusOptions = [
   "Atendida",
   "Reagendada",
   "Cancelada",
+  "No Asistió",
 ] as const;
 export type CitaEstatus = (typeof citaEstatusOptions)[number];
 

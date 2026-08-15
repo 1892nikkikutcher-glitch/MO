@@ -22,7 +22,9 @@ import {
   formatEdad,
   formatFechaCita,
   formatNombreConEdad,
+  presupuestoEstadoOptions,
   type CitaAgenda,
+  type EstadoPresupuesto,
   type Patient,
   type SavedBudget,
   type Pago,
@@ -33,6 +35,20 @@ function fechaLargaHoy() {
   const texto = new Date().toLocaleDateString("es-MX", { weekday: "long", day: "numeric", month: "long", year: "numeric" });
   return texto.charAt(0).toUpperCase() + texto.slice(1);
 }
+
+const estadoPresupuestoLabel: Record<EstadoPresupuesto, string> = {
+  pendiente: "Pendiente",
+  aceptado: "Aceptado",
+  rechazado: "Rechazado",
+  expirado: "Expirado",
+};
+
+const estadoPresupuestoColor: Record<EstadoPresupuesto, string> = {
+  pendiente: "bg-ink/10 text-ink/60",
+  aceptado: "bg-success/10 text-success",
+  rechazado: "bg-danger/10 text-danger",
+  expirado: "bg-warning/10 text-warning",
+};
 
 const expedienteTabs = [
   "Presupuestos",
@@ -221,9 +237,11 @@ function PresupuestosTab({
         onSave={(budget) => {
           setPresupuestos((prev) => {
             if (editingBudget) {
-              return prev.map((p) => (p.id === editingBudget.id ? { ...budget, id: p.id } : p));
+              return prev.map((p) =>
+                p.id === editingBudget.id ? { ...budget, id: p.id, estado: p.estado } : p
+              );
             }
-            return [{ ...budget, id: `${Date.now()}` }, ...prev];
+            return [{ ...budget, id: `${Date.now()}`, estado: "pendiente" }, ...prev];
           });
           setEditingBudget(null);
           setView("list");
@@ -277,9 +295,26 @@ function PresupuestosTab({
                       </div>
                     ))}
                   </div>
-                  <div className="mt-2 flex items-center gap-3">
+                  <div className="mt-2 flex flex-wrap items-center gap-3">
                     <span className="font-semibold text-accent">{formatCurrency(p.total)}</span>
                     <span className="text-xs text-ink/40">{p.fecha}</span>
+                    <select
+                      value={p.estado ?? "pendiente"}
+                      onChange={(e) => {
+                        const nuevoEstado = e.target.value as EstadoPresupuesto;
+                        setPresupuestos((prev) =>
+                          prev.map((b) => (b.id === p.id ? { ...b, estado: nuevoEstado } : b))
+                        );
+                      }}
+                      title="Estado del presupuesto"
+                      className={`rounded-full border-0 py-0.5 pl-2 pr-1 text-[10px] font-semibold uppercase tracking-wide outline-none ${estadoPresupuestoColor[p.estado ?? "pendiente"]}`}
+                    >
+                      {presupuestoEstadoOptions.map((estado) => (
+                        <option key={estado} value={estado}>
+                          {estadoPresupuestoLabel[estado]}
+                        </option>
+                      ))}
+                    </select>
                     <button
                       onClick={() => setPrintTarget(p)}
                       title="Imprimir"
@@ -347,6 +382,7 @@ const estadoColorResumen: Record<string, string> = {
   Atendida: "bg-success/10 text-success",
   Reagendada: "bg-warning/10 text-warning",
   Cancelada: "bg-danger/10 text-danger",
+  "No Asistió": "bg-danger/20 text-danger",
 };
 
 /** Suma meses a una fecha ISO ("YYYY-MM-DD") respetando el desbordamiento

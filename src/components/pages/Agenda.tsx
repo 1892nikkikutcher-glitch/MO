@@ -36,6 +36,7 @@ const estatusColor: Record<CitaEstatus, { bg: string; text: string; dot: string 
   Atendida: { bg: "bg-success/10", text: "text-success", dot: "bg-success" },
   Reagendada: { bg: "bg-warning/10", text: "text-warning", dot: "bg-warning" },
   Cancelada: { bg: "bg-danger/10", text: "text-danger", dot: "bg-danger" },
+  "No Asistió": { bg: "bg-danger/20", text: "text-danger", dot: "bg-danger" },
 };
 
 /** WhatsApp no soporta texto de color, así que se usa el círculo de color
@@ -701,7 +702,7 @@ function CitaDialog({
               </button>
               {mostrarEstatusRapido && (
                 <div className="absolute right-0 top-[42px] z-20 w-40 rounded-lg border border-edge/10 bg-modal p-1.5 shadow-card">
-                  {(["Confirmada", "En espera", "Atendida", "Reagendada", "Cancelada"] as CitaEstatus[]).map((opt) => (
+                  {(["Confirmada", "En espera", "Atendida", "Reagendada", "Cancelada", "No Asistió"] as CitaEstatus[]).map((opt) => (
                     <button
                       key={opt}
                       type="button"
