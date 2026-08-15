@@ -39,7 +39,8 @@ export default function Contrasena() {
         {enviado ? (
           <div className="mt-4 rounded-lg border border-success/30 bg-success/10 p-3 text-sm text-success">
             Listo — revisa tu correo ({userEmail}) y sigue el enlace para elegir tu nueva
-            contraseña.
+            contraseña. Si no lo ves en unos minutos, revisa también tu carpeta de Spam o Correo
+            no deseado.
           </div>
         ) : (
           <button
