@@ -11,6 +11,16 @@ const MESES = [
   "julio", "agosto", "septiembre", "octubre", "noviembre", "diciembre",
 ];
 
+/** Franja de acento + resplandor neón muy sutil para las tarjetas KPI del
+ * dashboard — mismo mecanismo que el borde inset de antes, solo con un
+ * halo del mismo color, difuminado y a baja opacidad, alrededor. */
+function neonShadow(hex: string): string {
+  const r = parseInt(hex.slice(1, 3), 16);
+  const g = parseInt(hex.slice(3, 5), 16);
+  const b = parseInt(hex.slice(5, 7), 16);
+  return `inset 3px 0 0 0 ${hex}, 0 0 14px -4px rgba(${r}, ${g}, ${b}, 0.55)`;
+}
+
 function WhatsAppIcon() {
   return (
     <svg width="14" height="14" viewBox="0 0 24 24" fill="none">
@@ -145,16 +155,16 @@ export default function Inicio() {
   const kpisVisibles = [
     ...(puedeVerFinanzas
       ? [
-          { label: "Ticket Promedio", value: formatCurrency(ticketPromedio), color: "#f59e0b" },
-          { label: "Saldo Pendiente", value: formatCurrency(saldoPendiente), color: "#dc2626" },
+          { label: "Ticket Promedio", value: formatCurrency(ticketPromedio), color: "#ffb020" },
+          { label: "Saldo Pendiente", value: formatCurrency(saldoPendiente), color: "#ff3b3b" },
         ]
       : []),
-    { label: "Nuevos Pacientes (Mes)", value: String(nuevosPacientesMes), color: "#ec4899" },
-    { label: "Citas por Mes", value: String(citasPorMes), color: "#3b82f6" },
-    { label: "Citas Atendidas (Mes)", value: String(citasAtendidas), color: "#22c55e" },
-    { label: "Laboratorios Pendientes", value: String(estadisticas.laboratoriosPendientesCount), color: "#f59e0b" },
-    { label: "Presupuestos del Mes", value: String(presupuestosDelMes), color: "#a855f7" },
-    { label: "Citas Canceladas (Mes)", value: String(citasCanceladas), color: "#dc2626" },
+    { label: "Nuevos Pacientes (Mes)", value: String(nuevosPacientesMes), color: "#ff3d9a" },
+    { label: "Citas por Mes", value: String(citasPorMes), color: "#3aa8ff" },
+    { label: "Citas Atendidas (Mes)", value: String(citasAtendidas), color: "#2ee67a" },
+    { label: "Laboratorios Pendientes", value: String(estadisticas.laboratoriosPendientesCount), color: "#ffb020" },
+    { label: "Presupuestos del Mes", value: String(presupuestosDelMes), color: "#b84dff" },
+    { label: "Citas Canceladas (Mes)", value: String(citasCanceladas), color: "#ff3b3b" },
   ];
 
   const edades = patients
@@ -214,21 +224,21 @@ export default function Inicio() {
           <>
             <div
               className="rounded-xl border border-edge/10 bg-surface p-4"
-              style={{ boxShadow: "inset 3px 0 0 0 #f59e0b" }}
+              style={{ boxShadow: neonShadow("#ffb020") }}
             >
               <div className="text-xl font-bold text-ink">{formatCurrency(corteDiario)}</div>
               <div className="mt-1 text-[11px] uppercase tracking-wide text-ink/40">Corte Diario</div>
             </div>
             <div
               className="rounded-xl border border-edge/10 bg-surface p-4"
-              style={{ boxShadow: "inset 3px 0 0 0 #ec4899" }}
+              style={{ boxShadow: neonShadow("#ff3d9a") }}
             >
               <div className="text-xl font-bold text-ink">{formatCurrency(corteSemanal)}</div>
               <div className="mt-1 text-[11px] uppercase tracking-wide text-ink/40">Corte Semanal</div>
             </div>
             <div
               className="rounded-xl border border-edge/10 bg-surface p-4"
-              style={{ boxShadow: "inset 3px 0 0 0 #22c55e" }}
+              style={{ boxShadow: neonShadow("#2ee67a") }}
             >
               <div className="text-xl font-bold text-ink">{formatCurrency(corteMensual)}</div>
               <div className="mt-1 text-[11px] uppercase tracking-wide text-ink/40">Corte Mensual</div>
@@ -237,7 +247,7 @@ export default function Inicio() {
         )}
         <div
           className="rounded-xl border border-edge/10 bg-surface p-4"
-          style={{ boxShadow: "inset 3px 0 0 0 #3b82f6" }}
+          style={{ boxShadow: neonShadow("#3aa8ff") }}
         >
           <div className="text-xl font-bold text-ink">{patients.length}</div>
           <div className="mt-1 text-[11px] uppercase tracking-wide text-ink/40">Total de Expedientes</div>
@@ -246,7 +256,7 @@ export default function Inicio() {
           <div
             key={kpi.label}
             className="rounded-xl border border-edge/10 bg-surface p-4"
-            style={{ boxShadow: `inset 3px 0 0 0 ${kpi.color}` }}
+            style={{ boxShadow: neonShadow(kpi.color) }}
           >
             <div className="text-xl font-bold text-ink">{kpi.value}</div>
             <div className="mt-1 text-[11px] uppercase tracking-wide text-ink/40">{kpi.label}</div>
@@ -254,7 +264,7 @@ export default function Inicio() {
         ))}
         <div
           className="rounded-xl border border-edge/10 bg-surface p-4"
-          style={{ boxShadow: "inset 3px 0 0 0 #ec4899" }}
+          style={{ boxShadow: neonShadow("#ff3d9a") }}
         >
           <div className="text-xl font-bold text-ink">{cumpleanerosDelMes.length}</div>
           <div className="mt-1 text-[11px] uppercase tracking-wide text-ink/40">
@@ -263,7 +273,7 @@ export default function Inicio() {
         </div>
         <div
           className="rounded-xl border border-edge/10 bg-surface p-4"
-          style={{ boxShadow: "inset 3px 0 0 0 #a855f7" }}
+          style={{ boxShadow: neonShadow("#b84dff") }}
         >
           <div className="text-xl font-bold text-ink">{edadPromedio ?? "—"}</div>
           <div className="mt-1 text-[11px] uppercase tracking-wide text-ink/40">Edad Promedio</div>
