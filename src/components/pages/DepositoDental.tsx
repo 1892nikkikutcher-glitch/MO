@@ -415,7 +415,8 @@ export default function DepositoDental() {
         action={
           <button
             onClick={() => setShowDeposito(true)}
-            className="rounded-lg bg-gradient-to-r from-accent to-orange-500 px-4 py-2 text-xs font-semibold text-black transition-opacity hover:opacity-90"
+            className="rounded-lg border border-accent/50 bg-accent/10 px-4 py-2 text-xs font-semibold text-accent transition-colors hover:bg-accent/20"
+            style={{ boxShadow: "0 0 12px -2px rgb(var(--accent-rgb) / 0.5)" }}
           >
             + Agregar Depósito
           </button>
@@ -468,7 +469,8 @@ export default function DepositoDental() {
             </button>
             <button
               onClick={() => setShowFaltante(true)}
-              className="rounded-lg bg-gradient-to-r from-accent to-orange-500 px-4 py-2 text-xs font-semibold text-black transition-opacity hover:opacity-90"
+              className="rounded-lg border border-accent/50 bg-accent/10 px-4 py-2 text-xs font-semibold text-accent transition-colors hover:bg-accent/20"
+              style={{ boxShadow: "0 0 12px -2px rgb(var(--accent-rgb) / 0.5)" }}
             >
               + Agregar Faltante
             </button>
@@ -548,7 +550,8 @@ export default function DepositoDental() {
         action={
           <button
             onClick={() => setShowCaducidad(true)}
-            className="rounded-lg bg-gradient-to-r from-accent to-orange-500 px-4 py-2 text-xs font-semibold text-black transition-opacity hover:opacity-90"
+            className="rounded-lg border border-accent/50 bg-accent/10 px-4 py-2 text-xs font-semibold text-accent transition-colors hover:bg-accent/20"
+            style={{ boxShadow: "0 0 12px -2px rgb(var(--accent-rgb) / 0.5)" }}
           >
             + Agregar Producto
           </button>
