@@ -34,6 +34,11 @@ export type Patient = {
   contactoParentesco?: string;
   contactoTelefono?: string;
 
+  /** Nombre del padre, madre o tutor — se captura cuando el paciente es
+   * menor de edad (el campo se muestra/oculta en Datos del Paciente según
+   * la fecha de nacimiento). */
+  nombreTutor?: string;
+
   /** Si está activo, el expediente sugiere una cita de prevención cada 6
    * meses a partir de la última cita del paciente (mientras no tenga ya una
    * cita futura agendada). Desactivable por paciente — por ejemplo, para no

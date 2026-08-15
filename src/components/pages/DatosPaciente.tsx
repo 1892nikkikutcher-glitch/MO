@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { formatEdad, type Patient } from "@/lib/patientData";
+import { calcularEdadDetallada, formatEdad, type Patient } from "@/lib/patientData";
 import { manejarCambioNombre } from "@/lib/textoNombre";
 import { sugerirNivelSocioeconomico } from "@/lib/nivelSocioeconomico";
 import { usePatientData } from "@/context/PatientDataContext";
@@ -73,6 +73,7 @@ export default function DatosPaciente({
   const [ocupacion, setOcupacion] = useState(patient.ocupacion ?? "");
   const [escolaridad, setEscolaridad] = useState(patient.escolaridad ?? escolaridadOptions[0]);
   const [lugarNacimiento, setLugarNacimiento] = useState(patient.lugarNacimiento ?? "");
+  const [nombreTutor, setNombreTutor] = useState(patient.nombreTutor ?? "");
 
   const [nivelSocioeconomico, setNivelSocioeconomico] = useState(
     patient.nivelSocioeconomico ?? nivelSocioeconomicoOptions[0]
@@ -112,6 +113,7 @@ export default function DatosPaciente({
     setOcupacion(patient.ocupacion ?? "");
     setEscolaridad(patient.escolaridad ?? escolaridadOptions[0]);
     setLugarNacimiento(patient.lugarNacimiento ?? "");
+    setNombreTutor(patient.nombreTutor ?? "");
     setNivelSocioeconomico(patient.nivelSocioeconomico ?? nivelSocioeconomicoOptions[0]);
     setIngresoFamiliar(patient.ingresoFamiliar ?? ingresoFamiliarOptions[0]);
     setDependientes(patient.dependientes ?? "");
@@ -130,6 +132,8 @@ export default function DatosPaciente({
     setSaved(false);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [patient.id]);
+
+  const esMenorDeEdad = (calcularEdadDetallada(birthDate)?.years ?? 18) < 18;
 
   const nivelSugerido = sugerirNivelSocioeconomico({
     ingresoFamiliar,
@@ -156,6 +160,7 @@ export default function DatosPaciente({
       ocupacion,
       escolaridad,
       lugarNacimiento,
+      nombreTutor: nombreTutor.trim(),
       nivelSocioeconomico,
       ingresoFamiliar,
       dependientes,
@@ -201,6 +206,21 @@ export default function DatosPaciente({
             />
             {birthDate && <p className="mt-1 text-xs text-ink/40">{formatEdad(birthDate)}</p>}
           </Field>
+          {esMenorDeEdad && (
+            <Field label="Nombre del padre, madre o tutor">
+              <input
+                type="text"
+                value={nombreTutor}
+                onChange={(e) => {
+                  manejarCambioNombre(e, setNombreTutor);
+                  setSaved(false);
+                }}
+                placeholder="Nombre completo"
+                className={inputClass}
+              />
+              <p className="mt-1 text-xs text-accent/70">Paciente menor de edad</p>
+            </Field>
+          )}
           <Field label="Sexo">
             <select
               value={sexo}
