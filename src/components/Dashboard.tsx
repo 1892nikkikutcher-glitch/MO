@@ -33,6 +33,7 @@ import Recordatorios from "./pages/Recordatorios";
 import Consultorio from "./pages/Consultorio";
 import Promociones from "./pages/Promociones";
 import Catalogos from "./pages/Catalogos";
+import ReporteEncuestas from "./pages/ReporteEncuestas";
 import Comisiones from "./pages/Comisiones";
 import AvisoPrivacidad from "./pages/AvisoPrivacidad";
 import Aseguradoras from "./pages/Aseguradoras";
@@ -64,6 +65,7 @@ const paginasConstruidas = new Set([
   "administracion-historial-clinico",
   "administracion-medicamentos",
   "administracion-catalogos",
+  "reportes-encuestas",
   "planes",
   "documentos",
   "gastos",
@@ -321,6 +323,7 @@ export default function Dashboard({
           {activePage === "reportes-ots" && <ReporteOts />}
           {activePage === "reportes-domiciliacion" && <ReporteDomiciliacion />}
           {activePage === "administracion-catalogos" && <Catalogos />}
+          {activePage === "reportes-encuestas" && <ReporteEncuestas />}
           {!paginasConstruidas.has(activePage) && <ProximamenteStub label={activeLabel} />}
         </div>
       </main>

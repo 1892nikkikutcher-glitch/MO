@@ -4,6 +4,7 @@
 
 export type FormatosWhatsApp = {
   confirmacionCita: string;
+  encuestaSatisfaccion: string;
 };
 
 export const formatosWhatsAppInicial: FormatosWhatsApp = {
@@ -22,6 +23,13 @@ Si necesita reagendar o cancelar, agradecemos su aviso oportuno antes de las 04:
 *Horario de recepción:*
 *Lun - vie 10:00 h a 18:00 h*
 *Sáb 15:00 h a 18:00 h*`,
+  encuestaSatisfaccion: `¡Hola *{{paciente}}*! Somos de *{{clinica}}*.
+
+Gracias por confiarnos su *{{procedimiento}}*. Nos encantaría conocer su experiencia:
+
+¿Qué calificación le daría a su atención, del 1 al 5? Y si gusta, cuéntenos qué podemos mejorar.
+
+¡Gracias por su tiempo!`,
 };
 
 export function renderPlantilla(plantilla: string, vars: Record<string, string>): string {
