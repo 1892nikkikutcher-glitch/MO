@@ -62,6 +62,10 @@ import type { Deposito, ArticuloFaltante, ArticuloCaducidad } from "@/lib/deposi
 import type { PagoEliminado } from "@/lib/pagosEliminados";
 import { saldosPendientesInicial, type SaldosPendientesConfig } from "@/lib/saldosPendientes";
 import { laboratoriosPendientesInicial, type LaboratoriosPendientesConfig } from "@/lib/laboratoriosPendientes";
+import {
+  presupuestosPendientesDetalleInicial,
+  type PresupuestosPendientesDetalleConfig,
+} from "@/lib/presupuestosPendientesDetalle";
 import type { PresupuestoLogEntry } from "@/lib/presupuestosLog";
 import type { OtLogEntry } from "@/lib/otsLog";
 import type { EncuestaEnviada } from "@/lib/encuestas";
@@ -386,6 +390,7 @@ type PatientDataContextValue = {
   setPagosEliminados: (updater: Updater<PagoEliminado[]>) => void;
   saldosPendientes: SaldosPendientesConfig;
   laboratoriosPendientes: LaboratoriosPendientesConfig;
+  presupuestosPendientesDetalle: PresupuestosPendientesDetalleConfig;
   presupuestosLog: PresupuestoLogEntry[];
   setPresupuestosLog: (updater: Updater<PresupuestoLogEntry[]>) => void;
   otsLog: OtLogEntry[];
@@ -530,6 +535,12 @@ export function PatientDataProvider({
     "laboratoriosPendientes",
     laboratoriosPendientesInicial
   );
+  const [presupuestosPendientesDetalle, setPresupuestosPendientesDetalle] =
+    useFirestoreDoc<PresupuestosPendientesDetalleConfig>(
+      clinicUid,
+      "presupuestosPendientesDetalle",
+      presupuestosPendientesDetalleInicial
+    );
   const [regulacionSanitaria, setRegulacionSanitaria] = useFirestoreDoc<EstadoRegulacionSanitaria>(
     clinicUid,
     "regulacionSanitaria",
@@ -838,6 +849,49 @@ export function PatientDataProvider({
     });
   };
 
+  /** Refleja en `config/presupuestosPendientesDetalle` cada presupuesto sin
+   * resolver (estado pendiente o sin marcar) con su paciente y folio, para
+   * la alerta clicable "presupuestos esperan seguimiento" de Requieren
+   * Atención — mismo patrón incremental que `registrarLaboratoriosPendientes`.
+   * Se quita del mapa el presupuesto que se marca Aceptado/Rechazado/
+   * Expirado, o que se elimina. */
+  const registrarPresupuestosPendientesDetalle = (
+    patientId: string,
+    prevArr: SavedBudget[],
+    next: SavedBudget[]
+  ) => {
+    const patientName = patients.find((p) => p.id === patientId)?.name ?? "";
+    const prevIds = new Set(prevArr.map((p) => p.id));
+    const nextIds = new Set(next.map((p) => p.id));
+    const cambiaron = next.filter((p) => {
+      const antes = prevArr.find((a) => a.id === p.id);
+      return !antes || JSON.stringify(antes) !== JSON.stringify(p);
+    });
+    const eliminados = [...prevIds].filter((id) => !nextIds.has(id));
+    if (cambiaron.length === 0 && eliminados.length === 0) return;
+    setPresupuestosPendientesDetalle((prev) => {
+      const porPresupuesto = { ...prev.porPresupuesto };
+      cambiaron.forEach((p) => {
+        const estado = p.estado ?? "pendiente";
+        if (estado !== "pendiente") {
+          delete porPresupuesto[p.id];
+        } else {
+          porPresupuesto[p.id] = {
+            id: p.id,
+            patientId,
+            patientName,
+            folio: p.folio,
+            total: p.total,
+            fecha: p.fecha,
+            actualizadoEn: new Date().toISOString(),
+          };
+        }
+      });
+      eliminados.forEach((id) => delete porPresupuesto[id]);
+      return { porPresupuesto };
+    });
+  };
+
   /** Refleja en `config/saldosPendientes` cuánto debe cada paciente (mismo
    * patrón incremental que el resto de los rollups) para poder listarlos en
    * Reportes → Saldos Pendientes sin tener que cargar los 1006 expedientes.
@@ -898,6 +952,7 @@ export function PatientDataProvider({
     const next = resolveUpdater(updater, prevArr);
     syncFirestoreList(`users/${clinicUid}/pacientes/${patientId}/presupuestos`, prevArr, next);
     registrarDeltaPresupuestos(prevArr, next);
+    registrarPresupuestosPendientesDetalle(patientId, prevArr, next);
     registrarSaldoPendiente(patientId, next, pagosPorPaciente[patientId] ?? []);
     registrarLogPresupuestos(patientId, prevArr, next);
     setPresupuestosPorPacienteState((prev) => ({ ...prev, [patientId]: next }));
@@ -1382,6 +1437,7 @@ export function PatientDataProvider({
         setPagosEliminados,
         saldosPendientes,
         laboratoriosPendientes,
+        presupuestosPendientesDetalle,
         presupuestosLog,
         setPresupuestosLog,
         otsLog,

@@ -8,6 +8,7 @@ import FinancialSummary from "@/components/dashboard/FinancialSummary";
 import ProductivitySummary from "@/components/dashboard/ProductivitySummary";
 import BudgetMetrics from "@/components/dashboard/BudgetMetrics";
 import AppointmentMetrics from "@/components/dashboard/AppointmentMetrics";
+import AttentionAlerts from "@/components/dashboard/AttentionAlerts";
 
 const MESES = [
   "enero", "febrero", "marzo", "abril", "mayo", "junio",
@@ -190,6 +191,8 @@ export default function Inicio() {
       <BudgetMetrics />
 
       <AppointmentMetrics />
+
+      <AttentionAlerts />
 
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-6">
         <div
