@@ -4,8 +4,12 @@
  * `calcularAvanceMetas`), que sigue siendo la fuente de los totales de
  * ingresos por rango de fechas. */
 
-import type { CitaAgenda, HorarioAtencion } from "@/lib/patientData";
+import type { CitaAgenda, HorarioAtencion, Patient } from "@/lib/patientData";
 import type { LaboratorioPendienteEntry } from "@/lib/laboratoriosPendientes";
+
+export function toIsoDate(d: Date): string {
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+}
 
 function timeToMinutes(t: string): number {
   const [h, m] = t.split(":").map(Number);
@@ -168,4 +172,80 @@ export function proximasCitas(citas: CitaAgenda[], hoyISO: string, dias: number)
       c.fecha <= limiteISO &&
       (c.estatus === "Agendada" || c.estatus === "Confirmada" || c.estatus === "En espera")
   ).length;
+}
+
+const MESES_ABR = [
+  "ene", "feb", "mar", "abr", "may", "jun", "jul", "ago", "sep", "oct", "nov", "dic",
+];
+
+export type PuntoMensual = { mes: string; label: string; valor: number };
+
+/** Los últimos `n` meses terminando en el mes de `hoy` (incluido), en orden
+ * cronológico — la base común para las gráficas de evolución mensual. */
+function ultimosNMeses(hoy: Date, n: number): { key: string; label: string }[] {
+  const meses: { key: string; label: string }[] = [];
+  for (let i = n - 1; i >= 0; i--) {
+    const d = new Date(hoy.getFullYear(), hoy.getMonth() - i, 1);
+    meses.push({
+      key: `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`,
+      label: MESES_ABR[d.getMonth()],
+    });
+  }
+  return meses;
+}
+
+/** Ingresos reales (pagos cobrados) por mes, últimos `n` meses — a partir
+ * del mismo rollup `finanzas.porFecha` que ya usa Fila 1. */
+export function ingresosPorMes(porFecha: Record<string, number>, hoy: Date, n = 12): PuntoMensual[] {
+  const meses = ultimosNMeses(hoy, n);
+  const totales = new Map<string, number>();
+  Object.entries(porFecha).forEach(([fecha, monto]) => {
+    const key = fecha.slice(0, 7);
+    totales.set(key, (totales.get(key) ?? 0) + monto);
+  });
+  return meses.map((m) => ({ mes: m.key, label: m.label, valor: totales.get(m.key) ?? 0 }));
+}
+
+/** Pacientes nuevos por mes, últimos `n` meses, a partir de `createdAt`.
+ * Los pacientes sin `createdAt` (altas antes de que existiera el campo, o
+ * importados en bloque) no cuentan en ningún mes — meses más antiguos
+ * pueden verse artificialmente bajos por eso. */
+export function pacientesNuevosPorMes(patients: Patient[], hoy: Date, n = 12): PuntoMensual[] {
+  const meses = ultimosNMeses(hoy, n);
+  const conteo = new Map<string, number>();
+  patients.forEach((p) => {
+    if (!p.createdAt) return;
+    const key = p.createdAt.slice(0, 7);
+    conteo.set(key, (conteo.get(key) ?? 0) + 1);
+  });
+  return meses.map((m) => ({ mes: m.key, label: m.label, valor: conteo.get(m.key) ?? 0 }));
+}
+
+export type PuntoSemanal = { label: string; valor: number };
+
+/** % de ocupación (horas clínicas / horas disponibles) por semana, últimas
+ * `n` semanas terminando hoy — mismo cálculo que la tarjeta Ocupación de
+ * Fila 2, solo repetido semana por semana. */
+export function ocupacionPorSemana(
+  citas: CitaAgenda[],
+  horario: HorarioAtencion,
+  hoy: Date,
+  n = 8
+): PuntoSemanal[] {
+  const semanas: PuntoSemanal[] = [];
+  for (let i = n - 1; i >= 0; i--) {
+    const finSemana = new Date(hoy);
+    finSemana.setDate(finSemana.getDate() - 7 * i);
+    const inicioSemana = new Date(finSemana);
+    inicioSemana.setDate(inicioSemana.getDate() - 6);
+
+    const desdeISO = toIsoDate(inicioSemana);
+    const hastaISO = toIsoDate(finSemana);
+    const horas = horasClinicasEnRango(citas, desdeISO, hastaISO);
+    const disponibles = horasDisponiblesEnRango(horario, desdeISO, hastaISO);
+    const pct = disponibles > 0 ? Math.min(100, Math.round((horas / disponibles) * 100)) : 0;
+
+    semanas.push({ label: `${inicioSemana.getDate()}/${inicioSemana.getMonth() + 1}`, valor: pct });
+  }
+  return semanas;
 }

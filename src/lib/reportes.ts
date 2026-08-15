@@ -68,6 +68,19 @@ export function resumenPorMedico(citas: CitaAgenda[], recursos: Recurso[]): Resu
     });
 }
 
+/** Empareja un tratamiento de texto libre con el catálogo de procedimientos
+ * (comparando sin acentos/mayúsculas, coincidencia exacta o por
+ * contención). Devuelve undefined si no hay coincidencia — nunca se
+ * inventa un procedimiento para un texto que no matchea. */
+export function buscarProcedimiento(
+  procedimientos: Procedimiento[],
+  tratamiento: string
+): Procedimiento | undefined {
+  const catalogoNorm = procedimientos.map((p) => ({ p, norm: normalizarTexto(p.nombre) }));
+  const norm = normalizarTexto(tratamiento);
+  return catalogoNorm.find((c) => c.norm === norm || norm.includes(c.norm) || c.norm.includes(norm))?.p;
+}
+
 export type ComisionMedico = {
   recurso: Recurso;
   items: { tratamiento: string; procedimiento: Procedimiento; comision: number }[];
@@ -76,21 +89,14 @@ export type ComisionMedico = {
 };
 
 /** Empareja cada tratamiento de texto libre capturado en las citas
- * "Atendida" con el catálogo de procedimientos (comparando sin
- * acentos/mayúsculas) para sumar la comisión del odontólogo. Los
- * tratamientos que no coinciden con ningún procedimiento del catálogo se
- * listan aparte — no se inventan montos para ellos. */
+ * "Atendida" con el catálogo de procedimientos para sumar la comisión del
+ * odontólogo. Los tratamientos que no coinciden con ningún procedimiento
+ * del catálogo se listan aparte — no se inventan montos para ellos. */
 export function calcularComisiones(
   citas: CitaAgenda[],
   recursos: Recurso[],
   procedimientos: Procedimiento[]
 ): ComisionMedico[] {
-  const catalogoNorm = procedimientos.map((p) => ({ p, norm: normalizarTexto(p.nombre) }));
-  const buscarProcedimiento = (tratamiento: string) => {
-    const norm = normalizarTexto(tratamiento);
-    return catalogoNorm.find((c) => c.norm === norm || norm.includes(c.norm) || c.norm.includes(norm))?.p;
-  };
-
   return recursos
     .filter((r) => r.tipo === "medico")
     .map((recurso) => {
@@ -101,7 +107,7 @@ export function calcularComisiones(
         cita.tratamientos.forEach((t) => {
           const limpio = t.trim();
           if (!limpio) return;
-          const procedimiento = buscarProcedimiento(limpio);
+          const procedimiento = buscarProcedimiento(procedimientos, limpio);
           if (procedimiento) {
             items.push({ tratamiento: limpio, procedimiento, comision: procedimiento.costoOdontologo });
           } else {
@@ -116,6 +122,44 @@ export function calcularComisiones(
         totalComision: items.reduce((sum, i) => sum + i.comision, 0),
       };
     });
+}
+
+export type ProduccionTratamiento = { nombre: string; valor: number; veces: number };
+
+/** Suma `costoPaciente` de cada tratamiento (texto libre) que coincide con
+ * el catálogo de Procedimientos, sobre las citas Atendidas dadas —
+ * "producción" en el sentido de valor de tratamiento realizado, no de pago
+ * cobrado (ver `FinancialSummary` para ingresos). Los tratamientos que no
+ * matchean el catálogo se cuentan aparte, nunca se les inventa un valor. */
+export function produccionPorTratamiento(
+  citas: CitaAgenda[],
+  procedimientos: Procedimiento[]
+): { porTratamiento: ProduccionTratamiento[]; sinCatalogoCount: number } {
+  const atendidas = citas.filter((c) => c.estatus === "Atendida");
+  const porNombre = new Map<string, { valor: number; veces: number }>();
+  let sinCatalogoCount = 0;
+
+  atendidas.forEach((cita) => {
+    cita.tratamientos.forEach((t) => {
+      const limpio = t.trim();
+      if (!limpio) return;
+      const procedimiento = buscarProcedimiento(procedimientos, limpio);
+      if (!procedimiento) {
+        sinCatalogoCount += 1;
+        return;
+      }
+      const actual = porNombre.get(procedimiento.nombre) ?? { valor: 0, veces: 0 };
+      actual.valor += procedimiento.costoPaciente;
+      actual.veces += 1;
+      porNombre.set(procedimiento.nombre, actual);
+    });
+  });
+
+  const porTratamiento = Array.from(porNombre.entries())
+    .map(([nombre, { valor, veces }]) => ({ nombre, valor, veces }))
+    .sort((a, b) => b.valor - a.valor);
+
+  return { porTratamiento, sinCatalogoCount };
 }
 
 export type ClasificacionPaciente = "Sin citas" | "Nuevo" | "Recurrente";
