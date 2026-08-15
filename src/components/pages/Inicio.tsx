@@ -7,6 +7,7 @@ import PendientesConsultorio from "@/components/PendientesConsultorio";
 import FinancialSummary from "@/components/dashboard/FinancialSummary";
 import ProductivitySummary from "@/components/dashboard/ProductivitySummary";
 import BudgetMetrics from "@/components/dashboard/BudgetMetrics";
+import AppointmentMetrics from "@/components/dashboard/AppointmentMetrics";
 
 const MESES = [
   "enero", "febrero", "marzo", "abril", "mayo", "junio",
@@ -125,19 +126,12 @@ export default function Inicio() {
 
   const citasDelMes = citas.filter((c) => c.fecha.slice(0, 7) === mesActualKey);
   const citasPorMes = citasDelMes.length;
-  const citasAtendidas = citasDelMes.filter((c) => c.estatus === "Atendida").length;
-  const citasCanceladas = citasDelMes.filter((c) => c.estatus === "Cancelada").length;
   // Math.max(0, ...): es un contador acumulado desde que existe el campo,
   // no un conteo real recalculado — crear y borrar presupuestos de prueba
   // en meses distintos puede dejarlo en negativo; nunca debe mostrarse así.
   const presupuestosDelMes = Math.max(0, estadisticas.presupuestosPorMes[mesActualKey] ?? 0);
 
-  const kpisVisibles = [
-    { label: "Citas por Mes", value: String(citasPorMes), color: "#3aa8ff" },
-    { label: "Citas Atendidas (Mes)", value: String(citasAtendidas), color: "#2ee67a" },
-    { label: "Presupuestos del Mes", value: String(presupuestosDelMes), color: "#b84dff" },
-    { label: "Citas Canceladas (Mes)", value: String(citasCanceladas), color: "#ff3b3b" },
-  ];
+  const kpisVisibles = [{ label: "Presupuestos del Mes", value: String(presupuestosDelMes), color: "#b84dff" }];
 
   const edades = patients
     .map((p) => calcularEdadDetallada(p.birthDate)?.years)
@@ -194,6 +188,8 @@ export default function Inicio() {
       <ProductivitySummary />
 
       <BudgetMetrics />
+
+      <AppointmentMetrics />
 
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-6">
         <div

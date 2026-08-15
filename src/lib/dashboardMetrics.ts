@@ -133,3 +133,39 @@ export function agruparLaboratoriosPendientes(
 
   return grupos;
 }
+
+/** `CitaAgenda.costo` es texto libre capturado a mano (ej. "$1,200") — no
+ * hay forma de sumarlo con precisión, así que cualquier total que lo use
+ * debe presentarse como aproximado, nunca como una cifra exacta. */
+function parseCostoAproximado(texto: string | undefined): number {
+  if (!texto) return 0;
+  const limpio = texto.replace(/[^\d.]/g, "");
+  const n = parseFloat(limpio);
+  return Number.isFinite(n) ? n : 0;
+}
+
+/** Valor estimado (aproximado, ver parseCostoAproximado) de las citas
+ * marcadas No Asistió en el rango — solo cuenta las que sí tienen un costo
+ * capturado, así que es un piso, no el total real. */
+export function valorPerdidoEstimado(citas: CitaAgenda[], desdeISO: string, hastaISO: string): number {
+  return citas
+    .filter((c) => c.estatus === "No Asistió" && c.fecha >= desdeISO && c.fecha <= hastaISO)
+    .reduce((total, c) => total + parseCostoAproximado(c.costo), 0);
+}
+
+/** Citas de los próximos `dias` días (incluyendo hoy) que todavía no se
+ * resolvieron (no atendidas, canceladas, reagendadas ni no-show). */
+export function proximasCitas(citas: CitaAgenda[], hoyISO: string, dias: number): number {
+  const hoy = new Date(`${hoyISO}T00:00:00`);
+  const limite = new Date(hoy);
+  limite.setDate(limite.getDate() + dias);
+  const limiteISO = `${limite.getFullYear()}-${String(limite.getMonth() + 1).padStart(2, "0")}-${String(
+    limite.getDate()
+  ).padStart(2, "0")}`;
+  return citas.filter(
+    (c) =>
+      c.fecha >= hoyISO &&
+      c.fecha <= limiteISO &&
+      (c.estatus === "Agendada" || c.estatus === "Confirmada" || c.estatus === "En espera")
+  ).length;
+}
