@@ -8,6 +8,7 @@ const estadoColor: Record<CitaEstatus, string> = {
   Confirmada: "bg-info/10 text-info",
   "En espera": "bg-accent/10 text-accent",
   Atendida: "bg-success/10 text-success",
+  Reagendada: "bg-warning/10 text-warning",
   Cancelada: "bg-danger/10 text-danger",
 };
 

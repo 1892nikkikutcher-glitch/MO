@@ -344,16 +344,61 @@ const estadoColorResumen: Record<string, string> = {
   Confirmada: "bg-info/10 text-info",
   "En espera": "bg-accent/10 text-accent",
   Atendida: "bg-success/10 text-success",
+  Reagendada: "bg-warning/10 text-warning",
   Cancelada: "bg-danger/10 text-danger",
 };
 
-function ExpedienteSidePanel({ citasFuturas }: { citasFuturas: CitaAgenda[] }) {
+/** Suma meses a una fecha ISO ("YYYY-MM-DD") respetando el desbordamiento
+ * de mes de JS Date (ej. 31 de enero + 1 mes = 3 de marzo, no 31 de
+ * febrero) — aceptable para una sugerencia, no para un cálculo exacto. */
+function addMonthsISO(fechaISO: string, months: number): string {
+  const d = new Date(`${fechaISO}T00:00:00`);
+  d.setMonth(d.getMonth() + months);
+  return d.toISOString().slice(0, 10);
+}
+
+function ExpedienteSidePanel({
+  citasFuturas,
+  ultimaCita,
+  sugerirPrevencion,
+  formatDate,
+}: {
+  citasFuturas: CitaAgenda[];
+  ultimaCita: CitaAgenda | undefined;
+  sugerirPrevencion: boolean;
+  formatDate: (date: string) => string;
+}) {
+  const hoyISO = new Date().toISOString().slice(0, 10);
+  const fechaSugerida = ultimaCita ? addMonthsISO(ultimaCita.fecha, 6) : null;
+  const mostrarSugerencia = sugerirPrevencion && citasFuturas.length === 0 && fechaSugerida;
+  const sugerenciaVencida = mostrarSugerencia && fechaSugerida! <= hoyISO;
+
   return (
     <div className="space-y-6 print:hidden">
       <div className="rounded-2xl border border-edge/10 bg-surface p-5">
         <h3 className="mb-4 text-xs font-semibold uppercase tracking-wide text-ink/50">
           Resumen de Citas
         </h3>
+
+        {ultimaCita && (
+          <p className="mb-3 text-xs text-ink/50">
+            Última cita: <span className="font-medium text-ink/70">{formatDate(ultimaCita.fecha)}</span>
+          </p>
+        )}
+
+        {mostrarSugerencia && (
+          <div
+            className={`mb-3 rounded-lg border p-3 text-xs ${
+              sugerenciaVencida
+                ? "border-accent/30 bg-accent/10 text-accent"
+                : "border-edge/10 bg-inset text-ink/50"
+            }`}
+          >
+            {sugerenciaVencida ? "Prevención sugerida desde el " : "Prevención sugerida: "}
+            <span className="font-medium">{formatDate(fechaSugerida!)}</span>
+          </div>
+        )}
+
         {citasFuturas.length === 0 ? (
           <p className="text-xs text-ink/40">Sin próximas citas agendadas</p>
         ) : (
@@ -477,6 +522,7 @@ export default function Expediente({
   const citasFuturas = citasPaciente
     .filter((c) => c.fecha >= hoyISO)
     .sort((a, b) => a.fecha.localeCompare(b.fecha) || a.horaInicio.localeCompare(b.horaInicio));
+  const ultimaCita = citasPaciente.find((c) => c.fecha < hoyISO && c.estatus !== "Cancelada");
 
   const enviarResumen = () => {
     const edad = calculateAge(patient.birthDate);
@@ -626,7 +672,12 @@ export default function Expediente({
             )}
         </div>
 
-        <ExpedienteSidePanel citasFuturas={citasFuturas} />
+        <ExpedienteSidePanel
+          citasFuturas={citasFuturas}
+          ultimaCita={ultimaCita}
+          sugerirPrevencion={patient.recordatorioPrevencion !== false}
+          formatDate={formatDate}
+        />
       </div>
     </div>
   );

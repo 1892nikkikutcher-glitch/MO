@@ -33,6 +33,12 @@ export type Patient = {
   contactoNombre?: string;
   contactoParentesco?: string;
   contactoTelefono?: string;
+
+  /** Si está activo, el expediente sugiere una cita de prevención cada 6
+   * meses a partir de la última cita del paciente (mientras no tenga ya una
+   * cita futura agendada). Desactivable por paciente — por ejemplo, para no
+   * agobiar a un paciente al que se prefiere atender solo cuando lo pida. */
+  recordatorioPrevencion?: boolean;
 };
 
 /** Convierte la fecha ISO ("YYYY-MM-DD") de una cita a formato día/mes/año
@@ -389,6 +395,7 @@ export const citaEstatusOptions = [
   "Confirmada",
   "En espera",
   "Atendida",
+  "Reagendada",
   "Cancelada",
 ] as const;
 export type CitaEstatus = (typeof citaEstatusOptions)[number];

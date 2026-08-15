@@ -95,6 +95,9 @@ export default function DatosPaciente({
     patient.contactoParentesco ?? parentescoOptions[0]
   );
   const [contactoTelefono, setContactoTelefono] = useState(patient.contactoTelefono ?? "");
+  const [recordatorioPrevencion, setRecordatorioPrevencion] = useState(
+    patient.recordatorioPrevencion ?? true
+  );
 
   const [saved, setSaved] = useState(false);
 
@@ -123,6 +126,7 @@ export default function DatosPaciente({
     setContactoNombre(patient.contactoNombre ?? "");
     setContactoParentesco(patient.contactoParentesco ?? parentescoOptions[0]);
     setContactoTelefono(patient.contactoTelefono ?? "");
+    setRecordatorioPrevencion(patient.recordatorioPrevencion ?? true);
     setSaved(false);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [patient.id]);
@@ -165,6 +169,7 @@ export default function DatosPaciente({
       contactoNombre,
       contactoParentesco,
       contactoTelefono,
+      recordatorioPrevencion,
     });
     setSaved(true);
   };
@@ -500,6 +505,29 @@ export default function DatosPaciente({
             </Field>
           </div>
         </div>
+      </CardShell>
+
+      <CardShell title="Prevención">
+        <label className="flex cursor-pointer items-start gap-3">
+          <input
+            type="checkbox"
+            checked={recordatorioPrevencion}
+            onChange={(e) => {
+              setRecordatorioPrevencion(e.target.checked);
+              setSaved(false);
+            }}
+            className="mt-0.5 h-4 w-4 rounded border-edge/30 accent-accent"
+          />
+          <span className="text-sm text-ink/80">
+            Sugerir cita de prevención cada 6 meses
+            <span className="mt-1 block text-xs font-normal text-ink/40">
+              Si está activo, el expediente sugiere agendar una limpieza de prevención 6 meses
+              después de la última cita del paciente (mientras no tenga ya una cita próxima
+              agendada). Desactívalo para pacientes a quienes prefieres atender solo cuando lo
+              soliciten.
+            </span>
+          </span>
+        </label>
       </CardShell>
 
       <div className="flex items-center gap-3">

@@ -17,6 +17,7 @@ const config: Config = {
         success: "rgb(var(--success-rgb) / <alpha-value>)",
         danger: "rgb(var(--danger-rgb) / <alpha-value>)",
         info: "rgb(var(--info-rgb) / <alpha-value>)",
+        warning: "rgb(var(--warning-rgb) / <alpha-value>)",
       },
       boxShadow: {
         card: "var(--shadow-card)",
