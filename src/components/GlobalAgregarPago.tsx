@@ -191,6 +191,7 @@ export default function GlobalAgregarPago({
 
   return (
     <AgregarPagoDialog
+      patientId={patientId}
       patientName={patient.name}
       saldoPendienteTotal={saldoPendienteTotal}
       tratamientosPendientes={tratamientosPendientes}

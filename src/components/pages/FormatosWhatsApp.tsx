@@ -14,6 +14,11 @@ const VISTA_PREVIA_VARS = {
   hora: "05:30 PM",
   procedimiento: "Limpieza dental",
   costo: "$1,200",
+  medico: "Dr. Nicolás Medina",
+  formaPago: "Tarjeta",
+  conceptos: "- Limpieza dental: $1,200",
+  total: "$1,200",
+  proximaCita: "\n\nSu próxima cita es el 20 de agosto de 2026 a las 11:00 AM.",
 };
 
 function PlantillaEditor({
@@ -117,6 +122,28 @@ export default function FormatosWhatsApp() {
               mismo en Encuestas. Usa <code className="text-accent">{"{{clinica}}"}</code>,{" "}
               <code className="text-accent">{"{{paciente}}"}</code> y{" "}
               <code className="text-accent">{"{{procedimiento}}"}</code>.
+            </>
+          }
+        />
+      </div>
+
+      <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
+        <PlantillaEditor
+          titulo="Recibo de Pago"
+          valorInicial={formatosWhatsapp.reciboPago ?? formatosWhatsAppInicial.reciboPago}
+          onGuardar={(texto) => setFormatosWhatsapp((prev) => ({ ...prev, reciboPago: texto }))}
+          descripcion={
+            <>
+              Se envía desde el ícono de WhatsApp al registrar un pago, o para reenviar un
+              comprobante ya guardado. Usa <code className="text-accent">{"{{clinica}}"}</code>,{" "}
+              <code className="text-accent">{"{{paciente}}"}</code>,{" "}
+              <code className="text-accent">{"{{fecha}}"}</code>,{" "}
+              <code className="text-accent">{"{{medico}}"}</code>,{" "}
+              <code className="text-accent">{"{{formaPago}}"}</code>,{" "}
+              <code className="text-accent">{"{{conceptos}}"}</code> y{" "}
+              <code className="text-accent">{"{{total}}"}</code> — se rellenan solos con los datos
+              reales del pago. <code className="text-accent">{"{{proximaCita}}"}</code> se rellena
+              sola con la siguiente cita agendada del paciente (o queda vacía si no tiene ninguna).
             </>
           }
         />

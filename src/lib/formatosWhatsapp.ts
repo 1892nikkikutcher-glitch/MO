@@ -2,9 +2,12 @@
  * Formatos WhatsApp. Usan marcadores {{clave}} que se sustituyen con los
  * datos reales de la cita antes de enviarse. */
 
+import type { CitaAgenda } from "@/lib/patientData";
+
 export type FormatosWhatsApp = {
   confirmacionCita: string;
   encuestaSatisfaccion: string;
+  reciboPago: string;
 };
 
 export const formatosWhatsAppInicial: FormatosWhatsApp = {
@@ -35,6 +38,19 @@ Gracias por confiarnos su *{{procedimiento}}*. Nos encantaría conocer su experi
 ¿Qué calificación le daría a su atención, del 1 al 5? Y si gusta, cuéntenos qué podemos mejorar.
 
 ¡Gracias por su tiempo!`,
+  reciboPago: `*Recibo de Pago*
+*{{clinica}}*
+
+Paciente: {{paciente}}
+Fecha: {{fecha}}
+Médico: {{medico}}
+Forma de pago: {{formaPago}}
+
+{{conceptos}}
+
+*Total: {{total}}*{{proximaCita}}
+
+¡Gracias por su confianza!`,
 };
 
 export function renderPlantilla(plantilla: string, vars: Record<string, string>): string {
@@ -64,4 +80,20 @@ export function formatHora12(hora24: string): string {
   h = h % 12;
   if (h === 0) h = 12;
   return `${String(h).padStart(2, "0")}:${m} ${sufijo}`;
+}
+
+/** Texto listo para insertar en {{proximaCita}} del recibo de pago: la
+ * siguiente cita agendada de este paciente (fecha de hoy en adelante, sin
+ * contar canceladas), o cadena vacía si no tiene ninguna — para que la
+ * plantilla no muestre una línea coja cuando no aplica. */
+export function buildProximaCitaTexto(citas: CitaAgenda[], patientId: string): string {
+  const hoy = new Date();
+  const hoyISO = `${hoy.getFullYear()}-${String(hoy.getMonth() + 1).padStart(2, "0")}-${String(hoy.getDate()).padStart(2, "0")}`;
+
+  const proxima = citas
+    .filter((c) => c.patientId === patientId && c.estatus !== "Cancelada" && c.fecha >= hoyISO)
+    .sort((a, b) => (a.fecha + a.horaInicio).localeCompare(b.fecha + b.horaInicio))[0];
+
+  if (!proxima) return "";
+  return `\n\nSu próxima cita es el ${formatFechaLarga(proxima.fecha)} a las ${formatHora12(proxima.horaInicio)}.`;
 }

@@ -11,6 +11,7 @@ import {
   type Pago,
 } from "@/lib/patientData";
 import { usePatientData } from "@/context/PatientDataContext";
+import { renderPlantilla, formatosWhatsAppInicial, buildProximaCitaTexto } from "@/lib/formatosWhatsapp";
 
 const medicos = ["Dr. Nicolás Medina González", "Dra. Ana Paola Ríos Cervantes"];
 const formasDePago = ["Efectivo", "Tarjeta de crédito", "Tarjeta de débito", "Transferencia", "Cheque"];
@@ -283,14 +284,18 @@ function SignaturePad({
 }
 
 function ReciboActions({
+  patientId,
   patientName,
   pago,
   onDone,
 }: {
+  patientId: string;
   patientName: string;
   pago: Pago;
   onDone: () => void;
 }) {
+  const { citas, clinicInfo, formatosWhatsapp } = usePatientData();
+
   const handleImprimir = () => {
     window.print();
   };
@@ -302,8 +307,18 @@ function ReciboActions({
   };
 
   const handleEnviarWhatsApp = () => {
-    const mensaje = encodeURIComponent(buildReciboTexto(patientName, pago));
-    window.open(`https://wa.me/?text=${mensaje}`, "_blank");
+    const plantilla = formatosWhatsapp.reciboPago ?? formatosWhatsAppInicial.reciboPago;
+    const texto = renderPlantilla(plantilla, {
+      clinica: clinicInfo?.nombre || "tu clínica",
+      paciente: patientName,
+      fecha: pago.fecha,
+      medico: pago.medico,
+      formaPago: pago.formaPago,
+      conceptos: pago.lineas.map((l) => `- ${l.label}: ${formatCurrency(l.monto)}`).join("\n"),
+      total: formatCurrency(pago.total),
+      proximaCita: buildProximaCitaTexto(citas, patientId),
+    });
+    window.open(`https://wa.me/?text=${encodeURIComponent(texto)}`, "_blank");
   };
 
   return (
@@ -388,12 +403,14 @@ function ReciboActions({
 }
 
 export function AgregarPagoDialog({
+  patientId,
   patientName,
   saldoPendienteTotal,
   tratamientosPendientes,
   onClose,
   onSave,
 }: {
+  patientId: string;
   patientName: string;
   saldoPendienteTotal: number;
   tratamientosPendientes: TratamientoPendiente[];
@@ -528,7 +545,7 @@ export function AgregarPagoDialog({
     return (
       <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4 print:bg-transparent">
         <div className="w-full max-w-md rounded-2xl border border-edge/10 bg-modal p-6 print:border-none print:bg-transparent print:p-0">
-          <ReciboActions patientName={patientName} pago={pagoGuardado} onDone={onClose} />
+          <ReciboActions patientId={patientId} patientName={patientName} pago={pagoGuardado} onDone={onClose} />
         </div>
       </div>
     );
@@ -735,7 +752,7 @@ export default function Pagos({
   pagos: Pago[];
   setPagos: Dispatch<SetStateAction<Pago[]>>;
 }) {
-  const { userEmail, setPagosEliminados } = usePatientData();
+  const { userEmail, setPagosEliminados, citas, clinicInfo, formatosWhatsapp } = usePatientData();
   const [showDialog, setShowDialog] = useState(false);
   const [printTarget, setPrintTarget] = useState<Pago | null>(null);
   const [pagoAEliminar, setPagoAEliminar] = useState<Pago | null>(null);
@@ -874,12 +891,22 @@ export default function Pagos({
                         <PrinterIcon />
                       </button>
                       <button
-                        onClick={() =>
-                          window.open(
-                            `https://wa.me/?text=${encodeURIComponent(buildReciboTexto(patientName, pago))}`,
-                            "_blank"
-                          )
-                        }
+                        onClick={() => {
+                          const plantilla = formatosWhatsapp.reciboPago ?? formatosWhatsAppInicial.reciboPago;
+                          const texto = renderPlantilla(plantilla, {
+                            clinica: clinicInfo?.nombre || "tu clínica",
+                            paciente: patientName,
+                            fecha: pago.fecha,
+                            medico: pago.medico,
+                            formaPago: pago.formaPago,
+                            conceptos: pago.lineas
+                              .map((l) => `- ${l.label}: ${formatCurrency(l.monto)}`)
+                              .join("\n"),
+                            total: formatCurrency(pago.total),
+                            proximaCita: buildProximaCitaTexto(citas, patientId),
+                          });
+                          window.open(`https://wa.me/?text=${encodeURIComponent(texto)}`, "_blank");
+                        }}
                         title="Enviar comprobante por WhatsApp"
                         className="flex h-7 w-7 items-center justify-center rounded-full border border-success/30 text-success/70 transition-colors hover:border-success hover:text-success"
                       >
@@ -934,6 +961,7 @@ export default function Pagos({
 
       {showDialog && (
         <AgregarPagoDialog
+          patientId={patientId}
           patientName={patientName}
           saldoPendienteTotal={saldoPendienteTratamientos}
           tratamientosPendientes={tratamientosPendientes}
