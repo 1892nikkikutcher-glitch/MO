@@ -225,8 +225,8 @@ export default function Medicamentos() {
         <h3 className="mb-2 text-xs font-semibold uppercase tracking-wide text-accent">Adulto</h3>
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
           {adultos.map((m) => (
-            <div key={m.id} className="rounded-lg border border-edge/10 bg-surface p-3 text-sm">
-              <p className="font-medium text-ink">{m.nombre}</p>
+            <div key={m.id} className="min-w-0 rounded-lg border border-edge/10 bg-surface p-3 text-sm">
+              <p className="break-words font-medium text-ink">{m.nombre}</p>
               <p className="mt-0.5 text-ink/60">
                 {m.dosisFrecuencia}
                 {m.periodo && `. ${m.periodo}`}
@@ -251,8 +251,8 @@ export default function Medicamentos() {
         </h3>
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
           {pediatricos.map((m) => (
-            <div key={m.id} className="rounded-lg border border-edge/10 bg-surface p-3 text-sm">
-              <p className="font-medium text-ink">{m.nombre}</p>
+            <div key={m.id} className="min-w-0 rounded-lg border border-edge/10 bg-surface p-3 text-sm">
+              <p className="break-words font-medium text-ink">{m.nombre}</p>
               <p className="mt-0.5 text-ink/60">
                 {m.mgPorKgMin}–{m.mgPorKgMax} mg/kg, {m.frecuenciaPediatrica}, {m.duracionPediatrica}
               </p>

@@ -127,7 +127,7 @@ export default function Catalogos() {
               {t.icono}
             </div>
             <div className="min-w-0 flex-1">
-              <div className="flex items-center justify-between gap-2">
+              <div className="flex flex-wrap items-center justify-between gap-x-2 gap-y-0.5">
                 <h4 className="font-semibold text-ink">{t.titulo}</h4>
                 <span className="flex-none text-xs font-medium text-ink/40">
                   {t.total} {t.etiquetaTotal}
