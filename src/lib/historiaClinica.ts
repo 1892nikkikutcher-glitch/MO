@@ -142,7 +142,16 @@ export const plantillaInicial: HistoriaClinicaTemplate = {
     {
       id: id("sec"),
       titulo: "Examen de Oclusión",
-      preguntas: [{ id: id("p"), tipo: "textarea", etiqueta: "Examen de oclusión" }],
+      preguntas: [
+        { id: id("p"), tipo: "texto", etiqueta: "Clase molar", placeholder: "Ej. Clase I bilateral" },
+        { id: id("p"), tipo: "texto", etiqueta: "Clase canina", placeholder: "Ej. Clase I bilateral" },
+        { id: id("p"), tipo: "texto", etiqueta: "Overjet (sobremordida horizontal)", placeholder: "Ej. 2 mm" },
+        { id: id("p"), tipo: "texto", etiqueta: "Overbite (sobremordida vertical)", placeholder: "Ej. 3 mm / 30%" },
+        { id: id("p"), tipo: "texto", etiqueta: "Apiñamiento", placeholder: "Ej. Leve en incisivos inferiores" },
+        { id: id("p"), tipo: "texto", etiqueta: "Giroversiones", placeholder: "Ej. OD 12 rotado 20°" },
+        { id: id("p"), tipo: "texto", etiqueta: "Tipo de dentición", placeholder: "Ej. Permanente / Mixta / Temporal" },
+        { id: id("p"), tipo: "textarea", etiqueta: "Otras observaciones de oclusión" },
+      ],
     },
     {
       id: id("sec"),
