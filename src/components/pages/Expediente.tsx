@@ -548,24 +548,26 @@ export default function Expediente({
         ← Volver a pacientes
       </button>
 
-      <div className="flex items-center gap-4 print:hidden">
-        <div
-          className="flex h-16 w-16 shrink-0 items-center justify-center rounded-full text-lg font-bold text-black"
-          style={{ backgroundColor: avatarColor }}
-        >
-          {initials}
-        </div>
-        <div className="flex-1">
-          <h2 className="text-xl font-semibold text-ink">{formatNombreConEdad(patient.name, patient.birthDate)}</h2>
-          <p className="mt-1 text-sm text-ink/50">
-            {patient.phone} · {formatDate(patient.birthDate)}
-            {patient.birthDate && ` · ${formatEdad(patient.birthDate)}`}
-          </p>
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-center print:hidden">
+        <div className="flex items-center gap-4">
+          <div
+            className="flex h-16 w-16 shrink-0 items-center justify-center rounded-full text-lg font-bold text-black"
+            style={{ backgroundColor: avatarColor }}
+          >
+            {initials}
+          </div>
+          <div className="min-w-0 flex-1">
+            <h2 className="text-xl font-semibold text-ink">{formatNombreConEdad(patient.name, patient.birthDate)}</h2>
+            <p className="mt-1 text-sm text-ink/50">
+              {patient.phone} · {formatDate(patient.birthDate)}
+              {patient.birthDate && ` · ${formatEdad(patient.birthDate)}`}
+            </p>
+          </div>
         </div>
         <button
           onClick={enviarResumen}
           title="Enviar resumen del expediente al paciente por WhatsApp"
-          className="flex items-center gap-2 rounded-lg border border-success/40 px-3 py-2 text-xs font-semibold text-success transition-colors hover:bg-success/10"
+          className="flex items-center justify-center gap-2 rounded-lg border border-success/40 px-3 py-2 text-xs font-semibold text-success transition-colors hover:bg-success/10 sm:shrink-0"
         >
           <WhatsAppIcon />
           Enviar resumen al paciente
@@ -603,15 +605,18 @@ export default function Expediente({
           <button
             key={tab}
             onClick={() => setActiveTab(tab)}
-            className={`rounded-lg px-3 py-2 text-xs font-semibold uppercase tracking-wide transition-colors ${
+            className={`rounded-lg border px-3 py-2 text-xs font-semibold uppercase tracking-wide transition-colors ${
               activeTab === tab
-                ? "bg-accent/15 text-accent"
-                : "text-ink/40 hover:bg-surface hover:text-ink/70"
+                ? "border-accent/70 bg-accent/15 text-accent"
+                : "border-accent/25 text-ink/40 hover:border-accent/50 hover:bg-surface hover:text-ink/70"
             }`}
             style={
               activeTab === tab
-                ? { textShadow: "0 0 8px rgba(251,146,60,0.4)" }
-                : undefined
+                ? {
+                    textShadow: "0 0 8px rgba(251,146,60,0.4)",
+                    boxShadow: "0 0 10px -2px rgb(var(--accent-rgb) / 0.55)",
+                  }
+                : { boxShadow: "0 0 6px -2px rgb(var(--accent-rgb) / 0.3)" }
             }
           >
             {tab}
