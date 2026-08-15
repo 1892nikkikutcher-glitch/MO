@@ -2,7 +2,6 @@
 
 import { usePatientData } from "@/context/PatientDataContext";
 import { calcularEdadDetallada, formatCurrency } from "@/lib/patientData";
-import { capitalizarNombre } from "@/lib/textoNombre";
 import { calcularAvanceMetas } from "@/lib/metas";
 import PendientesConsultorio from "@/components/PendientesConsultorio";
 
@@ -19,20 +18,6 @@ function neonShadow(hex: string): string {
   const g = parseInt(hex.slice(3, 5), 16);
   const b = parseInt(hex.slice(5, 7), 16);
   return `inset 3px 0 0 0 ${hex}, 0 0 14px -4px rgba(${r}, ${g}, ${b}, 0.55)`;
-}
-
-function WhatsAppIcon() {
-  return (
-    <svg width="14" height="14" viewBox="0 0 24 24" fill="none">
-      <path
-        d="M3 21l1.4-4.2A8.5 8.5 0 1 1 8.3 20.5L3 21ZM8.5 8.3c.2-.5.4-.5.6-.5h.5c.2 0 .4 0 .5.3.2.4.6 1.4.7 1.5.1.1.1.3 0 .4-.1.2-.2.3-.3.4-.2.2-.3.3-.1.6.7 1.1 1.4 1.7 2.5 2.3.2.1.3.1.4-.1.2-.2.5-.6.7-.8.1-.2.3-.2.5-.1.5.2 1.3.6 1.5.7.2.1.3.1.4.3.1.2.1.9-.2 1.4-.3.5-1.1.9-1.6 1-.5 0-1.1.1-3.4-.9-2.4-1.1-3.9-3.5-4.1-3.7-.1-.2-1-1.3-1-2.5s.6-1.7.8-2Z"
-        stroke="currentColor"
-        strokeWidth="1.4"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-      />
-    </svg>
-  );
 }
 
 const estatusColor: Record<string, string> = {
@@ -123,8 +108,7 @@ function CardShell({ title, children }: { title: string; children: React.ReactNo
 }
 
 export default function Inicio() {
-  const { puedeVerFinanzas, patients, citas, finanzas, metas, estadisticas, irAPagina, irAExpediente } =
-    usePatientData();
+  const { puedeVerFinanzas, patients, citas, finanzas, metas, estadisticas, irAPagina } = usePatientData();
 
   const hoy = new Date();
   const hoyISO = `${hoy.getFullYear()}-${String(hoy.getMonth() + 1).padStart(2, "0")}-${String(
@@ -208,14 +192,6 @@ export default function Inicio() {
     })
     .filter(({ nacimiento }) => nacimiento.getMonth() === hoy.getMonth())
     .sort((a, b) => a.nacimiento.getDate() - b.nacimiento.getDate());
-
-  const enviarSaludo = (nombre: string, telefono: string) => {
-    const texto = encodeURIComponent(
-      `¡Feliz cumpleaños, ${nombre.split(" ")[0]}! 🎉 De parte de todo el equipo te deseamos un excelente día. Tienes un regalo/promoción especial esperándote en tu próxima visita.`
-    );
-    const tel = telefono.replace(/\D/g, "");
-    window.open(`https://wa.me/${tel}?text=${texto}`, "_blank");
-  };
 
   return (
     <div className="space-y-6">
@@ -338,54 +314,6 @@ export default function Inicio() {
           />
         </CardShell>
       </div>
-
-      <CardShell title={`Cumpleaños de ${MESES[hoy.getMonth()]}`}>
-        {cumpleanerosDelMes.length === 0 ? (
-          <p className="text-sm text-ink/40">Ningún paciente cumple años este mes.</p>
-        ) : (
-          <div className="space-y-2">
-            {cumpleanerosDelMes.map(({ patient, nacimiento }) => {
-              const esHoy = nacimiento.getDate() === hoy.getDate();
-              const yaPaso = nacimiento.getDate() <= hoy.getDate();
-              const edad = calcularEdadDetallada(patient.birthDate);
-              const edadQueCumple = edad ? (yaPaso ? edad.years : edad.years + 1) : null;
-              return (
-                <div
-                  key={patient.id}
-                  className={`flex items-center justify-between rounded-lg border px-4 py-2.5 text-sm ${
-                    esHoy ? "border-accent/40 bg-accent/10" : "border-edge/10"
-                  }`}
-                >
-                  <div>
-                    <button
-                      onClick={() => irAExpediente(patient.id)}
-                      title="Ver expediente"
-                      className="font-medium text-ink underline decoration-ink/20 underline-offset-2 hover:text-accent hover:decoration-accent/50"
-                    >
-                      {capitalizarNombre(patient.name)}
-                    </button>
-                    <span className="ml-2 text-ink/40">
-                      {nacimiento.getDate()} de {MESES[nacimiento.getMonth()]}
-                      {edadQueCumple !== null && ` · cumple ${edadQueCumple} años`}
-                      {esHoy && " · ¡Hoy!"}
-                    </span>
-                  </div>
-                  {patient.phone && (
-                    <button
-                      onClick={() => enviarSaludo(capitalizarNombre(patient.name), patient.phone)}
-                      title="Enviar felicitación por WhatsApp"
-                      className="flex items-center gap-1.5 rounded-lg border border-success/40 px-2.5 py-1.5 text-xs font-semibold text-success transition-colors hover:bg-success/10"
-                    >
-                      <WhatsAppIcon />
-                      Felicitar
-                    </button>
-                  )}
-                </div>
-              );
-            })}
-          </div>
-        )}
-      </CardShell>
     </div>
   );
 }

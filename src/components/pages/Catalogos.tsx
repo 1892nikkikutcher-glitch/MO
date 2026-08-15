@@ -89,10 +89,10 @@ export default function Catalogos() {
       etiquetaTotal: catalogoMedicamentos.length === 1 ? "medicamento" : "medicamentos",
     },
     {
-      id: "administracion-promociones",
+      id: "administracion-marketing",
       icono: <IconEtiqueta />,
-      titulo: "Promociones",
-      descripcion: "Descuentos y ofertas con vigencia por fecha.",
+      titulo: "Marketing",
+      descripcion: "Promociones y cumpleaños del mes para tus pacientes.",
       total: promociones.length,
       etiquetaTotal: promociones.length === 1 ? "promoción" : "promociones",
       totalSecundario: promocionesVigentes,

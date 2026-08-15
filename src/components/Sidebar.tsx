@@ -159,7 +159,7 @@ export const navItems = [
       { id: "administracion-comisiones", label: "Comisiones" },
       { id: "administracion-medicos-pacientes", label: "Médicos vs pacientes" },
       { id: "administracion-medicamentos", label: "Medicamentos" },
-      { id: "administracion-promociones", label: "Promociones" },
+      { id: "administracion-marketing", label: "Marketing" },
       { id: "administracion-formatos-whatsapp", label: "Formatos WhatsApp" },
       { id: "administracion-catalogos", label: "Catálogos" },
       { id: "administracion-metas", label: "Metas" },

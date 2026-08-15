@@ -31,7 +31,7 @@ import BorrarCitas from "./pages/BorrarCitas";
 import Clasificacion from "./pages/Clasificacion";
 import Recordatorios from "./pages/Recordatorios";
 import Consultorio from "./pages/Consultorio";
-import Promociones from "./pages/Promociones";
+import Marketing from "./pages/Marketing";
 import Catalogos from "./pages/Catalogos";
 import ReporteEncuestas from "./pages/ReporteEncuestas";
 import Comisiones from "./pages/Comisiones";
@@ -80,7 +80,7 @@ const paginasConstruidas = new Set([
   "reportes-clasificacion",
   "reportes-recordatorios",
   "administracion-consultorio",
-  "administracion-promociones",
+  "administracion-marketing",
   "administracion-comisiones",
   "reportes-aviso-privacidad",
   "reportes-aseguradoras",
@@ -308,7 +308,7 @@ export default function Dashboard({
           {activePage === "reportes-clasificacion" && <Clasificacion />}
           {activePage === "reportes-recordatorios" && <Recordatorios />}
           {activePage === "administracion-consultorio" && <Consultorio />}
-          {activePage === "administracion-promociones" && <Promociones />}
+          {activePage === "administracion-marketing" && <Marketing />}
           {activePage === "administracion-comisiones" && <Comisiones />}
           {activePage === "reportes-aviso-privacidad" && <AvisoPrivacidad />}
           {activePage === "reportes-aseguradoras" && <Aseguradoras />}
