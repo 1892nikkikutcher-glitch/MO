@@ -767,12 +767,16 @@ export default function Pagos({
   );
 
   const totalPresupuestado = presupuestos.reduce((sum, p) => sum + p.total, 0);
-  const totalPagado = pagos.reduce((sum, p) => sum + p.total, 0);
-  const saldoPendiente = totalPresupuestado - totalPagado;
   const saldoPendienteTratamientos = tratamientosPendientes.reduce(
     (sum, t) => sum + t.pendiente,
     0
   );
+  /** Solo cuenta pagos ligados a un tratamiento del presupuesto — pagos
+   * sueltos como membresías no cuentan como abono a un tratamiento, para
+   * que Saldo Pendiente no se vea "pagado" por dinero que en realidad es
+   * de otro concepto. */
+  const totalPagado = totalPresupuestado - saldoPendienteTratamientos;
+  const saldoPendiente = saldoPendienteTratamientos;
 
   const upsertPago = (pago: Pago) => {
     setPagos((prev) => {

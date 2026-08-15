@@ -801,7 +801,12 @@ export function PatientDataProvider({
    * solo muestre saldos reales. */
   const registrarSaldoPendiente = (patientId: string, presupuestos: SavedBudget[], pagos: Pago[]) => {
     const totalPresupuestado = presupuestos.reduce((s, p) => s + p.total, 0);
-    const totalPagado = pagos.reduce((s, p) => s + p.total, 0);
+    // Solo cuenta pagos ligados a un tratamiento del presupuesto — pagos
+    // sueltos como membresías no deben "pagar" un tratamiento que no cubren.
+    const totalPagado = pagos.reduce(
+      (s, p) => s + p.lineas.reduce((ls, l) => ls + (l.tratamientoId ? l.monto : 0), 0),
+      0
+    );
     const saldo = totalPresupuestado - totalPagado;
     const patientName = patients.find((p) => p.id === patientId)?.name ?? "";
     setSaldosPendientes((prev) => {
