@@ -351,6 +351,7 @@ function CitaDialog({
     presupuestosPorPaciente,
     setPresupuestosPaciente,
     pagosPorPaciente,
+    citas,
   } = usePatientData();
   const [recursoId, setRecursoId] = useState(initial.recursoId ?? recursos[0]?.id ?? "");
   const [patientId, setPatientId] = useState(initial.patientId ?? "");
@@ -438,6 +439,13 @@ function CitaDialog({
   const nombrePacienteActual = patientId
     ? patients.find((p) => p.id === patientId)?.name ?? searchText
     : searchText.trim();
+
+  // Inasistencias previas de este paciente (sin contar la cita que se está
+  // editando) — para avisar antes de agendarle otra vez sin más precaución.
+  const inasistenciasPrevias = patientId
+    ? citas.filter((c) => c.patientId === patientId && c.estatus === "No Asistió" && c.id !== initial.id)
+        .length
+    : 0;
 
   const enviarConfirmacion = () => {
     const telefonoLimpio = telefono.replace(/\D/g, "");
@@ -676,6 +684,19 @@ function CitaDialog({
             )}
           </div>
           </div>
+
+          {inasistenciasPrevias > 0 && (
+            <div className="rounded-lg border border-danger/30 bg-danger/10 p-3 text-xs text-danger">
+              <p className="font-semibold">
+                ⚠️ Este paciente no asistió a {inasistenciasPrevias === 1 ? "una cita anterior" : `${inasistenciasPrevias} citas anteriores`} sin avisar.
+              </p>
+              <p className="mt-1 text-danger/80">
+                Considera ofrecer un horario que te afecte menos si vuelve a faltar, o pedirle un
+                pago anticipado (transferencia u otro medio electrónico) antes de confirmar esta
+                cita.
+              </p>
+            </div>
+          )}
 
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
           <div className="grid grid-cols-[1fr_auto] items-end gap-2">
