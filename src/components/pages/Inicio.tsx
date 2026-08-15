@@ -5,6 +5,7 @@ import { calcularEdadDetallada, formatCurrency } from "@/lib/patientData";
 import { calcularAvanceMetas } from "@/lib/metas";
 import PendientesConsultorio from "@/components/PendientesConsultorio";
 import FinancialSummary from "@/components/dashboard/FinancialSummary";
+import ProductivitySummary from "@/components/dashboard/ProductivitySummary";
 
 const MESES = [
   "enero", "febrero", "marzo", "abril", "mayo", "junio",
@@ -120,7 +121,6 @@ export default function Inicio() {
   const mesActualKey = hoyISO.slice(0, 7); // "YYYY-MM"
 
   const avanceMetas = calcularAvanceMetas(finanzas.porFecha, metas.metaMensual);
-  const nuevosPacientesMes = patients.filter((p) => p.createdAt?.slice(0, 7) === mesActualKey).length;
 
   const citasDelMes = citas.filter((c) => c.fecha.slice(0, 7) === mesActualKey);
   const citasPorMes = citasDelMes.length;
@@ -132,7 +132,6 @@ export default function Inicio() {
   const presupuestosDelMes = Math.max(0, estadisticas.presupuestosPorMes[mesActualKey] ?? 0);
 
   const kpisVisibles = [
-    { label: "Nuevos Pacientes (Mes)", value: String(nuevosPacientesMes), color: "#ff3d9a" },
     { label: "Citas por Mes", value: String(citasPorMes), color: "#3aa8ff" },
     { label: "Citas Atendidas (Mes)", value: String(citasAtendidas), color: "#2ee67a" },
     { label: "Laboratorios Pendientes", value: String(estadisticas.laboratoriosPendientesCount), color: "#ffb020" },
@@ -191,6 +190,8 @@ export default function Inicio() {
   return (
     <div className="space-y-6">
       <FinancialSummary />
+
+      <ProductivitySummary />
 
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-6">
         <div

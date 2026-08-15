@@ -58,3 +58,26 @@ export function variacionPct(actual: number, anterior: number): number | null {
   if (anterior <= 0) return null;
   return Math.round(((actual - anterior) / anterior) * 1000) / 10;
 }
+
+/** Pacientes distintos con al menos una cita Atendida en [desdeISO, hastaISO]. */
+export function pacientesAtendidosEnRango(citas: CitaAgenda[], desdeISO: string, hastaISO: string): number {
+  const ids = new Set<string>();
+  citas.forEach((c) => {
+    if (c.estatus === "Atendida" && c.patientId && c.fecha >= desdeISO && c.fecha <= hastaISO) {
+      ids.add(c.patientId);
+    }
+  });
+  return ids.size;
+}
+
+/** Pacientes "activos": con al menos una cita Atendida en los últimos 12
+ * meses — la definición de "actividad clínica" que usamos es haber sido
+ * atendido, no solo tener una cita agendada. */
+export function pacientesActivos(citas: CitaAgenda[], hoyISO: string): number {
+  const hace12Meses = new Date(`${hoyISO}T00:00:00`);
+  hace12Meses.setFullYear(hace12Meses.getFullYear() - 1);
+  const desdeISO = `${hace12Meses.getFullYear()}-${String(hace12Meses.getMonth() + 1).padStart(2, "0")}-${String(
+    hace12Meses.getDate()
+  ).padStart(2, "0")}`;
+  return pacientesAtendidosEnRango(citas, desdeISO, hoyISO);
+}
