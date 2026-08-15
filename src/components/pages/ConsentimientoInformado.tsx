@@ -2,12 +2,14 @@
 
 import { useState } from "react";
 import { usePatientData } from "@/context/PatientDataContext";
+import { calcularEdadDetallada } from "@/lib/patientData";
 
 type Patient = {
   id: string;
   name: string;
   phone: string;
   birthDate: string;
+  nombreTutor?: string;
 };
 
 const inputClass =
@@ -43,14 +45,17 @@ export default function ConsentimientoInformado({
   onVolver?: () => void;
 }) {
   const { perfilDoctor } = usePatientData();
+  const esMenorDeEdad = (calcularEdadDetallada(patient.birthDate)?.years ?? 18) < 18;
   const fechaInicial = todayFormatted();
   const [dia, setDia] = useState(fechaInicial.dia);
   const [mes, setMes] = useState(fechaInicial.mes);
   const [anio, setAnio] = useState(fechaInicial.anio);
   const [hora, setHora] = useState(nowFormatted());
   const [procedimiento, setProcedimiento] = useState("");
-  const [nombreFirmante, setNombreFirmante] = useState(patient.name);
-  const [parentesco, setParentesco] = useState("Titular");
+  const [nombreFirmante, setNombreFirmante] = useState(
+    esMenorDeEdad ? patient.nombreTutor || "" : patient.name
+  );
+  const [parentesco, setParentesco] = useState(esMenorDeEdad ? "Madre/Padre/Tutor" : "Titular");
   const [testigo1, setTestigo1] = useState("");
   const [testigo2, setTestigo2] = useState("");
 
@@ -111,6 +116,12 @@ export default function ConsentimientoInformado({
             onChange={(e) => setNombreFirmante(e.target.value)}
             className={inputClass}
           />
+          {esMenorDeEdad && (
+            <p className="mt-1 text-xs text-accent/70">
+              Paciente menor de edad — se llenó con el tutor de Datos del Paciente. Verifica o
+              corrígelo antes de imprimir.
+            </p>
+          )}
         </div>
         <div>
           <label className="mb-1 block text-xs font-medium text-ink/60">Parentesco</label>
