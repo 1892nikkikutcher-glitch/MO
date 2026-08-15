@@ -4,6 +4,7 @@ import { usePatientData } from "@/context/PatientDataContext";
 import { calcularEdadDetallada, formatCurrency } from "@/lib/patientData";
 import { calcularAvanceMetas } from "@/lib/metas";
 import PendientesConsultorio from "@/components/PendientesConsultorio";
+import FinancialSummary from "@/components/dashboard/FinancialSummary";
 
 const MESES = [
   "enero", "febrero", "marzo", "abril", "mayo", "junio",
@@ -25,7 +26,9 @@ const estatusColor: Record<string, string> = {
   Confirmada: "#3b82f6",
   "En espera": "#f59e0b",
   Atendida: "#22c55e",
+  Reagendada: "#a855f7",
   Cancelada: "#dc2626",
+  "No Asistió": "#7f1d1d",
 };
 
 function DonutChart({
@@ -117,14 +120,6 @@ export default function Inicio() {
   const mesActualKey = hoyISO.slice(0, 7); // "YYYY-MM"
 
   const avanceMetas = calcularAvanceMetas(finanzas.porFecha, metas.metaMensual);
-  const corteDiario = finanzas.porFecha[hoyISO] ?? 0;
-  const corteSemanal = avanceMetas.find((a) => a.label === "Semanal")?.actual ?? 0;
-  const corteMensual = avanceMetas.find((a) => a.label === "Mensual")?.actual ?? 0;
-  const totalPagadoHistorico = Object.values(finanzas.porFecha).reduce((sum, v) => sum + v, 0);
-
-  const ticketPromedio =
-    estadisticas.pagosCount > 0 ? Math.round(totalPagadoHistorico / estadisticas.pagosCount) : 0;
-  const saldoPendiente = Math.max(0, estadisticas.totalPresupuestado - totalPagadoHistorico);
   const nuevosPacientesMes = patients.filter((p) => p.createdAt?.slice(0, 7) === mesActualKey).length;
 
   const citasDelMes = citas.filter((c) => c.fecha.slice(0, 7) === mesActualKey);
@@ -137,12 +132,6 @@ export default function Inicio() {
   const presupuestosDelMes = Math.max(0, estadisticas.presupuestosPorMes[mesActualKey] ?? 0);
 
   const kpisVisibles = [
-    ...(puedeVerFinanzas
-      ? [
-          { label: "Ticket Promedio", value: formatCurrency(ticketPromedio), color: "#ffb020" },
-          { label: "Saldo Pendiente", value: formatCurrency(saldoPendiente), color: "#ff3b3b" },
-        ]
-      : []),
     { label: "Nuevos Pacientes (Mes)", value: String(nuevosPacientesMes), color: "#ff3d9a" },
     { label: "Citas por Mes", value: String(citasPorMes), color: "#3aa8ff" },
     { label: "Citas Atendidas (Mes)", value: String(citasAtendidas), color: "#2ee67a" },
@@ -176,13 +165,19 @@ export default function Inicio() {
     { label: "Subsecuentes", value: subsecuentes, color: "#f59e0b" },
   ];
 
-  const citasPorEstatusData = ["Agendada", "Confirmada", "En espera", "Atendida", "Cancelada"].map(
-    (estatus) => ({
-      label: estatus,
-      value: citasDelMes.filter((c) => c.estatus === estatus).length,
-      color: estatusColor[estatus],
-    })
-  );
+  const citasPorEstatusData = [
+    "Agendada",
+    "Confirmada",
+    "En espera",
+    "Atendida",
+    "Reagendada",
+    "Cancelada",
+    "No Asistió",
+  ].map((estatus) => ({
+    label: estatus,
+    value: citasDelMes.filter((c) => c.estatus === estatus).length,
+    color: estatusColor[estatus],
+  }));
 
   const cumpleanerosDelMes = patients
     .filter((p) => p.birthDate)
@@ -195,32 +190,9 @@ export default function Inicio() {
 
   return (
     <div className="space-y-6">
+      <FinancialSummary />
+
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-6">
-        {puedeVerFinanzas && (
-          <>
-            <div
-              className="rounded-xl border border-edge/10 bg-surface p-4"
-              style={{ boxShadow: neonShadow("#ffb020") }}
-            >
-              <div className="text-xl font-bold text-ink">{formatCurrency(corteDiario)}</div>
-              <div className="mt-1 text-[11px] uppercase tracking-wide text-ink/40">Corte Diario</div>
-            </div>
-            <div
-              className="rounded-xl border border-edge/10 bg-surface p-4"
-              style={{ boxShadow: neonShadow("#ff3d9a") }}
-            >
-              <div className="text-xl font-bold text-ink">{formatCurrency(corteSemanal)}</div>
-              <div className="mt-1 text-[11px] uppercase tracking-wide text-ink/40">Corte Semanal</div>
-            </div>
-            <div
-              className="rounded-xl border border-edge/10 bg-surface p-4"
-              style={{ boxShadow: neonShadow("#2ee67a") }}
-            >
-              <div className="text-xl font-bold text-ink">{formatCurrency(corteMensual)}</div>
-              <div className="mt-1 text-[11px] uppercase tracking-wide text-ink/40">Corte Mensual</div>
-            </div>
-          </>
-        )}
         <div
           className="rounded-xl border border-edge/10 bg-surface p-4"
           style={{ boxShadow: neonShadow("#3aa8ff") }}
