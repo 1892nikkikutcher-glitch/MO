@@ -33,6 +33,7 @@ import {
   type PerfilDoctor,
   type RolClinica,
   type SavedBudget,
+  type EstadoPresupuesto,
   type LineItem,
   type Pago,
   type Receta,
@@ -47,6 +48,7 @@ import {
   finanzasInicial,
   estadisticasInicial,
   fechaPagoAIso,
+  presupuestosPorEstadoInicial,
   type MetaConfig,
   type FinanzasConfig,
   type EstadisticasGlobales,
@@ -59,6 +61,7 @@ import type { Lamina } from "@/lib/laminas";
 import type { Deposito, ArticuloFaltante, ArticuloCaducidad } from "@/lib/depositoDental";
 import type { PagoEliminado } from "@/lib/pagosEliminados";
 import { saldosPendientesInicial, type SaldosPendientesConfig } from "@/lib/saldosPendientes";
+import { laboratoriosPendientesInicial, type LaboratoriosPendientesConfig } from "@/lib/laboratoriosPendientes";
 import type { PresupuestoLogEntry } from "@/lib/presupuestosLog";
 import type { OtLogEntry } from "@/lib/otsLog";
 import type { EncuestaEnviada } from "@/lib/encuestas";
@@ -382,6 +385,7 @@ type PatientDataContextValue = {
   pagosEliminados: PagoEliminado[];
   setPagosEliminados: (updater: Updater<PagoEliminado[]>) => void;
   saldosPendientes: SaldosPendientesConfig;
+  laboratoriosPendientes: LaboratoriosPendientesConfig;
   presupuestosLog: PresupuestoLogEntry[];
   setPresupuestosLog: (updater: Updater<PresupuestoLogEntry[]>) => void;
   otsLog: OtLogEntry[];
@@ -520,6 +524,11 @@ export function PatientDataProvider({
     clinicUid,
     "saldosPendientes",
     saldosPendientesInicial
+  );
+  const [laboratoriosPendientes, setLaboratoriosPendientes] = useFirestoreDoc<LaboratoriosPendientesConfig>(
+    clinicUid,
+    "laboratoriosPendientes",
+    laboratoriosPendientesInicial
   );
   const [regulacionSanitaria, setRegulacionSanitaria] = useFirestoreDoc<EstadoRegulacionSanitaria>(
     clinicUid,
@@ -782,7 +791,27 @@ export function PatientDataProvider({
     const mesesPrev = conMes(prevArr);
     const mesesNext = conMes(next);
     const meses = new Set([...mesesPrev, ...mesesNext]);
-    if (deltaTotal === 0 && meses.size === 0) return;
+
+    const estadoDe = (p: SavedBudget): EstadoPresupuesto => p.estado ?? "pendiente";
+    const estados: EstadoPresupuesto[] = ["pendiente", "aceptado", "rechazado", "expirado"];
+    const deltasPorEstado = Object.fromEntries(
+      estados.map((estado) => [
+        estado,
+        {
+          cantidad:
+            next.filter((p) => estadoDe(p) === estado).length -
+            prevArr.filter((p) => estadoDe(p) === estado).length,
+          valor:
+            next.filter((p) => estadoDe(p) === estado).reduce((s, p) => s + p.total, 0) -
+            prevArr.filter((p) => estadoDe(p) === estado).reduce((s, p) => s + p.total, 0),
+        },
+      ])
+    ) as Record<EstadoPresupuesto, { cantidad: number; valor: number }>;
+    const hayDeltaEstado = estados.some(
+      (e) => deltasPorEstado[e].cantidad !== 0 || deltasPorEstado[e].valor !== 0
+    );
+
+    if (deltaTotal === 0 && meses.size === 0 && !hayDeltaEstado) return;
     setEstadisticas((prevEst) => {
       const presupuestosPorMes = { ...prevEst.presupuestosPorMes };
       meses.forEach((mes) => {
@@ -790,10 +819,21 @@ export function PatientDataProvider({
           mesesNext.filter((m) => m === mes).length - mesesPrev.filter((m) => m === mes).length;
         if (deltaMes !== 0) presupuestosPorMes[mes] = (presupuestosPorMes[mes] ?? 0) + deltaMes;
       });
+      const presupuestosPorEstadoPrev = prevEst.presupuestosPorEstado ?? presupuestosPorEstadoInicial;
+      const presupuestosPorEstado = Object.fromEntries(
+        estados.map((estado) => [
+          estado,
+          {
+            cantidad: presupuestosPorEstadoPrev[estado].cantidad + deltasPorEstado[estado].cantidad,
+            valor: presupuestosPorEstadoPrev[estado].valor + deltasPorEstado[estado].valor,
+          },
+        ])
+      ) as EstadisticasGlobales["presupuestosPorEstado"];
       return {
         ...prevEst,
         totalPresupuestado: prevEst.totalPresupuestado + deltaTotal,
         presupuestosPorMes,
+        presupuestosPorEstado,
       };
     });
   };
@@ -1026,6 +1066,49 @@ export function PatientDataProvider({
     setOtsLog((prev) => [...entradas, ...prev]);
   };
 
+  /** Refleja en `config/laboratoriosPendientes` el detalle (no solo el
+   * conteo) de cada solicitud sin recibir, para poder listarlas agrupadas
+   * por fecha de entrega en el Dashboard sin cargar cada expediente — mismo
+   * patrón incremental que `registrarSaldoPendiente`. Se quita del mapa la
+   * orden que se marca "Recibido" o que se elimina. */
+  const registrarLaboratoriosPendientes = (
+    patientId: string,
+    prevArr: SolicitudLaboratorio[],
+    next: SolicitudLaboratorio[]
+  ) => {
+    const patientName = patients.find((p) => p.id === patientId)?.name ?? "";
+    const prevIds = new Set(prevArr.map((s) => s.id));
+    const nextIds = new Set(next.map((s) => s.id));
+    const cambiaron = next.filter((s) => {
+      const antes = prevArr.find((p) => p.id === s.id);
+      return !antes || JSON.stringify(antes) !== JSON.stringify(s);
+    });
+    const eliminadas = [...prevIds].filter((id) => !nextIds.has(id));
+    if (cambiaron.length === 0 && eliminadas.length === 0) return;
+    setLaboratoriosPendientes((prev) => {
+      const porOrden = { ...prev.porOrden };
+      cambiaron.forEach((s) => {
+        if (s.estatus === "Recibido") {
+          delete porOrden[s.id];
+        } else {
+          porOrden[s.id] = {
+            id: s.id,
+            patientId,
+            patientName,
+            tipo: s.tipo,
+            laboratorio: s.laboratorio,
+            trabajo: s.trabajo,
+            fechaEntrega: s.fechaEntrega,
+            estatus: s.estatus,
+            actualizadoEn: new Date().toISOString(),
+          };
+        }
+      });
+      eliminadas.forEach((id) => delete porOrden[id]);
+      return { porOrden };
+    });
+  };
+
   const setLaboratoriosPaciente = (patientId: string, updater: Updater<SolicitudLaboratorio[]>) => {
     if (!clinicUid) return;
     const prevArr = laboratoriosPorPaciente[patientId] ?? [];
@@ -1040,6 +1123,7 @@ export function PatientDataProvider({
         laboratoriosPendientesCount: prevEst.laboratoriosPendientesCount + deltaPendientes,
       }));
     }
+    registrarLaboratoriosPendientes(patientId, prevArr, next);
     registrarLogOts(patientId, prevArr, next);
     setLaboratoriosPorPacienteState((prev) => ({ ...prev, [patientId]: next }));
   };
@@ -1297,6 +1381,7 @@ export function PatientDataProvider({
         pagosEliminados,
         setPagosEliminados,
         saldosPendientes,
+        laboratoriosPendientes,
         presupuestosLog,
         setPresupuestosLog,
         otsLog,

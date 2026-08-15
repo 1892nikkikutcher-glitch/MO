@@ -18,6 +18,25 @@ export type FinanzasConfig = {
 
 export const finanzasInicial: FinanzasConfig = { porFecha: {}, porFechaYFormaPago: {} };
 
+/** Cantidad y valor ($) histórico de presupuestos por estado — presupuestos
+ * guardados antes de que existiera el campo `estado` cuentan como
+ * "pendiente", igual que en cualquier otra parte de la app. */
+export type PresupuestoPorEstado = { cantidad: number; valor: number };
+
+export type PresupuestosPorEstado = {
+  pendiente: PresupuestoPorEstado;
+  aceptado: PresupuestoPorEstado;
+  rechazado: PresupuestoPorEstado;
+  expirado: PresupuestoPorEstado;
+};
+
+export const presupuestosPorEstadoInicial: PresupuestosPorEstado = {
+  pendiente: { cantidad: 0, valor: 0 },
+  aceptado: { cantidad: 0, valor: 0 },
+  rechazado: { cantidad: 0, valor: 0 },
+  expirado: { cantidad: 0, valor: 0 },
+};
+
 /** Estadísticas agregadas de todo el consultorio, mantenidas de forma
  * incremental (a diferencia de presupuestos/pagos/laboratorios, que solo se
  * cargan por paciente cuando se abre su expediente) para que los KPIs del
@@ -32,6 +51,10 @@ export type EstadisticasGlobales = {
   presupuestosPorMes: Record<string, number>;
   /** Solicitudes de laboratorio con estatus distinto de "Recibido". */
   laboratoriosPendientesCount: number;
+  /** Ausente en cuentas creadas antes de este campo — tratar como
+   * `presupuestosPorEstadoInicial` (`estadisticas.presupuestosPorEstado ??
+   * presupuestosPorEstadoInicial`). */
+  presupuestosPorEstado?: PresupuestosPorEstado;
 };
 
 export const estadisticasInicial: EstadisticasGlobales = {
@@ -39,6 +62,7 @@ export const estadisticasInicial: EstadisticasGlobales = {
   pagosCount: 0,
   presupuestosPorMes: {},
   laboratoriosPendientesCount: 0,
+  presupuestosPorEstado: presupuestosPorEstadoInicial,
 };
 
 const SEMANAS_POR_MES = 4.345;

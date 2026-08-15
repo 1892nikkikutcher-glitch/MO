@@ -4,8 +4,8 @@
  * `calcularAvanceMetas`), que sigue siendo la fuente de los totales de
  * ingresos por rango de fechas. */
 
-import type { CitaAgenda } from "@/lib/patientData";
-import type { HorarioAtencion } from "@/lib/patientData";
+import type { CitaAgenda, HorarioAtencion } from "@/lib/patientData";
+import type { LaboratorioPendienteEntry } from "@/lib/laboratoriosPendientes";
 
 function timeToMinutes(t: string): number {
   const [h, m] = t.split(":").map(Number);
@@ -80,4 +80,56 @@ export function pacientesActivos(citas: CitaAgenda[], hoyISO: string): number {
     hace12Meses.getDate()
   ).padStart(2, "0")}`;
   return pacientesAtendidosEnRango(citas, desdeISO, hoyISO);
+}
+
+/** `fechaEntrega` de una solicitud de laboratorio es texto libre
+ * "dd/mm/aaaa" capturado a mano — no siempre parseable. Devuelve null en
+ * vez de romper el agrupamiento cuando el valor está vacío o mal formado. */
+export function parseFechaEntrega(texto: string): Date | null {
+  const m = texto.trim().match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
+  if (!m) return null;
+  const d = new Date(Number(m[3]), Number(m[2]) - 1, Number(m[1]));
+  return Number.isNaN(d.getTime()) ? null : d;
+}
+
+export type LaboratoriosAgrupados = {
+  vencidos: LaboratorioPendienteEntry[];
+  vencenHoy: LaboratorioPendienteEntry[];
+  proximos: LaboratorioPendienteEntry[];
+  sinFecha: LaboratorioPendienteEntry[];
+};
+
+/** Agrupa las solicitudes de laboratorio pendientes por cercanía a su
+ * fecha de entrega, cada grupo ordenado de más a menos urgente. Las
+ * órdenes sin fecha válida van aparte, no se mezclan con "próximos". */
+export function agruparLaboratoriosPendientes(
+  entries: LaboratorioPendienteEntry[],
+  hoy: Date = new Date()
+): LaboratoriosAgrupados {
+  const hoySinHora = new Date(hoy.getFullYear(), hoy.getMonth(), hoy.getDate());
+  const grupos: LaboratoriosAgrupados = { vencidos: [], vencenHoy: [], proximos: [], sinFecha: [] };
+
+  entries.forEach((entry) => {
+    const fecha = parseFechaEntrega(entry.fechaEntrega);
+    if (!fecha) {
+      grupos.sinFecha.push(entry);
+    } else if (fecha < hoySinHora) {
+      grupos.vencidos.push(entry);
+    } else if (fecha.getTime() === hoySinHora.getTime()) {
+      grupos.vencenHoy.push(entry);
+    } else {
+      grupos.proximos.push(entry);
+    }
+  });
+
+  const porFecha = (a: LaboratorioPendienteEntry, b: LaboratorioPendienteEntry) => {
+    const fa = parseFechaEntrega(a.fechaEntrega);
+    const fb = parseFechaEntrega(b.fechaEntrega);
+    if (!fa || !fb) return 0;
+    return fa.getTime() - fb.getTime();
+  };
+  grupos.vencidos.sort(porFecha);
+  grupos.proximos.sort(porFecha);
+
+  return grupos;
 }

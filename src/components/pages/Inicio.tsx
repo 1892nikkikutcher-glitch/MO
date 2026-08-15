@@ -6,6 +6,7 @@ import { calcularAvanceMetas } from "@/lib/metas";
 import PendientesConsultorio from "@/components/PendientesConsultorio";
 import FinancialSummary from "@/components/dashboard/FinancialSummary";
 import ProductivitySummary from "@/components/dashboard/ProductivitySummary";
+import BudgetMetrics from "@/components/dashboard/BudgetMetrics";
 
 const MESES = [
   "enero", "febrero", "marzo", "abril", "mayo", "junio",
@@ -134,7 +135,6 @@ export default function Inicio() {
   const kpisVisibles = [
     { label: "Citas por Mes", value: String(citasPorMes), color: "#3aa8ff" },
     { label: "Citas Atendidas (Mes)", value: String(citasAtendidas), color: "#2ee67a" },
-    { label: "Laboratorios Pendientes", value: String(estadisticas.laboratoriosPendientesCount), color: "#ffb020" },
     { label: "Presupuestos del Mes", value: String(presupuestosDelMes), color: "#b84dff" },
     { label: "Citas Canceladas (Mes)", value: String(citasCanceladas), color: "#ff3b3b" },
   ];
@@ -192,6 +192,8 @@ export default function Inicio() {
       <FinancialSummary />
 
       <ProductivitySummary />
+
+      <BudgetMetrics />
 
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-6">
         <div
