@@ -393,7 +393,7 @@ export default function Recetas() {
             className={inputClass}
           />
           {busquedaMedicamento.trim().length > 0 && (
-            <div className="absolute z-10 mt-1 max-h-64 w-full overflow-y-auto rounded-lg border border-edge/10 bg-field shadow-card">
+            <div className="absolute z-20 mt-1 max-h-64 w-full overflow-y-auto rounded-lg border border-edge/10 bg-modal shadow-card">
               {coincidenciasMedicamento.map((m) => (
                 <button
                   key={m.id}

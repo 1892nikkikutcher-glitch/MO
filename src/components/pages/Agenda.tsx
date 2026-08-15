@@ -700,7 +700,7 @@ function CitaDialog({
                 <IconReloj />
               </button>
               {mostrarEstatusRapido && (
-                <div className="absolute right-0 top-[42px] z-10 w-40 rounded-lg border border-edge/10 bg-field p-1.5 shadow-card">
+                <div className="absolute right-0 top-[42px] z-20 w-40 rounded-lg border border-edge/10 bg-modal p-1.5 shadow-card">
                   {(["Confirmada", "En espera", "Atendida", "Reagendada", "Cancelada"] as CitaEstatus[]).map((opt) => (
                     <button
                       key={opt}

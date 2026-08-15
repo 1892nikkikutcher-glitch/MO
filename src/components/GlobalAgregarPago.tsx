@@ -138,7 +138,7 @@ export default function GlobalAgregarPago({
               autoFocus
             />
             {coincidencias.length > 0 && (
-              <div className="absolute z-10 mt-1 max-h-48 w-full overflow-y-auto rounded-lg border border-edge/10 bg-field shadow-card">
+              <div className="mt-1 max-h-48 w-full overflow-y-auto rounded-lg border border-edge/10 bg-modal shadow-card">
                 {coincidencias.map((p) => (
                   <button
                     key={p.id}

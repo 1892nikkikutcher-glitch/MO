@@ -118,12 +118,34 @@ export default function NuevoPresupuesto({
     setProcedimientoSeleccionadoId("");
   };
 
+  /** Un procedimiento agregado aquí sin estar en el catálogo (ej. una resina
+   * que todavía no se da de alta) se guarda de una vez en el catálogo con
+   * el costo capturado, para que la próxima vez ya aparezca en el listado
+   * normal — el costo al odontólogo y el tiempo estimado quedan en 0/30 min
+   * hasta que se completen en Administración → Procedimientos. */
+  const guardarProcedimientoNoCatalogadoEnCatalogo = (nombre: string, costoPaciente: number) => {
+    const yaExiste = procedimientos.some(
+      (p) => p.nombre.trim().toLowerCase() === nombre.toLowerCase()
+    );
+    if (yaExiste) return;
+    const nuevo: Procedimiento = {
+      id: `nocat${Date.now()}`,
+      nombre,
+      especialidad,
+      costoPaciente,
+      costoOdontologo: 0,
+      duracionMinutos: 30,
+    };
+    setProcedimientos((prev) => [...prev, nuevo]);
+  };
+
   const handleAgregarPersonalizado = () => {
     const nombre = personalizadoNombre.trim();
     const precio = Number(personalizadoPrecio);
     if (!nombre || !precio) return;
     if (costoPorOrgano && selectedTeeth.length === 0) return;
     agregarItem(nombre, precio);
+    guardarProcedimientoNoCatalogadoEnCatalogo(nombre, precio);
     setPersonalizadoNombre("");
     setPersonalizadoPrecio("");
     setMostrarPersonalizado(false);
@@ -322,7 +344,7 @@ export default function NuevoPresupuesto({
               className="w-full resize-none rounded-lg border border-edge/10 bg-field px-3 py-2 text-sm text-ink placeholder-ink/30 outline-none focus:border-accent/60"
             />
             {mostrarSugerenciasDiagnostico && sugerenciasDiagnostico.length > 0 && (
-              <div className="absolute z-10 mt-1 max-h-48 w-full overflow-y-auto rounded-lg border border-edge/10 bg-field shadow-card">
+              <div className="absolute z-20 mt-1 max-h-48 w-full overflow-y-auto rounded-lg border border-edge/10 bg-modal shadow-card">
                 {sugerenciasDiagnostico.map((p) => (
                   <button
                     key={p.id}
@@ -450,10 +472,16 @@ export default function NuevoPresupuesto({
               onClick={() => setMostrarPersonalizado(true)}
               className="text-xs font-semibold text-ink/50 hover:text-ink"
             >
-              + Agregar procedimiento personalizado (no está en el catálogo)
+              + Agregar procedimiento no catalogado
             </button>
           ) : (
             <div className="space-y-2 rounded-lg border border-dashed border-edge/15 p-3">
+              <p className="text-xs text-ink/40">
+                Procedimiento no catalogado: aún no está en tu catálogo, pero sí se puede
+                realizar. Se agregará también a{" "}
+                <span className="font-medium text-ink/60">{especialidad}</span> para que
+                aparezca en presupuestos futuros de cualquier paciente.
+              </p>
               <div className="grid grid-cols-[1fr_120px] gap-2">
                 <input
                   type="text"
