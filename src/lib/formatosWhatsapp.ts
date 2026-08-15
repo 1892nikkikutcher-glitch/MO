@@ -14,6 +14,11 @@ Costo estimado: *{{costo}}*
 
 Le pedimos confirmar su asistencia respondiendo este mensaje. En caso de no confirmar, la cita podría ser cancelada sin previo aviso.
 
+Por favor responda con una de estas opciones:
+🟢 *Confirmo cita*
+🟡 *Reagendar*
+🔴 *Cancelar*
+
 Si necesita reagendar o cancelar, agradecemos su aviso oportuno antes de las 04:00 pm del día anterior, para poder ofrecer el espacio a otro paciente y administrar mejor nuestros tiempos.
 
 *Tolerancia máxima de 15 min. Anticipe sus tiempos para trámites en administración.*
