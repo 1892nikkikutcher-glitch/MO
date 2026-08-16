@@ -71,7 +71,7 @@ import type { OtLogEntry } from "@/lib/otsLog";
 import type { EncuestaEnviada } from "@/lib/encuestas";
 import type { Pendiente } from "@/lib/pendientes";
 import type { Domiciliacion } from "@/lib/domiciliacion";
-import type { Promocion, Aseguradora, EmpresaRPBI } from "@/lib/catalogosVarios";
+import type { Promocion, Aseguradora, EmpresaRPBI, Contador } from "@/lib/catalogosVarios";
 import type { PersonalAsistencia, RegistroAsistencia } from "@/lib/asistencia";
 import type { Procedimiento } from "@/lib/procedimientos";
 import { catalogoInicial, type MedicamentoCatalogo } from "@/lib/medicamentos";
@@ -407,6 +407,8 @@ type PatientDataContextValue = {
   setAseguradoras: (updater: Updater<Aseguradora[]>) => void;
   empresasRpbi: EmpresaRPBI[];
   setEmpresasRpbi: (updater: Updater<EmpresaRPBI[]>) => void;
+  contadores: Contador[];
+  setContadores: (updater: Updater<Contador[]>) => void;
   membresiasPorPaciente: Record<string, PatientMembership[]>;
   activarMembresia: (
     patientId: string,
@@ -587,6 +589,7 @@ export function PatientDataProvider({
   const [promociones, setPromociones] = useFirestoreList<Promocion>(clinicUid, "promociones");
   const [aseguradoras, setAseguradoras] = useFirestoreList<Aseguradora>(clinicUid, "aseguradoras");
   const [empresasRpbi, setEmpresasRpbi] = useFirestoreList<EmpresaRPBI>(clinicUid, "empresasRpbi");
+  const [contadores, setContadores] = useFirestoreList<Contador>(clinicUid, "contadores");
   const [personalAsistencia, setPersonalAsistencia] = useFirestoreList<PersonalAsistencia>(
     clinicUid,
     "personalAsistencia"
@@ -1480,6 +1483,8 @@ export function PatientDataProvider({
         setAseguradoras,
         empresasRpbi,
         setEmpresasRpbi,
+        contadores,
+        setContadores,
         membresiasPorPaciente,
         activarMembresia,
         renovarMembresia,

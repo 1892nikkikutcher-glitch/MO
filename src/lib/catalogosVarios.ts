@@ -27,11 +27,33 @@ export type Aseguradora = {
   notas: string;
 };
 
-/** Empresa (o persona responsable) encargada de recolectar los Residuos
- * Peligrosos Biológico-Infecciosos (RPBI) del consultorio. */
+/** Empresa (y/o persona responsable) encargada de recolectar los Residuos
+ * Peligrosos Biológico-Infecciosos (RPBI) del consultorio. `empresa` y
+ * `responsable` son independientes — se puede llenar solo uno o ambos.
+ * `nombre` es el campo original (empresa/responsable combinados en uno
+ * solo) de antes de este cambio: ausente en registros nuevos, se conserva
+ * como opcional solo para no perder los datos de registros ya guardados. */
 export type EmpresaRPBI = {
   id: string;
-  nombre: string;
+  empresa: string;
+  responsable: string;
+  telefono: string;
+  correo: string;
+  frecuencia: string;
+  costo: string;
+  incluye: string;
+  requiereFactura: boolean;
+  notas: string;
+  nombre?: string;
+};
+
+/** Contador o despacho contable del consultorio — mismo patrón que
+ * EmpresaRPBI: `despacho` y `contador` son independientes, se puede
+ * llenar solo uno o ambos. */
+export type Contador = {
+  id: string;
+  despacho: string;
+  contador: string;
   telefono: string;
   correo: string;
   notas: string;

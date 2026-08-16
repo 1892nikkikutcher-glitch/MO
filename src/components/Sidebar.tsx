@@ -220,6 +220,19 @@ export const navItems = [
     ),
   },
   {
+    id: "contabilidad",
+    label: "Contabilidad",
+    icon: (
+      <path
+        d="M6 2h9l5 5v13a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2ZM14 2v6h6M8 13h8M8 17h5"
+        stroke="currentColor"
+        strokeWidth="1.8"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+    ),
+  },
+  {
     id: "contrasena",
     label: "Contraseña",
     icon: (

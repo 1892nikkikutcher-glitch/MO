@@ -24,7 +24,36 @@ function WhatsAppIcon() {
 }
 
 function vacia(): Omit<EmpresaRPBI, "id"> {
-  return { nombre: "", telefono: "", correo: "", notas: "" };
+  return {
+    empresa: "",
+    responsable: "",
+    telefono: "",
+    correo: "",
+    frecuencia: "",
+    costo: "",
+    incluye: "",
+    requiereFactura: false,
+    notas: "",
+  };
+}
+
+/** Convierte un registro tal como está guardado en Firestore a la forma del
+ * formulario — los registros creados antes de separar empresa/responsable
+ * solo tienen `nombre`; se usa como valor inicial de "Responsable" (en la
+ * práctica siempre se había capturado un nombre de persona) para no perder
+ * lo ya guardado, y desaparece en cuanto se vuelve a guardar. */
+function aFormulario(e: EmpresaRPBI): Omit<EmpresaRPBI, "id"> {
+  return {
+    empresa: e.empresa ?? "",
+    responsable: e.responsable ?? e.nombre ?? "",
+    telefono: e.telefono ?? "",
+    correo: e.correo ?? "",
+    frecuencia: e.frecuencia ?? "",
+    costo: e.costo ?? "",
+    incluye: e.incluye ?? "",
+    requiereFactura: e.requiereFactura ?? false,
+    notas: e.notas ?? "",
+  };
 }
 
 function EmpresaRpbiDialog({
@@ -36,12 +65,12 @@ function EmpresaRpbiDialog({
   onClose: () => void;
   onGuardar: (data: Omit<EmpresaRPBI, "id">) => void;
 }) {
-  const [form, setForm] = useState<Omit<EmpresaRPBI, "id">>(inicial ?? vacia());
-  const puedeGuardar = form.nombre.trim().length > 0;
+  const [form, setForm] = useState<Omit<EmpresaRPBI, "id">>(inicial ? aFormulario(inicial) : vacia());
+  const puedeGuardar = form.empresa.trim().length > 0 || form.responsable.trim().length > 0;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4">
-      <div className="w-full max-w-sm rounded-2xl border border-edge/10 bg-modal p-6">
+    <div className="fixed inset-0 z-50 flex items-center justify-center overflow-y-auto bg-black/70 p-4">
+      <div className="my-8 w-full max-w-sm rounded-2xl border border-edge/10 bg-modal p-6">
         <div className="mb-4 flex items-center justify-between">
           <h3 className="text-base font-semibold text-ink">
             {inicial ? "Editar Empresa RPBI" : "Nueva Empresa RPBI"}
@@ -54,17 +83,28 @@ function EmpresaRpbiDialog({
           </button>
         </div>
         <div className="space-y-4">
-          <div>
-            <label className="mb-1 block text-xs font-medium text-ink/60">
-              Nombre de la empresa o responsable
-            </label>
-            <input
-              type="text"
-              value={form.nombre}
-              onChange={(e) => manejarCambioNombre(e, (v) => setForm((p) => ({ ...p, nombre: v })))}
-              placeholder="Ej. Recolectora RPBI del Bajío"
-              className={inputClass}
-            />
+          <p className="text-xs text-ink/40">Llena empresa, responsable, o ambos.</p>
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="mb-1 block text-xs font-medium text-ink/60">Empresa</label>
+              <input
+                type="text"
+                value={form.empresa}
+                onChange={(e) => setForm((p) => ({ ...p, empresa: e.target.value }))}
+                placeholder="Ej. Recolectora RPBI del Bajío"
+                className={inputClass}
+              />
+            </div>
+            <div>
+              <label className="mb-1 block text-xs font-medium text-ink/60">Responsable</label>
+              <input
+                type="text"
+                value={form.responsable}
+                onChange={(e) => manejarCambioNombre(e, (v) => setForm((p) => ({ ...p, responsable: v })))}
+                placeholder="Nombre de la persona"
+                className={inputClass}
+              />
+            </div>
           </div>
           <div className="grid grid-cols-2 gap-3">
             <div>
@@ -87,13 +127,58 @@ function EmpresaRpbiDialog({
               />
             </div>
           </div>
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="mb-1 block text-xs font-medium text-ink/60">
+                Frecuencia de recolección
+              </label>
+              <input
+                type="text"
+                value={form.frecuencia}
+                onChange={(e) => setForm((p) => ({ ...p, frecuencia: e.target.value }))}
+                placeholder="Ej. Cada 4 meses"
+                className={inputClass}
+              />
+            </div>
+            <div>
+              <label className="mb-1 block text-xs font-medium text-ink/60">Costo</label>
+              <input
+                type="text"
+                value={form.costo}
+                onChange={(e) => setForm((p) => ({ ...p, costo: e.target.value }))}
+                placeholder="Ej. $800 por recolección"
+                className={inputClass}
+              />
+            </div>
+          </div>
+          <div>
+            <label className="mb-1 block text-xs font-medium text-ink/60">
+              Qué incluye el servicio
+            </label>
+            <input
+              type="text"
+              value={form.incluye}
+              onChange={(e) => setForm((p) => ({ ...p, incluye: e.target.value }))}
+              placeholder="Ej. Bote de punzocortantes, bolsas rojas, bitácora..."
+              className={inputClass}
+            />
+          </div>
+          <label className="flex items-center gap-2 text-sm text-ink/70">
+            <input
+              type="checkbox"
+              checked={form.requiereFactura}
+              onChange={(e) => setForm((p) => ({ ...p, requiereFactura: e.target.checked }))}
+              className="h-4 w-4 rounded border-edge/30 accent-accent"
+            />
+            Pide factura del servicio
+          </label>
           <div>
             <label className="mb-1 block text-xs font-medium text-ink/60">Notas</label>
             <textarea
               value={form.notas}
               onChange={(e) => setForm((p) => ({ ...p, notas: e.target.value }))}
-              rows={3}
-              placeholder="Frecuencia de recolección, número de contrato/autorización, etc."
+              rows={2}
+              placeholder="Número de contrato/autorización, condiciones adicionales..."
               className={inputClass}
             />
           </div>
@@ -106,7 +191,10 @@ function EmpresaRpbiDialog({
             Cancelar
           </button>
           <button
-            onClick={() => puedeGuardar && onGuardar({ ...form, nombre: form.nombre.trim() })}
+            onClick={() =>
+              puedeGuardar &&
+              onGuardar({ ...form, empresa: form.empresa.trim(), responsable: form.responsable.trim() })
+            }
             disabled={!puedeGuardar}
             className="flex-1 rounded-lg bg-gradient-to-r from-accent to-orange-500 py-2.5 text-sm font-semibold text-black transition-opacity hover:opacity-90 disabled:opacity-40"
           >
@@ -118,13 +206,25 @@ function EmpresaRpbiDialog({
   );
 }
 
+/** Título de la tarjeta: empresa y/o responsable, lo que haya. */
+function tituloEmpresa(e: EmpresaRPBI): string {
+  const empresa = e.empresa ?? "";
+  const responsable = e.responsable ?? e.nombre ?? "";
+  if (empresa && responsable) return `${empresa} — ${responsable}`;
+  return empresa || responsable || "(sin nombre)";
+}
+
 export default function Rpbi() {
   const { empresasRpbi, setEmpresasRpbi } = usePatientData();
   const [editando, setEditando] = useState<EmpresaRPBI | "nuevo" | null>(null);
 
   const guardar = (data: Omit<EmpresaRPBI, "id">) => {
     if (editando && editando !== "nuevo") {
-      setEmpresasRpbi((prev) => prev.map((e) => (e.id === editando.id ? { ...e, ...data } : e)));
+      // Reemplaza el registro entero con { id, ...data } (en vez de mezclar
+      // sobre el anterior) para que el campo `nombre` heredado de antes de
+      // separar empresa/responsable no sobreviva al guardar — data nunca
+      // lo trae, así que desaparece del documento en Firestore.
+      setEmpresasRpbi((prev) => prev.map((e) => (e.id === editando.id ? { id: e.id, ...data } : e)));
     } else {
       const nueva: EmpresaRPBI = { id: `rpbi${Date.now()}`, ...data };
       setEmpresasRpbi((prev) => [nueva, ...prev]);
@@ -161,9 +261,31 @@ export default function Rpbi() {
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
           {empresasRpbi.map((e) => (
             <div key={e.id} className="rounded-2xl border border-edge/10 bg-surface p-5">
-              <p className="text-sm font-semibold text-ink">{e.nombre}</p>
+              <p className="text-sm font-semibold text-ink">{tituloEmpresa(e)}</p>
               {e.telefono && <p className="mt-1 text-xs text-ink/50">{e.telefono}</p>}
               {e.correo && <p className="text-xs text-ink/50">{e.correo}</p>}
+              {e.frecuencia && (
+                <p className="mt-2 text-xs text-ink/60">
+                  <span className="text-ink/40">Frecuencia: </span>
+                  {e.frecuencia}
+                </p>
+              )}
+              {e.costo && (
+                <p className="text-xs text-ink/60">
+                  <span className="text-ink/40">Costo: </span>
+                  {e.costo}
+                </p>
+              )}
+              {e.incluye && (
+                <p className="text-xs text-ink/60">
+                  <span className="text-ink/40">Incluye: </span>
+                  {e.incluye}
+                </p>
+              )}
+              <p className="text-xs text-ink/60">
+                <span className="text-ink/40">Factura: </span>
+                {e.requiereFactura ? "Sí" : "No"}
+              </p>
               {e.notas && <p className="mt-2 text-xs text-ink/40">{e.notas}</p>}
               <div className="mt-3 flex flex-wrap items-center gap-2 border-t border-edge/10 pt-3">
                 {e.telefono && (

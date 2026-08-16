@@ -20,6 +20,7 @@ import Documentos from "./pages/Documentos";
 import Gastos from "./pages/Gastos";
 import RegulacionSanitaria from "./pages/RegulacionSanitaria";
 import Rpbi from "./pages/Rpbi";
+import Contabilidad from "./pages/Contabilidad";
 import Educacion from "./pages/Educacion";
 import DepositoDental from "./pages/DepositoDental";
 import ProximamenteStub from "./pages/ProximamenteStub";
@@ -72,6 +73,7 @@ const paginasConstruidas = new Set([
   "gastos",
   "regulacion-sanitaria",
   "rpbi",
+  "contabilidad",
   "educacion",
   "deposito-dental",
   "contrasena",
@@ -301,6 +303,7 @@ export default function Dashboard({
           {activePage === "gastos" && <Gastos />}
           {activePage === "regulacion-sanitaria" && <RegulacionSanitaria />}
           {activePage === "rpbi" && <Rpbi />}
+          {activePage === "contabilidad" && <Contabilidad />}
           {activePage === "educacion" && <Educacion />}
           {activePage === "deposito-dental" && <DepositoDental />}
           {activePage === "contrasena" && <Contrasena />}
