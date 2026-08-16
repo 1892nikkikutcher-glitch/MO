@@ -73,6 +73,12 @@ export default function NuevoPresupuesto({
   const [costoPorOrgano, setCostoPorOrgano] = useState(false);
   const [descuentoPct, setDescuentoPct] = useState("");
   const [items, setItems] = useState<LineItem[]>(initialBudget?.items ?? []);
+  /** Id del renglón que se está editando (null = capturando uno nuevo). La
+   * edición reutiliza el mismo formulario de "procedimiento no catalogado"
+   * (nombre + precio libres) sin importar si el renglón se agregó
+   * originalmente desde el catálogo o no — así se puede corregir cualquier
+   * renglón, por ejemplo para agregar el OD que se te olvidó marcar. */
+  const [editandoItemId, setEditandoItemId] = useState<string | null>(null);
 
   const toggleTooth = (tooth: number) => {
     setSelectedTeeth((prev) =>
@@ -110,6 +116,58 @@ export default function NuevoPresupuesto({
     setNotaProcedimiento("");
   };
 
+  /** Igual que agregarItem pero reemplaza un renglón existente en vez de
+   * añadir uno — misma fórmula de precio (multiplicador × descuento). */
+  const actualizarItem = (id: string, procedure: string, precioUnitario: number) => {
+    const descuento = Math.min(100, Math.max(0, Number(descuentoPct) || 0));
+    const precioTotal = Math.round(precioUnitario * multiplicador * (1 - descuento / 100) * 100) / 100;
+    setItems((prev) =>
+      prev.map((it) =>
+        it.id === id
+          ? {
+              ...it,
+              procedure,
+              price: precioTotal,
+              precioUnitario,
+              cantidad: multiplicador,
+              descuentoPct: descuento,
+              teeth: selectedTeeth,
+              note: notaProcedimiento.trim(),
+            }
+          : it
+      )
+    );
+    setSelectedTeeth([]);
+    setCostoPorOrgano(false);
+    setDescuentoPct("");
+    setNotaProcedimiento("");
+  };
+
+  const iniciarEdicionItem = (item: LineItem) => {
+    setEditandoItemId(item.id);
+    setSelectedTeeth(item.teeth);
+    setNotaProcedimiento(item.note);
+    setDescuentoPct(item.descuentoPct ? String(item.descuentoPct) : "");
+    setCostoPorOrgano((item.cantidad ?? 1) > 1);
+    setPersonalizadoNombre(item.procedure);
+    setPersonalizadoPrecio(String(item.precioUnitario ?? item.price));
+    setProcedimientoSeleccionadoId("");
+    setMostrarPersonalizado(true);
+  };
+
+  const cancelarEdicionOPersonalizado = () => {
+    setMostrarPersonalizado(false);
+    setPersonalizadoNombre("");
+    setPersonalizadoPrecio("");
+    if (editandoItemId) {
+      setEditandoItemId(null);
+      setSelectedTeeth([]);
+      setCostoPorOrgano(false);
+      setDescuentoPct("");
+      setNotaProcedimiento("");
+    }
+  };
+
   const handleAgregarDelCatalogo = () => {
     const procedimiento = procedimientos.find((p) => p.id === procedimientoSeleccionadoId);
     if (!procedimiento) return;
@@ -144,8 +202,13 @@ export default function NuevoPresupuesto({
     const precio = Number(personalizadoPrecio);
     if (!nombre || !precio) return;
     if (costoPorOrgano && selectedTeeth.length === 0) return;
-    agregarItem(nombre, precio);
-    guardarProcedimientoNoCatalogadoEnCatalogo(nombre, precio);
+    if (editandoItemId) {
+      actualizarItem(editandoItemId, nombre, precio);
+      setEditandoItemId(null);
+    } else {
+      agregarItem(nombre, precio);
+      guardarProcedimientoNoCatalogadoEnCatalogo(nombre, precio);
+    }
     setPersonalizadoNombre("");
     setPersonalizadoPrecio("");
     setMostrarPersonalizado(false);
@@ -488,10 +551,16 @@ export default function NuevoPresupuesto({
           ) : (
             <div className="space-y-2 rounded-lg border border-dashed border-edge/15 p-3">
               <p className="text-xs text-ink/40">
-                Procedimiento no catalogado: aún no está en tu catálogo, pero sí se puede
-                realizar. Se agregará también a{" "}
-                <span className="font-medium text-ink/60">{especialidad}</span> para que
-                aparezca en presupuestos futuros de cualquier paciente.
+                {editandoItemId ? (
+                  "Editando este renglón — ajusta nombre, precio, dientes o descuento y guarda los cambios."
+                ) : (
+                  <>
+                    Procedimiento no catalogado: aún no está en tu catálogo, pero sí se puede
+                    realizar. Se agregará también a{" "}
+                    <span className="font-medium text-ink/60">{especialidad}</span> para que
+                    aparezca en presupuestos futuros de cualquier paciente.
+                  </>
+                )}
               </p>
               <div className="grid grid-cols-[1fr_120px] gap-2">
                 <input
@@ -520,14 +589,10 @@ export default function NuevoPresupuesto({
                   }
                   className="flex-1 rounded-lg border border-accent/40 py-2 text-xs font-semibold text-accent transition-colors hover:bg-accent/10 disabled:cursor-not-allowed disabled:opacity-40"
                 >
-                  Agregar
+                  {editandoItemId ? "Guardar cambios" : "Agregar"}
                 </button>
                 <button
-                  onClick={() => {
-                    setMostrarPersonalizado(false);
-                    setPersonalizadoNombre("");
-                    setPersonalizadoPrecio("");
-                  }}
+                  onClick={cancelarEdicionOPersonalizado}
                   className="rounded-lg border border-edge/15 px-3 py-2 text-xs font-semibold text-ink/60 hover:bg-surface"
                 >
                   Cancelar
@@ -594,6 +659,13 @@ export default function NuevoPresupuesto({
                   </div>
                   <div className="flex items-center gap-3">
                     <span className="font-medium text-ink">{formatCurrency(item.price)}</span>
+                    <button
+                      onClick={() => iniciarEdicionItem(item)}
+                      className="text-ink/30 hover:text-accent print:hidden"
+                      title="Editar"
+                    >
+                      ✎
+                    </button>
                     <button
                       onClick={() => handleRemoveItem(item.id)}
                       className="text-ink/30 hover:text-danger print:hidden"
