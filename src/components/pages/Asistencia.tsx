@@ -16,6 +16,7 @@ import {
   type DiaSemana,
   type BloqueHorario,
 } from "@/lib/asistencia";
+import { manejarCambioNombre } from "@/lib/textoNombre";
 
 const inputClass =
   "w-full rounded-lg border border-edge/10 bg-field px-3 py-2 text-sm text-ink placeholder-ink/30 outline-none focus:border-accent/60";
@@ -61,7 +62,12 @@ function PersonalDialog({
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
             <div>
               <label className="mb-1 block text-xs font-medium text-ink/60">Nombre</label>
-              <input type="text" value={nombre} onChange={(e) => setNombre(e.target.value)} className={inputClass} />
+              <input
+                type="text"
+                value={nombre}
+                onChange={(e) => manejarCambioNombre(e, setNombre)}
+                className={inputClass}
+              />
             </div>
             <div>
               <label className="mb-1 block text-xs font-medium text-ink/60">Puesto</label>

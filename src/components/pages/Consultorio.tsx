@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { usePatientData } from "@/context/PatientDataContext";
+import { manejarCambioNombre } from "@/lib/textoNombre";
 
 const inputClass =
   "w-full rounded-lg border border-edge/10 bg-field px-3 py-2 text-sm text-ink outline-none focus:border-accent/60";
@@ -136,10 +137,12 @@ export default function Consultorio() {
               <input
                 type="text"
                 value={responsableSanitario}
-                onChange={(e) => {
-                  setResponsableSanitario(e.target.value);
-                  setGuardado(false);
-                }}
+                onChange={(e) =>
+                  manejarCambioNombre(e, (v) => {
+                    setResponsableSanitario(v);
+                    setGuardado(false);
+                  })
+                }
                 disabled={soloLectura}
                 className={inputClass}
               />

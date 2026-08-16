@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { usePatientData } from "@/context/PatientDataContext";
 import { calcularEdadDetallada } from "@/lib/patientData";
+import { manejarCambioNombre } from "@/lib/textoNombre";
 
 type Patient = {
   id: string;
@@ -113,7 +114,7 @@ export default function ConsentimientoInformado({
           <input
             type="text"
             value={nombreFirmante}
-            onChange={(e) => setNombreFirmante(e.target.value)}
+            onChange={(e) => manejarCambioNombre(e, setNombreFirmante)}
             className={inputClass}
           />
           {esMenorDeEdad && (
@@ -139,7 +140,7 @@ export default function ConsentimientoInformado({
           <input
             type="text"
             value={testigo1}
-            onChange={(e) => setTestigo1(e.target.value)}
+            onChange={(e) => manejarCambioNombre(e, setTestigo1)}
             className={inputClass}
           />
         </div>
@@ -148,7 +149,7 @@ export default function ConsentimientoInformado({
           <input
             type="text"
             value={testigo2}
-            onChange={(e) => setTestigo2(e.target.value)}
+            onChange={(e) => manejarCambioNombre(e, setTestigo2)}
             className={inputClass}
           />
         </div>

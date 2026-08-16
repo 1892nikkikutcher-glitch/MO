@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { usePatientData } from "@/context/PatientDataContext";
 import type { Aseguradora } from "@/lib/catalogosVarios";
+import { manejarCambioNombre } from "@/lib/textoNombre";
 
 const inputClass =
   "w-full rounded-lg border border-edge/10 bg-field px-3 py-2 text-sm text-ink outline-none focus:border-accent/60";
@@ -48,7 +49,7 @@ function AseguradoraDialog({
             <input
               type="text"
               value={form.contacto}
-              onChange={(e) => setForm((p) => ({ ...p, contacto: e.target.value }))}
+              onChange={(e) => manejarCambioNombre(e, (v) => setForm((p) => ({ ...p, contacto: v })))}
               placeholder="Nombre del ejecutivo/agente"
               className={inputClass}
             />

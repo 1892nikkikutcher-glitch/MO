@@ -269,7 +269,7 @@ function NuevaRecursoDialog({
             <input
               type="text"
               value={nombre}
-              onChange={(e) => setNombre(e.target.value)}
+              onChange={(e) => (tipo === "medico" ? manejarCambioNombre(e, setNombre) : setNombre(e.target.value))}
               placeholder={tipo === "medico" ? "Ej. Dra. Fernanda Ruiz" : "Ej. Unidad 3 · Consultorio C"}
               className={inputClass}
             />
@@ -1689,7 +1689,11 @@ export default function Agenda() {
                       <input
                         autoFocus
                         value={nombreEditando}
-                        onChange={(e) => setNombreEditando(e.target.value)}
+                        onChange={(e) =>
+                          r.tipo === "medico"
+                            ? manejarCambioNombre(e, setNombreEditando)
+                            : setNombreEditando(e.target.value)
+                        }
                         onBlur={guardarNombreRecurso}
                         onKeyDown={(e) => {
                           if (e.key === "Enter") guardarNombreRecurso();
