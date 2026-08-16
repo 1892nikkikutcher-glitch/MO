@@ -71,7 +71,7 @@ import type { OtLogEntry } from "@/lib/otsLog";
 import type { EncuestaEnviada } from "@/lib/encuestas";
 import type { Pendiente } from "@/lib/pendientes";
 import type { Domiciliacion } from "@/lib/domiciliacion";
-import type { Promocion, Aseguradora } from "@/lib/catalogosVarios";
+import type { Promocion, Aseguradora, EmpresaRPBI } from "@/lib/catalogosVarios";
 import type { PersonalAsistencia, RegistroAsistencia } from "@/lib/asistencia";
 import type { Procedimiento } from "@/lib/procedimientos";
 import { catalogoInicial, type MedicamentoCatalogo } from "@/lib/medicamentos";
@@ -405,6 +405,8 @@ type PatientDataContextValue = {
   setPromociones: (updater: Updater<Promocion[]>) => void;
   aseguradoras: Aseguradora[];
   setAseguradoras: (updater: Updater<Aseguradora[]>) => void;
+  empresasRpbi: EmpresaRPBI[];
+  setEmpresasRpbi: (updater: Updater<EmpresaRPBI[]>) => void;
   membresiasPorPaciente: Record<string, PatientMembership[]>;
   activarMembresia: (
     patientId: string,
@@ -584,6 +586,7 @@ export function PatientDataProvider({
   const [pendientes, setPendientes] = useFirestoreList<Pendiente>(clinicUid, "pendientes");
   const [promociones, setPromociones] = useFirestoreList<Promocion>(clinicUid, "promociones");
   const [aseguradoras, setAseguradoras] = useFirestoreList<Aseguradora>(clinicUid, "aseguradoras");
+  const [empresasRpbi, setEmpresasRpbi] = useFirestoreList<EmpresaRPBI>(clinicUid, "empresasRpbi");
   const [personalAsistencia, setPersonalAsistencia] = useFirestoreList<PersonalAsistencia>(
     clinicUid,
     "personalAsistencia"
@@ -785,6 +788,8 @@ export function PatientDataProvider({
   };
 
   const irAExpediente = (patientId: string, tab?: string) => {
+    if (cambiosSinGuardar && !window.confirm(`${cambiosSinGuardar} ¿Salir sin guardar?`)) return;
+    setCambiosSinGuardar(null);
     setNavegacionExpediente({ patientId, tab });
     onIrAPagina?.("pacientes");
   };
@@ -1473,6 +1478,8 @@ export function PatientDataProvider({
         setPromociones,
         aseguradoras,
         setAseguradoras,
+        empresasRpbi,
+        setEmpresasRpbi,
         membresiasPorPaciente,
         activarMembresia,
         renovarMembresia,

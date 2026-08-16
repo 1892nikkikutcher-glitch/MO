@@ -207,6 +207,19 @@ export const navItems = [
     ),
   },
   {
+    id: "rpbi",
+    label: "RPBI",
+    icon: (
+      <path
+        d="M4 7h16M9 7V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v3m-9 0 1 13a2 2 0 0 0 2 2h6a2 2 0 0 0 2-2l1-13M12 11v5M9.5 13.5h5"
+        stroke="currentColor"
+        strokeWidth="1.8"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+    ),
+  },
+  {
     id: "contrasena",
     label: "Contraseña",
     icon: (

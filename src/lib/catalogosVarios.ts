@@ -26,3 +26,13 @@ export type Aseguradora = {
   correo: string;
   notas: string;
 };
+
+/** Empresa (o persona responsable) encargada de recolectar los Residuos
+ * Peligrosos Biológico-Infecciosos (RPBI) del consultorio. */
+export type EmpresaRPBI = {
+  id: string;
+  nombre: string;
+  telefono: string;
+  correo: string;
+  notas: string;
+};

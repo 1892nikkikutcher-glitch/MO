@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { usePatientData } from "@/context/PatientDataContext";
 import type { NotaEvolucion } from "@/lib/patientData";
 
@@ -59,7 +59,8 @@ function todayFormatted() {
 }
 
 export default function NotasEvolucion({ patientId }: { patientId: string }) {
-  const { recursos, notasEvolucionPorPaciente, setNotasEvolucionPaciente } = usePatientData();
+  const { recursos, notasEvolucionPorPaciente, setNotasEvolucionPaciente, setCambiosSinGuardar } =
+    usePatientData();
   const medicos = recursos.filter((r) => r.tipo === "medico");
   const notas = notasEvolucionPorPaciente[patientId] ?? [];
 
@@ -67,6 +68,22 @@ export default function NotasEvolucion({ patientId }: { patientId: string }) {
   const [form, setForm] = useState<Record<PsoapKey, string>>(emptyForm);
 
   const puedeAgregar = Object.values(form).some((v) => v.trim().length > 0);
+
+  // El botón "+ Agregar Nota" es lo único que guarda — si se escribe en los
+  // campos PSOAP y se sale sin darle clic, antes se perdía en silencio.
+  useEffect(() => {
+    setCambiosSinGuardar(puedeAgregar ? "Tienes una nota de evolución sin guardar." : null);
+    return () => setCambiosSinGuardar(null);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [puedeAgregar]);
+
+  // Este componente no se desmonta al cambiar de paciente (ej. desde "Ver
+  // expediente" en Agenda) — sin este reset, un borrador sin guardar de un
+  // paciente podía quedar pegado y agregarse por error al paciente nuevo.
+  useEffect(() => {
+    setForm(emptyForm);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [patientId]);
 
   const handleAgregar = () => {
     if (!puedeAgregar) return;
