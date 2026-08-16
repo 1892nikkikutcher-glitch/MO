@@ -121,24 +121,55 @@ function formatRangeLabel(inicio: Date, fin: Date) {
 const inputClass =
   "w-full rounded-lg border border-edge/10 bg-field px-3 py-2 text-sm text-ink outline-none focus:border-accent/60";
 
+/** Asigna cada cita a un carril (columna) para dibujarla en la agenda, pero
+ * el ancho de carril se calcula por grupo de citas realmente encimadas
+ * (mismo truco que Google Calendar), no para el día completo — si dos
+ * citas se empalman a las 16:00 pero el resto del día no tiene nada más
+ * encimado, solo esas dos se dividen la columna; las demás usan el ancho
+ * completo aunque estén en el mismo día. */
 function assignLanes(citasDelDia: CitaAgenda[]) {
   const sorted = [...citasDelDia].sort(
     (a, b) => timeToMinutes(a.horaInicio) - timeToMinutes(b.horaInicio)
   );
-  const lanesEnd: number[] = [];
-  const withLane = sorted.map((c) => {
+
+  const withLane: { cita: CitaAgenda; lane: number; lanesInGroup: number }[] = [];
+  let grupo: CitaAgenda[] = [];
+  let finGrupo = -Infinity;
+
+  const cerrarGrupo = () => {
+    if (grupo.length === 0) return;
+    const lanesEnd: number[] = [];
+    const inicioIndice = withLane.length;
+    grupo.forEach((c) => {
+      const start = timeToMinutes(c.horaInicio);
+      const end = timeToMinutes(c.horaFin);
+      let lane = lanesEnd.findIndex((e) => e <= start);
+      if (lane === -1) {
+        lane = lanesEnd.length;
+        lanesEnd.push(end);
+      } else {
+        lanesEnd[lane] = end;
+      }
+      withLane.push({ cita: c, lane, lanesInGroup: 1 });
+    });
+    const lanesInGroup = Math.max(lanesEnd.length, 1);
+    for (let i = inicioIndice; i < withLane.length; i++) withLane[i].lanesInGroup = lanesInGroup;
+    grupo = [];
+  };
+
+  sorted.forEach((c) => {
     const start = timeToMinutes(c.horaInicio);
     const end = timeToMinutes(c.horaFin);
-    let lane = lanesEnd.findIndex((e) => e <= start);
-    if (lane === -1) {
-      lane = lanesEnd.length;
-      lanesEnd.push(end);
-    } else {
-      lanesEnd[lane] = end;
+    if (grupo.length > 0 && start >= finGrupo) {
+      cerrarGrupo();
+      finGrupo = -Infinity;
     }
-    return { cita: c, lane };
+    grupo.push(c);
+    finGrupo = Math.max(finGrupo, end);
   });
-  return { withLane, totalLanes: Math.max(lanesEnd.length, 1) };
+  cerrarGrupo();
+
+  return withLane;
 }
 
 function addMonths(d: Date, n: number) {
@@ -1490,7 +1521,7 @@ export default function Agenda() {
 
             {dias.map((dia) => {
               const citasDelDia = citasVisibles.filter((c) => c.fecha === toISODate(dia));
-              const { withLane, totalLanes } = assignLanes(citasDelDia);
+              const withLane = assignLanes(citasDelDia);
               const esHoy = isSameDay(dia, hoy);
               return (
                 <div key={toISODate(dia)} className="min-w-[130px] flex-1 border-r border-edge/10 last:border-r-0">
@@ -1600,14 +1631,14 @@ export default function Agenda() {
                       />
                     ))}
 
-                    {withLane.map(({ cita, lane }) => {
+                    {withLane.map(({ cita, lane, lanesInGroup }) => {
                       const recurso = recursoPorId(cita.recursoId);
                       const top = (timeToMinutes(cita.horaInicio) - HOUR_START * 60) * PX_PER_MIN;
                       const height = Math.max(
                         (timeToMinutes(cita.horaFin) - timeToMinutes(cita.horaInicio)) * PX_PER_MIN,
                         18
                       );
-                      const widthPct = 100 / totalLanes;
+                      const widthPct = 100 / lanesInGroup;
                       return (
                         <button
                           key={cita.id}
