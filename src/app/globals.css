@@ -128,3 +128,15 @@ select option {
   background-color: #ffffff;
   color: #1c1d22;
 }
+
+/* Márgenes de impresión más chicos que los ~1" que pone Chrome por
+   default — sin esto, documentos que sí caben en una hoja (ej.
+   Consentimiento Informado) se recortaban unos milímetros de más y
+   brincaban a una segunda página, activando la impresión a doble cara si
+   la impresora la tenía configurada por default. */
+@media print {
+  @page {
+    size: letter;
+    margin: 10mm;
+  }
+}

@@ -39,6 +39,30 @@ const estatusColor: Record<CitaEstatus, { bg: string; text: string; dot: string 
   "No Asistió": { bg: "bg-danger/20", text: "text-danger", dot: "bg-danger" },
 };
 
+/** Color de texto de la tarjeta de cita en el calendario — mismo tono que
+ * el estatus (para verlo de un vistazo sin abrir la cita), a plena
+ * intensidad (no la versión atenuada que usan las píldoras de arriba,
+ * pensada para fondo neutro). Agendada se queda en tinta plana: es el
+ * estatus por default y no necesita resaltar. */
+const citaTextColor: Record<CitaEstatus, string> = {
+  Agendada: "text-ink",
+  Confirmada: "text-info",
+  "En espera": "text-accent",
+  Atendida: "text-success",
+  Reagendada: "text-warning",
+  Cancelada: "text-danger",
+  "No Asistió": "text-danger",
+};
+
+/** Halo oscuro alrededor de las letras (simulado con varios text-shadow en
+ * diagonal) para que el color de estatus se siga leyendo aunque la tarjeta
+ * tenga un color de fondo parecido (ej. estatus "Atendida" en verde sobre
+ * un recurso también verde) — contraste por fuera (el halo) y por dentro
+ * (el color en sí), igual en modo claro y oscuro porque el color de
+ * recurso no cambia con el tema. */
+const CITA_TEXT_OUTLINE =
+  "-1px -1px 0 rgba(0,0,0,0.6), 1px -1px 0 rgba(0,0,0,0.6), -1px 1px 0 rgba(0,0,0,0.6), 1px 1px 0 rgba(0,0,0,0.6)";
+
 /** WhatsApp no soporta texto de color, así que se usa el círculo de color
  * emoji más parecido (por distancia RGB) al color asignado al recurso, para
  * poder distinguir de un vistazo a qué médico corresponde cada cita. */
@@ -261,7 +285,7 @@ function NuevaRecursoDialog({
 
   return (
     <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/70 p-4">
-      <div className="w-full max-w-sm rounded-2xl border border-edge/10 bg-[#111] p-6">
+      <div className="w-full max-w-sm rounded-2xl border border-edge/10 bg-modal p-6">
         <div className="mb-4 flex items-center justify-between">
           <h3 className="text-base font-semibold text-ink">Nuevo Recurso</h3>
           <button
@@ -315,7 +339,7 @@ function NuevaRecursoDialog({
                   className="h-7 w-7 rounded-full border-2 transition-transform"
                   style={{
                     backgroundColor: c,
-                    borderColor: color === c ? "#fff" : "transparent",
+                    borderColor: color === c ? "rgb(var(--ink-rgb))" : "transparent",
                     transform: color === c ? "scale(1.15)" : "scale(1)",
                   }}
                 />
@@ -762,7 +786,7 @@ function CitaDialog({
                         setEstatus(opt);
                         setMostrarEstatusRapido(false);
                       }}
-                      className="block w-full rounded-md px-2 py-1.5 text-left text-xs text-ink/80 hover:bg-surface"
+                      className={`block w-full rounded-md px-2 py-1.5 text-left text-xs font-medium hover:bg-surface ${citaTextColor[opt]}`}
                     >
                       {opt}
                     </button>
@@ -1487,8 +1511,10 @@ export default function Agenda() {
                               abrirEditarCita(cita);
                             }}
                             title={`${cita.horaInicio}–${cita.horaFin} · ${cita.paciente} · ${recurso?.nombre ?? ""}`}
-                            className="block w-full truncate rounded px-1 py-0.5 text-left text-[10px] font-medium text-white"
-                            style={{ backgroundColor: recurso?.color ?? "#666" }}
+                            className={`block w-full truncate rounded px-1 py-0.5 text-left text-[10px] font-medium ${
+                              citaTextColor[cita.estatus] ?? "text-ink"
+                            }`}
+                            style={{ backgroundColor: recurso?.color ?? "#666", textShadow: CITA_TEXT_OUTLINE }}
                           >
                             {cita.horaInicio} {cita.paciente}
                           </button>
@@ -1658,15 +1684,16 @@ export default function Agenda() {
                             e.stopPropagation();
                             abrirEditarCita(cita);
                           }}
-                          className={`absolute overflow-hidden rounded-md px-1.5 py-0.5 text-left text-[10px] leading-tight text-ink shadow-sm transition-transform hover:z-10 hover:scale-[1.02] ${
-                            draggingId === cita.id ? "cursor-grabbing opacity-40" : "cursor-grab"
-                          }`}
+                          className={`absolute overflow-hidden rounded-md px-1.5 py-0.5 text-left text-[10px] leading-tight shadow-sm transition-transform hover:z-10 hover:scale-[1.02] ${
+                            citaTextColor[cita.estatus] ?? "text-ink"
+                          } ${draggingId === cita.id ? "cursor-grabbing opacity-40" : "cursor-grab"}`}
                           style={{
                             top,
                             height,
                             left: `${lane * widthPct}%`,
                             width: `calc(${widthPct}% - 2px)`,
                             backgroundColor: recurso?.color ?? "#666",
+                            textShadow: CITA_TEXT_OUTLINE,
                           }}
                           title={`${cita.horaInicio}–${cita.horaFin} · ${cita.paciente} · ${recurso?.nombre ?? ""} — arrastra para cambiar el horario`}
                         >

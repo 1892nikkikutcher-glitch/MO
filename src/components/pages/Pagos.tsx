@@ -127,7 +127,7 @@ function AgregarPagoExtraDialog({
 
   return (
     <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/70 p-4">
-      <div className="w-full max-w-sm rounded-2xl border border-edge/10 bg-[#111] p-6">
+      <div className="w-full max-w-sm rounded-2xl border border-edge/10 bg-modal p-6">
         <div className="mb-4 flex items-center justify-between">
           <h3 className="text-base font-semibold text-ink">Pago Extra</h3>
           <button

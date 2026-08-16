@@ -170,56 +170,60 @@ export default function ConsentimientoInformado({
       </div>
 
       <div className="rounded-2xl bg-white p-8 text-black shadow-lg print:rounded-none print:p-0 print:shadow-none">
-        <h2 className="text-center text-base font-bold uppercase tracking-wide">
+        <h2 className="text-center text-base font-bold uppercase tracking-wide print:text-sm">
           Carta de Consentimiento Informado General
         </h2>
-        <div className="mt-3 text-center text-sm leading-snug">
+        <div className="mt-3 text-center text-sm leading-snug print:mt-1.5 print:text-xs">
           <p className="font-semibold">{perfilDoctor.nombre || "Consultorio dental"}</p>
           {perfilDoctor.cedulaProfesional && <p>Cédula profesional {perfilDoctor.cedulaProfesional}</p>}
           {perfilDoctor.direccionClinica && <p>{perfilDoctor.direccionClinica}</p>}
         </div>
 
-        <p className="mt-4 text-sm">
+        <p className="mt-4 text-sm print:mt-2 print:text-xs">
           Fecha: <span className="font-medium">{dia}</span> de{" "}
           <span className="font-medium">{mes}</span> del <span className="font-medium">{anio}</span>{" "}
           &nbsp;&nbsp; Hora: <span className="font-medium">{hora}</span>
         </p>
-        <p className="text-sm">
+        <p className="text-sm print:text-xs">
           Paciente: <span className="font-medium">{patient.name}</span>
         </p>
 
-        <h3 className="mt-5 text-sm font-bold uppercase">Declaración del paciente</h3>
-        <p className="mt-1 whitespace-pre-line text-justify text-[13px] leading-relaxed">
+        <h3 className="mt-5 text-sm font-bold uppercase print:mt-2.5 print:text-xs">
+          Declaración del paciente
+        </h3>
+        <p className="mt-1 whitespace-pre-line text-justify text-[13px] leading-relaxed print:text-[10.5px] print:leading-snug">
           {parrafoDeclaracion}
         </p>
-        <div className="mt-2 min-h-[3rem] border-b border-dashed border-black/40 text-[13px]">
+        <div className="mt-2 min-h-[3rem] border-b border-dashed border-black/40 text-[13px] print:min-h-[2rem] print:text-[10.5px]">
           {procedimiento}
         </div>
 
-        <h3 className="mt-5 text-sm font-bold uppercase">Aceptación del paciente</h3>
-        <p className="mt-1 whitespace-pre-line text-justify text-[13px] leading-relaxed">
+        <h3 className="mt-5 text-sm font-bold uppercase print:mt-2.5 print:text-xs">
+          Aceptación del paciente
+        </h3>
+        <p className="mt-1 whitespace-pre-line text-justify text-[13px] leading-relaxed print:text-[10.5px] print:leading-snug">
           {parrafoAceptacion(perfilDoctor.nombre)}
         </p>
 
-        <div className="mt-10 grid grid-cols-2 gap-x-10 gap-y-10 text-center text-[11px]">
+        <div className="mt-10 grid grid-cols-2 gap-x-10 gap-y-10 text-center text-[11px] print:mt-5 print:gap-x-8 print:gap-y-5 print:text-[9.5px]">
           <div>
-            <div className="mb-1 h-12 border-b border-black" />
+            <div className="mb-1 h-12 border-b border-black print:h-8" />
             <p>Firma {perfilDoctor.nombre || "del profesional"}</p>
           </div>
           <div>
-            <div className="mb-1 h-12 border-b border-black" />
+            <div className="mb-1 h-12 border-b border-black print:h-8" />
             <p>Nombre y firma del paciente o representante legal y parentesco</p>
             <p className="mt-1 font-medium">
               {nombreFirmante} — {parentesco}
             </p>
           </div>
           <div>
-            <div className="mb-1 h-12 border-b border-black" />
+            <div className="mb-1 h-12 border-b border-black print:h-8" />
             <p>Nombre y firma del testigo</p>
             {testigo1 && <p className="mt-1 font-medium">{testigo1}</p>}
           </div>
           <div>
-            <div className="mb-1 h-12 border-b border-black" />
+            <div className="mb-1 h-12 border-b border-black print:h-8" />
             <p>Nombre y firma del testigo</p>
             {testigo2 && <p className="mt-1 font-medium">{testigo2}</p>}
           </div>
