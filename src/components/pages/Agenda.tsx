@@ -54,14 +54,24 @@ const citaTextColor: Record<CitaEstatus, string> = {
   "No Asistió": "text-danger",
 };
 
-/** Halo oscuro alrededor de las letras (simulado con varios text-shadow en
- * diagonal) para que el color de estatus se siga leyendo aunque la tarjeta
- * tenga un color de fondo parecido (ej. estatus "Atendida" en verde sobre
- * un recurso también verde) — contraste por fuera (el halo) y por dentro
- * (el color en sí), igual en modo claro y oscuro porque el color de
- * recurso no cambia con el tema. */
-const CITA_TEXT_OUTLINE =
-  "-1px -1px 0 rgba(0,0,0,0.6), 1px -1px 0 rgba(0,0,0,0.6), -1px 1px 0 rgba(0,0,0,0.6), 1px 1px 0 rgba(0,0,0,0.6)";
+/** Halo oscuro alrededor de las letras (8 direcciones + difuminado, en vez
+ * de solo las 4 esquinas) para que el color de estatus se siga leyendo
+ * aunque la tarjeta tenga un color de fondo parecido — medido en pares
+ * como "Atendida" (verde claro) sobre un recurso también verde, el
+ * contraste de solo el color de letra puede bajar hasta ~1.2:1 (invisible
+ * sin halo). El halo da el contraste "por fuera"; el color en sí, "por
+ * dentro" — igual en modo claro y oscuro porque el color de recurso no
+ * cambia con el tema. */
+const CITA_TEXT_OUTLINE = [
+  "-1px 0 1px rgba(0,0,0,0.85)",
+  "1px 0 1px rgba(0,0,0,0.85)",
+  "0 -1px 1px rgba(0,0,0,0.85)",
+  "0 1px 1px rgba(0,0,0,0.85)",
+  "-1px -1px 1px rgba(0,0,0,0.85)",
+  "1px -1px 1px rgba(0,0,0,0.85)",
+  "-1px 1px 1px rgba(0,0,0,0.85)",
+  "1px 1px 1px rgba(0,0,0,0.85)",
+].join(", ");
 
 /** WhatsApp no soporta texto de color, así que se usa el círculo de color
  * emoji más parecido (por distancia RGB) al color asignado al recurso, para
