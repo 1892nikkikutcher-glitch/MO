@@ -64,7 +64,7 @@ export default function DatosPaciente({
   patient: Patient;
   formatDate: (date: string) => string;
 }) {
-  const { updatePatient, setCambiosSinGuardar } = usePatientData();
+  const { updatePatient, setCambiosSinGuardar, citas } = usePatientData();
 
   const [nombreCompleto, setNombreCompleto] = useState(patient.name);
   const [birthDate, setBirthDate] = useState(patient.birthDate ?? "");
@@ -98,6 +98,10 @@ export default function DatosPaciente({
   const [contactoTelefono, setContactoTelefono] = useState(patient.contactoTelefono ?? "");
   const [recordatorioPrevencion, setRecordatorioPrevencion] = useState(
     patient.recordatorioPrevencion ?? true
+  );
+  const [comportamientoFrankl, setComportamientoFrankl] = useState(patient.comportamientoFrankl ?? 0);
+  const [comportamientoEstrellas, setComportamientoEstrellas] = useState(
+    patient.comportamientoEstrellas ?? 0
   );
 
   const [saved, setSaved] = useState(false);
@@ -143,12 +147,37 @@ export default function DatosPaciente({
     setContactoParentesco(patient.contactoParentesco ?? parentescoOptions[0]);
     setContactoTelefono(patient.contactoTelefono ?? "");
     setRecordatorioPrevencion(patient.recordatorioPrevencion ?? true);
+    setComportamientoFrankl(patient.comportamientoFrankl ?? 0);
+    setComportamientoEstrellas(patient.comportamientoEstrellas ?? 0);
     setSaved(false);
     setTocado(false);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [patient.id]);
 
   const esMenorDeEdad = (calcularEdadDetallada(birthDate)?.years ?? 18) < 18;
+
+  // Confiabilidad de asistencia — se calcula sola a partir del historial de
+  // citas, no se captura a mano. "Resueltas" son las citas que ya tuvieron
+  // un desenlace claro (Atendida, Cancelada o No Asistió); Agendada/
+  // Confirmada/En espera todavía están pendientes y no cuentan. Reagendada
+  // se muestra aparte porque no es un desenlace final, pero sí es una señal
+  // de comportamiento (paciente que mueve su cita seguido).
+  const citasPaciente = citas.filter((c) => c.patientId === patient.id);
+  const citasAtendidas = citasPaciente.filter((c) => c.estatus === "Atendida").length;
+  const citasCanceladas = citasPaciente.filter((c) => c.estatus === "Cancelada").length;
+  const citasReagendadas = citasPaciente.filter((c) => c.estatus === "Reagendada").length;
+  const citasNoAsistio = citasPaciente.filter((c) => c.estatus === "No Asistió").length;
+  const citasResueltas = citasAtendidas + citasCanceladas + citasNoAsistio;
+  const pctCumplida = citasResueltas > 0 ? Math.round((citasAtendidas / citasResueltas) * 100) : null;
+  const incidencias = citasCanceladas + citasReagendadas + citasNoAsistio;
+  const asistenciaLabel =
+    citasResueltas === 0 && citasReagendadas === 0
+      ? null
+      : incidencias === 0
+        ? { texto: "Muy cumplido", color: "text-success" }
+        : incidencias / Math.max(citasResueltas + citasReagendadas, 1) > 0.3 || citasReagendadas > 2
+          ? { texto: "Cancela o reagenda seguido", color: "text-danger" }
+          : { texto: "Asistencia regular", color: "text-ink/60" };
 
   const nivelSugerido = sugerirNivelSocioeconomico({
     ingresoFamiliar,
@@ -190,6 +219,8 @@ export default function DatosPaciente({
       contactoParentesco,
       contactoTelefono,
       recordatorioPrevencion,
+      comportamientoFrankl,
+      comportamientoEstrellas,
     });
     setSaved(true);
     setTocado(false);
@@ -309,6 +340,105 @@ export default function DatosPaciente({
               className={inputClass}
             />
           </Field>
+        </div>
+      </CardShell>
+
+      <CardShell title="Comportamiento">
+        {esMenorDeEdad ? (
+          <div>
+            <label className="mb-2 block text-xs font-medium text-ink/60">
+              Escala de Frankl (comportamiento en el sillón dental)
+            </label>
+            <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+              {(
+                [
+                  [1, "Definitivamente negativo"],
+                  [2, "Negativo"],
+                  [3, "Positivo"],
+                  [4, "Definitivamente positivo"],
+                ] as const
+              ).map(([valor, etiqueta]) => (
+                <button
+                  key={valor}
+                  type="button"
+                  onClick={() => {
+                    setComportamientoFrankl(comportamientoFrankl === valor ? 0 : valor);
+                    marcarSinGuardar();
+                  }}
+                  className={`rounded-lg border p-3 text-left transition-colors ${
+                    comportamientoFrankl === valor
+                      ? "border-accent bg-accent/15"
+                      : "border-edge/15 hover:border-accent/40"
+                  }`}
+                >
+                  <div
+                    className={`text-lg font-bold ${
+                      comportamientoFrankl === valor ? "text-accent" : "text-ink"
+                    }`}
+                  >
+                    {valor}
+                  </div>
+                  <div className="text-[11px] leading-tight text-ink/50">{etiqueta}</div>
+                </button>
+              ))}
+            </div>
+          </div>
+        ) : (
+          <div>
+            <label className="mb-2 block text-xs font-medium text-ink/60">
+              Calificación de comportamiento / cooperación
+            </label>
+            <div className="flex gap-1">
+              {([1, 2, 3, 4, 5] as const).map((valor) => (
+                <button
+                  key={valor}
+                  type="button"
+                  onClick={() => {
+                    setComportamientoEstrellas(comportamientoEstrellas === valor ? 0 : valor);
+                    marcarSinGuardar();
+                  }}
+                  title={`${valor} de 5`}
+                  className="p-0.5 text-2xl leading-none transition-transform hover:scale-110"
+                >
+                  <span className={valor <= comportamientoEstrellas ? "text-accent" : "text-ink/20"}>
+                    ★
+                  </span>
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
+
+        <div className="border-t border-edge/10 pt-4">
+          <label className="mb-1 block text-xs font-medium text-ink/60">
+            Asistencia (calculado del historial de citas)
+          </label>
+          {citasPaciente.length === 0 ? (
+            <p className="text-xs text-ink/40">Aún no tiene citas registradas.</p>
+          ) : citasResueltas === 0 && citasReagendadas === 0 ? (
+            <p className="text-xs text-ink/40">
+              Aún no hay citas con un resultado (Atendida, Cancelada, etc.) para calcularlo.
+            </p>
+          ) : (
+            <>
+              <p className="text-sm text-ink/70">
+                {citasResueltas > 0 && (
+                  <>
+                    <span className="font-semibold text-ink">{pctCumplida}%</span> de citas cumplidas
+                    ({citasAtendidas} de {citasResueltas}){" "}
+                  </>
+                )}
+                {citasCanceladas > 0 && <>· {citasCanceladas} cancelada(s) </>}
+                {citasReagendadas > 0 && <>· {citasReagendadas} reagendada(s) </>}
+                {citasNoAsistio > 0 && <>· {citasNoAsistio} no asistió/asistieron </>}
+              </p>
+              {asistenciaLabel && (
+                <p className={`mt-1 text-xs font-semibold ${asistenciaLabel.color}`}>
+                  {asistenciaLabel.texto}
+                </p>
+              )}
+            </>
+          )}
         </div>
       </CardShell>
 

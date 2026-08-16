@@ -44,6 +44,16 @@ export type Patient = {
    * cita futura agendada). Desactivable por paciente — por ejemplo, para no
    * agobiar a un paciente al que se prefiere atender solo cuando lo pida. */
   recordatorioPrevencion?: boolean;
+
+  /** Escala de Frankl (comportamiento en el sillón dental) para pacientes
+   * menores de edad: 1 Definitivamente negativo, 2 Negativo, 3 Positivo,
+   * 4 Definitivamente positivo. 0 o ausente = sin calificar. Cuál de los
+   * dos campos se captura depende de si el paciente es menor de edad al
+   * momento de guardar — ver `esMenorDeEdad` en Datos del Paciente. */
+  comportamientoFrankl?: 0 | 1 | 2 | 3 | 4;
+  /** Calificación de comportamiento/cooperación (1-5 estrellas) para
+   * pacientes adultos. 0 o ausente = sin calificar. */
+  comportamientoEstrellas?: 0 | 1 | 2 | 3 | 4 | 5;
 };
 
 /** Convierte la fecha ISO ("YYYY-MM-DD") de una cita a formato día/mes/año
