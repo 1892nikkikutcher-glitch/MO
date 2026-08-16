@@ -279,8 +279,13 @@ function formatFechaHora(iso: string) {
 }
 
 export default function HistoriaClinica({ patientId }: { patientId: string }) {
-  const { historiaClinicaTemplate, historiaClinicaPorPaciente, setRespuestasHistoriaClinica, irAPagina } =
-    usePatientData();
+  const {
+    historiaClinicaTemplate,
+    historiaClinicaPorPaciente,
+    setRespuestasHistoriaClinica,
+    irAPagina,
+    setCambiosSinGuardar,
+  } = usePatientData();
   const guardadas = historiaClinicaPorPaciente[patientId] ?? respuestasVacias;
 
   const [borrador, setBorrador] = useState<RespuestasHistoriaClinica>(guardadas);
@@ -296,6 +301,15 @@ export default function HistoriaClinica({ patientId }: { patientId: string }) {
 
   const yaGuardado = Boolean(guardadas.actualizadoEn);
   const hayCambiosSinGuardar = JSON.stringify(borrador) !== JSON.stringify(guardadas);
+
+  // Avisa antes de salir (cambiar de pestaña dentro del expediente, ir a
+  // otro módulo, o cerrar la pestaña) si hay ediciones sin guardar — antes
+  // se perdían silenciosamente al cambiar de pantalla.
+  useEffect(() => {
+    setCambiosSinGuardar(hayCambiosSinGuardar ? "Historia Clínica tiene cambios sin guardar." : null);
+    return () => setCambiosSinGuardar(null);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [hayCambiosSinGuardar]);
 
   const actualizarPregunta = (preguntaId: string, valor: RespuestaValor) => {
     setBorrador((prev) => ({ ...prev, porPregunta: { ...prev.porPregunta, [preguntaId]: valor } }));

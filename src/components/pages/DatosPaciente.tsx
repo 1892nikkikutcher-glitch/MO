@@ -64,7 +64,7 @@ export default function DatosPaciente({
   patient: Patient;
   formatDate: (date: string) => string;
 }) {
-  const { updatePatient } = usePatientData();
+  const { updatePatient, setCambiosSinGuardar } = usePatientData();
 
   const [nombreCompleto, setNombreCompleto] = useState(patient.name);
   const [birthDate, setBirthDate] = useState(patient.birthDate ?? "");
@@ -101,6 +101,20 @@ export default function DatosPaciente({
   );
 
   const [saved, setSaved] = useState(false);
+  // "Tocado desde la última carga/guardado" — a diferencia de `saved` (que
+  // solo controla el mensaje "Cambios guardados"), esto es lo que decide si
+  // hay que avisar antes de salir sin guardar.
+  const [tocado, setTocado] = useState(false);
+  const marcarSinGuardar = () => {
+    setSaved(false);
+    setTocado(true);
+  };
+
+  useEffect(() => {
+    setCambiosSinGuardar(tocado ? "Datos del Paciente tiene cambios sin guardar." : null);
+    return () => setCambiosSinGuardar(null);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [tocado]);
 
   // Al cambiar de paciente (navegar a otro expediente), recargar el
   // formulario con los datos de ese paciente en vez de arrastrar los del
@@ -130,6 +144,7 @@ export default function DatosPaciente({
     setContactoTelefono(patient.contactoTelefono ?? "");
     setRecordatorioPrevencion(patient.recordatorioPrevencion ?? true);
     setSaved(false);
+    setTocado(false);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [patient.id]);
 
@@ -147,7 +162,7 @@ export default function DatosPaciente({
     setServicios((prev) =>
       prev.includes(servicio) ? prev.filter((s) => s !== servicio) : [...prev, servicio]
     );
-    setSaved(false);
+    marcarSinGuardar();
   };
 
   const guardarCambios = () => {
@@ -177,6 +192,7 @@ export default function DatosPaciente({
       recordatorioPrevencion,
     });
     setSaved(true);
+    setTocado(false);
   };
 
   return (
@@ -189,7 +205,7 @@ export default function DatosPaciente({
               value={nombreCompleto}
               onChange={(e) => {
                 manejarCambioNombre(e, setNombreCompleto);
-                setSaved(false);
+                marcarSinGuardar();
               }}
               className={inputClass}
             />
@@ -200,7 +216,7 @@ export default function DatosPaciente({
               value={birthDate}
               onChange={(e) => {
                 setBirthDate(e.target.value);
-                setSaved(false);
+                marcarSinGuardar();
               }}
               className={inputClass}
             />
@@ -213,7 +229,7 @@ export default function DatosPaciente({
                 value={nombreTutor}
                 onChange={(e) => {
                   manejarCambioNombre(e, setNombreTutor);
-                  setSaved(false);
+                  marcarSinGuardar();
                 }}
                 placeholder="Nombre completo"
                 className={inputClass}
@@ -226,7 +242,7 @@ export default function DatosPaciente({
               value={sexo}
               onChange={(e) => {
                 setSexo(e.target.value);
-                setSaved(false);
+                marcarSinGuardar();
               }}
               className={inputClass}
             >
@@ -242,7 +258,7 @@ export default function DatosPaciente({
               value={estadoCivil}
               onChange={(e) => {
                 setEstadoCivil(e.target.value);
-                setSaved(false);
+                marcarSinGuardar();
               }}
               className={inputClass}
             >
@@ -259,7 +275,7 @@ export default function DatosPaciente({
               value={ocupacion}
               onChange={(e) => {
                 setOcupacion(e.target.value);
-                setSaved(false);
+                marcarSinGuardar();
               }}
               placeholder="Ej. Docente, Comerciante..."
               className={inputClass}
@@ -270,7 +286,7 @@ export default function DatosPaciente({
               value={escolaridad}
               onChange={(e) => {
                 setEscolaridad(e.target.value);
-                setSaved(false);
+                marcarSinGuardar();
               }}
               className={inputClass}
             >
@@ -287,7 +303,7 @@ export default function DatosPaciente({
               value={lugarNacimiento}
               onChange={(e) => {
                 setLugarNacimiento(e.target.value);
-                setSaved(false);
+                marcarSinGuardar();
               }}
               placeholder="Ciudad, Estado"
               className={inputClass}
@@ -303,7 +319,7 @@ export default function DatosPaciente({
               value={nivelSocioeconomico}
               onChange={(e) => {
                 setNivelSocioeconomico(e.target.value);
-                setSaved(false);
+                marcarSinGuardar();
               }}
               className={inputClass}
             >
@@ -321,7 +337,7 @@ export default function DatosPaciente({
                   type="button"
                   onClick={() => {
                     setNivelSocioeconomico(nivelSugerido);
-                    setSaved(false);
+                    marcarSinGuardar();
                   }}
                   className="font-semibold text-accent underline decoration-accent/40 underline-offset-2 hover:decoration-accent"
                 >
@@ -335,7 +351,7 @@ export default function DatosPaciente({
               value={ingresoFamiliar}
               onChange={(e) => {
                 setIngresoFamiliar(e.target.value);
-                setSaved(false);
+                marcarSinGuardar();
               }}
               className={inputClass}
             >
@@ -353,7 +369,7 @@ export default function DatosPaciente({
               value={dependientes}
               onChange={(e) => {
                 setDependientes(e.target.value);
-                setSaved(false);
+                marcarSinGuardar();
               }}
               placeholder="0"
               className={inputClass}
@@ -364,7 +380,7 @@ export default function DatosPaciente({
               value={tipoVivienda}
               onChange={(e) => {
                 setTipoVivienda(e.target.value);
-                setSaved(false);
+                marcarSinGuardar();
               }}
               className={inputClass}
             >
@@ -381,7 +397,7 @@ export default function DatosPaciente({
               value={responsablePago}
               onChange={(e) => {
                 manejarCambioNombre(e, setResponsablePago);
-                setSaved(false);
+                marcarSinGuardar();
               }}
               placeholder="Nombre del responsable"
               className={inputClass}
@@ -423,7 +439,7 @@ export default function DatosPaciente({
               value={celular}
               onChange={(e) => {
                 setCelular(e.target.value);
-                setSaved(false);
+                marcarSinGuardar();
               }}
               className={inputClass}
             />
@@ -434,7 +450,7 @@ export default function DatosPaciente({
               value={telefonoFijo}
               onChange={(e) => {
                 setTelefonoFijo(e.target.value);
-                setSaved(false);
+                marcarSinGuardar();
               }}
               placeholder="Opcional"
               className={inputClass}
@@ -446,7 +462,7 @@ export default function DatosPaciente({
               value={correo}
               onChange={(e) => {
                 setCorreo(e.target.value);
-                setSaved(false);
+                marcarSinGuardar();
               }}
               placeholder="correo@ejemplo.com"
               className={inputClass}
@@ -458,7 +474,7 @@ export default function DatosPaciente({
               value={direccion}
               onChange={(e) => {
                 setDireccion(e.target.value);
-                setSaved(false);
+                marcarSinGuardar();
               }}
               placeholder="Calle, número, colonia"
               className={inputClass}
@@ -472,7 +488,7 @@ export default function DatosPaciente({
               value={codigoPostal}
               onChange={(e) => {
                 setCodigoPostal(e.target.value.replace(/\D/g, "").slice(0, 5));
-                setSaved(false);
+                marcarSinGuardar();
               }}
               placeholder="Ej. 50000"
               className={inputClass}
@@ -491,7 +507,7 @@ export default function DatosPaciente({
                 value={contactoNombre}
                 onChange={(e) => {
                   manejarCambioNombre(e, setContactoNombre);
-                  setSaved(false);
+                  marcarSinGuardar();
                 }}
                 className={inputClass}
               />
@@ -501,7 +517,7 @@ export default function DatosPaciente({
                 value={contactoParentesco}
                 onChange={(e) => {
                   setContactoParentesco(e.target.value);
-                  setSaved(false);
+                  marcarSinGuardar();
                 }}
                 className={inputClass}
               >
@@ -518,7 +534,7 @@ export default function DatosPaciente({
                 value={contactoTelefono}
                 onChange={(e) => {
                   setContactoTelefono(e.target.value);
-                  setSaved(false);
+                  marcarSinGuardar();
                 }}
                 className={inputClass}
               />
@@ -534,7 +550,7 @@ export default function DatosPaciente({
             checked={recordatorioPrevencion}
             onChange={(e) => {
               setRecordatorioPrevencion(e.target.checked);
-              setSaved(false);
+              marcarSinGuardar();
             }}
             className="mt-0.5 h-4 w-4 rounded border-edge/30 accent-accent"
           />

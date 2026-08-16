@@ -466,6 +466,8 @@ type PatientDataContextValue = {
   abrirNuevaCitaDesdeInicio: () => void;
   consumirSolicitudNuevaCitaBlanco: () => void;
   irAPagina: (pageId: string) => void;
+  cambiosSinGuardar: string | null;
+  setCambiosSinGuardar: (mensaje: string | null) => void;
   miRol: RolClinica | null;
   puedeVerFinanzas: boolean;
   clinicInfo: ClinicInfo | null;
@@ -633,6 +635,21 @@ export function PatientDataProvider({
   const [navegacionExpediente, setNavegacionExpediente] = useState<NavegacionExpediente>(null);
   const [navegacionNuevaCita, setNavegacionNuevaCita] = useState<NavegacionNuevaCita>(null);
   const [solicitudNuevaCitaBlanco, setSolicitudNuevaCitaBlanco] = useState(false);
+  // Bandera compartida para pantallas con "Guardar" manual (Historia Clínica,
+  // Datos del Paciente): mientras tenga un mensaje, se avisa antes de salir
+  // por navegación dentro de la app (irAPagina) o al cerrar/recargar la
+  // pestaña — para no perder información como pasó antes.
+  const [cambiosSinGuardar, setCambiosSinGuardar] = useState<string | null>(null);
+
+  useEffect(() => {
+    const handler = (e: BeforeUnloadEvent) => {
+      if (!cambiosSinGuardar) return;
+      e.preventDefault();
+      e.returnValue = "";
+    };
+    window.addEventListener("beforeunload", handler);
+    return () => window.removeEventListener("beforeunload", handler);
+  }, [cambiosSinGuardar]);
 
   const [colaboradoresActivos, setColaboradoresActivos] = useState<ClinicMember[]>([]);
   const [invitacionesPendientes, setInvitacionesPendientes] = useState<ClinicInvite[]>([]);
@@ -788,7 +805,11 @@ export function PatientDataProvider({
 
   const consumirSolicitudNuevaCitaBlanco = () => setSolicitudNuevaCitaBlanco(false);
 
-  const irAPagina = (pageId: string) => onIrAPagina?.(pageId);
+  const irAPagina = (pageId: string) => {
+    if (cambiosSinGuardar && !window.confirm(`${cambiosSinGuardar} ¿Salir sin guardar?`)) return;
+    setCambiosSinGuardar(null);
+    onIrAPagina?.(pageId);
+  };
 
   /** Refleja en `config/estadisticas` el total presupuestado y el conteo por
    * mes (alta, edición o baja de un presupuesto) para que los KPIs "Saldo
@@ -1502,6 +1523,8 @@ export function PatientDataProvider({
         abrirNuevaCitaDesdeInicio,
         consumirSolicitudNuevaCitaBlanco,
         irAPagina,
+        cambiosSinGuardar,
+        setCambiosSinGuardar,
         miRol: rol,
         puedeVerFinanzas: rol === "admin",
         clinicInfo,

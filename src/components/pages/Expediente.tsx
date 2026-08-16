@@ -493,7 +493,24 @@ export default function Expediente({
     puedeVerFinanzas,
     historiaClinicaTemplate,
     historiaClinicaPorPaciente,
+    cambiosSinGuardar,
+    setCambiosSinGuardar,
   } = usePatientData();
+
+  // Historia Clínica y Datos del Paciente avisan aquí (vía contexto) cuando
+  // tienen ediciones sin guardar — antes se perdían silenciosamente al
+  // cambiar de pestaña dentro del expediente o volver al listado.
+  const cambiarTab = (tab: ExpedienteTab) => {
+    if (cambiosSinGuardar && !window.confirm(`${cambiosSinGuardar} ¿Salir sin guardar?`)) return;
+    setCambiosSinGuardar(null);
+    setActiveTab(tab);
+  };
+
+  const volverAPacientes = () => {
+    if (cambiosSinGuardar && !window.confirm(`${cambiosSinGuardar} ¿Salir sin guardar?`)) return;
+    setCambiosSinGuardar(null);
+    onBack();
+  };
 
   useEffect(() => {
     cargarDatosPaciente(patient.id);
@@ -579,7 +596,7 @@ export default function Expediente({
   return (
     <div className="space-y-6">
       <button
-        onClick={onBack}
+        onClick={volverAPacientes}
         className="flex items-center gap-2 text-sm font-medium text-accent hover:text-accent print:hidden"
       >
         ← Volver a pacientes
@@ -641,7 +658,7 @@ export default function Expediente({
           .map((tab) => (
           <button
             key={tab}
-            onClick={() => setActiveTab(tab)}
+            onClick={() => cambiarTab(tab)}
             className={`rounded-lg border px-3 py-2 text-xs font-semibold uppercase tracking-wide transition-colors ${
               activeTab === tab
                 ? "border-accent/70 bg-accent/15 text-accent"
