@@ -9,10 +9,15 @@ export default function Odontograma({
   selectedTeeth,
   onToggleTooth,
   title = "Odontograma",
+  hideSummary = false,
 }: {
   selectedTeeth: number[];
   onToggleTooth: (tooth: number) => void;
   title?: string;
+  /** Oculta el "Dientes seleccionados: ..." de abajo — para cuando esa
+   * misma información ya se muestra fusionada en otro campo (ej. "Órganos
+   * dentales a trabajar" en Nuevo Presupuesto), y repetirla es redundante. */
+  hideSummary?: boolean;
 }) {
   const renderArch = (teeth: number[]) => (
     <div className="flex gap-1">
@@ -65,7 +70,7 @@ export default function Odontograma({
           {renderArch(lowerPermanent)}
         </div>
       </div>
-      {selectedTeeth.length > 0 && (
+      {!hideSummary && selectedTeeth.length > 0 && (
         <p className="mt-4 text-center text-xs text-ink/50">
           Dientes seleccionados: {[...selectedTeeth].sort((a, b) => a - b).join(", ")}
         </p>

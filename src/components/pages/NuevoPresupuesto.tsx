@@ -360,20 +360,31 @@ export default function NuevoPresupuesto({
           </div>
         </div>
 
-        <Odontograma selectedTeeth={selectedTeeth} onToggleTooth={toggleTooth} />
+        <Odontograma selectedTeeth={selectedTeeth} onToggleTooth={toggleTooth} hideSummary />
 
         <div className="space-y-4 rounded-2xl border border-edge/10 bg-surface p-6">
           <div>
             <label className="mb-1 block text-xs font-medium text-ink/60">
               Órganos dentales a trabajar
             </label>
-            <input
-              type="text"
-              value={notaProcedimiento}
-              onChange={(e) => setNotaProcedimiento(e.target.value)}
-              placeholder="Ej. OD 16 caries y resina clase I"
-              className="w-full rounded-lg border border-edge/10 bg-field px-3 py-2 text-sm text-ink placeholder-ink/30 outline-none focus:border-accent/60"
-            />
+            <div className="flex items-center gap-2 rounded-lg border border-edge/10 bg-field px-3 py-2 focus-within:border-accent/60">
+              {selectedTeeth.length > 0 && (
+                <span className="shrink-0 rounded-md bg-accent/15 px-2 py-1 text-xs font-semibold text-accent">
+                  OD {[...selectedTeeth].sort((a, b) => a - b).join(", ")}
+                </span>
+              )}
+              <input
+                type="text"
+                value={notaProcedimiento}
+                onChange={(e) => setNotaProcedimiento(e.target.value)}
+                placeholder={
+                  selectedTeeth.length > 0
+                    ? "Detalle clínico opcional, ej. caries y resina clase I"
+                    : "Marca dientes en el odontograma de abajo, o describe aquí (ej. OD 16 caries y resina clase I)"
+                }
+                className="w-full min-w-0 flex-1 bg-transparent text-sm text-ink placeholder-ink/30 outline-none"
+              />
+            </div>
           </div>
 
           {procedimientos.length === 0 ? (
@@ -569,12 +580,15 @@ export default function NuevoPresupuesto({
                     {(item.cantidad ?? 1) <= 1 && (item.descuentoPct ?? 0) > 0 && (
                       <div className="text-xs text-ink/40">Descuento: {item.descuentoPct}%</div>
                     )}
-                    {item.note && (
-                      <div className="text-xs text-accent/80">{item.note}</div>
-                    )}
-                    {item.teeth.length > 0 && (
-                      <div className="text-xs text-ink/40">
-                        Dientes: {item.teeth.sort((a, b) => a - b).join(", ")}
+                    {(item.teeth.length > 0 || item.note) && (
+                      <div className="text-xs text-accent/80">
+                        {item.teeth.length > 0 && (
+                          <span className="font-semibold">
+                            OD {[...item.teeth].sort((a, b) => a - b).join(", ")}
+                          </span>
+                        )}
+                        {item.teeth.length > 0 && item.note && " — "}
+                        {item.note}
                       </div>
                     )}
                   </div>
