@@ -1,9 +1,12 @@
 "use client";
 
+import { useMemo, useState } from "react";
 import { usePatientData } from "@/context/PatientDataContext";
 import { calcularEdadDetallada, formatCurrency } from "@/lib/patientData";
 import { calcularAvanceMetas } from "@/lib/metas";
+import { calcularRangoPeriodo, type PeriodoId } from "@/lib/dashboardMetrics";
 import PendientesConsultorio from "@/components/PendientesConsultorio";
+import PeriodSelector from "@/components/dashboard/PeriodSelector";
 import FinancialSummary from "@/components/dashboard/FinancialSummary";
 import ProductivitySummary from "@/components/dashboard/ProductivitySummary";
 import BudgetMetrics from "@/components/dashboard/BudgetMetrics";
@@ -124,6 +127,21 @@ export default function Inicio() {
   ).padStart(2, "0")}`;
   const mesActualKey = hoyISO.slice(0, 7); // "YYYY-MM"
 
+  const [periodoId, setPeriodoId] = useState<PeriodoId>("mes");
+  const [personalizado, setPersonalizado] = useState(() => ({
+    desdeISO: `${hoyISO.slice(0, 7)}-01`,
+    hastaISO: hoyISO,
+  }));
+  // Fila 1 (Finanzas), Fila 2 (Operación) y Fila 4 (Agenda) del dashboard
+  // reaccionan a este periodo — Presupuestos/Laboratorios (Fila 3) y las
+  // gráficas de evolución mensual se quedan históricas/de tendencia, no
+  // tiene sentido "filtrarlas" por periodo.
+  const rango = useMemo(
+    () => calcularRangoPeriodo(periodoId, hoy, personalizado),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [periodoId, personalizado, hoyISO]
+  );
+
   const avanceMetas = calcularAvanceMetas(finanzas.porFecha, metas.metaMensual);
 
   const citasDelMes = citas.filter((c) => c.fecha.slice(0, 7) === mesActualKey);
@@ -185,13 +203,20 @@ export default function Inicio() {
 
   return (
     <div className="space-y-6">
-      <FinancialSummary />
+      <PeriodSelector
+        periodoId={periodoId}
+        onSelect={setPeriodoId}
+        personalizado={personalizado}
+        onPersonalizadoChange={setPersonalizado}
+      />
 
-      <ProductivitySummary />
+      <FinancialSummary rango={rango} />
+
+      <ProductivitySummary rango={rango} />
 
       <BudgetMetrics />
 
-      <AppointmentMetrics />
+      <AppointmentMetrics rango={rango} />
 
       <AttentionAlerts />
 

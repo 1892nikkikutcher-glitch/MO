@@ -6,9 +6,95 @@
 
 import type { CitaAgenda, HorarioAtencion, Patient } from "@/lib/patientData";
 import type { LaboratorioPendienteEntry } from "@/lib/laboratoriosPendientes";
+import { inicioSemana } from "@/lib/metas";
 
 export function toIsoDate(d: Date): string {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+}
+
+export type PeriodoId = "hoy" | "semana" | "mes" | "trimestre" | "año" | "personalizado";
+
+export type RangoPeriodo = {
+  id: PeriodoId;
+  label: string;
+  desdeISO: string;
+  hastaISO: string;
+  /** Mismo número de días, justo antes de `desdeISO` — la base de
+   * comparación "vs periodo anterior" para cualquier periodo, incluido uno
+   * personalizado. */
+  desdeAnteriorISO: string;
+  hastaAnteriorISO: string;
+};
+
+function inicioTrimestre(hoy: Date): Date {
+  const q = Math.floor(hoy.getMonth() / 3);
+  return new Date(hoy.getFullYear(), q * 3, 1);
+}
+
+function inicioAnio(hoy: Date): Date {
+  return new Date(hoy.getFullYear(), 0, 1);
+}
+
+/** Calcula el rango de fechas [desde, hasta] de un periodo del selector del
+ * Dashboard, más el rango "anterior" equivalente (mismo número de días,
+ * inmediatamente antes) para la comparación porcentual. `hasta` siempre es
+ * hoy, salvo en "personalizado". */
+export function calcularRangoPeriodo(
+  id: PeriodoId,
+  hoy: Date,
+  personalizado?: { desdeISO: string; hastaISO: string }
+): RangoPeriodo {
+  const hoySinHora = new Date(hoy.getFullYear(), hoy.getMonth(), hoy.getDate());
+  let desde: Date;
+  let hasta: Date = hoySinHora;
+  let label: string;
+
+  if (id === "personalizado" && personalizado) {
+    const a = new Date(`${personalizado.desdeISO}T00:00:00`);
+    const b = new Date(`${personalizado.hastaISO}T00:00:00`);
+    desde = a <= b ? a : b;
+    hasta = a <= b ? b : a;
+    label = "Personalizado";
+  } else {
+    switch (id) {
+      case "hoy":
+        desde = hoySinHora;
+        label = "Hoy";
+        break;
+      case "semana":
+        desde = inicioSemana(hoy);
+        label = "Esta semana";
+        break;
+      case "trimestre":
+        desde = inicioTrimestre(hoy);
+        label = "Este trimestre";
+        break;
+      case "año":
+        desde = inicioAnio(hoy);
+        label = "Este año";
+        break;
+      case "mes":
+      default:
+        desde = new Date(hoy.getFullYear(), hoy.getMonth(), 1);
+        label = "Este mes";
+        break;
+    }
+  }
+
+  const dias = Math.max(1, Math.round((hasta.getTime() - desde.getTime()) / 86_400_000) + 1);
+  const hastaAnterior = new Date(desde);
+  hastaAnterior.setDate(hastaAnterior.getDate() - 1);
+  const desdeAnterior = new Date(hastaAnterior);
+  desdeAnterior.setDate(desdeAnterior.getDate() - (dias - 1));
+
+  return {
+    id,
+    label,
+    desdeISO: toIsoDate(desde),
+    hastaISO: toIsoDate(hasta),
+    desdeAnteriorISO: toIsoDate(desdeAnterior),
+    hastaAnteriorISO: toIsoDate(hastaAnterior),
+  };
 }
 
 function timeToMinutes(t: string): number {

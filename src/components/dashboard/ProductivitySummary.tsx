@@ -6,6 +6,8 @@ import {
   horasDisponiblesEnRango,
   pacientesActivos,
   pacientesAtendidosEnRango,
+  variacionPct,
+  type RangoPeriodo,
 } from "@/lib/dashboardMetrics";
 import DashboardMetricCard from "./DashboardMetricCard";
 
@@ -14,28 +16,50 @@ function toIso(d: Date): string {
 }
 
 /** Fila 2 del Dashboard Principal — Operación: qué tan ocupado y productivo
- * estuvo el consultorio este mes, en pacientes y en horas clínicas. */
-export default function ProductivitySummary() {
+ * estuvo el consultorio en el periodo seleccionado, en pacientes y en horas
+ * clínicas. Pacientes Activos usa una ventana fija de 12 meses (definición
+ * de "actividad clínica", no del periodo del selector). */
+export default function ProductivitySummary({ rango }: { rango: RangoPeriodo }) {
   const { patients, citas, horario } = usePatientData();
 
   const hoy = new Date();
   const hoyISO = toIso(hoy);
-  const inicioMesISO = toIso(new Date(hoy.getFullYear(), hoy.getMonth(), 1));
-  const mesActualKey = hoyISO.slice(0, 7);
 
-  const pacientesAtendidosMes = pacientesAtendidosEnRango(citas, inicioMesISO, hoyISO);
-  const nuevosPacientesMes = patients.filter((p) => p.createdAt?.slice(0, 7) === mesActualKey).length;
+  const pacientesAtendidosPeriodo = pacientesAtendidosEnRango(citas, rango.desdeISO, rango.hastaISO);
+  const pacientesAtendidosAnterior = pacientesAtendidosEnRango(
+    citas,
+    rango.desdeAnteriorISO,
+    rango.hastaAnteriorISO
+  );
+  const comparacionAtendidos = variacionPct(pacientesAtendidosPeriodo, pacientesAtendidosAnterior);
+
+  const nuevosPacientesPeriodo = patients.filter(
+    (p) => p.createdAt && p.createdAt >= rango.desdeISO && p.createdAt <= rango.hastaISO
+  ).length;
   const activos = pacientesActivos(citas, hoyISO);
 
-  const horasClinicas = horasClinicasEnRango(citas, inicioMesISO, hoyISO);
-  const horasDisponibles = horasDisponiblesEnRango(horario, inicioMesISO, hoyISO);
+  const horasClinicas = horasClinicasEnRango(citas, rango.desdeISO, rango.hastaISO);
+  const horasDisponibles = horasDisponiblesEnRango(horario, rango.desdeISO, rango.hastaISO);
   const ocupacionPct = horasDisponibles > 0 ? Math.min(100, Math.round((horasClinicas / horasDisponibles) * 100)) : 0;
 
   return (
     <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
-      <DashboardMetricCard label="Pacientes Atendidos (Mes)" value={String(pacientesAtendidosMes)} color="#2ee67a" />
+      <DashboardMetricCard
+        label={`Pacientes Atendidos (${rango.label})`}
+        value={String(pacientesAtendidosPeriodo)}
+        color="#2ee67a"
+        comparison={
+          comparacionAtendidos === null
+            ? null
+            : { pct: comparacionAtendidos, favorable: comparacionAtendidos >= 0 }
+        }
+      />
 
-      <DashboardMetricCard label="Pacientes Nuevos (Mes)" value={String(nuevosPacientesMes)} color="#ff3d9a" />
+      <DashboardMetricCard
+        label={`Pacientes Nuevos (${rango.label})`}
+        value={String(nuevosPacientesPeriodo)}
+        color="#ff3d9a"
+      />
 
       <DashboardMetricCard
         label="Pacientes Activos"
@@ -47,17 +71,17 @@ export default function ProductivitySummary() {
       </DashboardMetricCard>
 
       <DashboardMetricCard
-        label="Horas Clínicas (Mes)"
+        label={`Horas Clínicas (${rango.label})`}
         value={`${horasClinicas} h`}
         color="#b84dff"
-        tooltip="Suma de la duración de las citas marcadas como Atendidas este mes."
+        tooltip="Suma de la duración de las citas marcadas como Atendidas en el periodo."
       />
 
       <DashboardMetricCard
         label="Ocupación"
         value={`${ocupacionPct}%`}
         color="#ffb020"
-        tooltip={`${horasClinicas} h ocupadas de ${horasDisponibles} h disponibles según el horario del consultorio. Aproximado: el horario no distingue días de la semana.`}
+        tooltip={`${horasClinicas} h ocupadas de ${horasDisponibles} h disponibles según el horario del consultorio en el periodo. Aproximado: el horario no distingue días de la semana.`}
       >
         <div className="mt-2 h-1.5 w-full overflow-hidden rounded-full bg-inset">
           <div

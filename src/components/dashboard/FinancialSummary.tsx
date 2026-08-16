@@ -3,7 +3,7 @@
 import { usePatientData } from "@/context/PatientDataContext";
 import { formatCurrency } from "@/lib/patientData";
 import { inicioMes, inicioSemana, sumarRango } from "@/lib/metas";
-import { horasClinicasEnRango, variacionPct } from "@/lib/dashboardMetrics";
+import { horasClinicasEnRango, variacionPct, type RangoPeriodo } from "@/lib/dashboardMetrics";
 import DashboardMetricCard from "./DashboardMetricCard";
 
 function toIso(d: Date): string {
@@ -13,38 +13,44 @@ function toIso(d: Date): string {
 /** Fila 1 del Dashboard Principal — Finanzas. Reemplaza las antiguas
  * tarjetas de Corte Diario/Semanal/Mensual con una tarjeta de Ingresos más
  * completa, y agrega Ingreso por Hora Clínica. Solo visible para quien
- * puede ver finanzas (mismo gate que el resto de esta fila desde antes). */
-export default function FinancialSummary() {
+ * puede ver finanzas (mismo gate que el resto de esta fila desde antes).
+ * `rango` viene del selector de periodo en Inicio.tsx — Ingresos e Ingreso
+ * por Hora Clínica se calculan sobre ese rango; Ticket Promedio y Saldo
+ * Pendiente siguen siendo históricos (no tiene sentido "filtrarlos"). */
+export default function FinancialSummary({ rango }: { rango: RangoPeriodo }) {
   const { puedeVerFinanzas, citas, finanzas, estadisticas } = usePatientData();
 
   if (!puedeVerFinanzas) return null;
 
   const hoy = new Date();
   const hoyISO = toIso(hoy);
-  const inicioMesActual = inicioMes(hoy);
-  const inicioMesAnterior = new Date(hoy.getFullYear(), hoy.getMonth() - 1, 1);
-  const finMesAnterior = new Date(hoy.getFullYear(), hoy.getMonth(), 0);
-  finMesAnterior.setHours(23, 59, 59, 999);
 
   const ingresosHoy = finanzas.porFecha[hoyISO] ?? 0;
   const ingresosSemana = sumarRango(finanzas.porFecha, inicioSemana(hoy), hoy);
-  const ingresosMes = sumarRango(finanzas.porFecha, inicioMesActual, hoy);
-  const ingresosMesAnterior = sumarRango(finanzas.porFecha, inicioMesAnterior, finMesAnterior);
-  const comparacionIngresos = variacionPct(ingresosMes, ingresosMesAnterior);
+  const ingresosMes = sumarRango(finanzas.porFecha, inicioMes(hoy), hoy);
+
+  const desdePeriodo = new Date(`${rango.desdeISO}T00:00:00`);
+  const hastaPeriodo = new Date(`${rango.hastaISO}T00:00:00`);
+  const desdeAnterior = new Date(`${rango.desdeAnteriorISO}T00:00:00`);
+  const hastaAnterior = new Date(`${rango.hastaAnteriorISO}T00:00:00`);
+  const ingresosPeriodo = sumarRango(finanzas.porFecha, desdePeriodo, hastaPeriodo);
+  const ingresosPeriodoAnterior = sumarRango(finanzas.porFecha, desdeAnterior, hastaAnterior);
+  const comparacionIngresos = variacionPct(ingresosPeriodo, ingresosPeriodoAnterior);
 
   const totalPagadoHistorico = Object.values(finanzas.porFecha).reduce((sum, v) => sum + v, 0);
   const ticketPromedio =
     estadisticas.pagosCount > 0 ? Math.round(totalPagadoHistorico / estadisticas.pagosCount) : 0;
   const saldoPendiente = Math.max(0, estadisticas.totalPresupuestado - totalPagadoHistorico);
 
-  const horasClinicasMes = horasClinicasEnRango(citas, toIso(inicioMesActual), hoyISO);
-  const ingresoPorHora = horasClinicasMes > 0 ? Math.round(ingresosMes / horasClinicasMes) : 0;
+  const horasClinicasPeriodo = horasClinicasEnRango(citas, rango.desdeISO, rango.hastaISO);
+  const ingresoPorHora =
+    horasClinicasPeriodo > 0 ? Math.round(ingresosPeriodo / horasClinicasPeriodo) : 0;
 
   return (
     <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
       <DashboardMetricCard
-        label="Ingresos del Mes"
-        value={formatCurrency(ingresosMes)}
+        label={`Ingresos (${rango.label})`}
+        value={formatCurrency(ingresosPeriodo)}
         color="#ffb020"
         wide
         comparison={
@@ -81,13 +87,13 @@ export default function FinancialSummary() {
       />
 
       <DashboardMetricCard
-        label="Ingreso / Hora Clínica"
-        value={horasClinicasMes > 0 ? formatCurrency(ingresoPorHora) : "—"}
+        label={`Ingreso / Hora Clínica (${rango.label})`}
+        value={horasClinicasPeriodo > 0 ? formatCurrency(ingresoPorHora) : "—"}
         color="#b84dff"
         tooltip={
-          horasClinicasMes > 0
-            ? `Ingresos del mes entre ${horasClinicasMes} h clínicas trabajadas (duración de citas Atendidas).`
-            : "Aún no hay citas Atendidas este mes para calcularlo."
+          horasClinicasPeriodo > 0
+            ? `Ingresos del periodo entre ${horasClinicasPeriodo} h clínicas trabajadas (duración de citas Atendidas).`
+            : "Aún no hay citas Atendidas en este periodo para calcularlo."
         }
       />
     </div>
