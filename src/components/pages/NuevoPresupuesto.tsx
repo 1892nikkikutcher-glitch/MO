@@ -70,7 +70,6 @@ export default function NuevoPresupuesto({
   const [personalizadoPrecio, setPersonalizadoPrecio] = useState("");
   const [mostrarPersonalizado, setMostrarPersonalizado] = useState(false);
   const [selectedTeeth, setSelectedTeeth] = useState<number[]>([]);
-  const [costoPorOrgano, setCostoPorOrgano] = useState(false);
   const [descuentoPct, setDescuentoPct] = useState("");
   const [items, setItems] = useState<LineItem[]>(initialBudget?.items ?? []);
   /** Id del renglón que se está editando (null = capturando uno nuevo). La
@@ -86,13 +85,13 @@ export default function NuevoPresupuesto({
     );
   };
 
-  /** Cuando el costo es "por órgano dentario", el precio se multiplica por
-   * la cantidad de dientes seleccionados en el odontograma (ej. una resina
-   * en 9 piezas cuesta 9 veces el precio unitario) — igual que en el
-   * sistema anterior. Si no está marcado, el precio queda fijo aunque se
-   * hayan marcado dientes solo como referencia. */
+  /** El precio siempre se multiplica por la cantidad de dientes marcados en
+   * el odontograma (ej. una resina en 3 piezas cuesta 3 veces el precio
+   * unitario) — "Precio Unitario" es siempre el precio por diente. Para un
+   * tratamiento con un precio combinado fijo que cubre varios dientes,
+   * captura el precio total y marca solo un diente representativo. */
   const precioUnitarioDelCatalogo = procedimientos.find((p) => p.id === procedimientoSeleccionadoId)?.costoPaciente;
-  const multiplicador = costoPorOrgano ? Math.max(selectedTeeth.length, 1) : 1;
+  const multiplicador = Math.max(selectedTeeth.length, 1);
 
   const agregarItem = (procedure: string, precioUnitario: number) => {
     const descuento = Math.min(100, Math.max(0, Number(descuentoPct) || 0));
@@ -111,7 +110,6 @@ export default function NuevoPresupuesto({
       },
     ]);
     setSelectedTeeth([]);
-    setCostoPorOrgano(false);
     setDescuentoPct("");
     setNotaProcedimiento("");
   };
@@ -138,7 +136,6 @@ export default function NuevoPresupuesto({
       )
     );
     setSelectedTeeth([]);
-    setCostoPorOrgano(false);
     setDescuentoPct("");
     setNotaProcedimiento("");
   };
@@ -148,7 +145,6 @@ export default function NuevoPresupuesto({
     setSelectedTeeth(item.teeth);
     setNotaProcedimiento(item.note);
     setDescuentoPct(item.descuentoPct ? String(item.descuentoPct) : "");
-    setCostoPorOrgano((item.cantidad ?? 1) > 1);
     setPersonalizadoNombre(item.procedure);
     setPersonalizadoPrecio(String(item.precioUnitario ?? item.price));
     setProcedimientoSeleccionadoId("");
@@ -162,7 +158,6 @@ export default function NuevoPresupuesto({
     if (editandoItemId) {
       setEditandoItemId(null);
       setSelectedTeeth([]);
-      setCostoPorOrgano(false);
       setDescuentoPct("");
       setNotaProcedimiento("");
     }
@@ -171,7 +166,6 @@ export default function NuevoPresupuesto({
   const handleAgregarDelCatalogo = () => {
     const procedimiento = procedimientos.find((p) => p.id === procedimientoSeleccionadoId);
     if (!procedimiento) return;
-    if (costoPorOrgano && selectedTeeth.length === 0) return;
     agregarItem(procedimiento.nombre, procedimiento.costoPaciente);
     setProcedimientoSeleccionadoId("");
   };
@@ -201,7 +195,6 @@ export default function NuevoPresupuesto({
     const nombre = personalizadoNombre.trim();
     const precio = Number(personalizadoPrecio);
     if (!nombre || !precio) return;
-    if (costoPorOrgano && selectedTeeth.length === 0) return;
     if (editandoItemId) {
       actualizarItem(editandoItemId, nombre, precio);
       setEditandoItemId(null);
@@ -485,16 +478,6 @@ export default function NuevoPresupuesto({
             </div>
           )}
 
-          <label className="flex items-center gap-2 text-sm text-ink/70">
-            <input
-              type="checkbox"
-              checked={costoPorOrgano}
-              onChange={(e) => setCostoPorOrgano(e.target.checked)}
-              className="h-4 w-4 rounded border-edge/30 accent-accent"
-            />
-            Costo por órgano dentario (multiplica el precio × dientes marcados en el odontograma)
-          </label>
-
           <div className="flex items-center gap-2">
             <label className="text-xs font-medium text-ink/60">Descuento</label>
             <input
@@ -509,11 +492,9 @@ export default function NuevoPresupuesto({
             <span className="text-xs text-ink/50">%</span>
           </div>
 
-          {(costoPorOrgano || Number(descuentoPct) > 0) && (
+          {(multiplicador > 1 || Number(descuentoPct) > 0) && (
             <p className="text-xs text-ink/50">
-              {costoPorOrgano && selectedTeeth.length === 0 ? (
-                "Marca al menos un diente en el odontograma de arriba."
-              ) : precioUnitarioDelCatalogo !== undefined ? (
+              {precioUnitarioDelCatalogo !== undefined ? (
                 <>
                   {formatCurrency(precioUnitarioDelCatalogo)} × {multiplicador}{" "}
                   {multiplicador === 1 ? "unidad" : "dientes"}
@@ -534,7 +515,7 @@ export default function NuevoPresupuesto({
           {procedimientos.length > 0 && (
             <button
               onClick={handleAgregarDelCatalogo}
-              disabled={!procedimientoSeleccionadoId || (costoPorOrgano && selectedTeeth.length === 0)}
+              disabled={!procedimientoSeleccionadoId}
               className="w-full rounded-lg border border-accent/40 py-2.5 text-sm font-semibold text-accent transition-colors hover:bg-accent/10 disabled:cursor-not-allowed disabled:opacity-40"
             >
               + Agregar procedimiento
@@ -552,7 +533,7 @@ export default function NuevoPresupuesto({
             <div className="space-y-2 rounded-lg border border-dashed border-edge/15 p-3">
               <p className="text-xs text-ink/40">
                 {editandoItemId ? (
-                  "Editando este renglón — ajusta nombre, precio, dientes o descuento y guarda los cambios."
+                  "Editando este renglón — ajusta nombre, precio, dientes o descuento y presiona \"Aplicar al renglón\". Después, no olvides guardar todo el presupuesto con el botón de hasta abajo — eso es lo que realmente lo guarda en el expediente."
                 ) : (
                   <>
                     Procedimiento no catalogado: aún no está en tu catálogo, pero sí se puede
@@ -582,14 +563,10 @@ export default function NuevoPresupuesto({
               <div className="flex gap-2">
                 <button
                   onClick={handleAgregarPersonalizado}
-                  disabled={
-                    !personalizadoNombre.trim() ||
-                    !Number(personalizadoPrecio) ||
-                    (costoPorOrgano && selectedTeeth.length === 0)
-                  }
+                  disabled={!personalizadoNombre.trim() || !Number(personalizadoPrecio)}
                   className="flex-1 rounded-lg border border-accent/40 py-2 text-xs font-semibold text-accent transition-colors hover:bg-accent/10 disabled:cursor-not-allowed disabled:opacity-40"
                 >
-                  {editandoItemId ? "Guardar cambios" : "Agregar"}
+                  {editandoItemId ? "Aplicar al renglón" : "Agregar"}
                 </button>
                 <button
                   onClick={cancelarEdicionOPersonalizado}

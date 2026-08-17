@@ -392,15 +392,25 @@ export type Recurso = {
   tipo: TipoRecurso;
 };
 
+/** A propósito NO incluye azul, ámbar/naranja, verde, morado ni rojo — esos
+ * cinco tonos ya están tomados por los estatus de cita (Confirmada,
+ * En espera, Atendida, Reagendada, Cancelada/No Asistió respectivamente).
+ * Si un recurso usara alguno, el texto de estatus dentro de su tarjeta en
+ * la agenda quedaría "color sobre color" (ej. texto azul de "Confirmada"
+ * sobre una tarjeta también azul) — molesto de leer aunque siga siendo
+ * legible por el halo oscuro. Se queda en teal/cian y fucsia/rosa (las
+ * únicas familias de color que no chocan con ningún estatus) más grises de
+ * distinto tono para variedad — antes de agregar un color nuevo aquí,
+ * verifica que no caiga en esas cinco familias. */
 export const RECURSO_COLOR_PALETTE = [
-  "#22c55e",
-  "#3b82f6",
-  "#f59e0b",
-  "#dc2626",
-  "#a855f7",
-  "#ec4899",
   "#14b8a6",
+  "#06b6d4",
+  "#d946ef",
+  "#ec4899",
+  "#94a3b8",
   "#64748b",
+  "#78716c",
+  "#44403c",
 ];
 
 /** Da un color que ningún recurso existente esté usando todavía, para que

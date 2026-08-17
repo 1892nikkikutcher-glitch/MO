@@ -78,13 +78,11 @@ export async function generarPresupuestoPdf(datos: DatosPresupuestoPdf): Promise
   doc.text(`Paciente: ${datos.pacienteNombre}`, xNombre, y);
   doc.text(datos.medico || datos.perfilDoctor.nombre, xTotal, y, { align: "right" });
   y += 5;
-  if (datos.pacienteCorreo) doc.text(`Correo electrónico: ${datos.pacienteCorreo}`, xNombre, y);
+  doc.text(`Correo electrónico: ${datos.pacienteCorreo || "Sin registro"}`, xNombre, y);
   doc.text(datos.fechaLarga, xTotal, y, { align: "right" });
   y += 5;
-  if (datos.pacienteTelefono) {
-    doc.text(`Teléfono: ${datos.pacienteTelefono}`, xNombre, y);
-    y += 5;
-  }
+  doc.text(`Teléfono: ${datos.pacienteTelefono || "Sin registro"}`, xNombre, y);
+  y += 5;
 
   if (datos.diagnostico) {
     y += 2;

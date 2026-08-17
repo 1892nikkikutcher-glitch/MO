@@ -7,6 +7,8 @@ import {
   esNegacionExplicita,
   esSeccionGinecoObstetrica,
   respuestasVacias,
+  valorOdontogramaComoDiagnosticos,
+  type DiagnosticoOdontograma,
   type PreguntaTemplate,
   type RespuestaValor,
   type RespuestasHistoriaClinica,
@@ -195,6 +197,202 @@ function ListaPrioridad({ valor, onChange }: { valor: PuntoPrioridad[]; onChange
   );
 }
 
+function todayISO() {
+  return new Date().toISOString().slice(0, 10);
+}
+
+function formatFechaCorta(iso: string) {
+  if (!iso) return "";
+  const [y, m, d] = iso.split("-");
+  if (!y || !m || !d) return iso;
+  return `${d}/${m}/${y}`;
+}
+
+/** Odontograma para anotar diagnósticos por diente (uno o varios a la
+ * vez) — marcar dientes arriba deja una selección "en borrador" que se
+ * convierte en un renglón guardado al capturar el diagnóstico, igual que
+ * el flujo de agregar procedimientos en Nuevo Presupuesto. El tratamiento
+ * sugerido es criterio del médico (no un cálculo), y sirve después para
+ * prellenar un renglón de presupuesto para este mismo diagnóstico. */
+function OdontogramaDiagnostico({
+  entries,
+  onChange,
+}: {
+  entries: DiagnosticoOdontograma[];
+  onChange: (entries: DiagnosticoOdontograma[]) => void;
+}) {
+  const { procedimientos } = usePatientData();
+  const [selectedTeeth, setSelectedTeeth] = useState<number[]>([]);
+  const [diagnosticoTexto, setDiagnosticoTexto] = useState("");
+  const [tratamientoSugerido, setTratamientoSugerido] = useState("");
+  const [editandoId, setEditandoId] = useState<string | null>(null);
+
+  const toggleTooth = (t: number) =>
+    setSelectedTeeth((prev) => (prev.includes(t) ? prev.filter((x) => x !== t) : [...prev, t]));
+
+  const limpiarFormulario = () => {
+    setSelectedTeeth([]);
+    setDiagnosticoTexto("");
+    setTratamientoSugerido("");
+    setEditandoId(null);
+  };
+
+  const iniciarEdicion = (entry: DiagnosticoOdontograma) => {
+    setEditandoId(entry.id);
+    setSelectedTeeth(entry.dientes);
+    setDiagnosticoTexto(entry.diagnostico);
+    setTratamientoSugerido(entry.tratamientoSugerido ?? "");
+  };
+
+  const guardarEntrada = () => {
+    const diagnostico = diagnosticoTexto.trim();
+    if (selectedTeeth.length === 0 || !diagnostico) return;
+    if (editandoId) {
+      onChange(
+        entries.map((e) =>
+          e.id === editandoId
+            ? {
+                ...e,
+                dientes: selectedTeeth,
+                diagnostico,
+                tratamientoSugerido: tratamientoSugerido.trim() || undefined,
+                fecha: e.fecha || todayISO(),
+              }
+            : e
+        )
+      );
+    } else {
+      const nuevo: DiagnosticoOdontograma = {
+        id: `diag${Date.now()}`,
+        dientes: selectedTeeth,
+        diagnostico,
+        tratamientoSugerido: tratamientoSugerido.trim() || undefined,
+        fecha: todayISO(),
+      };
+      onChange([nuevo, ...entries]);
+    }
+    limpiarFormulario();
+  };
+
+  const quitarEntrada = (id: string) => onChange(entries.filter((e) => e.id !== id));
+
+  return (
+    <div className="space-y-4">
+      <Odontograma selectedTeeth={selectedTeeth} onToggleTooth={toggleTooth} title="" hideSummary />
+
+      <div className="space-y-3 rounded-lg border border-dashed border-edge/15 p-3">
+        <p className="text-xs text-ink/40">
+          Marca uno o varios dientes arriba y anota su diagnóstico — un mismo diagnóstico puede
+          aplicar a varios dientes a la vez (ej. caries clase I en 3 piezas). Después de agregarlo o
+          editarlo aquí, no olvides guardar el historial completo con el botón de hasta abajo.
+        </p>
+        {selectedTeeth.length > 0 && (
+          <p className="text-xs font-semibold text-accent">
+            OD {[...selectedTeeth].sort((a, b) => a - b).join(", ")}
+          </p>
+        )}
+        <div>
+          <label className="mb-1 block text-xs font-medium text-ink/60">Diagnóstico</label>
+          <input
+            type="text"
+            value={diagnosticoTexto}
+            onChange={(e) => setDiagnosticoTexto(e.target.value)}
+            placeholder="Ej. Caries de segundo grado clase I"
+            className={inputClass}
+          />
+        </div>
+        <div>
+          <label className="mb-1 block text-xs font-medium text-ink/60">
+            Tratamiento sugerido (opcional — para prellenar el presupuesto después)
+          </label>
+          <input
+            type="text"
+            list="odontograma-catalogo-procedimientos"
+            value={tratamientoSugerido}
+            onChange={(e) => setTratamientoSugerido(e.target.value)}
+            placeholder="Ej. Resina clase I"
+            className={inputClass}
+          />
+          <datalist id="odontograma-catalogo-procedimientos">
+            {procedimientos.map((p) => (
+              <option key={p.id} value={p.nombre} />
+            ))}
+          </datalist>
+        </div>
+        <div className="flex gap-2">
+          <button
+            type="button"
+            onClick={guardarEntrada}
+            disabled={selectedTeeth.length === 0 || !diagnosticoTexto.trim()}
+            className="flex-1 rounded-lg border border-accent/40 py-2 text-xs font-semibold text-accent transition-colors hover:bg-accent/10 disabled:cursor-not-allowed disabled:opacity-40"
+          >
+            {editandoId ? "Aplicar al diagnóstico" : "+ Agregar diagnóstico"}
+          </button>
+          {editandoId && (
+            <button
+              type="button"
+              onClick={limpiarFormulario}
+              className="rounded-lg border border-edge/15 px-3 py-2 text-xs font-semibold text-ink/60 hover:bg-surface"
+            >
+              Cancelar
+            </button>
+          )}
+        </div>
+      </div>
+
+      {entries.length > 0 && (
+        <div className="space-y-2">
+          {entries.map((entry) => (
+            <div
+              key={entry.id}
+              className="flex items-start justify-between gap-3 rounded-lg border border-edge/10 bg-inset px-3 py-2 text-sm"
+            >
+              <div>
+                <p className="text-xs font-semibold text-accent">
+                  OD {[...entry.dientes].sort((a, b) => a - b).join(", ")}
+                </p>
+                <p className="text-ink">
+                  {entry.diagnostico || (
+                    <span className="italic text-ink/40">Sin diagnóstico anotado — edítalo para agregarlo</span>
+                  )}
+                </p>
+                {entry.tratamientoSugerido && (
+                  <p className="text-xs text-ink/50">Tratamiento sugerido: {entry.tratamientoSugerido}</p>
+                )}
+                {(entry.fecha || entry.fechaPresupuesto) && (
+                  <p className="text-xs text-ink/30">
+                    {entry.fecha && `Diagnosticado ${formatFechaCorta(entry.fecha)}`}
+                    {entry.fecha && entry.fechaPresupuesto && " · "}
+                    {entry.fechaPresupuesto && `Presupuestado ${formatFechaCorta(entry.fechaPresupuesto)}`}
+                  </p>
+                )}
+              </div>
+              <div className="flex shrink-0 items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => iniciarEdicion(entry)}
+                  title="Editar"
+                  className="text-ink/30 transition-colors hover:text-accent"
+                >
+                  ✎
+                </button>
+                <button
+                  type="button"
+                  onClick={() => quitarEntrada(entry.id)}
+                  title="Quitar"
+                  className="text-ink/30 transition-colors hover:text-danger"
+                >
+                  ✕
+                </button>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
 function PreguntaRenderer({
   pregunta,
   valor,
@@ -251,12 +449,11 @@ function PreguntaRenderer({
     );
   }
   if (pregunta.tipo === "odontograma") {
-    const dientes = (valor as number[]) ?? [];
+    const entries = valorOdontogramaComoDiagnosticos(valor);
     return (
-      <Odontograma
-        selectedTeeth={dientes}
-        onToggleTooth={(tooth) => onChange(dientes.includes(tooth) ? dientes.filter((t) => t !== tooth) : [...dientes, tooth])}
-        title=""
+      <OdontogramaDiagnostico
+        entries={entries}
+        onChange={(next) => onChange(next as unknown as RespuestaValor)}
       />
     );
   }

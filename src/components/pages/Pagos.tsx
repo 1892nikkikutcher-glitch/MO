@@ -112,6 +112,83 @@ function EliminarPagoDialog({
   );
 }
 
+function EditarPagoDialog({
+  pago,
+  onClose,
+  onSave,
+}: {
+  pago: Pago;
+  onClose: () => void;
+  onSave: (pago: Pago) => void;
+}) {
+  const [lineas, setLineas] = useState<LineaPago[]>(() => pago.lineas.map((l) => ({ ...l })));
+  const total = lineas.reduce((sum, l) => sum + l.monto, 0);
+  const puedeGuardar = total > 0;
+
+  const actualizarMonto = (id: string, monto: number) => {
+    setLineas((prev) => prev.map((l) => (l.id === id ? { ...l, monto: Math.max(0, monto) } : l)));
+  };
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4">
+      <div className="w-full max-w-md rounded-2xl border border-edge/10 bg-modal p-6">
+        <div className="mb-4 flex items-center justify-between">
+          <h3 className="text-base font-semibold text-ink">Editar Pago</h3>
+          <button
+            onClick={onClose}
+            className="flex h-7 w-7 items-center justify-center rounded-full text-ink/50 hover:bg-surface hover:text-ink"
+          >
+            ✕
+          </button>
+        </div>
+        <p className="mb-4 text-xs text-ink/40">
+          Corrige el monto de cada concepto — por ejemplo, si se anotó de menos o de más al
+          registrar el pago.
+        </p>
+        <div className="space-y-2">
+          {lineas.map((l) => (
+            <div
+              key={l.id}
+              className="flex items-center justify-between gap-3 rounded-lg border border-edge/10 bg-inset px-3 py-2 text-sm"
+            >
+              <span className="min-w-0 flex-1 truncate text-ink/80">{l.label}</span>
+              <span className="flex shrink-0 items-center gap-1 text-ink/60">
+                $
+                <input
+                  type="number"
+                  min={0}
+                  value={l.monto}
+                  onChange={(e) => actualizarMonto(l.id, Number(e.target.value))}
+                  className="w-24 rounded-md border border-edge/10 bg-field px-1.5 py-1 text-right text-sm text-ink outline-none focus:border-accent/60"
+                />
+              </span>
+            </div>
+          ))}
+        </div>
+        <div className="mt-4 flex items-center justify-between rounded-lg border border-edge/10 bg-inset px-3 py-2">
+          <span className="text-xs uppercase tracking-wide text-ink/40">Nuevo total</span>
+          <span className="text-lg font-bold text-success">{formatCurrency(total)}</span>
+        </div>
+        <div className="mt-6 flex gap-3">
+          <button
+            onClick={onClose}
+            className="flex-1 rounded-lg border border-edge/15 py-2.5 text-sm font-semibold text-ink/80 transition-colors hover:bg-surface"
+          >
+            Cancelar
+          </button>
+          <button
+            onClick={() => puedeGuardar && onSave({ ...pago, lineas, total })}
+            disabled={!puedeGuardar}
+            className="flex-1 rounded-lg bg-gradient-to-r from-accent to-orange-500 py-2.5 text-sm font-semibold text-black transition-opacity hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-40"
+          >
+            Guardar cambios
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function AgregarPagoExtraDialog({
   onClose,
   onAdd,
@@ -756,6 +833,7 @@ export default function Pagos({
   const [showDialog, setShowDialog] = useState(false);
   const [printTarget, setPrintTarget] = useState<Pago | null>(null);
   const [pagoAEliminar, setPagoAEliminar] = useState<Pago | null>(null);
+  const [pagoAEditar, setPagoAEditar] = useState<Pago | null>(null);
 
   const eliminarPagoConMotivo = (pago: Pago, motivo: string) => {
     const registro = {
@@ -919,13 +997,22 @@ export default function Pagos({
                     {formatCurrency(pago.total)}
                   </td>
                   <td className="px-6 py-3 text-right">
-                    <button
-                      onClick={() => setPagoAEliminar(pago)}
-                      title="Eliminar pago"
-                      className="ml-auto flex h-7 w-7 items-center justify-center rounded-full border border-danger/20 text-danger/50 transition-colors hover:border-danger/60 hover:text-danger"
-                    >
-                      <TrashIcon />
-                    </button>
+                    <div className="ml-auto flex w-fit items-center gap-1.5">
+                      <button
+                        onClick={() => setPagoAEditar(pago)}
+                        title="Editar monto del pago"
+                        className="flex h-7 w-7 items-center justify-center rounded-full border border-edge/15 text-ink/50 transition-colors hover:border-accent/50 hover:text-accent"
+                      >
+                        ✎
+                      </button>
+                      <button
+                        onClick={() => setPagoAEliminar(pago)}
+                        title="Eliminar pago"
+                        className="flex h-7 w-7 items-center justify-center rounded-full border border-danger/20 text-danger/50 transition-colors hover:border-danger/60 hover:text-danger"
+                      >
+                        <TrashIcon />
+                      </button>
+                    </div>
                   </td>
                 </tr>
               ))}
@@ -976,6 +1063,17 @@ export default function Pagos({
           pago={pagoAEliminar}
           onClose={() => setPagoAEliminar(null)}
           onConfirm={(motivo) => eliminarPagoConMotivo(pagoAEliminar, motivo)}
+        />
+      )}
+
+      {pagoAEditar && (
+        <EditarPagoDialog
+          pago={pagoAEditar}
+          onClose={() => setPagoAEditar(null)}
+          onSave={(pago) => {
+            upsertPago(pago);
+            setPagoAEditar(null);
+          }}
         />
       )}
     </div>

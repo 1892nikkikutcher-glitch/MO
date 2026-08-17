@@ -184,6 +184,7 @@ function PresupuestosTab({
   const [editingBudget, setEditingBudget] = useState<SavedBudget | null>(null);
   const [printTarget, setPrintTarget] = useState<SavedBudget | null>(null);
   const [enviandoWhatsAppId, setEnviandoWhatsAppId] = useState<string | null>(null);
+  const [presupuestoAEliminar, setPresupuestoAEliminar] = useState<SavedBudget | null>(null);
 
   useEffect(() => {
     if (printTarget) {
@@ -288,7 +289,15 @@ function PresupuestosTab({
                   <div className="space-y-1">
                     {p.items.map((item) => (
                       <div key={item.id} className="flex items-center justify-between gap-3 text-sm">
-                        <span className="text-ink/80">{item.note || item.procedure}</span>
+                        <span className="text-ink/80">
+                          {item.procedure}
+                          {item.teeth.length > 0 && (
+                            <span className="ml-2 text-xs font-semibold text-accent/80">
+                              OD {[...item.teeth].sort((a, b) => a - b).join(", ")}
+                            </span>
+                          )}
+                          {item.note && <span className="ml-2 text-xs text-ink/40">{item.note}</span>}
+                        </span>
                         <span className="shrink-0 rounded bg-inset px-2 py-0.5 text-xs text-ink/60">
                           {formatCurrency(item.price)}
                         </span>
@@ -345,7 +354,7 @@ function PresupuestosTab({
                     <PencilIcon />
                   </button>
                   <button
-                    onClick={() => setPresupuestos((prev) => prev.filter((b) => b.id !== p.id))}
+                    onClick={() => setPresupuestoAEliminar(p)}
                     title="Eliminar"
                     className="flex h-7 w-7 items-center justify-center rounded-full border border-danger/20 text-danger/50 transition-colors hover:border-danger/60 hover:text-danger"
                   >
@@ -354,6 +363,36 @@ function PresupuestosTab({
                 </div>
               </div>
             ))}
+          </div>
+        </div>
+      )}
+
+      {presupuestoAEliminar && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4">
+          <div className="w-full max-w-sm rounded-2xl border border-edge/10 bg-modal p-6">
+            <h3 className="text-base font-semibold text-ink">Eliminar presupuesto</h3>
+            <p className="mt-2 text-sm text-ink/70">
+              Vas a eliminar el presupuesto <span className="font-semibold text-ink">#{presupuestoAEliminar.folio}</span>{" "}
+              por <span className="font-semibold text-ink">{formatCurrency(presupuestoAEliminar.total)}</span>. Esta
+              acción no se puede deshacer.
+            </p>
+            <div className="mt-6 flex gap-3">
+              <button
+                onClick={() => setPresupuestoAEliminar(null)}
+                className="flex-1 rounded-lg border border-edge/15 py-2.5 text-sm font-semibold text-ink/80 transition-colors hover:bg-surface"
+              >
+                Cancelar
+              </button>
+              <button
+                onClick={() => {
+                  setPresupuestos((prev) => prev.filter((b) => b.id !== presupuestoAEliminar.id));
+                  setPresupuestoAEliminar(null);
+                }}
+                className="flex-1 rounded-lg bg-danger py-2.5 text-sm font-semibold text-black transition-opacity hover:opacity-90"
+              >
+                Eliminar
+              </button>
+            </div>
           </div>
         </div>
       )}

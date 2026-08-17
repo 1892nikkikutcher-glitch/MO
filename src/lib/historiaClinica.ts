@@ -155,7 +155,7 @@ export const plantillaInicial: HistoriaClinicaTemplate = {
     },
     {
       id: id("sec"),
-      titulo: "Odontograma",
+      titulo: "Odontograma Diagnóstico",
       preguntas: [{ id: id("p"), tipo: "odontograma", etiqueta: "Odontograma" }],
     },
     {
@@ -193,6 +193,71 @@ export const plantillaInicial: HistoriaClinicaTemplate = {
 };
 
 export type RespuestaValor = string | string[] | number[];
+
+/** Un diagnóstico anotado sobre uno o varios dientes del odontograma (ej.
+ * "Caries de segundo grado clase I" marcado en 3 piezas a la vez). Se
+ * guarda en la respuesta de la pregunta tipo "odontograma" como
+ * `DiagnosticoOdontograma[]` — igual que "listaPrioridad" ya guarda su
+ * propio tipo por dentro de `RespuestaValor` vía un cast, en vez de
+ * ampliar la unión para cada tipo de pregunta nuevo. `tratamientoSugerido`
+ * es el criterio del médico para prellenar el presupuesto (ej. una caries
+ * clase I sugiere "Resina clase I"), no un cálculo automático. */
+export type DiagnosticoOdontograma = {
+  id: string;
+  dientes: number[];
+  diagnostico: string;
+  tratamientoSugerido?: string;
+  /** ISO date — cuándo se anotó el diagnóstico. */
+  fecha: string;
+  /** ISO date — se llena solo cuando este diagnóstico se usa para
+   * prellenar un renglón de presupuesto (ver NuevoPresupuesto), como
+   * registro de que ya se presupuestó y cuándo. */
+  fechaPresupuesto?: string;
+};
+
+/** Antes de este cambio, la respuesta de una pregunta "odontograma" era
+ * simplemente `number[]` (dientes marcados, sin diagnóstico). Para no
+ * perder selecciones ya guardadas, se migran a una sola entrada con
+ * diagnóstico vacío — se sigue viendo el mismo grupo de dientes marcado,
+ * y basta con editarla para ponerle el diagnóstico. Nunca se escribe sola
+ * — solo se usa al leer, hasta que el usuario la edite y guarde. */
+export function valorOdontogramaComoDiagnosticos(valor: RespuestaValor | undefined): DiagnosticoOdontograma[] {
+  if (!valor || !Array.isArray(valor)) return [];
+  if (valor.length === 0) return [];
+  if (typeof valor[0] === "number") {
+    return [
+      {
+        id: "migrado",
+        dientes: valor as number[],
+        diagnostico: "",
+        fecha: "",
+      },
+    ];
+  }
+  return (valor as unknown as DiagnosticoOdontograma[]) ?? [];
+}
+
+/** Junta los diagnósticos de odontograma de TODAS las preguntas tipo
+ * "odontograma" de la plantilla (normalmente solo hay una) en una sola
+ * lista, cada uno con el id de su pregunta de origen — para poder
+ * encontrarlos y actualizarlos (ej. al presupuestarlos) sin que quien los
+ * usa necesite saber en qué pregunta viven. */
+export function todosLosDiagnosticosOdontograma(
+  template: HistoriaClinicaTemplate,
+  respuestas: RespuestasHistoriaClinica
+): { preguntaId: string; diagnostico: DiagnosticoOdontograma }[] {
+  const resultado: { preguntaId: string; diagnostico: DiagnosticoOdontograma }[] = [];
+  for (const seccion of template.secciones) {
+    for (const pregunta of seccion.preguntas) {
+      if (pregunta.tipo !== "odontograma") continue;
+      const entradas = valorOdontogramaComoDiagnosticos(respuestas.porPregunta[pregunta.id]);
+      for (const diagnostico of entradas) {
+        resultado.push({ preguntaId: pregunta.id, diagnostico });
+      }
+    }
+  }
+  return resultado;
+}
 
 export type RespuestasHistoriaClinica = {
   porPregunta: Record<string, RespuestaValor>;

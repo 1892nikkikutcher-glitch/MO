@@ -54,8 +54,8 @@ export default function PresupuestoImpreso({
       <div className="mt-4 flex justify-between text-sm">
         <div>
           <p>Paciente: {pacienteNombre}</p>
-          {pacienteCorreo && <p>Correo electrónico: {pacienteCorreo}</p>}
-          {pacienteTelefono && <p>Teléfono: {pacienteTelefono}</p>}
+          <p>Correo electrónico: {pacienteCorreo || "Sin registro"}</p>
+          <p>Teléfono: {pacienteTelefono || "Sin registro"}</p>
         </div>
         <div className="text-right">
           <p>{medico || perfilDoctor.nombre}</p>
