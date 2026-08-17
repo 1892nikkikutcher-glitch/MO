@@ -5,6 +5,7 @@ import { usePatientData } from "@/context/PatientDataContext";
 import { renderPlantilla, formatosWhatsAppInicial } from "@/lib/formatosWhatsapp";
 import { formatFechaCita } from "@/lib/patientData";
 import type { EncuestaEnviada } from "@/lib/encuestas";
+import ConfirmarEliminar from "@/components/ConfirmarEliminar";
 
 function WhatsAppIcon() {
   return (
@@ -134,6 +135,7 @@ export default function ReporteEncuestas() {
   const { citas, patients, clinicInfo, formatosWhatsapp, encuestas, setEncuestas, irAExpediente } =
     usePatientData();
   const [respondiendo, setRespondiendo] = useState<EncuestaEnviada | null>(null);
+  const [encuestaAEliminar, setEncuestaAEliminar] = useState<EncuestaEnviada | null>(null);
 
   const desde = haceDias(30);
   const hasta = hoyISO();
@@ -278,7 +280,7 @@ export default function ReporteEncuestas() {
                     Registrar respuesta
                   </button>
                   <button
-                    onClick={() => setEncuestas((prev) => prev.filter((x) => x.id !== e.id))}
+                    onClick={() => setEncuestaAEliminar(e)}
                     title="Quitar de esta bitácora"
                     className="flex h-8 w-8 items-center justify-center rounded-full border border-danger/20 text-danger/50 transition-colors hover:border-danger/60 hover:text-danger"
                   >
@@ -335,7 +337,7 @@ export default function ReporteEncuestas() {
                     </td>
                     <td className="px-6 py-3 text-right">
                       <button
-                        onClick={() => setEncuestas((prev) => prev.filter((x) => x.id !== e.id))}
+                        onClick={() => setEncuestaAEliminar(e)}
                         title="Quitar de esta bitácora"
                         className="ml-auto flex h-7 w-7 items-center justify-center rounded-full border border-danger/20 text-danger/50 transition-colors hover:border-danger/60 hover:text-danger"
                       >
@@ -363,6 +365,19 @@ export default function ReporteEncuestas() {
               )
             );
             setRespondiendo(null);
+          }}
+        />
+      )}
+
+      {encuestaAEliminar && (
+        <ConfirmarEliminar
+          titulo="¿Quitar esta encuesta de la bitácora?"
+          mensaje={`Encuesta de ${encuestaAEliminar.patientName}. Esta acción no se puede deshacer.`}
+          confirmLabel="Quitar"
+          onCancel={() => setEncuestaAEliminar(null)}
+          onConfirm={() => {
+            setEncuestas((prev) => prev.filter((x) => x.id !== encuestaAEliminar.id));
+            setEncuestaAEliminar(null);
           }}
         />
       )}

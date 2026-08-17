@@ -4,6 +4,7 @@ import { useState } from "react";
 import { usePatientData } from "@/context/PatientDataContext";
 import type { Aseguradora } from "@/lib/catalogosVarios";
 import { manejarCambioNombre } from "@/lib/textoNombre";
+import ConfirmarEliminar from "@/components/ConfirmarEliminar";
 
 const inputClass =
   "w-full rounded-lg border border-edge/10 bg-field px-3 py-2 text-sm text-ink outline-none focus:border-accent/60";
@@ -105,6 +106,7 @@ function AseguradoraDialog({
 export default function Aseguradoras() {
   const { aseguradoras, setAseguradoras } = usePatientData();
   const [editando, setEditando] = useState<Aseguradora | "nuevo" | null>(null);
+  const [aseguradoraAEliminar, setAseguradoraAEliminar] = useState<Aseguradora | null>(null);
 
   const guardar = (data: Omit<Aseguradora, "id">) => {
     if (editando && editando !== "nuevo") {
@@ -147,7 +149,7 @@ export default function Aseguradoras() {
                   Editar
                 </button>
                 <button
-                  onClick={() => setAseguradoras((prev) => prev.filter((x) => x.id !== a.id))}
+                  onClick={() => setAseguradoraAEliminar(a)}
                   className="rounded-lg border border-danger/30 px-2.5 py-1 text-xs text-danger hover:bg-danger/10"
                 >
                   Eliminar
@@ -163,6 +165,18 @@ export default function Aseguradoras() {
           inicial={editando === "nuevo" ? null : editando}
           onClose={() => setEditando(null)}
           onGuardar={guardar}
+        />
+      )}
+
+      {aseguradoraAEliminar && (
+        <ConfirmarEliminar
+          titulo="¿Eliminar esta aseguradora?"
+          mensaje={`Vas a eliminar "${aseguradoraAEliminar.nombre}" del catálogo. Esta acción no se puede deshacer.`}
+          onCancel={() => setAseguradoraAEliminar(null)}
+          onConfirm={() => {
+            setAseguradoras((prev) => prev.filter((x) => x.id !== aseguradoraAEliminar.id));
+            setAseguradoraAEliminar(null);
+          }}
         />
       )}
     </div>

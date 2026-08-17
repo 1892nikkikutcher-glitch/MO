@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import Odontograma from "./Odontograma";
 import { usePatientData } from "@/context/PatientDataContext";
+import ConfirmarEliminar from "@/components/ConfirmarEliminar";
 import {
   esNegacionExplicita,
   esSeccionGinecoObstetrica,
@@ -122,6 +123,7 @@ function FaseSection({
   onQuitar: (id: string) => void;
 }) {
   const [nuevo, setNuevo] = useState("");
+  const [puntoAQuitar, setPuntoAQuitar] = useState<PuntoPrioridad | null>(null);
   const info = faseInfo[fase];
 
   const agregar = () => {
@@ -142,7 +144,7 @@ function FaseSection({
               <span className="mr-2 font-semibold text-accent">{index + 1}.</span>
               {punto.texto}
             </span>
-            <button onClick={() => onQuitar(punto.id)} className="text-ink/30 hover:text-danger" title="Quitar">
+            <button onClick={() => setPuntoAQuitar(punto)} className="text-ink/30 hover:text-danger" title="Quitar">
               ✕
             </button>
           </div>
@@ -168,6 +170,19 @@ function FaseSection({
           + Agregar
         </button>
       </div>
+
+      {puntoAQuitar && (
+        <ConfirmarEliminar
+          titulo="¿Quitar este punto?"
+          mensaje={`"${puntoAQuitar.texto}"`}
+          confirmLabel="Quitar"
+          onCancel={() => setPuntoAQuitar(null)}
+          onConfirm={() => {
+            onQuitar(puntoAQuitar.id);
+            setPuntoAQuitar(null);
+          }}
+        />
+      )}
     </div>
   );
 }
@@ -226,6 +241,7 @@ function OdontogramaDiagnostico({
   const [diagnosticoTexto, setDiagnosticoTexto] = useState("");
   const [tratamientoSugerido, setTratamientoSugerido] = useState("");
   const [editandoId, setEditandoId] = useState<string | null>(null);
+  const [entradaAEliminar, setEntradaAEliminar] = useState<DiagnosticoOdontograma | null>(null);
 
   const toggleTooth = (t: number) =>
     setSelectedTeeth((prev) => (prev.includes(t) ? prev.filter((x) => x !== t) : [...prev, t]));
@@ -378,7 +394,7 @@ function OdontogramaDiagnostico({
                 </button>
                 <button
                   type="button"
-                  onClick={() => quitarEntrada(entry.id)}
+                  onClick={() => setEntradaAEliminar(entry)}
                   title="Quitar"
                   className="text-ink/30 transition-colors hover:text-danger"
                 >
@@ -388,6 +404,21 @@ function OdontogramaDiagnostico({
             </div>
           ))}
         </div>
+      )}
+
+      {entradaAEliminar && (
+        <ConfirmarEliminar
+          titulo="¿Quitar este diagnóstico?"
+          mensaje={`OD ${[...entradaAEliminar.dientes].sort((a, b) => a - b).join(", ")} — "${
+            entradaAEliminar.diagnostico || "Sin diagnóstico anotado"
+          }". Esta acción no se puede deshacer.`}
+          confirmLabel="Quitar"
+          onCancel={() => setEntradaAEliminar(null)}
+          onConfirm={() => {
+            quitarEntrada(entradaAEliminar.id);
+            setEntradaAEliminar(null);
+          }}
+        />
       )}
     </div>
   );

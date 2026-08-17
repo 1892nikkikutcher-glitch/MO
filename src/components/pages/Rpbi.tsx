@@ -5,6 +5,7 @@ import { usePatientData } from "@/context/PatientDataContext";
 import type { EmpresaRPBI } from "@/lib/catalogosVarios";
 import { manejarCambioNombre } from "@/lib/textoNombre";
 import { limpiarTelefono } from "@/lib/depositoDental";
+import ConfirmarEliminar from "@/components/ConfirmarEliminar";
 
 const inputClass =
   "w-full rounded-lg border border-edge/10 bg-field px-3 py-2 text-sm text-ink outline-none focus:border-accent/60";
@@ -217,6 +218,7 @@ function tituloEmpresa(e: EmpresaRPBI): string {
 export default function Rpbi() {
   const { empresasRpbi, setEmpresasRpbi } = usePatientData();
   const [editando, setEditando] = useState<EmpresaRPBI | "nuevo" | null>(null);
+  const [empresaAEliminar, setEmpresaAEliminar] = useState<EmpresaRPBI | null>(null);
 
   const guardar = (data: Omit<EmpresaRPBI, "id">) => {
     if (editando && editando !== "nuevo") {
@@ -304,7 +306,7 @@ export default function Rpbi() {
                   Editar
                 </button>
                 <button
-                  onClick={() => setEmpresasRpbi((prev) => prev.filter((x) => x.id !== e.id))}
+                  onClick={() => setEmpresaAEliminar(e)}
                   className="rounded-lg border border-danger/30 px-2.5 py-1 text-xs text-danger hover:bg-danger/10"
                 >
                   Eliminar
@@ -320,6 +322,18 @@ export default function Rpbi() {
           inicial={editando === "nuevo" ? null : editando}
           onClose={() => setEditando(null)}
           onGuardar={guardar}
+        />
+      )}
+
+      {empresaAEliminar && (
+        <ConfirmarEliminar
+          titulo="¿Eliminar esta empresa RPBI?"
+          mensaje={`Vas a eliminar "${empresaAEliminar.empresa}" del catálogo. Esta acción no se puede deshacer.`}
+          onCancel={() => setEmpresaAEliminar(null)}
+          onConfirm={() => {
+            setEmpresasRpbi((prev) => prev.filter((x) => x.id !== empresaAEliminar.id));
+            setEmpresaAEliminar(null);
+          }}
         />
       )}
     </div>

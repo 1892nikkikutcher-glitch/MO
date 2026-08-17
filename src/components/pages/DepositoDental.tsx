@@ -16,6 +16,7 @@ import {
   type TipoFaltante,
   type UrgenciaFaltante,
 } from "@/lib/depositoDental";
+import ConfirmarEliminar from "@/components/ConfirmarEliminar";
 
 const inputClass =
   "w-full rounded-lg border border-edge/10 bg-field px-3 py-2 text-sm text-ink placeholder-ink/30 outline-none focus:border-accent/60";
@@ -387,6 +388,9 @@ export default function DepositoDental() {
   const [showDeposito, setShowDeposito] = useState(false);
   const [showFaltante, setShowFaltante] = useState(false);
   const [showCaducidad, setShowCaducidad] = useState(false);
+  const [depositoAEliminar, setDepositoAEliminar] = useState<Deposito | null>(null);
+  const [faltanteAEliminar, setFaltanteAEliminar] = useState<ArticuloFaltante | null>(null);
+  const [caducidadAEliminar, setCaducidadAEliminar] = useState<ArticuloCaducidad | null>(null);
 
   const clinicaNombre = clinicInfo?.nombre || perfilDoctor.nombre || "";
 
@@ -442,7 +446,7 @@ export default function DepositoDental() {
                     Pedir / Cotizar
                   </button>
                   <button
-                    onClick={() => setDepositos((prev) => prev.filter((x) => x.id !== d.id))}
+                    onClick={() => setDepositoAEliminar(d)}
                     title="Eliminar"
                     className="ml-auto flex h-7 w-7 items-center justify-center rounded-full border border-danger/20 text-danger/50 transition-colors hover:border-danger/60 hover:text-danger"
                   >
@@ -527,9 +531,7 @@ export default function DepositoDental() {
                     </td>
                     <td className="px-4 py-3 text-right">
                       <button
-                        onClick={() =>
-                          setArticulosFaltantes((prev) => prev.filter((x) => x.id !== a.id))
-                        }
+                        onClick={() => setFaltanteAEliminar(a)}
                         title="Eliminar"
                         className="ml-auto flex h-7 w-7 items-center justify-center rounded-full border border-danger/20 text-danger/50 transition-colors hover:border-danger/60 hover:text-danger"
                       >
@@ -592,9 +594,7 @@ export default function DepositoDental() {
                         </td>
                         <td className="px-4 py-3 text-right">
                           <button
-                            onClick={() =>
-                              setArticulosCaducidad((prev) => prev.filter((x) => x.id !== a.id))
-                            }
+                            onClick={() => setCaducidadAEliminar(a)}
                             title="Eliminar"
                             className="ml-auto flex h-7 w-7 items-center justify-center rounded-full border border-danger/20 text-danger/50 transition-colors hover:border-danger/60 hover:text-danger"
                           >
@@ -649,6 +649,42 @@ export default function DepositoDental() {
             };
             setArticulosCaducidad((prev) => [nuevo, ...prev]);
             setShowCaducidad(false);
+          }}
+        />
+      )}
+
+      {depositoAEliminar && (
+        <ConfirmarEliminar
+          titulo="¿Eliminar este depósito dental?"
+          mensaje={`Vas a eliminar "${depositoAEliminar.nombre}" del catálogo. Esta acción no se puede deshacer.`}
+          onCancel={() => setDepositoAEliminar(null)}
+          onConfirm={() => {
+            setDepositos((prev) => prev.filter((x) => x.id !== depositoAEliminar.id));
+            setDepositoAEliminar(null);
+          }}
+        />
+      )}
+
+      {faltanteAEliminar && (
+        <ConfirmarEliminar
+          titulo="¿Eliminar este faltante?"
+          mensaje={`Vas a eliminar "${faltanteAEliminar.nombre}" de la lista de faltantes. Esta acción no se puede deshacer.`}
+          onCancel={() => setFaltanteAEliminar(null)}
+          onConfirm={() => {
+            setArticulosFaltantes((prev) => prev.filter((x) => x.id !== faltanteAEliminar.id));
+            setFaltanteAEliminar(null);
+          }}
+        />
+      )}
+
+      {caducidadAEliminar && (
+        <ConfirmarEliminar
+          titulo="¿Eliminar este producto?"
+          mensaje={`Vas a eliminar "${caducidadAEliminar.nombre}" del control de caducidades. Esta acción no se puede deshacer.`}
+          onCancel={() => setCaducidadAEliminar(null)}
+          onConfirm={() => {
+            setArticulosCaducidad((prev) => prev.filter((x) => x.id !== caducidadAEliminar.id));
+            setCaducidadAEliminar(null);
           }}
         />
       )}

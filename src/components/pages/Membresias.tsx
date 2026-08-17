@@ -10,6 +10,7 @@ import {
   type DuracionTipo,
   type MembershipPlan,
 } from "@/lib/membresias";
+import ConfirmarEliminar from "@/components/ConfirmarEliminar";
 
 const inputClass =
   "w-full rounded-lg border border-edge/10 bg-field px-3 py-2 text-sm text-ink placeholder-ink/30 outline-none focus:border-accent/60";
@@ -264,6 +265,7 @@ function PlanDialog({
 export default function Membresias() {
   const { miRol, membershipPlanes, setMembershipPlanes } = usePatientData();
   const [editando, setEditando] = useState<MembershipPlan | "nuevo" | null>(null);
+  const [planAEliminar, setPlanAEliminar] = useState<MembershipPlan | null>(null);
 
   if (miRol !== "admin") {
     return (
@@ -334,7 +336,7 @@ export default function Membresias() {
                   Editar
                 </button>
                 <button
-                  onClick={() => eliminarPlan(plan.id)}
+                  onClick={() => setPlanAEliminar(plan)}
                   className="flex-1 rounded-lg border border-danger/30 py-1.5 text-xs font-semibold text-danger hover:bg-danger/10"
                 >
                   Eliminar
@@ -350,6 +352,18 @@ export default function Membresias() {
           inicial={editando === "nuevo" ? null : editando}
           onClose={() => setEditando(null)}
           onGuardar={guardarPlan}
+        />
+      )}
+
+      {planAEliminar && (
+        <ConfirmarEliminar
+          titulo="¿Eliminar este plan de membresía?"
+          mensaje={`Vas a eliminar "${planAEliminar.nombre}" del catálogo. Esta acción no se puede deshacer.`}
+          onCancel={() => setPlanAEliminar(null)}
+          onConfirm={() => {
+            eliminarPlan(planAEliminar.id);
+            setPlanAEliminar(null);
+          }}
         />
       )}
     </div>

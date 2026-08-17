@@ -9,6 +9,7 @@ import {
   formatDuracion,
   type Procedimiento,
 } from "@/lib/procedimientos";
+import ConfirmarEliminar from "@/components/ConfirmarEliminar";
 
 const inputClass =
   "w-full rounded-lg border border-edge/10 bg-field px-3 py-2 text-sm text-ink placeholder-ink/30 outline-none focus:border-accent/60";
@@ -177,6 +178,7 @@ function ProcedimientoDialog({
 export default function Procedimientos() {
   const { miRol, procedimientos, setProcedimientos } = usePatientData();
   const [editando, setEditando] = useState<Procedimiento | "nuevo" | null>(null);
+  const [procedimientoAEliminar, setProcedimientoAEliminar] = useState<Procedimiento | null>(null);
 
   if (miRol !== "admin") {
     return (
@@ -255,7 +257,7 @@ export default function Procedimientos() {
                           Editar
                         </button>
                         <button
-                          onClick={() => eliminarProcedimiento(p.id)}
+                          onClick={() => setProcedimientoAEliminar(p)}
                           className="rounded-lg border border-danger/30 px-2.5 py-1 text-xs text-danger hover:bg-danger/10"
                         >
                           Eliminar
@@ -275,6 +277,18 @@ export default function Procedimientos() {
           inicial={editando === "nuevo" ? null : editando}
           onClose={() => setEditando(null)}
           onGuardar={guardarProcedimiento}
+        />
+      )}
+
+      {procedimientoAEliminar && (
+        <ConfirmarEliminar
+          titulo="¿Eliminar este procedimiento?"
+          mensaje={`Vas a eliminar "${procedimientoAEliminar.nombre}" del catálogo. Esta acción no se puede deshacer.`}
+          onCancel={() => setProcedimientoAEliminar(null)}
+          onConfirm={() => {
+            eliminarProcedimiento(procedimientoAEliminar.id);
+            setProcedimientoAEliminar(null);
+          }}
         />
       )}
     </div>

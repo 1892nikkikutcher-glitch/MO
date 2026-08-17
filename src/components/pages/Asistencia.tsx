@@ -17,6 +17,7 @@ import {
   type BloqueHorario,
 } from "@/lib/asistencia";
 import { manejarCambioNombre } from "@/lib/textoNombre";
+import ConfirmarEliminar from "@/components/ConfirmarEliminar";
 
 const inputClass =
   "w-full rounded-lg border border-edge/10 bg-field px-3 py-2 text-sm text-ink placeholder-ink/30 outline-none focus:border-accent/60";
@@ -143,6 +144,7 @@ function TabPersonal() {
     usePatientData();
   const [editando, setEditando] = useState<PersonalAsistencia | "nuevo" | null>(null);
   const [fecha, setFecha] = useState(hoyISO());
+  const [personalAEliminar, setPersonalAEliminar] = useState<PersonalAsistencia | null>(null);
 
   const guardarPersonal = (data: Omit<PersonalAsistencia, "id">) => {
     if (editando && editando !== "nuevo") {
@@ -223,7 +225,7 @@ function TabPersonal() {
                           Editar
                         </button>
                         <button
-                          onClick={() => eliminarPersonal(p.id)}
+                          onClick={() => setPersonalAEliminar(p)}
                           className="rounded-lg border border-danger/30 px-2.5 py-1 text-xs text-danger hover:bg-danger/10"
                         >
                           Eliminar
@@ -253,6 +255,18 @@ function TabPersonal() {
           inicial={editando === "nuevo" ? null : editando}
           onClose={() => setEditando(null)}
           onGuardar={guardarPersonal}
+        />
+      )}
+
+      {personalAEliminar && (
+        <ConfirmarEliminar
+          titulo="¿Eliminar a este colaborador?"
+          mensaje={`Vas a eliminar a "${personalAEliminar.nombre}" (${personalAEliminar.puesto}) de la lista de personal. Esta acción no se puede deshacer.`}
+          onCancel={() => setPersonalAEliminar(null)}
+          onConfirm={() => {
+            eliminarPersonal(personalAEliminar.id);
+            setPersonalAEliminar(null);
+          }}
         />
       )}
     </div>

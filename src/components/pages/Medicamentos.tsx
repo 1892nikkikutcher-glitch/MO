@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { usePatientData } from "@/context/PatientDataContext";
 import type { MedicamentoCatalogo, TipoPacienteMedicamento } from "@/lib/medicamentos";
+import ConfirmarEliminar from "@/components/ConfirmarEliminar";
 
 const inputClass =
   "w-full rounded-lg border border-edge/10 bg-field px-3 py-2 text-sm text-ink placeholder-ink/30 outline-none focus:border-accent/60";
@@ -180,6 +181,7 @@ function MedicamentoDialog({
 export default function Medicamentos() {
   const { miRol, catalogoMedicamentos, setCatalogoMedicamentos } = usePatientData();
   const [editando, setEditando] = useState<MedicamentoCatalogo | "nuevo" | null>(null);
+  const [medicamentoAEliminar, setMedicamentoAEliminar] = useState<MedicamentoCatalogo | null>(null);
 
   if (miRol !== "admin") {
     return (
@@ -236,7 +238,7 @@ export default function Medicamentos() {
                 <button onClick={() => setEditando(m)} className="text-xs font-semibold text-ink/60 hover:text-ink">
                   Editar
                 </button>
-                <button onClick={() => eliminarMedicamento(m.id)} className="text-xs font-semibold text-danger hover:text-danger">
+                <button onClick={() => setMedicamentoAEliminar(m)} className="text-xs font-semibold text-danger hover:text-danger">
                   Eliminar
                 </button>
               </div>
@@ -262,7 +264,7 @@ export default function Medicamentos() {
                 <button onClick={() => setEditando(m)} className="text-xs font-semibold text-ink/60 hover:text-ink">
                   Editar
                 </button>
-                <button onClick={() => eliminarMedicamento(m.id)} className="text-xs font-semibold text-danger hover:text-danger">
+                <button onClick={() => setMedicamentoAEliminar(m)} className="text-xs font-semibold text-danger hover:text-danger">
                   Eliminar
                 </button>
               </div>
@@ -277,6 +279,18 @@ export default function Medicamentos() {
           inicial={editando === "nuevo" ? null : editando}
           onClose={() => setEditando(null)}
           onGuardar={guardarMedicamento}
+        />
+      )}
+
+      {medicamentoAEliminar && (
+        <ConfirmarEliminar
+          titulo="¿Eliminar este medicamento?"
+          mensaje={`Vas a eliminar "${medicamentoAEliminar.nombre}" del catálogo. Esta acción no se puede deshacer.`}
+          onCancel={() => setMedicamentoAEliminar(null)}
+          onConfirm={() => {
+            eliminarMedicamento(medicamentoAEliminar.id);
+            setMedicamentoAEliminar(null);
+          }}
         />
       )}
     </div>

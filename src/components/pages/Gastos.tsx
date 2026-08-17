@@ -2,9 +2,10 @@
 
 import { useState } from "react";
 import { usePatientData } from "@/context/PatientDataContext";
-import { gastoCategoriaOptions, type GastoCategoria } from "@/lib/gastos";
+import { gastoCategoriaOptions, type GastoCategoria, type Gasto } from "@/lib/gastos";
 import { formatCurrency } from "@/lib/patientData";
 import { inicioMes, sumarRango } from "@/lib/metas";
+import ConfirmarEliminar from "@/components/ConfirmarEliminar";
 
 const inputClass =
   "w-full rounded-lg border border-edge/10 bg-field px-3 py-2 text-sm text-ink outline-none focus:border-accent/60";
@@ -28,6 +29,7 @@ export default function Gastos() {
   const [categoria, setCategoria] = useState<GastoCategoria>(gastoCategoriaOptions[0]);
   const [monto, setMonto] = useState("");
   const [fecha, setFecha] = useState(todayIso());
+  const [gastoAEliminar, setGastoAEliminar] = useState<Gasto | null>(null);
 
   const puedeGuardar = concepto.trim().length > 0 && Number(monto) > 0;
 
@@ -162,7 +164,7 @@ export default function Gastos() {
                   </td>
                   <td className="px-6 py-3 text-right">
                     <button
-                      onClick={() => eliminarGasto(g.id)}
+                      onClick={() => setGastoAEliminar(g)}
                       className="text-xs font-semibold text-danger hover:text-danger"
                     >
                       Eliminar
@@ -173,6 +175,18 @@ export default function Gastos() {
             </tbody>
           </table>
         </div>
+      )}
+
+      {gastoAEliminar && (
+        <ConfirmarEliminar
+          titulo="¿Eliminar este gasto?"
+          mensaje={`Vas a eliminar "${gastoAEliminar.concepto}" por ${formatCurrency(gastoAEliminar.monto)}. Esta acción no se puede deshacer.`}
+          onCancel={() => setGastoAEliminar(null)}
+          onConfirm={() => {
+            eliminarGasto(gastoAEliminar.id);
+            setGastoAEliminar(null);
+          }}
+        />
       )}
     </div>
   );

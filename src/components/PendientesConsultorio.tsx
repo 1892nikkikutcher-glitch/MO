@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { usePatientData } from "@/context/PatientDataContext";
 import type { Pendiente } from "@/lib/pendientes";
+import ConfirmarEliminar from "@/components/ConfirmarEliminar";
 
 function TrashIcon() {
   return (
@@ -23,6 +24,7 @@ export default function PendientesConsultorio() {
   const [agregando, setAgregando] = useState(false);
   const [texto, setTexto] = useState("");
   const [verCompletados, setVerCompletados] = useState(false);
+  const [pendienteAEliminar, setPendienteAEliminar] = useState<Pendiente | null>(null);
 
   const pendientesActivos = [...pendientes]
     .filter((p) => !p.completado)
@@ -136,7 +138,7 @@ export default function PendientesConsultorio() {
             />
             <span className="flex-1 text-sm text-ink">{p.texto}</span>
             <button
-              onClick={() => eliminar(p.id)}
+              onClick={() => setPendienteAEliminar(p)}
               title="Eliminar pendiente"
               className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-ink/30 transition-colors hover:bg-danger/10 hover:text-danger"
             >
@@ -169,7 +171,7 @@ export default function PendientesConsultorio() {
                   />
                   <span className="flex-1 text-sm text-ink line-through">{p.texto}</span>
                   <button
-                    onClick={() => eliminar(p.id)}
+                    onClick={() => setPendienteAEliminar(p)}
                     title="Eliminar pendiente"
                     className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-ink/30 transition-colors hover:bg-danger/10 hover:text-danger"
                   >
@@ -180,6 +182,18 @@ export default function PendientesConsultorio() {
             </div>
           )}
         </div>
+      )}
+
+      {pendienteAEliminar && (
+        <ConfirmarEliminar
+          titulo="¿Eliminar este pendiente?"
+          mensaje={`"${pendienteAEliminar.texto}"`}
+          onCancel={() => setPendienteAEliminar(null)}
+          onConfirm={() => {
+            eliminar(pendienteAEliminar.id);
+            setPendienteAEliminar(null);
+          }}
+        />
       )}
     </div>
   );

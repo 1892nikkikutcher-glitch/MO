@@ -6,6 +6,7 @@ import type { Contador } from "@/lib/catalogosVarios";
 import { formatCurrency } from "@/lib/patientData";
 import { inicioMes, sumarRango } from "@/lib/metas";
 import { limpiarTelefono } from "@/lib/depositoDental";
+import ConfirmarEliminar from "@/components/ConfirmarEliminar";
 
 const inputClass =
   "w-full rounded-lg border border-edge/10 bg-field px-3 py-2 text-sm text-ink outline-none focus:border-accent/60";
@@ -141,6 +142,7 @@ function tituloContador(c: Contador): string {
 export default function Contabilidad() {
   const { contadores, setContadores, puedeVerFinanzas, finanzas, gastos } = usePatientData();
   const [editando, setEditando] = useState<Contador | "nuevo" | null>(null);
+  const [contadorAEliminar, setContadorAEliminar] = useState<Contador | null>(null);
 
   const guardar = (data: Omit<Contador, "id">) => {
     if (editando && editando !== "nuevo") {
@@ -217,7 +219,7 @@ export default function Contabilidad() {
                     Editar
                   </button>
                   <button
-                    onClick={() => setContadores((prev) => prev.filter((x) => x.id !== c.id))}
+                    onClick={() => setContadorAEliminar(c)}
                     className="rounded-lg border border-danger/30 px-2.5 py-1 text-xs text-danger hover:bg-danger/10"
                   >
                     Eliminar
@@ -270,6 +272,18 @@ export default function Contabilidad() {
           inicial={editando === "nuevo" ? null : editando}
           onClose={() => setEditando(null)}
           onGuardar={guardar}
+        />
+      )}
+
+      {contadorAEliminar && (
+        <ConfirmarEliminar
+          titulo="¿Eliminar este contador?"
+          mensaje={`Vas a eliminar "${tituloContador(contadorAEliminar)}" del catálogo. Esta acción no se puede deshacer.`}
+          onCancel={() => setContadorAEliminar(null)}
+          onConfirm={() => {
+            setContadores((prev) => prev.filter((x) => x.id !== contadorAEliminar.id));
+            setContadorAEliminar(null);
+          }}
         />
       )}
     </div>

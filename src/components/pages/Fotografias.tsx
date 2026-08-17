@@ -1,6 +1,7 @@
 "use client";
 
 import { useRef, useState } from "react";
+import ConfirmarEliminar from "@/components/ConfirmarEliminar";
 
 type Foto = {
   id: string;
@@ -62,6 +63,7 @@ function GalleryUploadCard({
   onRemove: (id: string) => void;
 }) {
   const inputRef = useRef<HTMLInputElement>(null);
+  const [fotoAEliminar, setFotoAEliminar] = useState<Foto | null>(null);
 
   return (
     <div className="space-y-4 rounded-2xl border border-edge/10 bg-surface p-6">
@@ -112,7 +114,7 @@ function GalleryUploadCard({
                   <DownloadIcon />
                 </a>
                 <button
-                  onClick={() => onRemove(foto.id)}
+                  onClick={() => setFotoAEliminar(foto)}
                   title="Eliminar"
                   className="flex h-7 w-7 items-center justify-center rounded-full border border-edge/20 bg-inset text-ink/80 transition-colors hover:border-danger/60 hover:text-danger"
                 >
@@ -122,6 +124,18 @@ function GalleryUploadCard({
             </div>
           ))}
         </div>
+      )}
+
+      {fotoAEliminar && (
+        <ConfirmarEliminar
+          titulo="¿Eliminar esta fotografía?"
+          mensaje="Esta acción no se puede deshacer."
+          onCancel={() => setFotoAEliminar(null)}
+          onConfirm={() => {
+            onRemove(fotoAEliminar.id);
+            setFotoAEliminar(null);
+          }}
+        />
       )}
     </div>
   );

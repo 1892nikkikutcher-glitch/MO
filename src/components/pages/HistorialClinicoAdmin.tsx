@@ -9,6 +9,7 @@ import {
   type SeccionTemplate,
   type TipoPregunta,
 } from "@/lib/historiaClinica";
+import ConfirmarEliminar from "@/components/ConfirmarEliminar";
 
 const inputClass =
   "w-full rounded-lg border border-edge/10 bg-field px-3 py-2 text-sm text-ink placeholder-ink/30 outline-none focus:border-accent/60";
@@ -40,6 +41,8 @@ function PreguntaEditor({
   onMover: (direccion: -1 | 1) => void;
   onQuitar: () => void;
 }) {
+  const [confirmandoQuitar, setConfirmandoQuitar] = useState(false);
+
   return (
     <div className="rounded-lg border border-edge/10 bg-inset p-3">
       <div className="grid grid-cols-1 gap-2 sm:grid-cols-[1fr_160px_auto]">
@@ -79,7 +82,7 @@ function PreguntaEditor({
             ↓
           </button>
           <button
-            onClick={onQuitar}
+            onClick={() => setConfirmandoQuitar(true)}
             title="Quitar pregunta"
             className="flex h-8 w-8 items-center justify-center rounded-md border border-danger/30 text-danger hover:bg-danger/10"
           >
@@ -87,6 +90,19 @@ function PreguntaEditor({
           </button>
         </div>
       </div>
+
+      {confirmandoQuitar && (
+        <ConfirmarEliminar
+          titulo="¿Quitar esta pregunta?"
+          mensaje={`"${pregunta.etiqueta || "(sin etiqueta)"}" se quitará de la Historia Clínica de todos los pacientes. Esta acción no se puede deshacer.`}
+          confirmLabel="Quitar"
+          onCancel={() => setConfirmandoQuitar(false)}
+          onConfirm={() => {
+            onQuitar();
+            setConfirmandoQuitar(false);
+          }}
+        />
+      )}
 
       {pregunta.tipo === "chips" && (
         <input
@@ -125,6 +141,8 @@ function SeccionEditor({
   onMover: (direccion: -1 | 1) => void;
   onQuitar: () => void;
 }) {
+  const [confirmandoQuitar, setConfirmandoQuitar] = useState(false);
+
   const actualizarPregunta = (id: string, cambios: Partial<PreguntaTemplate>) => {
     onCambiar({
       ...seccion,
@@ -173,7 +191,7 @@ function SeccionEditor({
             ↓
           </button>
           <button
-            onClick={onQuitar}
+            onClick={() => setConfirmandoQuitar(true)}
             title="Quitar sección"
             className="flex h-8 w-8 items-center justify-center rounded-md border border-danger/30 text-danger hover:bg-danger/10"
           >
@@ -181,6 +199,19 @@ function SeccionEditor({
           </button>
         </div>
       </div>
+
+      {confirmandoQuitar && (
+        <ConfirmarEliminar
+          titulo="¿Quitar esta sección completa?"
+          mensaje={`"${seccion.titulo || "(sin título)"}" y sus ${seccion.preguntas.length} pregunta(s) se quitarán de la Historia Clínica de todos los pacientes. Esta acción no se puede deshacer.`}
+          confirmLabel="Quitar sección"
+          onCancel={() => setConfirmandoQuitar(false)}
+          onConfirm={() => {
+            onQuitar();
+            setConfirmandoQuitar(false);
+          }}
+        />
+      )}
 
       <div className="space-y-2">
         {seccion.preguntas.map((pregunta, i) => (

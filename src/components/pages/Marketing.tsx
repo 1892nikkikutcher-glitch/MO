@@ -5,6 +5,7 @@ import { usePatientData } from "@/context/PatientDataContext";
 import { promocionVigente, type Promocion } from "@/lib/catalogosVarios";
 import { calcularEdadDetallada } from "@/lib/patientData";
 import { capitalizarNombre } from "@/lib/textoNombre";
+import ConfirmarEliminar from "@/components/ConfirmarEliminar";
 
 const MESES = [
   "enero", "febrero", "marzo", "abril", "mayo", "junio",
@@ -146,6 +147,7 @@ function PromocionDialog({
 export default function Marketing() {
   const { promociones, setPromociones, patients, irAExpediente } = usePatientData();
   const [editando, setEditando] = useState<Promocion | "nuevo" | null>(null);
+  const [promocionAEliminar, setPromocionAEliminar] = useState<Promocion | null>(null);
   const hoy = new Date();
   const hoyIso = hoyISO();
 
@@ -222,7 +224,7 @@ export default function Marketing() {
                       Editar
                     </button>
                     <button
-                      onClick={() => setPromociones((prev) => prev.filter((x) => x.id !== p.id))}
+                      onClick={() => setPromocionAEliminar(p)}
                       className="rounded-lg border border-danger/30 px-2.5 py-1 text-xs text-danger hover:bg-danger/10"
                     >
                       Eliminar
@@ -290,6 +292,18 @@ export default function Marketing() {
           </div>
         )}
       </CardShell>
+
+      {promocionAEliminar && (
+        <ConfirmarEliminar
+          titulo="¿Eliminar esta promoción?"
+          mensaje={`Vas a eliminar "${promocionAEliminar.nombre}". Esta acción no se puede deshacer.`}
+          onCancel={() => setPromocionAEliminar(null)}
+          onConfirm={() => {
+            setPromociones((prev) => prev.filter((x) => x.id !== promocionAEliminar.id));
+            setPromocionAEliminar(null);
+          }}
+        />
+      )}
     </div>
   );
 }

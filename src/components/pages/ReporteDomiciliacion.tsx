@@ -4,6 +4,7 @@ import { useState } from "react";
 import { usePatientData } from "@/context/PatientDataContext";
 import { formatCurrency, formatNombreConEdad } from "@/lib/patientData";
 import type { Domiciliacion } from "@/lib/domiciliacion";
+import ConfirmarEliminar from "@/components/ConfirmarEliminar";
 
 const inputClass =
   "w-full rounded-lg border border-edge/10 bg-field px-3 py-2 text-sm text-ink placeholder-ink/30 outline-none focus:border-accent/60";
@@ -162,6 +163,7 @@ function AgregarDomiciliacionDialog({
 export default function ReporteDomiciliacion() {
   const { domiciliaciones, setDomiciliaciones, irAExpediente } = usePatientData();
   const [showDialog, setShowDialog] = useState(false);
+  const [domiciliacionAEliminar, setDomiciliacionAEliminar] = useState<Domiciliacion | null>(null);
 
   const ordenados = [...domiciliaciones].sort((a, b) => a.diaCobro - b.diaCobro);
   const totalMensual = domiciliaciones.filter((d) => d.activo).reduce((s, d) => s + d.monto, 0);
@@ -251,7 +253,7 @@ export default function ReporteDomiciliacion() {
                   </td>
                   <td className="px-6 py-3 text-right">
                     <button
-                      onClick={() => setDomiciliaciones((prev) => prev.filter((x) => x.id !== d.id))}
+                      onClick={() => setDomiciliacionAEliminar(d)}
                       title="Eliminar"
                       className="ml-auto flex h-7 w-7 items-center justify-center rounded-full border border-danger/20 text-danger/50 transition-colors hover:border-danger/60 hover:text-danger"
                     >
@@ -277,6 +279,18 @@ export default function ReporteDomiciliacion() {
             };
             setDomiciliaciones((prev) => [nueva, ...prev]);
             setShowDialog(false);
+          }}
+        />
+      )}
+
+      {domiciliacionAEliminar && (
+        <ConfirmarEliminar
+          titulo="¿Eliminar esta domiciliación?"
+          mensaje={`Vas a eliminar la domiciliación de ${domiciliacionAEliminar.patientName} (${domiciliacionAEliminar.banco}) por ${formatCurrency(domiciliacionAEliminar.monto)} mensuales. Esta acción no se puede deshacer.`}
+          onCancel={() => setDomiciliacionAEliminar(null)}
+          onConfirm={() => {
+            setDomiciliaciones((prev) => prev.filter((x) => x.id !== domiciliacionAEliminar.id));
+            setDomiciliacionAEliminar(null);
           }}
         />
       )}

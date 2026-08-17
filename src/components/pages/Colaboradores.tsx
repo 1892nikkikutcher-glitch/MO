@@ -4,6 +4,7 @@ import { useState } from "react";
 import { usePatientData } from "@/context/PatientDataContext";
 import type { RolClinica } from "@/lib/patientData";
 import { manejarCambioNombre } from "@/lib/textoNombre";
+import ConfirmarEliminar from "@/components/ConfirmarEliminar";
 
 const inputClass =
   "w-full rounded-lg border border-edge/10 bg-field px-3 py-2 text-sm text-ink placeholder-ink/30 outline-none focus:border-accent/60";
@@ -45,6 +46,11 @@ export default function Colaboradores() {
   const [whatsapp, setWhatsapp] = useState("");
   const [rol, setRol] = useState<RolClinica>("colaborador");
   const [enviando, setEnviando] = useState(false);
+  const [colaboradorAEliminar, setColaboradorAEliminar] = useState<{
+    memberId: string;
+    nombre: string;
+    correo: string;
+  } | null>(null);
 
   if (miRol !== "admin") {
     return (
@@ -222,7 +228,9 @@ export default function Colaboradores() {
                       <td className="px-6 py-3 text-right">
                         {!esUnoMismo && (
                           <button
-                            onClick={() => eliminarColaborador(memberId)}
+                            onClick={() =>
+                              setColaboradorAEliminar({ memberId, nombre: c.nombre || c.correo, correo: c.correo })
+                            }
                             className="text-xs font-semibold text-danger hover:text-danger"
                           >
                             Eliminar
@@ -237,6 +245,18 @@ export default function Colaboradores() {
           </div>
         )}
       </div>
+
+      {colaboradorAEliminar && (
+        <ConfirmarEliminar
+          titulo="¿Quitar a este colaborador?"
+          mensaje={`${colaboradorAEliminar.nombre} (${colaboradorAEliminar.correo}) perderá acceso a la clínica de inmediato. Esta acción no se puede deshacer.`}
+          onCancel={() => setColaboradorAEliminar(null)}
+          onConfirm={() => {
+            eliminarColaborador(colaboradorAEliminar.memberId);
+            setColaboradorAEliminar(null);
+          }}
+        />
+      )}
     </div>
   );
 }

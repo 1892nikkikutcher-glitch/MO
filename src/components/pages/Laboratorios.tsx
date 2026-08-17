@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import Odontograma from "./Odontograma";
+import ConfirmarEliminar from "@/components/ConfirmarEliminar";
 import { usePatientData } from "@/context/PatientDataContext";
 import {
   laboratorioTipoOptions,
@@ -246,6 +247,7 @@ function NuevaSolicitudDialog({
 export default function Laboratorios({ patientId }: { patientId: string }) {
   const { laboratoriosPorPaciente, setLaboratoriosPaciente } = usePatientData();
   const [showDialog, setShowDialog] = useState(false);
+  const [solicitudAEliminar, setSolicitudAEliminar] = useState<Solicitud | null>(null);
   const solicitudes = laboratoriosPorPaciente[patientId] ?? [];
 
   const cambiarEstatus = (id: string, estatus: Estatus) => {
@@ -331,7 +333,7 @@ export default function Laboratorios({ patientId }: { patientId: string }) {
                   </td>
                   <td className="px-6 py-3 text-right">
                     <button
-                      onClick={() => eliminarSolicitud(s.id)}
+                      onClick={() => setSolicitudAEliminar(s)}
                       className="text-xs font-semibold text-danger hover:text-danger"
                     >
                       Eliminar
@@ -350,6 +352,18 @@ export default function Laboratorios({ patientId }: { patientId: string }) {
           onSave={(solicitud) => {
             setLaboratoriosPaciente(patientId, (prev) => [solicitud, ...prev]);
             setShowDialog(false);
+          }}
+        />
+      )}
+
+      {solicitudAEliminar && (
+        <ConfirmarEliminar
+          titulo="¿Eliminar esta solicitud de laboratorio?"
+          mensaje={`Vas a eliminar la solicitud de "${solicitudAEliminar.trabajo}" con ${solicitudAEliminar.laboratorio}. Esta acción no se puede deshacer.`}
+          onCancel={() => setSolicitudAEliminar(null)}
+          onConfirm={() => {
+            eliminarSolicitud(solicitudAEliminar.id);
+            setSolicitudAEliminar(null);
           }}
         />
       )}
