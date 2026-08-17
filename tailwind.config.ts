@@ -11,6 +11,8 @@ const config: Config = {
         field: "var(--field)",
         inset: "var(--inset)",
         modal: "var(--modal)",
+        "modal-solid": "var(--modal-solid)",
+        "cita-card": "var(--cita-card-bg)",
         edge: "rgb(var(--edge-rgb) / <alpha-value>)",
         ink: "rgb(var(--ink-rgb) / <alpha-value>)",
         accent: "rgb(var(--accent-rgb) / <alpha-value>)",

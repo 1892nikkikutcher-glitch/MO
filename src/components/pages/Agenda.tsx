@@ -4,1039 +4,67 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { usePatientData } from "@/context/PatientDataContext";
 import {
   citaEstatusOptions,
-  computeTratamientosPendientes,
-  formatNombreConEdad,
-  elegirColorDisponible,
-  RECURSO_COLOR_PALETTE,
   type CitaAgenda,
   type CitaEstatus,
-  type FrecuenciaRecurrencia,
   type Recurso,
-  type LineItem,
-  type SavedBudget,
 } from "@/lib/patientData";
-import { renderPlantilla, formatFechaLarga, formatHora12 } from "@/lib/formatosWhatsapp";
-import { manejarCambioNombre } from "@/lib/textoNombre";
 import { descargarICS } from "@/lib/exportCalendario";
-import { formatDuracion } from "@/lib/procedimientos";
-import GlobalAgregarPago from "@/components/GlobalAgregarPago";
+import { horasDisponiblesEnRango } from "@/lib/dashboardMetrics";
+import { collection, onSnapshot, query, where } from "firebase/firestore";
+import { db } from "@/lib/firebase";
+import {
+  PX_PER_MIN,
+  DIAS_SEMANA,
+  MESES,
+  estatusColor,
+  CITA_ESTATUS_HEX,
+  CITA_BORDE_NEUTRO,
+  hexToRgba,
+  emojiParaColor,
+  getMonday,
+  addDays,
+  toISODate,
+  isSameDay,
+  timeToMinutes,
+  minutesToTime,
+  resolverMedico,
+  resolverUnidad,
+  detectarConflictos,
+  formatRangeLabel,
+  assignLanes,
+} from "@/lib/agendaHelpers";
+import AppointmentStatusBadge from "@/components/agenda/AppointmentStatusBadge";
+import AgendaCitaDialog from "@/components/agenda/AgendaCitaDialog";
+import AgendaRecursoDialog from "@/components/agenda/AgendaRecursoDialog";
 
-const PX_PER_MIN = 1.2;
-const DIAS_SEMANA = ["lun.", "mar.", "mié.", "jue.", "vie.", "sáb.", "dom."];
-const MESES = [
-  "enero", "febrero", "marzo", "abril", "mayo", "junio",
-  "julio", "agosto", "septiembre", "octubre", "noviembre", "diciembre",
-];
-const MESES_ABR = ["ene.", "feb.", "mar.", "abr.", "may.", "jun.", "jul.", "ago.", "sep.", "oct.", "nov.", "dic."];
 
-const estatusColor: Record<CitaEstatus, { bg: string; text: string; dot: string }> = {
-  Agendada: { bg: "bg-surface2", text: "text-ink/70", dot: "bg-ink/50" },
-  Confirmada: { bg: "bg-info/10", text: "text-info", dot: "bg-info" },
-  "En espera": { bg: "bg-accent/10", text: "text-accent", dot: "bg-accent" },
-  Atendida: { bg: "bg-success/10", text: "text-success", dot: "bg-success" },
-  Reagendada: { bg: "bg-warning/10", text: "text-warning", dot: "bg-warning" },
-  Cancelada: { bg: "bg-danger/10", text: "text-danger", dot: "bg-danger" },
-  "No Asistió": { bg: "bg-danger/20", text: "text-danger", dot: "bg-danger" },
-};
-
-/** Color de texto de la tarjeta de cita en el calendario — mismo tono que
- * el estatus (para verlo de un vistazo sin abrir la cita), a plena
- * intensidad (no la versión atenuada que usan las píldoras de arriba,
- * pensada para fondo neutro). Agendada se queda en tinta plana: es el
- * estatus por default y no necesita resaltar. */
-const citaTextColor: Record<CitaEstatus, string> = {
-  Agendada: "text-ink",
-  Confirmada: "text-info",
-  "En espera": "text-accent",
-  Atendida: "text-success",
-  Reagendada: "text-warning",
-  Cancelada: "text-danger",
-  "No Asistió": "text-danger",
-};
-
-/** Halo oscuro alrededor de las letras (8 direcciones + difuminado, en vez
- * de solo las 4 esquinas) para que el color de estatus se siga leyendo
- * aunque la tarjeta tenga un color de fondo parecido — medido en pares
- * como "Atendida" (verde claro) sobre un recurso también verde, el
- * contraste de solo el color de letra puede bajar hasta ~1.2:1 (invisible
- * sin halo). El halo da el contraste "por fuera"; el color en sí, "por
- * dentro" — igual en modo claro y oscuro porque el color de recurso no
- * cambia con el tema. */
-const CITA_TEXT_OUTLINE = [
-  "-1px 0 1px rgba(0,0,0,0.85)",
-  "1px 0 1px rgba(0,0,0,0.85)",
-  "0 -1px 1px rgba(0,0,0,0.85)",
-  "0 1px 1px rgba(0,0,0,0.85)",
-  "-1px -1px 1px rgba(0,0,0,0.85)",
-  "1px -1px 1px rgba(0,0,0,0.85)",
-  "-1px 1px 1px rgba(0,0,0,0.85)",
-  "1px 1px 1px rgba(0,0,0,0.85)",
-].join(", ");
-
-/** WhatsApp no soporta texto de color, así que se usa el círculo de color
- * emoji más parecido (por distancia RGB) al color asignado al recurso, para
- * poder distinguir de un vistazo a qué médico corresponde cada cita. */
-const EMOJI_COLOR_REFS: { emoji: string; hex: string }[] = [
-  { emoji: "🔴", hex: "#ef4444" },
-  { emoji: "🟠", hex: "#f97316" },
-  { emoji: "🟡", hex: "#eab308" },
-  { emoji: "🟢", hex: "#22c55e" },
-  { emoji: "🔵", hex: "#3b82f6" },
-  { emoji: "🟣", hex: "#a855f7" },
-  { emoji: "🟤", hex: "#92400e" },
-  { emoji: "⚫", hex: "#000000" },
-  { emoji: "⚪", hex: "#ffffff" },
-];
-
-function hexToRgb(hex: string) {
-  const n = parseInt(hex.replace("#", ""), 16);
-  return { r: (n >> 16) & 255, g: (n >> 8) & 255, b: n & 255 };
-}
-
-function emojiParaColor(hex: string): string {
-  const c = hexToRgb(hex);
-  let mejor = EMOJI_COLOR_REFS[0];
-  let mejorDist = Infinity;
-  for (const ref of EMOJI_COLOR_REFS) {
-    const r = hexToRgb(ref.hex);
-    const dist = (c.r - r.r) ** 2 + (c.g - r.g) ** 2 + (c.b - r.b) ** 2;
-    if (dist < mejorDist) {
-      mejorDist = dist;
-      mejor = ref;
-    }
-  }
-  return mejor.emoji;
-}
-const duracionOptions = [15, 20, 25, 30, 45, 60, 75, 90, 105, 120, 150, 180, 210, 240];
-
-function getMonday(d: Date) {
-  const date = new Date(d);
-  const day = date.getDay();
-  const diff = day === 0 ? -6 : 1 - day;
-  date.setDate(date.getDate() + diff);
-  date.setHours(0, 0, 0, 0);
-  return date;
-}
-
-function addDays(d: Date, n: number) {
-  const date = new Date(d);
-  date.setDate(date.getDate() + n);
-  return date;
-}
-
-function toISODate(d: Date) {
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
-}
-
-function isSameDay(a: Date, b: Date) {
-  return toISODate(a) === toISODate(b);
-}
-
-function timeToMinutes(t: string) {
-  const [h, m] = t.split(":").map(Number);
-  return h * 60 + (m || 0);
-}
-
-function minutesToTime(m: number) {
-  const h = Math.floor(m / 60);
-  const min = m % 60;
-  return `${String(h).padStart(2, "0")}:${String(min).padStart(2, "0")}`;
-}
-
-function formatRangeLabel(inicio: Date, fin: Date) {
-  const sameMonth = inicio.getMonth() === fin.getMonth();
-  const mesInicio = MESES_ABR[inicio.getMonth()];
-  const mesFin = MESES_ABR[fin.getMonth()];
-  return sameMonth
-    ? `${inicio.getDate()} – ${fin.getDate()} de ${mesFin} de ${fin.getFullYear()}`
-    : `${inicio.getDate()} de ${mesInicio} – ${fin.getDate()} de ${mesFin} de ${fin.getFullYear()}`;
-}
-
-const inputClass =
-  "w-full rounded-lg border border-edge/10 bg-field px-3 py-2 text-sm text-ink outline-none focus:border-accent/60";
-
-/** Asigna cada cita a un carril (columna) para dibujarla en la agenda, pero
- * el ancho de carril se calcula por grupo de citas realmente encimadas
- * (mismo truco que Google Calendar), no para el día completo — si dos
- * citas se empalman a las 16:00 pero el resto del día no tiene nada más
- * encimado, solo esas dos se dividen la columna; las demás usan el ancho
- * completo aunque estén en el mismo día. */
-function assignLanes(citasDelDia: CitaAgenda[]) {
-  const sorted = [...citasDelDia].sort(
-    (a, b) => timeToMinutes(a.horaInicio) - timeToMinutes(b.horaInicio)
-  );
-
-  const withLane: { cita: CitaAgenda; lane: number; lanesInGroup: number }[] = [];
-  let grupo: CitaAgenda[] = [];
-  let finGrupo = -Infinity;
-
-  const cerrarGrupo = () => {
-    if (grupo.length === 0) return;
-    const lanesEnd: number[] = [];
-    const inicioIndice = withLane.length;
-    grupo.forEach((c) => {
-      const start = timeToMinutes(c.horaInicio);
-      const end = timeToMinutes(c.horaFin);
-      let lane = lanesEnd.findIndex((e) => e <= start);
-      if (lane === -1) {
-        lane = lanesEnd.length;
-        lanesEnd.push(end);
-      } else {
-        lanesEnd[lane] = end;
-      }
-      withLane.push({ cita: c, lane, lanesInGroup: 1 });
-    });
-    const lanesInGroup = Math.max(lanesEnd.length, 1);
-    for (let i = inicioIndice; i < withLane.length; i++) withLane[i].lanesInGroup = lanesInGroup;
-    grupo = [];
-  };
-
-  sorted.forEach((c) => {
-    const start = timeToMinutes(c.horaInicio);
-    const end = timeToMinutes(c.horaFin);
-    if (grupo.length > 0 && start >= finGrupo) {
-      cerrarGrupo();
-      finGrupo = -Infinity;
-    }
-    grupo.push(c);
-    finGrupo = Math.max(finGrupo, end);
-  });
-  cerrarGrupo();
-
-  return withLane;
-}
-
-function addMonths(d: Date, n: number) {
-  const date = new Date(d);
-  date.setMonth(date.getMonth() + n);
-  return date;
-}
-
-function IconExpediente({ size = 16 }: { size?: number }) {
-  return (
-    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" className="shrink-0">
-      <path
-        d="M4 4h11l5 5v11a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V5a1 1 0 0 1 1-1ZM14 4v6h6"
-        stroke="currentColor"
-        strokeWidth="1.8"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-      />
-    </svg>
-  );
-}
-
-function IconNotas({ size = 16 }: { size?: number }) {
-  return (
-    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" className="shrink-0">
-      <path
-        d="M5 4h14v16l-3-2-3 2-3-2-3 2V4Z"
-        stroke="currentColor"
-        strokeWidth="1.8"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-      />
-      <path d="M8 9h8M8 13h5" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
-    </svg>
-  );
-}
-
-function IconWhatsApp({ size = 22 }: { size?: number }) {
-  return (
-    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" className="shrink-0">
-      <path
-        d="M3 21l1.4-4.2A8.5 8.5 0 1 1 8.3 20.5L3 21ZM8.5 8.3c.2-.5.4-.5.6-.5h.5c.2 0 .4 0 .5.3.2.4.6 1.4.7 1.5.1.1.1.3 0 .4-.1.2-.2.3-.3.4-.2.2-.3.3-.1.6.7 1.1 1.4 1.7 2.5 2.3.2.1.3.1.4-.1.2-.2.5-.6.7-.8.1-.2.3-.2.5-.1.5.2 1.3.6 1.5.7.2.1.3.1.4.3.1.2.1.9-.2 1.4-.3.5-1.1.9-1.6 1-.5 0-1.1.1-3.4-.9-2.4-1.1-3.9-3.5-4.1-3.7-.1-.2-1-1.3-1-2.5s.6-1.7.8-2Z"
-        stroke="currentColor"
-        strokeWidth="1.3"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-      />
-    </svg>
-  );
-}
-
-function IconReloj() {
-  return (
-    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" className="shrink-0">
-      <circle cx="12" cy="12" r="9" stroke="currentColor" strokeWidth="1.8" />
-      <path d="M12 7v5l3.5 2" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
-    </svg>
-  );
-}
-
-function IconPago({ size = 22 }: { size?: number }) {
-  return (
-    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" className="shrink-0">
-      <path
-        d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"
-        stroke="currentColor"
-        strokeWidth="1.8"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-      />
-    </svg>
-  );
-}
-
-function NuevaRecursoDialog({
-  inicial,
-  coloresEnUso,
-  onClose,
-  onSave,
-}: {
-  inicial?: Recurso;
-  coloresEnUso: string[];
-  onClose: () => void;
-  onSave: (recurso: { nombre: string; tipo: "medico" | "unidad"; color: string }) => void;
-}) {
-  const [nombre, setNombre] = useState(inicial?.nombre ?? "");
-  const [tipo, setTipo] = useState<"medico" | "unidad">(inicial?.tipo ?? "medico");
-  const [color, setColor] = useState(() => inicial?.color ?? elegirColorDisponible(coloresEnUso));
-
-  const puedeGuardar = nombre.trim().length > 0;
-
-  return (
-    <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/70 p-4">
-      <div className="w-full max-w-sm rounded-2xl border border-edge/10 bg-modal p-6">
-        <div className="mb-4 flex items-center justify-between">
-          <h3 className="text-base font-semibold text-ink">
-            {inicial ? "Editar Recurso" : "Nuevo Recurso"}
-          </h3>
-          <button
-            onClick={onClose}
-            className="flex h-6 w-6 items-center justify-center rounded-full text-ink/50 hover:bg-surface hover:text-ink"
-          >
-            ✕
-          </button>
-        </div>
-        <p className="mb-4 text-xs text-ink/40">
-          Un recurso puede ser un médico o una unidad/consultorio — lo importante es cómo organizas
-          tu agenda.
-        </p>
-
-        <div className="space-y-3">
-          <div>
-            <label className="mb-1 block text-xs font-medium text-ink/60">Tipo</label>
-            <div className="flex gap-2">
-              {(["medico", "unidad"] as const).map((t) => (
-                <button
-                  key={t}
-                  onClick={() => setTipo(t)}
-                  className={`flex-1 rounded-lg border py-2 text-xs font-semibold transition-colors ${
-                    tipo === t
-                      ? "border-accent bg-accent/15 text-accent"
-                      : "border-edge/15 text-ink/50 hover:border-accent/40"
-                  }`}
-                >
-                  {t === "medico" ? "Médico" : "Unidad"}
-                </button>
-              ))}
-            </div>
-          </div>
-          <div>
-            <label className="mb-1 block text-xs font-medium text-ink/60">Nombre</label>
-            <input
-              type="text"
-              value={nombre}
-              onChange={(e) => (tipo === "medico" ? manejarCambioNombre(e, setNombre) : setNombre(e.target.value))}
-              placeholder={tipo === "medico" ? "Ej. Dra. Fernanda Ruiz" : "Ej. Unidad 3 · Consultorio C"}
-              className={inputClass}
-            />
-          </div>
-          <div>
-            <label className="mb-1 block text-xs font-medium text-ink/60">Color</label>
-            <div className="flex flex-wrap gap-2">
-              {RECURSO_COLOR_PALETTE.map((c) => (
-                <button
-                  key={c}
-                  onClick={() => setColor(c)}
-                  className="h-7 w-7 rounded-full border-2 transition-transform"
-                  style={{
-                    backgroundColor: c,
-                    borderColor: color === c ? "rgb(var(--ink-rgb))" : "transparent",
-                    transform: color === c ? "scale(1.15)" : "scale(1)",
-                  }}
-                />
-              ))}
-            </div>
-          </div>
-        </div>
-
-        <div className="mt-6 flex gap-3">
-          <button
-            onClick={onClose}
-            className="flex-1 rounded-lg border border-edge/15 py-2 text-sm font-semibold text-ink/80 transition-colors hover:bg-surface"
-          >
-            Cancelar
-          </button>
-          <button
-            onClick={() => puedeGuardar && onSave({ nombre: nombre.trim(), tipo, color })}
-            disabled={!puedeGuardar}
-            className="flex-1 rounded-lg bg-gradient-to-r from-accent to-orange-500 py-2 text-sm font-semibold text-black transition-opacity hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-40"
-          >
-            {inicial ? "Guardar" : "Agregar"}
-          </button>
-        </div>
-      </div>
-    </div>
-  );
-}
-
-const frecuenciaMeses: Record<FrecuenciaRecurrencia, number> = {
-  mensual: 1,
-  trimestral: 3,
-  semestral: 6,
-};
-
-const frecuenciaLabel: Record<FrecuenciaRecurrencia, string> = {
-  mensual: "Cada mes",
-  trimestral: "Cada 3 meses",
-  semestral: "Cada 6 meses",
-};
-
-function CitaDialog({
-  recursos,
-  initial,
-  isEditing,
-  onClose,
-  onSave,
-  onDelete,
-}: {
-  recursos: Recurso[];
-  initial: Partial<CitaAgenda> & { fecha: string; horaInicio: string };
-  isEditing: boolean;
-  onClose: () => void;
-  onSave: (citas: CitaAgenda[]) => void;
-  onDelete?: () => void;
-}) {
-  const {
-    patients,
-    addPatient,
-    updatePatient,
-    irAExpediente,
-    clinicInfo,
-    formatosWhatsapp,
-    cargarDatosPaciente,
-    presupuestosPorPaciente,
-    setPresupuestosPaciente,
-    pagosPorPaciente,
-    citas,
-  } = usePatientData();
-  const [recursoId, setRecursoId] = useState(initial.recursoId ?? recursos[0]?.id ?? "");
-  const [patientId, setPatientId] = useState(initial.patientId ?? "");
-  const [searchText, setSearchText] = useState(initial.paciente ?? "");
-  const [showAgregarPago, setShowAgregarPago] = useState(false);
-  const patientData = initial.patientId ? patients.find((p) => p.id === initial.patientId) : undefined;
-
+/** Primera fase de optimización de lecturas: además del listener completo
+ * de `citas` en PatientDataContext (que sigue existiendo tal cual, porque
+ * Dashboard, Expediente y la revisión de inasistencias previas dependen de
+ * tener el historial completo disponible), la Agenda abre una suscripción
+ * PROPIA y adicional acotada por rango de fechas — usada solo para dibujar
+ * la grilla del calendario. Mientras el listener completo del contexto
+ * siga activo, esto no reduce las lecturas globales de Firestore (de
+ * hecho suma una suscripción más); es un paso preparatorio para el día en
+ * que la Agenda pueda dejar de depender de ese listener completo. */
+function useCitasEnRango(clinicUid: string | null, desdeISO: string, hastaISO: string) {
+  const [citasEnRango, setCitasEnRango] = useState<CitaAgenda[]>([]);
   useEffect(() => {
-    if (initial.patientId) cargarDatosPaciente(initial.patientId);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [initial.patientId]);
-
-  const [telefono, setTelefono] = useState(patientData?.phone ?? "");
-  const [correo, setCorreo] = useState(patientData?.email ?? "");
-  const [tratamientos, setTratamientos] = useState<string[]>(initial.tratamientos ?? []);
-  const [procedimientoInput, setProcedimientoInput] = useState("");
-  const [costo, setCosto] = useState(initial.costo ?? "");
-  const [comentarios, setComentarios] = useState(initial.comentarios ?? "");
-  const [fecha, setFecha] = useState(initial.fecha);
-  const [horaInicio, setHoraInicio] = useState(initial.horaInicio);
-  const [duracion, setDuracion] = useState(
-    initial.horaFin ? timeToMinutes(initial.horaFin) - timeToMinutes(initial.horaInicio) : 30
-  );
-  const [estatus, setEstatus] = useState<CitaEstatus>(initial.estatus ?? "Agendada");
-  const [mostrarEstatusRapido, setMostrarEstatusRapido] = useState(false);
-  const [recurrente, setRecurrente] = useState(false);
-  const [frecuencia, setFrecuencia] = useState<FrecuenciaRecurrencia>("mensual");
-  const [repeticiones, setRepeticiones] = useState(3);
-  const folioRef = useState(() => initial.folio ?? `F-${Date.now().toString().slice(-6)}`)[0];
-
-  const coincidencias =
-    !patientId && searchText.trim().length > 0
-      ? patients.filter((p) => p.name.toLowerCase().includes(searchText.trim().toLowerCase()))
-      : [];
-
-  const puedeGuardar =
-    recursoId && fecha && horaInicio && (patientId || searchText.trim().length > 0);
-
-  const seleccionarPaciente = (id: string) => {
-    const p = patients.find((pp) => pp.id === id);
-    if (!p) return;
-    setPatientId(id);
-    setSearchText(p.name);
-    setTelefono(p.phone);
-    setCorreo(p.email ?? "");
-    cargarDatosPaciente(id);
-  };
-
-  const cambiarPaciente = () => {
-    setPatientId("");
-    setSearchText("");
-    setTelefono("");
-    setCorreo("");
-  };
-
-  const crearPaciente = () => {
-    if (!searchText.trim()) return;
-    const nuevo = addPatient({ name: searchText.trim(), phone: telefono.trim() });
-    setPatientId(nuevo.id);
-  };
-
-  const agregarProcedimiento = () => {
-    const val = procedimientoInput.trim();
-    if (!val) return;
-    setTratamientos((prev) => [...prev, val]);
-    setProcedimientoInput("");
-  };
-
-  const tratamientosPendientes = patientId
-    ? computeTratamientosPendientes(
-        presupuestosPorPaciente[patientId] ?? [],
-        pagosPorPaciente[patientId] ?? []
-      )
-    : [];
-
-  const agregarDelPresupuesto = (label: string) => {
-    if (tratamientos.includes(label)) return;
-    setTratamientos((prev) => [...prev, label]);
-  };
-
-  const quitarProcedimiento = (idx: number) => {
-    setTratamientos((prev) => prev.filter((_, i) => i !== idx));
-  };
-
-  const nombrePacienteActual = patientId
-    ? patients.find((p) => p.id === patientId)?.name ?? searchText
-    : searchText.trim();
-
-  // Inasistencias previas de este paciente (sin contar la cita que se está
-  // editando) — para avisar antes de agendarle otra vez sin más precaución.
-  const inasistenciasPrevias = patientId
-    ? citas.filter((c) => c.patientId === patientId && c.estatus === "No Asistió" && c.id !== initial.id)
-        .length
-    : 0;
-
-  const enviarConfirmacion = () => {
-    const telefonoLimpio = telefono.replace(/\D/g, "");
-    if (!telefonoLimpio || !nombrePacienteActual || !fecha || !horaInicio) return;
-    const texto = renderPlantilla(formatosWhatsapp.confirmacionCita, {
-      clinica: clinicInfo?.nombre || "tu clínica",
-      paciente: nombrePacienteActual,
-      fecha: formatFechaLarga(fecha),
-      hora: formatHora12(horaInicio),
-      procedimiento: tratamientos.join(", ") || "su tratamiento",
-      costo: costo.trim() || "por confirmar",
+    if (!clinicUid) {
+      setCitasEnRango([]);
+      return;
+    }
+    const q = query(
+      collection(db, `users/${clinicUid}/citas`),
+      where("fecha", ">=", desdeISO),
+      where("fecha", "<=", hastaISO)
+    );
+    const unsub = onSnapshot(q, (snap) => {
+      setCitasEnRango(snap.docs.map((d) => ({ ...(d.data() as CitaAgenda), id: d.id })));
     });
-    window.open(`https://wa.me/${telefonoLimpio}?text=${encodeURIComponent(texto)}`, "_blank");
-  };
-
-  const puedeEnviarConfirmacion =
-    telefono.replace(/\D/g, "").length > 0 && !!nombrePacienteActual && !!fecha && !!horaInicio;
-
-  const handleGuardar = () => {
-    if (!puedeGuardar) return;
-    const nombrePaciente = patientId
-      ? patients.find((p) => p.id === patientId)?.name ?? searchText
-      : searchText.trim();
-
-    if (patientId) {
-      const actual = patients.find((p) => p.id === patientId);
-      if (actual && (actual.phone !== telefono.trim() || (actual.email ?? "") !== correo.trim())) {
-        updatePatient(patientId, { phone: telefono.trim(), email: correo.trim() });
-      }
-    }
-
-    const base: CitaAgenda = {
-      id: initial.id ?? `${Date.now()}`,
-      folio: initial.folio ?? folioRef,
-      recursoId,
-      patientId: patientId || null,
-      paciente: nombrePaciente,
-      tratamientos,
-      costo: costo.trim(),
-      comentarios: comentarios.trim(),
-      fecha,
-      horaInicio,
-      horaFin: minutesToTime(timeToMinutes(horaInicio) + duracion),
-      estatus,
-      recurrenciaId: initial.recurrenciaId ?? (recurrente ? `rec${Date.now()}` : null),
-    };
-
-    // Si la cita queda ligada a un paciente y trae un costo estimado, se
-    // refleja de una vez en su Presupuesto — así el presupuesto y los pagos
-    // (que ya se calculan contra el presupuesto) quedan conectados desde
-    // el momento en que se agenda, sin esperar a que alguien lo capture a
-    // mano por separado. El presupuesto queda ligado 1 a 1 a esta cita
-    // (mismo id, "pres-cita-<id de la cita>"): si se vuelve a guardar la
-    // misma cita con otro costo o tratamientos, se actualiza ese mismo
-    // presupuesto en vez de crear uno nuevo. Antes se evitaba duplicar
-    // comparando el NOMBRE del procedimiento contra todo el historial del
-    // paciente, pero eso hacía que una limpieza (o cualquier tratamiento
-    // recurrente) ya facturada alguna vez dejara de generar presupuesto en
-    // citas futuras — quedaban sin nada pendiente por cobrar.
-    if (patientId && tratamientos.length > 0) {
-      const montoCosto = Number(costo.replace(/[^\d.]/g, "")) || 0;
-      if (montoCosto > 0) {
-        const presupuestoId = `pres-cita-${base.id}`;
-        const items: LineItem[] = tratamientos.map((t, idx) => ({
-          id: `item-cita-${base.id}-${idx}`,
-          procedure: t,
-          price: idx === 0 ? montoCosto - Math.floor(montoCosto / tratamientos.length) * (tratamientos.length - 1) : Math.floor(montoCosto / tratamientos.length),
-          teeth: [],
-          note: "",
-        }));
-        const presupuestoDeCita: SavedBudget = {
-          id: presupuestoId,
-          folio: base.id.slice(-6),
-          fecha,
-          medico: recursos.find((r) => r.id === recursoId)?.nombre ?? "",
-          tipoDePrecio: "Consultorio",
-          especialidad: "Odontología General",
-          diagnostico: "Generado automáticamente a partir de una cita agendada.",
-          items,
-          total: montoCosto,
-        };
-        setPresupuestosPaciente(patientId, (prev) => {
-          const existe = prev.some((p) => p.id === presupuestoId);
-          return existe
-            ? prev.map((p) => (p.id === presupuestoId ? presupuestoDeCita : p))
-            : [presupuestoDeCita, ...prev];
-        });
-      }
-    }
-
-    const citasAGuardar: CitaAgenda[] = [base];
-    if (!isEditing && recurrente && repeticiones > 0) {
-      const meses = frecuenciaMeses[frecuencia];
-      for (let i = 1; i <= repeticiones; i++) {
-        const nuevaFecha = addMonths(new Date(`${fecha}T00:00:00`), meses * i);
-        citasAGuardar.push({
-          ...base,
-          id: `${Date.now()}-${i}`,
-          fecha: toISODate(nuevaFecha),
-          estatus: "Agendada",
-        });
-      }
-    }
-
-    onSave(citasAGuardar);
-  };
-
-  return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4">
-      <div className="max-h-[90vh] w-full max-w-4xl overflow-y-auto rounded-2xl border border-edge/10 bg-modal p-6">
-        <div className="mb-4 flex items-center justify-between">
-          <div>
-            <h2 className="text-lg font-semibold text-ink">
-              {isEditing ? "Editar Cita" : "Nueva Cita"}
-            </h2>
-            <p className="text-xs text-ink/40">Folio: {initial.folio ?? folioRef}</p>
-          </div>
-          <div className="flex items-center gap-2">
-            <button
-              type="button"
-              onClick={() => patientId && irAExpediente(patientId)}
-              disabled={!patientId}
-              title={patientId ? "Ver expediente" : "Selecciona un paciente primero"}
-              className="flex h-11 w-11 items-center justify-center rounded-full text-success transition-colors hover:bg-success/15 disabled:cursor-not-allowed disabled:opacity-30 disabled:hover:bg-transparent"
-            >
-              <IconExpediente size={22} />
-            </button>
-            <button
-              type="button"
-              onClick={() => patientId && irAExpediente(patientId, "Notas de Evolución y Seguimiento")}
-              disabled={!patientId}
-              title={patientId ? "Notas de evolución" : "Selecciona un paciente primero"}
-              className="flex h-11 w-11 items-center justify-center rounded-full text-success transition-colors hover:bg-success/15 disabled:cursor-not-allowed disabled:opacity-30 disabled:hover:bg-transparent"
-            >
-              <IconNotas size={22} />
-            </button>
-            <button
-              type="button"
-              onClick={enviarConfirmacion}
-              disabled={!puedeEnviarConfirmacion}
-              title={
-                puedeEnviarConfirmacion
-                  ? "Enviar confirmación de cita por WhatsApp"
-                  : "Falta teléfono, paciente, fecha u hora para poder enviar"
-              }
-              className="flex h-11 w-11 items-center justify-center rounded-full text-success transition-colors hover:bg-success/15 disabled:cursor-not-allowed disabled:opacity-30 disabled:hover:bg-transparent"
-            >
-              <IconWhatsApp size={24} />
-            </button>
-            <button
-              type="button"
-              onClick={() => patientId && setShowAgregarPago(true)}
-              disabled={!patientId}
-              title={patientId ? "Registrar pago" : "Selecciona un paciente primero"}
-              className="flex h-11 w-11 items-center justify-center rounded-full text-success transition-colors hover:bg-success/15 disabled:cursor-not-allowed disabled:opacity-30 disabled:hover:bg-transparent"
-            >
-              <IconPago size={22} />
-            </button>
-            <button
-              onClick={onClose}
-              className="ml-1 flex h-7 w-7 items-center justify-center rounded-full text-ink/50 hover:bg-surface hover:text-ink"
-            >
-              ✕
-            </button>
-          </div>
-        </div>
-
-        <div className="space-y-4">
-          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-          <div>
-            <label className="mb-1 block text-xs font-medium text-ink/60">
-              Responsable (médico o unidad)
-            </label>
-            <select value={recursoId} onChange={(e) => setRecursoId(e.target.value)} className={inputClass}>
-              {recursos.map((r) => (
-                <option key={r.id} value={r.id}>
-                  {r.nombre}
-                </option>
-              ))}
-            </select>
-          </div>
-
-          <div>
-            <label className="mb-1 block text-xs font-medium text-ink/60">Paciente</label>
-            {patientId ? (
-              <div className="flex items-center justify-between rounded-lg border border-success/30 bg-success/10 px-3 py-2 text-sm">
-                <span className="text-ink">{searchText}</span>
-                <button
-                  onClick={cambiarPaciente}
-                  className="text-xs font-semibold text-success hover:text-success"
-                >
-                  Cambiar
-                </button>
-              </div>
-            ) : (
-              <>
-                <input
-                  type="text"
-                  value={searchText}
-                  onChange={(e) => manejarCambioNombre(e, setSearchText)}
-                  placeholder="Buscar paciente por nombre..."
-                  className={inputClass}
-                />
-                {coincidencias.length > 0 && (
-                  <div className="mt-1.5 max-h-32 space-y-1 overflow-y-auto rounded-lg border border-edge/10 bg-field p-1.5">
-                    {coincidencias.map((p) => (
-                      <button
-                        key={p.id}
-                        onClick={() => seleccionarPaciente(p.id)}
-                        className="block w-full rounded-md px-2 py-1.5 text-left text-sm text-ink/80 hover:bg-surface"
-                      >
-                        {formatNombreConEdad(p.name, p.birthDate)}
-                        <span className="ml-2 text-xs text-ink/40">{p.phone}</span>
-                      </button>
-                    ))}
-                  </div>
-                )}
-                {searchText.trim().length > 0 && coincidencias.length === 0 && (
-                  <div className="mt-2 rounded-lg border border-accent/30 bg-accent/10 p-3 text-xs">
-                    <p className="text-accent">
-                      El paciente &quot;{searchText.trim()}&quot; no se encuentra, ¿desea crearlo?
-                    </p>
-                    <button
-                      onClick={crearPaciente}
-                      className="mt-2 rounded-lg bg-gradient-to-r from-accent to-orange-500 px-3 py-1.5 text-xs font-semibold text-black transition-opacity hover:opacity-90"
-                    >
-                      Crear Paciente
-                    </button>
-                    <p className="mt-1.5 text-ink/30">
-                      Se registrará con este nombre y el teléfono capturado abajo; podrás completar
-                      su expediente después.
-                    </p>
-                  </div>
-                )}
-              </>
-            )}
-          </div>
-          </div>
-
-          {inasistenciasPrevias > 0 && (
-            <div className="rounded-lg border border-danger/30 bg-danger/10 p-3 text-xs text-danger">
-              <p className="font-semibold">
-                ⚠️ Este paciente no asistió a {inasistenciasPrevias === 1 ? "una cita anterior" : `${inasistenciasPrevias} citas anteriores`} sin avisar.
-              </p>
-              <p className="mt-1 text-danger/80">
-                Considera ofrecer un horario que te afecte menos si vuelve a faltar, o pedirle un
-                pago anticipado (transferencia u otro medio electrónico) antes de confirmar esta
-                cita.
-              </p>
-            </div>
-          )}
-
-          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-          <div className="grid grid-cols-[1fr_auto] items-end gap-2">
-            <div>
-              <label className="mb-1 block text-xs font-medium text-ink/60">
-                Tel. celular (WhatsApp)
-              </label>
-              <input
-                type="text"
-                value={telefono}
-                onChange={(e) => setTelefono(e.target.value)}
-                placeholder="55 1234 5678"
-                className={inputClass}
-              />
-            </div>
-            <div className="relative">
-              <button
-                type="button"
-                onClick={() => setMostrarEstatusRapido((v) => !v)}
-                title="Estatus rápido"
-                className="flex h-[38px] w-[38px] items-center justify-center rounded-lg border border-edge/10 text-ink/50 transition-colors hover:bg-surface hover:text-ink"
-              >
-                <IconReloj />
-              </button>
-              {mostrarEstatusRapido && (
-                <div className="absolute right-0 top-[42px] z-20 w-40 rounded-lg border border-edge/10 bg-modal p-1.5 shadow-card">
-                  {(["Confirmada", "En espera", "Atendida", "Reagendada", "Cancelada", "No Asistió"] as CitaEstatus[]).map((opt) => (
-                    <button
-                      key={opt}
-                      type="button"
-                      onClick={() => {
-                        setEstatus(opt);
-                        setMostrarEstatusRapido(false);
-                      }}
-                      className={`block w-full rounded-md px-2 py-1.5 text-left text-xs font-medium hover:bg-surface ${citaTextColor[opt]}`}
-                    >
-                      {opt}
-                    </button>
-                  ))}
-                </div>
-              )}
-            </div>
-          </div>
-
-          <div>
-            <label className="mb-1 block text-xs font-medium text-ink/60">Correo paciente</label>
-            <input
-              type="email"
-              value={correo}
-              onChange={(e) => setCorreo(e.target.value)}
-              placeholder="correo@ejemplo.com"
-              className={inputClass}
-            />
-          </div>
-          </div>
-
-          <div>
-            <label className="mb-1 block text-xs font-medium text-ink/60">
-              Procedimiento(s) de la cita o Motivo de Consulta
-            </label>
-            {tratamientosPendientes.length > 0 && (
-              <div className="mb-2 space-y-1">
-                <p className="text-[11px] text-ink/40">Del presupuesto de este paciente:</p>
-                <div className="flex flex-wrap gap-1.5">
-                  {tratamientosPendientes.map((t) => (
-                    <button
-                      key={t.id}
-                      type="button"
-                      onClick={() => agregarDelPresupuesto(t.label)}
-                      disabled={tratamientos.includes(t.label)}
-                      className="rounded-full border border-accent/30 px-2.5 py-1 text-xs font-medium text-accent transition-colors hover:bg-accent/10 disabled:cursor-not-allowed disabled:opacity-40"
-                    >
-                      + {t.label}
-                    </button>
-                  ))}
-                </div>
-              </div>
-            )}
-            <div className="flex gap-2">
-              <input
-                type="text"
-                value={procedimientoInput}
-                onChange={(e) => setProcedimientoInput(e.target.value)}
-                onKeyDown={(e) => {
-                  if (e.key === "Enter") {
-                    e.preventDefault();
-                    agregarProcedimiento();
-                  }
-                }}
-                placeholder="Ej. Limpieza dental"
-                className={inputClass}
-              />
-              <button
-                type="button"
-                onClick={agregarProcedimiento}
-                className="shrink-0 rounded-lg border border-accent/40 px-3 text-sm font-semibold text-accent transition-colors hover:bg-accent/10"
-              >
-                Agregar
-              </button>
-            </div>
-            {tratamientos.length > 0 && (
-              <div className="mt-2 flex flex-wrap gap-1.5">
-                {tratamientos.map((t, idx) => (
-                  <span
-                    key={`${t}-${idx}`}
-                    className="flex items-center gap-1 rounded-full bg-accent/10 px-2.5 py-1 text-xs font-medium text-accent"
-                  >
-                    {t}
-                    <button
-                      type="button"
-                      onClick={() => quitarProcedimiento(idx)}
-                      className="text-accent/60 hover:text-accent"
-                    >
-                      ✕
-                    </button>
-                  </span>
-                ))}
-              </div>
-            )}
-          </div>
-
-          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-          <div>
-            <label className="mb-1 block text-xs font-medium text-ink/60">Costo estimado (aparece en el recordatorio de WhatsApp)</label>
-            <input
-              type="text"
-              value={costo}
-              onChange={(e) => setCosto(e.target.value)}
-              placeholder="Ej. $1,200"
-              className={inputClass}
-            />
-          </div>
-
-          <div>
-            <label className="mb-1 block text-xs font-medium text-ink/60">Comentarios de la cita</label>
-            <textarea
-              value={comentarios}
-              onChange={(e) => setComentarios(e.target.value)}
-              placeholder="Notas para el equipo sobre esta cita..."
-              rows={2}
-              className={`${inputClass} resize-none`}
-            />
-          </div>
-          </div>
-
-          <div className="grid grid-cols-3 gap-3">
-            <div>
-              <label className="mb-1 block text-xs font-medium text-ink/60">Fecha</label>
-              <input
-                type="date"
-                value={fecha}
-                onChange={(e) => setFecha(e.target.value)}
-                className={inputClass}
-              />
-            </div>
-            <div>
-              <label className="mb-1 block text-xs font-medium text-ink/60">Inicio</label>
-              <input
-                type="time"
-                value={horaInicio}
-                onChange={(e) => setHoraInicio(e.target.value)}
-                className={inputClass}
-              />
-            </div>
-            <div>
-              <label className="mb-1 block text-xs font-medium text-ink/60">Duración</label>
-              <select
-                value={duracion}
-                onChange={(e) => setDuracion(Number(e.target.value))}
-                className={inputClass}
-              >
-                {duracionOptions.map((d) => (
-                  <option key={d} value={d}>
-                    {formatDuracion(d)}
-                  </option>
-                ))}
-              </select>
-            </div>
-          </div>
-
-          {!isEditing && (
-            <div className="rounded-lg border border-edge/10 p-3">
-              <label className="flex items-center gap-2 text-sm font-medium text-ink/80">
-                <input
-                  type="checkbox"
-                  checked={recurrente}
-                  onChange={(e) => setRecurrente(e.target.checked)}
-                  className="h-4 w-4 accent-accent"
-                />
-                Programar seguimiento recurrente
-              </label>
-              {recurrente && (
-                <div className="mt-3 grid grid-cols-2 gap-3">
-                  <div>
-                    <label className="mb-1 block text-xs font-medium text-ink/60">Frecuencia</label>
-                    <select
-                      value={frecuencia}
-                      onChange={(e) => setFrecuencia(e.target.value as FrecuenciaRecurrencia)}
-                      className={inputClass}
-                    >
-                      {(Object.keys(frecuenciaLabel) as FrecuenciaRecurrencia[]).map((f) => (
-                        <option key={f} value={f}>
-                          {frecuenciaLabel[f]}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-                  <div>
-                    <label className="mb-1 block text-xs font-medium text-ink/60">
-                      Citas a generar
-                    </label>
-                    <input
-                      type="number"
-                      min={1}
-                      max={24}
-                      value={repeticiones}
-                      onChange={(e) => setRepeticiones(Number(e.target.value))}
-                      className={inputClass}
-                    />
-                  </div>
-                </div>
-              )}
-            </div>
-          )}
-
-          <div>
-            <label className="mb-1 block text-xs font-medium text-ink/60">Estatus</label>
-            <select
-              value={estatus}
-              onChange={(e) => setEstatus(e.target.value as CitaEstatus)}
-              className={inputClass}
-            >
-              {citaEstatusOptions.map((e) => (
-                <option key={e} value={e}>
-                  {e}
-                </option>
-              ))}
-            </select>
-          </div>
-        </div>
-
-        <div className="mt-6 flex gap-3">
-          {isEditing && onDelete && (
-            <button
-              onClick={onDelete}
-              className="rounded-lg border border-danger/30 px-4 py-2.5 text-sm font-semibold text-danger transition-colors hover:bg-danger/10"
-            >
-              Eliminar
-            </button>
-          )}
-          <button
-            onClick={onClose}
-            className="flex-1 rounded-lg border border-edge/15 py-2.5 text-sm font-semibold text-ink/80 transition-colors hover:bg-surface"
-          >
-            Cancelar
-          </button>
-          <button
-            onClick={handleGuardar}
-            disabled={!puedeGuardar}
-            className="flex-1 rounded-lg bg-gradient-to-r from-accent to-orange-500 py-2.5 text-sm font-semibold text-black transition-opacity hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-40"
-          >
-            Guardar
-          </button>
-        </div>
-      </div>
-
-      {showAgregarPago && patientId && (
-        <GlobalAgregarPago initialPatientId={patientId} onClose={() => setShowAgregarPago(false)} />
-      )}
-    </div>
-  );
+    return unsub;
+  }, [clinicUid, desdeISO, hastaISO]);
+  return citasEnRango;
 }
 
 export default function Agenda() {
@@ -1045,6 +73,7 @@ export default function Agenda() {
     setRecursos,
     citas,
     setCitas,
+    clinicUid,
     horario,
     patients,
     navegacionNuevaCita,
@@ -1053,6 +82,7 @@ export default function Agenda() {
     consumirSolicitudNuevaCitaBlanco,
     colaboradoresActivos,
     irAPagina,
+    procedimientos,
   } = usePatientData();
   /** La agenda siempre se ve/agenda de 7am a 22h como base (para casos
    * extemporáneos), pero si el horario de atención configurado es más
@@ -1061,6 +91,9 @@ export default function Agenda() {
   const HOUR_END = Math.max(22, Math.ceil(timeToMinutes(horario.cierre || "22:00") / 60));
   const [weekStart, setWeekStart] = useState(() => getMonday(new Date()));
   const [vista, setVista] = useState<"semana" | "3dias" | "dia" | "mes">("semana");
+  /** Qué recurso determina el color principal de cada tarjeta — ver
+   * colorPrincipalCita. El selector "Ver por" (Etapa 3) controla esto. */
+  const [vistaRecurso, setVistaRecurso] = useState<"todos" | "medicos" | "unidades">("todos");
   const [diaSeleccionado, setDiaSeleccionado] = useState(() => new Date());
   const [mesActual, setMesActual] = useState(() => {
     const d = new Date();
@@ -1075,12 +108,53 @@ export default function Agenda() {
     isEditing: boolean;
   } | null>(null);
   const [menuEnviarAgenda, setMenuEnviarAgenda] = useState<string | null>(null);
+  /** Aviso no bloqueante de conflicto de horario (médico y/o unidad) tras
+   * arrastrar una cita — se muestra unos segundos, no impide el cambio. */
+  const [avisoConflicto, setAvisoConflicto] = useState<string[] | null>(null);
+  const mostrarAvisoConflicto = (avisos: string[]) => {
+    if (avisos.length === 0) return;
+    setAvisoConflicto(avisos);
+    setTimeout(() => setAvisoConflicto((prev) => (prev === avisos ? null : prev)), 7000);
+  };
+
+  /** Fuerza un re-render cada 60s para que la línea de hora actual (más
+   * abajo) se mantenga alineada sin depender de otra interacción. */
+  const [, forzarTick] = useState(0);
+  useEffect(() => {
+    const id = setInterval(() => forzarTick((t) => t + 1), 60000);
+    return () => clearInterval(id);
+  }, []);
 
   const dias = useMemo(() => {
     if (vista === "dia") return [diaSeleccionado];
     if (vista === "3dias") return Array.from({ length: 3 }, (_, i) => addDays(diaSeleccionado, i));
     return Array.from({ length: 7 }, (_, i) => addDays(weekStart, i));
   }, [vista, weekStart, diaSeleccionado]);
+
+  /** Rango de fechas exacto del mes/periodo — usado por el resumen por
+   * vista (no debe incluir los días de relleno de meses vecinos que sí
+   * aparecen en la grilla). */
+  const rangoResumen = useMemo(() => {
+    if (vista === "mes") {
+      const inicio = new Date(mesActual.getFullYear(), mesActual.getMonth(), 1);
+      const fin = new Date(mesActual.getFullYear(), mesActual.getMonth() + 1, 0);
+      return { desde: toISODate(inicio), hasta: toISODate(fin) };
+    }
+    return { desde: toISODate(dias[0]), hasta: toISODate(dias[dias.length - 1]) };
+  }, [vista, mesActual, dias]);
+
+  /** Rango que realmente se dibuja en la grilla — en vista Mes es más
+   * ancho que rangoResumen porque la cuadrícula (diasMes, 42 días) incluye
+   * días de relleno de la semana del mes anterior/siguiente. */
+  const rangoConsulta = useMemo(() => {
+    if (vista !== "mes") return rangoResumen;
+    const inicioGrid = getMonday(new Date(mesActual.getFullYear(), mesActual.getMonth(), 1));
+    return { desde: toISODate(inicioGrid), hasta: toISODate(addDays(inicioGrid, 41)) };
+  }, [vista, mesActual, rangoResumen]);
+
+  /** Ver comentario en useCitasEnRango — primera fase de optimización,
+   * usada únicamente para dibujar la grilla (citasVisibles más abajo). */
+  const citasEnRango = useCitasEnRango(clinicUid, rangoConsulta.desde, rangoConsulta.hasta);
 
   const minGridWidth = vista === "dia" ? 300 : vista === "3dias" ? 400 : 640;
 
@@ -1100,10 +174,37 @@ export default function Agenda() {
   const totalHeight = (HOUR_END - HOUR_START) * 60 * PX_PER_MIN;
 
   const recursoPorId = (id: string) => recursos.find((r) => r.id === id);
+  const recursoMedico = (cita: CitaAgenda) => resolverMedico(recursos, cita);
+  const recursoUnidad = (cita: CitaAgenda) => resolverUnidad(recursos, cita);
 
-  const citasVisibles = citas.filter(
-    (c) => !recursosOcultos.has(c.recursoId) && !estatusOcultos.has(c.estatus)
-  );
+  /** Color principal de la tarjeta de una cita — identifica al médico o a
+   * la unidad, nunca al estatus. Con vistaRecurso "todos": médico si la
+   * cita tiene uno asignado, si no la unidad. Con "medicos"/"unidades":
+   * siempre ese recurso (gris neutro si la cita no lo tiene asignado). */
+  const colorPrincipalCita = (cita: CitaAgenda) => {
+    if (vistaRecurso === "medicos") return recursoMedico(cita)?.color ?? CITA_BORDE_NEUTRO;
+    if (vistaRecurso === "unidades") return recursoUnidad(cita)?.color ?? CITA_BORDE_NEUTRO;
+    return recursoMedico(cita)?.color ?? recursoUnidad(cita)?.color ?? CITA_BORDE_NEUTRO;
+  };
+
+  /** Especialidad del primer tratamiento de la cita, resuelta contra el
+   * catálogo de procedimientos por coincidencia de nombre — no se inventa
+   * una categoría si no hay match en el catálogo. */
+  const especialidadDeCita = (cita: CitaAgenda): string | undefined => {
+    const primero = cita.tratamientos?.[0]?.trim().toLowerCase();
+    if (!primero) return undefined;
+    return procedimientos.find((p) => p.nombre.trim().toLowerCase() === primero)?.especialidad;
+  };
+
+  /** Fuente para todo lo que se dibuja en la grilla (día/3días/semana/mes)
+   * y para el resumen por vista — citasEnRango ya viene acotada al rango
+   * visible (ver useCitasEnRango). Los conteos globales de arriba
+   * (conteoEstatus) siguen usando `citas` completo a propósito. */
+  const citasVisibles = citasEnRango.filter((c) => {
+    const idsRecurso = [c.medicoId, c.unidadId, c.recursoId].filter(Boolean) as string[];
+    const ocultaPorRecurso = idsRecurso.some((id) => recursosOcultos.has(id));
+    return !ocultaPorRecurso && !estatusOcultos.has(c.estatus);
+  });
 
   const conteoEstatus = citaEstatusOptions.map((e) => ({
     estatus: e,
@@ -1273,6 +374,7 @@ export default function Agenda() {
   const dragGrabOffsetRef = useRef(0);
 
   const moverCita = (citaId: string, nuevaFecha: string, minutosSoltado: number) => {
+    let citaMovida: CitaAgenda | null = null;
     setCitas((prev) =>
       prev.map((c) => {
         if (c.id !== citaId) return c;
@@ -1281,14 +383,19 @@ export default function Agenda() {
           Math.max(Math.round(minutosSoltado / 30) * 30, HOUR_START * 60),
           HOUR_END * 60 - duracion
         );
-        return {
+        citaMovida = {
           ...c,
           fecha: nuevaFecha,
           horaInicio: minutesToTime(nuevoInicio),
           horaFin: minutesToTime(nuevoInicio + duracion),
         };
+        return citaMovida;
       })
     );
+    if (citaMovida) {
+      const avisos = detectarConflictos(recursos, citas, citaMovida);
+      mostrarAvisoConflicto(avisos);
+    }
     setDraggingId(null);
     setDragOverDay(null);
   };
@@ -1312,14 +419,65 @@ export default function Agenda() {
     setDialogState(null);
   };
 
+  /** Métricas del periodo visible en la vista activa. La ocupación solo se
+   * calcula en "Ver por: Todos" contra el horario configurado del
+   * consultorio (única disponibilidad real que existe hoy) — al filtrar
+   * por médico o unidad específicos no hay disponibilidad configurada por
+   * recurso todavía, así que se muestra "—" en vez de inventar un
+   * porcentaje (queda lista la arquitectura para cuando exista). */
+  const resumenVista = useMemo(() => {
+    const citasDelRango = citasVisibles.filter(
+      (c) => c.fecha >= rangoResumen.desde && c.fecha <= rangoResumen.hasta
+    );
+    const contar = (estatus: CitaEstatus) => citasDelRango.filter((c) => c.estatus === estatus).length;
+    const horasClinicas =
+      Math.round(
+        citasDelRango
+          .filter((c) => c.estatus === "Atendida")
+          .reduce((sum, c) => sum + (timeToMinutes(c.horaFin) - timeToMinutes(c.horaInicio)), 0) / 6
+      ) / 10;
+    let ocupacion: number | null = null;
+    if (vistaRecurso === "todos") {
+      const disponibles = horasDisponiblesEnRango(horario, rangoResumen.desde, rangoResumen.hasta);
+      ocupacion = disponibles > 0 ? Math.round((horasClinicas / disponibles) * 1000) / 10 : null;
+    }
+    return {
+      programadas: citasDelRango.length,
+      atendidas: contar("Atendida"),
+      confirmadas: contar("Confirmada"),
+      enEspera: contar("En espera"),
+      canceladas: contar("Cancelada"),
+      noAsistieron: contar("No Asistió"),
+      pendientes: citasDelRango.filter((c) => !["Atendida", "Cancelada", "No Asistió"].includes(c.estatus)).length,
+      horasClinicas,
+      ocupacion,
+    };
+  }, [citasVisibles, rangoResumen, horario, vistaRecurso]);
+
   return (
     <div className="flex flex-col gap-6">
       <div className="min-w-0 flex-1 space-y-4">
+        {avisoConflicto && (
+          <div className="flex items-start justify-between gap-3 rounded-xl border border-warning/30 bg-warning/10 p-3 text-xs text-warning">
+            <div className="space-y-0.5">
+              {avisoConflicto.map((a, i) => (
+                <p key={i}>⚠️ {a}</p>
+              ))}
+            </div>
+            <button
+              onClick={() => setAvisoConflicto(null)}
+              className="shrink-0 text-warning/70 hover:text-warning"
+            >
+              ✕
+            </button>
+          </div>
+        )}
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div className="flex flex-wrap gap-2">
             {conteoEstatus.map(({ estatus, total }) => {
               const oculto = estatusOcultos.has(estatus);
               const c = estatusColor[estatus];
+              const hex = CITA_ESTATUS_HEX[estatus];
               return (
                 <button
                   key={estatus}
@@ -1327,8 +485,9 @@ export default function Agenda() {
                   className={`flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-semibold transition-opacity ${c.bg} ${c.text} ${
                     oculto ? "opacity-30" : ""
                   }`}
+                  style={hex ? { color: hex, backgroundColor: hexToRgba(hex, 0.12) } : undefined}
                 >
-                  <span className={`h-2 w-2 rounded-full ${c.dot}`} />
+                  <span className={`h-2 w-2 rounded-full ${c.dot}`} style={hex ? { backgroundColor: hex } : undefined} />
                   {total} {estatus}
                 </button>
               );
@@ -1361,6 +520,27 @@ export default function Agenda() {
             >
               Hoy
             </button>
+
+            <div className="flex items-center gap-1.5 rounded-lg border border-edge/10 p-0.5">
+              <span className="pl-1.5 text-[10px] font-semibold uppercase tracking-wide text-ink/40">Ver por</span>
+              {(
+                [
+                  { id: "todos", label: "Todos" },
+                  { id: "medicos", label: "Médicos" },
+                  { id: "unidades", label: "Unidades" },
+                ] as const
+              ).map((op) => (
+                <button
+                  key={op.id}
+                  onClick={() => setVistaRecurso(op.id)}
+                  className={`rounded-md px-2.5 py-1 text-xs font-semibold transition-colors ${
+                    vistaRecurso === op.id ? "bg-accent/15 text-accent" : "text-ink/50"
+                  }`}
+                >
+                  {op.label}
+                </button>
+              ))}
+            </div>
 
             <div className="flex rounded-lg border border-edge/10 p-0.5">
               <button
@@ -1457,6 +637,49 @@ export default function Agenda() {
                 : formatRangeLabel(weekStart, addDays(weekStart, 6))}
         </h2>
 
+        <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-6">
+          {(() => {
+            const ocupacionChip = {
+              label: vista === "dia" ? "Ocupación" : "Ocupación prom.",
+              value: resumenVista.ocupacion !== null ? `${resumenVista.ocupacion}%` : "—",
+            };
+            const horasChip = { label: "Horas clínicas", value: `${resumenVista.horasClinicas} h` };
+            const chips =
+              vista === "dia"
+                ? [
+                    { label: "Programadas", value: resumenVista.programadas },
+                    { label: "Atendidas", value: resumenVista.atendidas },
+                    { label: "Pendientes", value: resumenVista.pendientes },
+                    horasChip,
+                    ocupacionChip,
+                  ]
+                : vista === "mes"
+                  ? [
+                      { label: "Programadas", value: resumenVista.programadas },
+                      { label: "Atendidas", value: resumenVista.atendidas },
+                      { label: "Canceladas", value: resumenVista.canceladas },
+                      { label: "No asistieron", value: resumenVista.noAsistieron },
+                      horasChip,
+                      ocupacionChip,
+                    ]
+                  : [
+                      { label: "Programadas", value: resumenVista.programadas },
+                      horasChip,
+                      ocupacionChip,
+                      { label: "Confirmadas", value: resumenVista.confirmadas },
+                      { label: "En espera", value: resumenVista.enEspera },
+                      { label: "Canceladas", value: resumenVista.canceladas },
+                      { label: "No asistieron", value: resumenVista.noAsistieron },
+                    ];
+            return chips.map((chip) => (
+              <div key={chip.label} className="rounded-xl border border-edge/10 bg-surface px-3 py-2">
+                <p className="text-[10px] uppercase tracking-wide text-ink/40">{chip.label}</p>
+                <p className="text-base font-semibold text-ink">{chip.value}</p>
+              </div>
+            ));
+          })()}
+        </div>
+
         {vista === "mes" && (
           <div className="overflow-hidden rounded-2xl border border-edge/10 bg-surface">
             <div className="grid grid-cols-7 border-b border-edge/10">
@@ -1476,8 +699,18 @@ export default function Agenda() {
                 const citasDelDia = citasVisibles
                   .filter((c) => c.fecha === toISODate(dia))
                   .sort((a, b) => timeToMinutes(a.horaInicio) - timeToMinutes(b.horaInicio));
-                const visibles = citasDelDia.slice(0, 3);
-                const resto = citasDelDia.length - visibles.length;
+                const horasDelDia = citasDelDia.reduce(
+                  (sum, c) => sum + (timeToMinutes(c.horaFin) - timeToMinutes(c.horaInicio)) / 60,
+                  0
+                );
+                const coloresPresentes = Array.from(new Set(citasDelDia.map((c) => colorPrincipalCita(c))));
+                const resumenTooltip =
+                  citasDelDia.length > 0
+                    ? citasDelDia
+                        .slice(0, 6)
+                        .map((c) => `${c.horaInicio} ${c.paciente}`)
+                        .join("\n") + (citasDelDia.length > 6 ? `\n+${citasDelDia.length - 6} más` : "")
+                    : undefined;
                 return (
                   <div
                     key={toISODate(dia)}
@@ -1486,7 +719,8 @@ export default function Agenda() {
                       setWeekStart(getMonday(dia));
                       setVista("dia");
                     }}
-                    className={`flex min-h-[104px] cursor-pointer flex-col gap-1 border-b border-r border-edge/10 p-1.5 transition-colors last:border-r-0 hover:bg-app ${
+                    title={resumenTooltip}
+                    className={`flex min-h-[104px] cursor-pointer flex-col gap-1.5 border-b border-r border-edge/10 p-1.5 transition-colors last:border-r-0 hover:bg-app ${
                       enMes ? "" : "opacity-40"
                     }`}
                   >
@@ -1497,28 +731,19 @@ export default function Agenda() {
                     >
                       {dia.getDate()}
                     </span>
-                    <div className="space-y-0.5">
-                      {visibles.map((cita) => {
-                        const recurso = recursoPorId(cita.recursoId);
-                        return (
-                          <button
-                            key={cita.id}
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              abrirEditarCita(cita);
-                            }}
-                            title={`${cita.horaInicio}–${cita.horaFin} · ${cita.paciente} · ${recurso?.nombre ?? ""}`}
-                            className={`block w-full truncate rounded px-1 py-0.5 text-left text-[10px] font-medium ${
-                              citaTextColor[cita.estatus] ?? "text-ink"
-                            }`}
-                            style={{ backgroundColor: recurso?.color ?? "#666", textShadow: CITA_TEXT_OUTLINE }}
-                          >
-                            {cita.horaInicio} {cita.paciente}
-                          </button>
-                        );
-                      })}
-                      {resto > 0 && <div className="px-1 text-[10px] text-ink/40">+{resto} más</div>}
-                    </div>
+                    {citasDelDia.length > 0 && (
+                      <div className="flex flex-1 flex-col justify-end gap-1">
+                        <div className="flex flex-wrap gap-1">
+                          {coloresPresentes.slice(0, 8).map((c, i) => (
+                            <span key={i} className="h-1.5 w-1.5 rounded-full" style={{ backgroundColor: c }} />
+                          ))}
+                        </div>
+                        <p className="text-[11px] font-semibold text-ink">
+                          {citasDelDia.length} {citasDelDia.length === 1 ? "cita" : "citas"}
+                        </p>
+                        <p className="text-[10px] text-ink/40">{horasDelDia.toFixed(1)} h</p>
+                      </div>
+                    )}
                   </div>
                 );
               })}
@@ -1646,6 +871,17 @@ export default function Agenda() {
                         title="Horario de comida"
                       />
                     )}
+                    {esHoy && (
+                      <div
+                        className="pointer-events-none absolute left-0 right-0 z-10 flex items-center"
+                        style={{
+                          top: (hoy.getHours() * 60 + hoy.getMinutes() - HOUR_START * 60) * PX_PER_MIN,
+                        }}
+                      >
+                        <span className="-ml-[3px] h-[7px] w-[7px] shrink-0 rounded-full bg-accent" />
+                        <span className="h-px flex-1 bg-accent/70" />
+                      </div>
+                    )}
                     {Array.from({ length: HOUR_END - HOUR_START }, (_, i) => (
                       <div
                         key={i}
@@ -1655,13 +891,17 @@ export default function Agenda() {
                     ))}
 
                     {withLane.map(({ cita, lane, lanesInGroup }) => {
-                      const recurso = recursoPorId(cita.recursoId);
+                      const medico = recursoMedico(cita);
+                      const unidad = recursoUnidad(cita);
+                      const stripe = colorPrincipalCita(cita);
+                      const especialidad = especialidadDeCita(cita);
                       const top = (timeToMinutes(cita.horaInicio) - HOUR_START * 60) * PX_PER_MIN;
                       const height = Math.max(
                         (timeToMinutes(cita.horaFin) - timeToMinutes(cita.horaInicio)) * PX_PER_MIN,
                         18
                       );
                       const widthPct = 100 / lanesInGroup;
+                      const arrastrando = draggingId === cita.id;
                       return (
                         <button
                           key={cita.id}
@@ -1681,25 +921,51 @@ export default function Agenda() {
                             e.stopPropagation();
                             abrirEditarCita(cita);
                           }}
-                          className={`absolute overflow-hidden rounded-md px-1.5 py-0.5 text-left text-[10px] leading-tight shadow-sm transition-transform hover:z-10 hover:scale-[1.02] ${
-                            citaTextColor[cita.estatus] ?? "text-ink"
-                          } ${draggingId === cita.id ? "cursor-grabbing opacity-40" : "cursor-grab"}`}
+                          className={`absolute overflow-hidden rounded-md border border-edge/10 bg-cita-card text-left text-[10px] leading-tight text-ink transition-transform hover:z-10 hover:scale-[1.02] hover:shadow-[0_0_10px_var(--stripe)] ${
+                            arrastrando ? "cursor-grabbing opacity-40" : "cursor-grab"
+                          }`}
                           style={{
                             top,
                             height,
                             left: `${lane * widthPct}%`,
                             width: `calc(${widthPct}% - 2px)`,
-                            backgroundColor: recurso?.color ?? "#666",
-                            textShadow: CITA_TEXT_OUTLINE,
+                            borderLeftWidth: 5,
+                            borderLeftColor: stripe,
+                            borderLeftStyle: "solid",
+                            ["--stripe" as string]: stripe,
+                            ...(arrastrando ? { boxShadow: `0 0 10px ${hexToRgba(stripe, 0.85)}` } : {}),
                           }}
-                          title={`${cita.horaInicio}–${cita.horaFin} · ${cita.paciente} · ${recurso?.nombre ?? ""} — arrastra para cambiar el horario`}
+                          title={`${cita.horaInicio}–${cita.horaFin} · ${cita.paciente} · ${medico?.nombre ?? unidad?.nombre ?? "Sin asignar"} — arrastra para cambiar el horario`}
                         >
-                          <div className="font-semibold">
-                            {cita.horaInicio} {cita.paciente}
+                          <div
+                            className="pointer-events-none absolute inset-0"
+                            style={{ backgroundColor: hexToRgba(stripe, 0.07) }}
+                          />
+                          <div className="relative px-1.5 py-1">
+                            <div className="truncate font-semibold">
+                              {cita.horaInicio} {cita.paciente}
+                            </div>
+                            {(cita.tratamientos ?? []).length > 0 && (
+                              <div className="truncate text-ink/60">
+                                {cita.tratamientos.join(", ")}
+                                {especialidad && (
+                                  <span className="ml-1 text-[8px] font-semibold uppercase tracking-wide text-ink/35">
+                                    · {especialidad}
+                                  </span>
+                                )}
+                              </div>
+                            )}
+                            <div className="mt-0.5 flex flex-wrap items-center gap-1">
+                              <AppointmentStatusBadge estatus={cita.estatus} />
+                              {(medico || unidad) && (
+                                <span className="truncate text-[9px] text-ink/40">
+                                  {medico?.nombre}
+                                  {medico && unidad ? " · " : ""}
+                                  {unidad?.nombre}
+                                </span>
+                              )}
+                            </div>
                           </div>
-                          {(cita.tratamientos ?? []).length > 0 && (
-                            <div className="opacity-80">{cita.tratamientos.join(", ")}</div>
-                          )}
                         </button>
                       );
                     })}
@@ -1715,7 +981,15 @@ export default function Agenda() {
       <div className="grid grid-cols-1 gap-4 print:hidden sm:grid-cols-2">
         <div className="rounded-2xl border border-edge/10 bg-surface p-4">
           <div className="mb-3 flex items-center justify-between">
-            <h3 className="text-xs font-semibold uppercase tracking-wide text-ink/50">Recursos</h3>
+            <div className="flex items-center gap-1.5">
+              <h3 className="text-xs font-semibold uppercase tracking-wide text-ink/50">Recursos</h3>
+              <span
+                title="El color identifica al médico o unidad. El badge dentro de la tarjeta indica el estado de la cita — son cosas distintas."
+                className="flex h-4 w-4 cursor-help items-center justify-center rounded-full border border-edge/20 text-[10px] text-ink/40"
+              >
+                ?
+              </span>
+            </div>
             <button
               onClick={() => setRecursoDialog("nuevo")}
               title="Agregar recurso"
@@ -1784,7 +1058,7 @@ export default function Agenda() {
       </div>
 
       {dialogState && (
-        <CitaDialog
+        <AgendaCitaDialog
           recursos={recursos}
           initial={dialogState.initial}
           isEditing={dialogState.isEditing}
@@ -1795,7 +1069,7 @@ export default function Agenda() {
       )}
 
       {recursoDialog && (
-        <NuevaRecursoDialog
+        <AgendaRecursoDialog
           inicial={recursoDialog === "nuevo" ? undefined : recursoDialog}
           coloresEnUso={recursos.map((r) => r.color)}
           onClose={() => setRecursoDialog(null)}

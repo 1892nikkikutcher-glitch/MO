@@ -11,6 +11,10 @@
   --field: rgba(255, 255, 255, 0.06);
   --inset: rgba(0, 0, 0, 0.32);
   --modal: rgba(11, 14, 24, 0.74);
+  --modal-solid: #0b0e18;
+  /* Fondo de tarjeta de cita en Agenda — sólido (no glass, hay muchas
+     tarjetas pequeñas a la vez) y ligeramente más claro que --app. */
+  --cita-card-bg: #141826;
 
   --edge-rgb: 255 255 255;
   --ink-rgb: 255 255 255;
@@ -35,6 +39,8 @@
   --field: rgba(255, 255, 255, 0.62);
   --inset: rgba(20, 23, 32, 0.05);
   --modal: rgba(255, 255, 255, 0.8);
+  --modal-solid: #ffffff;
+  --cita-card-bg: #ffffff;
 
   --edge-rgb: 64 67 76;
   --ink-rgb: 28 29 34;
@@ -102,7 +108,10 @@ body {
 
 .bg-modal.rounded-2xl,
 .bg-modal.rounded-xl,
-.bg-modal.rounded-lg {
+.bg-modal.rounded-lg,
+.bg-modal-solid.rounded-2xl,
+.bg-modal-solid.rounded-xl,
+.bg-modal-solid.rounded-lg {
   box-shadow: var(--shadow-modal);
 }
 

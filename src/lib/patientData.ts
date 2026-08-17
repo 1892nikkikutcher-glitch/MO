@@ -392,25 +392,17 @@ export type Recurso = {
   tipo: TipoRecurso;
 };
 
-/** A propósito NO incluye azul, ámbar/naranja, verde, morado ni rojo — esos
- * cinco tonos ya están tomados por los estatus de cita (Confirmada,
- * En espera, Atendida, Reagendada, Cancelada/No Asistió respectivamente).
- * Si un recurso usara alguno, el texto de estatus dentro de su tarjeta en
- * la agenda quedaría "color sobre color" (ej. texto azul de "Confirmada"
- * sobre una tarjeta también azul) — molesto de leer aunque siga siendo
- * legible por el halo oscuro. Se queda en teal/cian y fucsia/rosa (las
- * únicas familias de color que no chocan con ningún estatus) más grises de
- * distinto tono para variedad — antes de agregar un color nuevo aquí,
- * verifica que no caiga en esas cinco familias. */
+/** Paleta pastel (fondo de tarjeta de recurso) — clara y poco saturada a
+ * propósito: el texto de la cita siempre es negro (alto contraste
+ * garantizado sobre cualquiera de estos tonos) y el estatus se distingue
+ * por el borde/resplandor de color (ver CITA_ESTATUS_HEX en Agenda.tsx),
+ * no por el color de fondo. */
 export const RECURSO_COLOR_PALETTE = [
-  "#14b8a6",
-  "#06b6d4",
-  "#d946ef",
-  "#ec4899",
-  "#94a3b8",
-  "#64748b",
-  "#78716c",
-  "#44403c",
+  "#E8C0FC", // Lila
+  "#A8DEFA", // Cielo
+  "#D0F4E0", // Menta
+  "#FCF5BF", // Amarillo pastel
+  "#FF99C8", // Rosa
 ];
 
 /** Da un color que ningún recurso existente esté usando todavía, para que
@@ -439,7 +431,15 @@ export type FrecuenciaRecurrencia = "mensual" | "trimestral" | "semestral";
 export type CitaAgenda = {
   id: string;
   folio: string;
+  /** @deprecated Se conserva solo por retrocompatibilidad con citas creadas
+   * antes de separar médico y unidad — para citas nuevas o editadas, usar
+   * medicoId/unidadId. Se mantiene sincronizado como medicoId || unidadId
+   * mientras exista código legado que aún lo lea. */
   recursoId: string;
+  /** Recurso tipo "medico" asignado a la cita, independiente de la unidad. */
+  medicoId?: string | null;
+  /** Recurso tipo "unidad" asignado a la cita, independiente del médico. */
+  unidadId?: string | null;
   patientId: string | null;
   paciente: string;
   tratamientos: string[];
@@ -451,7 +451,8 @@ export type CitaAgenda = {
   horaFin: string;
   estatus: CitaEstatus;
   recurrenciaId: string | null;
-  /** Hora real (HH:MM) en que el paciente se presentó — asistencia de pacientes. */
+  /** Hora real (HH:MM) en que el paciente se presentó — asistencia de
+   * pacientes. Se estampa automáticamente al marcar la cita "En espera". */
   horaLlegada?: string | null;
 };
 
