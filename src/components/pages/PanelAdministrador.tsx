@@ -186,7 +186,13 @@ function EliminarClinicaModal({ clinica, onClose, onEliminado }: { clinica: Clin
   const [texto, setTexto] = useState("");
   const [eliminando, setEliminando] = useState(false);
   const [error, setError] = useState("");
-  const habilitado = texto.trim() === clinica.nombre;
+  // Si la clínica no tiene nombre propio, pedir que se escriba el
+  // placeholder "(sin nombre)" tal cual (con paréntesis) sería una mala
+  // confirmación — se pide una palabra fija en su lugar. Comparación sin
+  // distinguir mayúsculas para no exigir precisión innecesaria.
+  const tieneNombrePropio = Boolean(clinica.nombre) && clinica.nombre !== "(sin nombre)";
+  const palabraConfirmacion = tieneNombrePropio ? clinica.nombre : "ELIMINAR";
+  const habilitado = texto.trim().toLowerCase() === palabraConfirmacion.toLowerCase();
 
   const eliminar = async () => {
     setEliminando(true);
@@ -214,7 +220,7 @@ function EliminarClinicaModal({ clinica, onClose, onEliminado }: { clinica: Clin
           Para revocar acceso sin perder nada, usa <span className="font-semibold">Suspender</span> en vez de esto.
         </p>
         <p className="mt-4 text-xs text-ink/50">
-          Escribe <span className="font-semibold text-ink">{clinica.nombre}</span> para confirmar:
+          Escribe <span className="font-semibold text-ink">{palabraConfirmacion}</span> para confirmar:
         </p>
         <input value={texto} onChange={(e) => setTexto(e.target.value)} className={`${inputClass} mt-1`} />
         {error && <p className="mt-2 text-xs text-danger">{error}</p>}
