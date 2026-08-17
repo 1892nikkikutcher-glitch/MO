@@ -1,13 +1,17 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import Odontograma from "./Odontograma";
 import { usePatientData } from "@/context/PatientDataContext";
 import ConfirmarEliminar from "@/components/ConfirmarEliminar";
 import {
+  claveDetalleSiNo,
   esNegacionExplicita,
+  esSeccionAntecedentesPatologicos,
+  esSeccionDiagnosticoSistemico,
   esSeccionGinecoObstetrica,
   respuestasVacias,
+  resumenAntecedentesPatologicos,
   valorOdontogramaComoDiagnosticos,
   type DiagnosticoOdontograma,
   type PreguntaTemplate,
@@ -59,30 +63,55 @@ function Section({
   );
 }
 
-function SiNoRow({ label, value, onChange }: { label: string; value: SiNo; onChange: (v: SiNo) => void }) {
+function SiNoRow({
+  label,
+  value,
+  onChange,
+  detalle,
+  onChangeDetalle,
+  mostrarDetalle,
+}: {
+  label: string;
+  value: SiNo;
+  onChange: (v: SiNo) => void;
+  detalle?: string;
+  onChangeDetalle?: (v: string) => void;
+  mostrarDetalle?: boolean;
+}) {
   return (
-    <div className="flex items-center justify-between gap-4 border-b border-edge/5 py-2 last:border-0">
-      <span className="text-sm text-ink/70">{label}</span>
-      <div className="flex shrink-0 gap-2">
-        <button
-          type="button"
-          onClick={() => onChange(value === "si" ? "" : "si")}
-          className={`h-7 w-12 rounded-md border text-xs font-semibold transition-colors ${
-            value === "si" ? "border-success bg-success/15 text-success" : "border-edge/15 text-ink/40 hover:border-edge/30"
-          }`}
-        >
-          SI
-        </button>
-        <button
-          type="button"
-          onClick={() => onChange(value === "no" ? "" : "no")}
-          className={`h-7 w-12 rounded-md border text-xs font-semibold transition-colors ${
-            value === "no" ? "border-danger bg-danger/15 text-danger" : "border-edge/15 text-ink/40 hover:border-edge/30"
-          }`}
-        >
-          NO
-        </button>
+    <div className="border-b border-edge/5 py-2 last:border-0">
+      <div className="flex items-center justify-between gap-4">
+        <span className="text-sm text-ink/70">{label}</span>
+        <div className="flex shrink-0 gap-2">
+          <button
+            type="button"
+            onClick={() => onChange(value === "si" ? "" : "si")}
+            className={`h-7 w-12 rounded-md border text-xs font-semibold transition-colors ${
+              value === "si" ? "border-success bg-success/15 text-success" : "border-edge/15 text-ink/40 hover:border-edge/30"
+            }`}
+          >
+            SI
+          </button>
+          <button
+            type="button"
+            onClick={() => onChange(value === "no" ? "" : "no")}
+            className={`h-7 w-12 rounded-md border text-xs font-semibold transition-colors ${
+              value === "no" ? "border-danger bg-danger/15 text-danger" : "border-edge/15 text-ink/40 hover:border-edge/30"
+            }`}
+          >
+            NO
+          </button>
+        </div>
       </div>
+      {value === "si" && mostrarDetalle && (
+        <input
+          type="text"
+          value={detalle ?? ""}
+          onChange={(e) => onChangeDetalle?.(e.target.value)}
+          placeholder="Ej. desde cuándo, si está controlado(a) y con qué se controla..."
+          className={`${inputClass} mt-2`}
+        />
+      )}
     </div>
   );
 }
@@ -434,13 +463,28 @@ function PreguntaRenderer({
   pregunta,
   valor,
   onChange,
+  detalle,
+  onChangeDetalle,
+  mostrarDetalle,
 }: {
   pregunta: PreguntaTemplate;
   valor: RespuestaValor | undefined;
   onChange: (v: RespuestaValor) => void;
+  detalle?: string;
+  onChangeDetalle?: (v: string) => void;
+  mostrarDetalle?: boolean;
 }) {
   if (pregunta.tipo === "sino") {
-    return <SiNoRow label={pregunta.etiqueta} value={(valor as SiNo) ?? ""} onChange={onChange} />;
+    return (
+      <SiNoRow
+        label={pregunta.etiqueta}
+        value={(valor as SiNo) ?? ""}
+        onChange={onChange}
+        detalle={detalle}
+        onChangeDetalle={onChangeDetalle}
+        mostrarDetalle={mostrarDetalle}
+      />
+    );
   }
   if (pregunta.tipo === "texto") {
     return (
@@ -533,8 +577,47 @@ export default function HistoriaClinica({ patientId }: { patientId: string }) {
   // sin pisar ediciones que el usuario todavía no ha guardado.
   useEffect(() => {
     setBorrador(guardadas);
+    ultimoAutoGeneradoRef.current = "";
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [patientId]);
+
+  // Id de la pregunta textarea de "Diagnóstico Sistémico" (se detecta por
+  // título de sección, igual que el resto de esta plantilla configurable).
+  const preguntaDiagSistemicoId = useMemo(() => {
+    for (const seccion of historiaClinicaTemplate.secciones) {
+      if (esSeccionDiagnosticoSistemico(seccion.titulo)) {
+        return seccion.preguntas.find((p) => p.tipo === "textarea")?.id ?? null;
+      }
+    }
+    return null;
+  }, [historiaClinicaTemplate]);
+
+  const resumenAntecedentes = useMemo(
+    () => resumenAntecedentesPatologicos(historiaClinicaTemplate, { porPregunta: borrador.porPregunta }),
+    [historiaClinicaTemplate, borrador.porPregunta]
+  );
+
+  // Rastrea el último texto que ESTE efecto escribió en Diagnóstico
+  // Sistémico — mientras el campo siga igual a eso, se sigue actualizando
+  // solo; en cuanto el doctor lo edite a mano (o lo borre), deja de
+  // tocarlo, para no pisar lo que ya escribió. La decisión y la mutación
+  // del ref viven en el cuerpo del efecto (no dentro del updater de
+  // setBorrador) a propósito: en modo estricto de desarrollo React invoca
+  // dos veces la forma funcional de un setState, y mutar el ref ahí adentro
+  // hacía que la segunda invocación viera un ref ya actualizado y descartara
+  // la actualización silenciosamente.
+  const ultimoAutoGeneradoRef = useRef("");
+  useEffect(() => {
+    if (!preguntaDiagSistemicoId) return;
+    const actual = (borrador.porPregunta[preguntaDiagSistemicoId] as string) ?? "";
+    const sigueSiendoAutoGenerado = actual === "" || actual === ultimoAutoGeneradoRef.current;
+    if (!sigueSiendoAutoGenerado || actual === resumenAntecedentes) return;
+    ultimoAutoGeneradoRef.current = resumenAntecedentes;
+    setBorrador((prev) => ({
+      ...prev,
+      porPregunta: { ...prev.porPregunta, [preguntaDiagSistemicoId]: resumenAntecedentes },
+    }));
+  }, [resumenAntecedentes, preguntaDiagSistemicoId, borrador.porPregunta]);
 
   const yaGuardado = Boolean(guardadas.actualizadoEn);
   const hayCambiosSinGuardar = JSON.stringify(borrador) !== JSON.stringify(guardadas);
@@ -627,6 +710,9 @@ export default function HistoriaClinica({ patientId }: { patientId: string }) {
                 pregunta={pregunta}
                 valor={borrador.porPregunta[pregunta.id]}
                 onChange={(v) => actualizarPregunta(pregunta.id, v)}
+                mostrarDetalle={esSeccionAntecedentesPatologicos(seccion.titulo)}
+                detalle={borrador.porPregunta[claveDetalleSiNo(pregunta.id)] as string | undefined}
+                onChangeDetalle={(v) => actualizarPregunta(claveDetalleSiNo(pregunta.id), v)}
               />
             ))
           )}

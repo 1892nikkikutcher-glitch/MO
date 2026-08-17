@@ -281,13 +281,51 @@ export const respuestasVacias: RespuestasHistoriaClinica = { porPregunta: {}, al
  * doctor, así que también atrapa secciones renombradas o agregadas que
  * seguían el mismo patrón ("Antecedentes Patológicos...", "Diagnóstico
  * Sistémico"). */
-function esSeccionSistemica(titulo: string): boolean {
+export function esSeccionAntecedentesPatologicos(titulo: string): boolean {
   const t = titulo.toLowerCase();
-  return (
-    t.includes("antecedente") && t.includes("patol") ||
-    t.includes("diagnóstico sistémico") ||
-    t.includes("diagnostico sistemico")
-  );
+  return t.includes("antecedente") && t.includes("patol");
+}
+
+export function esSeccionDiagnosticoSistemico(titulo: string): boolean {
+  const t = titulo.toLowerCase();
+  return t.includes("diagnóstico sistémico") || t.includes("diagnostico sistemico");
+}
+
+function esSeccionSistemica(titulo: string): boolean {
+  return esSeccionAntecedentesPatologicos(titulo) || esSeccionDiagnosticoSistemico(titulo);
+}
+
+/** Convención de guardado para el detalle opcional de una pregunta "sino"
+ * (ej. "desde cuándo, si está controlada, con qué se controla") — se
+ * guarda como una respuesta más en porPregunta, bajo una clave derivada,
+ * en vez de ampliar RespuestaValor para no tocar el resto de tipos de
+ * pregunta que no lo necesitan. */
+export function claveDetalleSiNo(preguntaId: string): string {
+  return `${preguntaId}__detalle`;
+}
+
+/** Junta los antecedentes patológicos marcados "Sí" (con su detalle, si se
+ * capturó) en líneas de texto — se usa para rellenar en automático el
+ * campo de Diagnóstico Sistémico mientras el doctor no lo haya editado a
+ * mano (ver HistoriaClinica.tsx). Deliberadamente NO incluye el propio
+ * Diagnóstico Sistémico (a diferencia de condicionesSistemicasPositivas),
+ * porque ese es justo el campo que se va a rellenar con este resultado. */
+export function resumenAntecedentesPatologicos(
+  template: HistoriaClinicaTemplate,
+  respuestas: RespuestasHistoriaClinica
+): string {
+  const lineas: string[] = [];
+  for (const seccion of template.secciones) {
+    if (!esSeccionAntecedentesPatologicos(seccion.titulo)) continue;
+    for (const pregunta of seccion.preguntas) {
+      if (pregunta.tipo !== "sino") continue;
+      if (respuestas.porPregunta[pregunta.id] !== "si") continue;
+      const detalle = respuestas.porPregunta[claveDetalleSiNo(pregunta.id)];
+      const detalleTexto = typeof detalle === "string" ? detalle.trim() : "";
+      lineas.push(detalleTexto ? `${pregunta.etiqueta}: ${detalleTexto}` : pregunta.etiqueta);
+    }
+  }
+  return lineas.join("\n");
 }
 
 /** Igual que `esSeccionSistemica`: detecta por título (no por id fijo) para
@@ -315,7 +353,9 @@ export function condicionesSistemicasPositivas(
     for (const pregunta of seccion.preguntas) {
       const valor = respuestas.porPregunta[pregunta.id];
       if (pregunta.tipo === "sino" && valor === "si") {
-        resultado.push({ etiqueta: pregunta.etiqueta, detalle: "Sí" });
+        const detalle = respuestas.porPregunta[claveDetalleSiNo(pregunta.id)];
+        const detalleTexto = typeof detalle === "string" ? detalle.trim() : "";
+        resultado.push({ etiqueta: pregunta.etiqueta, detalle: detalleTexto || "Sí" });
       } else if (
         (pregunta.tipo === "texto" || pregunta.tipo === "textarea") &&
         typeof valor === "string" &&
