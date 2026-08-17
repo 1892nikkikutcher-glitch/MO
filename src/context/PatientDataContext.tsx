@@ -269,6 +269,7 @@ function useClinicResolution(authUid: string, authEmail: string) {
             await setDoc(doc(db, "clinics", authUid), {
               ownerId: authUid,
               nombre: "",
+              creadoEl: new Date().toISOString().slice(0, 10),
             } satisfies ClinicInfo);
             await setDoc(doc(db, "clinicMembers", `${authUid}_${authUid}`), {
               clinicId: authUid,

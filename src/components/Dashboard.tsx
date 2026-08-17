@@ -50,6 +50,7 @@ import ReporteOts from "./pages/ReporteOts";
 import ReporteDomiciliacion from "./pages/ReporteDomiciliacion";
 import GlobalAgregarPago from "./GlobalAgregarPago";
 import GlobalNuevoPaciente from "./GlobalNuevoPaciente";
+import PanelAdministrador from "./pages/PanelAdministrador";
 import { PatientDataProvider, usePatientData } from "@/context/PatientDataContext";
 
 const paginasConstruidas = new Set([
@@ -98,6 +99,7 @@ const paginasConstruidas = new Set([
   "reportes-presupuestos",
   "reportes-ots",
   "reportes-domiciliacion",
+  "panel-admin",
 ]);
 
 const quickActions = [
@@ -214,31 +216,79 @@ function QuickActionsBar({
   );
 }
 
-export default function Dashboard({
-  uid,
+/** Pantalla que reemplaza todo el dashboard cuando la clínica está
+ * suspendida/cancelada desde el Panel de administrador — es el mecanismo
+ * principal para revocar acceso (ver ClinicInfo.estadoCuenta), en vez de
+ * borrar el registro de la clínica. Cada clínica ya puede leer su propio
+ * doc clinics/{clinicId} con las reglas actuales, no requiere reglas
+ * nuevas. */
+function CuentaSuspendida({ onLogout }: { onLogout: () => void }) {
+  return (
+    <div className="flex min-h-screen items-center justify-center bg-app px-4">
+      <div className="w-full max-w-sm rounded-2xl border border-edge/10 bg-modal p-8 text-center">
+        <h2 className="text-lg font-semibold text-ink">Tu cuenta está suspendida</h2>
+        <p className="mt-2 text-sm text-ink/60">
+          El acceso a esta clínica está pausado por el momento. Contacta a soporte si crees que es un error.
+        </p>
+        <button
+          onClick={onLogout}
+          className="mt-6 w-full rounded-lg border border-edge/15 py-2.5 text-sm font-semibold text-ink/80 transition-colors hover:bg-surface"
+        >
+          Cerrar sesión
+        </button>
+      </div>
+    </div>
+  );
+}
+
+function DashboardBody({
+  activePage,
+  setActivePage,
+  theme,
+  setTheme,
+  mobileMenuOpen,
+  setMobileMenuOpen,
+  showRegistrarPago,
+  setShowRegistrarPago,
+  showNuevoPaciente,
+  setShowNuevoPaciente,
   userEmail,
   onLogout,
+  esAdmin,
 }: {
-  uid: string;
+  activePage: string;
+  setActivePage: (id: string) => void;
+  theme: "dark" | "light";
+  setTheme: (updater: (t: "dark" | "light") => "dark" | "light") => void;
+  mobileMenuOpen: boolean;
+  setMobileMenuOpen: (open: boolean) => void;
+  showRegistrarPago: boolean;
+  setShowRegistrarPago: (open: boolean) => void;
+  showNuevoPaciente: boolean;
+  setShowNuevoPaciente: (open: boolean) => void;
   userEmail: string;
   onLogout: () => void;
+  esAdmin: boolean;
 }) {
-  const [activePage, setActivePage] = useState("inicio");
-  const [showRegistrarPago, setShowRegistrarPago] = useState(false);
-  const [showNuevoPaciente, setShowNuevoPaciente] = useState(false);
-  const [theme, setTheme] = useState<"dark" | "light">("dark");
-  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const { clinicInfo } = usePatientData();
   const isLight = theme === "light";
   const activeLabel =
-    navItems.find((item) => item.id === activePage)?.label ??
-    navItems.flatMap((item) => ("children" in item ? item.children ?? [] : [])).find(
-      (child) => child.id === activePage
-    )?.label ??
-    "";
+    activePage === "panel-admin"
+      ? "Panel de administrador"
+      : navItems.find((item) => item.id === activePage)?.label ??
+        navItems.flatMap((item) => ("children" in item ? item.children ?? [] : [])).find(
+          (child) => child.id === activePage
+        )?.label ??
+        "";
+
+  // El dueño de la plataforma nunca queda bloqueado por su propio
+  // estadoCuenta — si no, una suspensión accidental de su propia clínica lo
+  // dejaría sin forma de entrar al Panel de administrador para revertirla.
+  if (!esAdmin && clinicInfo && (clinicInfo.estadoCuenta === "suspendida" || clinicInfo.estadoCuenta === "cancelada")) {
+    return <CuentaSuspendida onLogout={onLogout} />;
+  }
 
   return (
-    <PatientDataProvider uid={uid} userEmail={userEmail} onIrAPagina={setActivePage}>
-    <InvitePrompt />
     <div data-theme={theme} className="flex min-h-screen bg-app text-ink">
       <Sidebar
         active={activePage}
@@ -247,6 +297,7 @@ export default function Dashboard({
         onToggleTheme={() => setTheme((t) => (t === "dark" ? "light" : "dark"))}
         mobileOpen={mobileMenuOpen}
         onCloseMobile={() => setMobileMenuOpen(false)}
+        esAdmin={esAdmin}
       />
 
       <main className="min-w-0 flex-1">
@@ -286,6 +337,7 @@ export default function Dashboard({
             {activePage === "inicio" ? "Dashboard Principal" : activeLabel}
           </h1>
           {activePage === "inicio" && <Inicio />}
+          {activePage === "panel-admin" && <PanelAdministrador />}
           {activePage === "pacientes" && <Pacientes />}
           {activePage === "agenda" && <Agenda />}
           {activePage === "recetas" && <Recetas />}
@@ -341,6 +393,43 @@ export default function Dashboard({
         <GlobalNuevoPaciente onClose={() => setShowNuevoPaciente(false)} />
       )}
     </div>
+  );
+}
+
+export default function Dashboard({
+  uid,
+  userEmail,
+  onLogout,
+}: {
+  uid: string;
+  userEmail: string;
+  onLogout: () => void;
+}) {
+  const [activePage, setActivePage] = useState("inicio");
+  const [showRegistrarPago, setShowRegistrarPago] = useState(false);
+  const [showNuevoPaciente, setShowNuevoPaciente] = useState(false);
+  const [theme, setTheme] = useState<"dark" | "light">("dark");
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const esAdmin = uid === process.env.NEXT_PUBLIC_ADMIN_UID;
+
+  return (
+    <PatientDataProvider uid={uid} userEmail={userEmail} onIrAPagina={setActivePage}>
+      <InvitePrompt />
+      <DashboardBody
+        activePage={activePage}
+        setActivePage={setActivePage}
+        theme={theme}
+        setTheme={setTheme}
+        mobileMenuOpen={mobileMenuOpen}
+        setMobileMenuOpen={setMobileMenuOpen}
+        showRegistrarPago={showRegistrarPago}
+        setShowRegistrarPago={setShowRegistrarPago}
+        showNuevoPaciente={showNuevoPaciente}
+        setShowNuevoPaciente={setShowNuevoPaciente}
+        userEmail={userEmail}
+        onLogout={onLogout}
+        esAdmin={esAdmin}
+      />
     </PatientDataProvider>
   );
 }

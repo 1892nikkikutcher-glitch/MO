@@ -297,6 +297,10 @@ export const planesDisponibles: {
   id: PlanId;
   nombre: string;
   precio: string;
+  /** Monto mensual aproximado en MXN, usado para calcular MRR/ARPU en el
+   * Panel de administrador (misma cifra que ya está en `precio`, pero como
+   * número — evita parsear el string). */
+  precioMensualAprox: number;
   unidades: string;
   caracteristicas: string[];
 }[] = [
@@ -304,6 +308,7 @@ export const planesDisponibles: {
     id: "prueba",
     nombre: "Prueba (14 días)",
     precio: "Gratis",
+    precioMensualAprox: 0,
     unidades: "1 unidad",
     caracteristicas: [
       "Acceso completo durante 14 días",
@@ -315,6 +320,7 @@ export const planesDisponibles: {
     id: "consultorio",
     nombre: "Consultorio",
     precio: "$280 cada 4 semanas",
+    precioMensualAprox: 280,
     unidades: "Hasta 2 unidades",
     caracteristicas: [
       "Hasta 2 unidades / consultorios",
@@ -325,6 +331,7 @@ export const planesDisponibles: {
     id: "clinicas",
     nombre: "Clínicas",
     precio: "$840 cada 4 semanas",
+    precioMensualAprox: 840,
     unidades: "3 unidades o más",
     caracteristicas: [
       "3 unidades o más",
@@ -341,7 +348,19 @@ export type SuscripcionPlan = {
   /** Los siguientes campos los escribe únicamente el webhook de Stripe. */
   stripeCustomerId?: string;
   stripeSubscriptionId?: string;
+  /** Passthrough crudo del status de Stripe (ej. "active", "past_due",
+   * "canceled") — informativo, no se usa para decidir MRR/pagando. */
   stripeStatus?: string;
+  /** Estado normalizado — este es el que de verdad decide si una clínica
+   * "paga" (genera MRR) para el Panel de administrador. Ausente = tratar
+   * como "prueba" (retrocompatible). */
+  estadoSuscripcion?: "prueba" | "activa" | "atrasada" | "cancelada";
+  /** Quién mandó el último cambio a este documento. El webhook de Stripe
+   * siempre escribe "stripe" — así, en cuanto existe una suscripción real,
+   * cualquier evento futuro de Stripe retoma el control aunque el Panel de
+   * administrador la haya editado manualmente antes. Ausente = "manual"
+   * (clínicas que nunca han pasado por Stripe). */
+  origenSuscripcion?: "stripe" | "manual";
 };
 
 export type RolClinica = "admin" | "colaborador";
@@ -358,6 +377,15 @@ export type ClinicInfo = {
    * no siempre es el mismo doctor que atiende, así que se captura aparte. */
   responsableSanitario?: string;
   cedulaResponsableSanitario?: string;
+  /** Fecha ISO (YYYY-MM-DD) en que se creó el registro de la clínica en la
+   * plataforma — se usa en el Panel de administrador. Ausente en clínicas
+   * creadas antes de este campo. */
+  creadoEl?: string;
+  /** Controla el acceso real a la app (ver Dashboard.tsx). Ausente = tratar
+   * como "activa" (retrocompatible). Se cambia únicamente desde el Panel
+   * de administrador — es el mecanismo principal para revocar acceso, en
+   * vez de borrar el documento (que PatientDataContext podría recrear). */
+  estadoCuenta?: "activa" | "suspendida" | "cancelada";
 };
 
 /** Documento `clinicMembers/{clinicId}_{uid}`. Campo `role` en inglés para
@@ -381,6 +409,35 @@ export type ClinicInvite = {
   whatsapp?: string;
   role: RolClinica;
   status: "pending" | "claimed";
+};
+
+export const categoriaSugerenciaOptions = [
+  "sugerencia",
+  "problema",
+  "nueva_funcion",
+  "facturacion",
+  "otro",
+] as const;
+export type CategoriaSugerencia = (typeof categoriaSugerenciaOptions)[number];
+
+export const estadoSugerenciaOptions = ["nueva", "leida", "en_revision", "resuelta"] as const;
+export type EstadoSugerencia = (typeof estadoSugerenciaOptions)[number];
+
+/** Documento `sugerenciasPlataforma/{autoId}` — cerrado por completo a
+ * lectura/escritura de cliente en firestore.rules; solo lo toca el backend
+ * (POST /api/sugerencias para crear, GET /api/admin/resumen para leer). El
+ * cliente que manda una sugerencia nunca decide clinicId/clinicNombre/autor
+ * ni la fecha — el servidor los resuelve del token verificado. */
+export type SugerenciaPlataforma = {
+  id: string;
+  clinicId: string;
+  clinicNombre: string;
+  autor: string;
+  categoria: CategoriaSugerencia;
+  mensaje: string;
+  estado: EstadoSugerencia;
+  /** ISO datetime, generado en servidor. */
+  fecha: string;
 };
 
 export type TipoRecurso = "medico" | "unidad";

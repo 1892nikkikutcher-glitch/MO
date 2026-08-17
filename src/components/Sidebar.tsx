@@ -1,6 +1,105 @@
 "use client";
 
 import { useState } from "react";
+import { auth } from "@/lib/firebase";
+import { categoriaSugerenciaOptions, type CategoriaSugerencia } from "@/lib/patientData";
+
+const categoriaSugerenciaLabel: Record<CategoriaSugerencia, string> = {
+  sugerencia: "Sugerencia",
+  problema: "Problema",
+  nueva_funcion: "Nueva función",
+  facturacion: "Facturación",
+  otro: "Otro",
+};
+
+function SugerenciaModal({ onClose }: { onClose: () => void }) {
+  const [categoria, setCategoria] = useState<CategoriaSugerencia>("sugerencia");
+  const [mensaje, setMensaje] = useState("");
+  const [enviando, setEnviando] = useState(false);
+  const [enviado, setEnviado] = useState(false);
+  const [error, setError] = useState("");
+
+  const enviar = async () => {
+    if (!mensaje.trim()) return;
+    setEnviando(true);
+    setError("");
+    try {
+      const token = await auth.currentUser?.getIdToken();
+      const res = await fetch("/api/sugerencias", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token ?? ""}` },
+        body: JSON.stringify({ categoria, mensaje: mensaje.trim() }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data.error || "No se pudo enviar.");
+      setEnviado(true);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "No se pudo enviar.");
+    } finally {
+      setEnviando(false);
+    }
+  };
+
+  return (
+    <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/70 p-4">
+      <div className="w-full max-w-sm rounded-2xl border border-edge/10 bg-modal p-6">
+        {enviado ? (
+          <>
+            <h3 className="text-base font-semibold text-ink">¡Gracias por tu sugerencia!</h3>
+            <p className="mt-2 text-sm text-ink/70">Ya la recibimos y la vamos a revisar.</p>
+            <button
+              onClick={onClose}
+              className="mt-6 w-full rounded-lg border border-accent/60 bg-accent/15 py-2.5 text-sm font-semibold text-accent hover:bg-accent/25"
+            >
+              Cerrar
+            </button>
+          </>
+        ) : (
+          <>
+            <h3 className="text-base font-semibold text-ink">Enviar sugerencia</h3>
+            <p className="mt-1 text-xs text-ink/50">Cuéntanos qué mejorarías, un problema, o lo que necesites.</p>
+
+            <label className="mb-1 mt-4 block text-xs font-medium text-ink/60">Categoría</label>
+            <select
+              value={categoria}
+              onChange={(e) => setCategoria(e.target.value as CategoriaSugerencia)}
+              className="w-full rounded-lg border border-edge/10 bg-field px-3 py-2 text-sm text-ink outline-none focus:border-accent/60"
+            >
+              {categoriaSugerenciaOptions.map((c) => (
+                <option key={c} value={c}>
+                  {categoriaSugerenciaLabel[c]}
+                </option>
+              ))}
+            </select>
+
+            <label className="mb-1 mt-4 block text-xs font-medium text-ink/60">Mensaje</label>
+            <textarea
+              value={mensaje}
+              onChange={(e) => setMensaje(e.target.value)}
+              rows={4}
+              className="w-full resize-none rounded-lg border border-edge/10 bg-field px-3 py-2 text-sm text-ink outline-none focus:border-accent/60"
+            />
+
+            {error && <p className="mt-2 text-xs text-danger">{error}</p>}
+
+            <div className="mt-6 flex gap-3">
+              <button onClick={onClose} className="flex-1 rounded-lg border border-edge/15 py-2.5 text-sm font-semibold text-ink/80 hover:bg-surface">
+                Cancelar
+              </button>
+              <button
+                onClick={enviar}
+                disabled={!mensaje.trim() || enviando}
+                className="flex-1 rounded-lg border border-accent/60 bg-accent/15 py-2.5 text-sm font-semibold text-accent hover:bg-accent/25 disabled:opacity-40"
+              >
+                {enviando ? "Enviando…" : "Enviar"}
+              </button>
+            </div>
+          </>
+        )}
+      </div>
+    </div>
+  );
+}
 
 export const navItems = [
   {
@@ -302,6 +401,34 @@ function ChevronIcon({ open }: { open: boolean }) {
   );
 }
 
+function ShieldIcon() {
+  return (
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" className="shrink-0">
+      <path
+        d="M12 2 4 5v6c0 5 3.4 8.7 8 11 4.6-2.3 8-6 8-11V5l-8-3Z"
+        stroke="currentColor"
+        strokeWidth="1.8"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+    </svg>
+  );
+}
+
+function MessageIcon() {
+  return (
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" className="shrink-0">
+      <path
+        d="M4 4h16v12H7l-3 3V4Z"
+        stroke="currentColor"
+        strokeWidth="1.8"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+    </svg>
+  );
+}
+
 export default function Sidebar({
   active,
   onNavigate,
@@ -309,6 +436,7 @@ export default function Sidebar({
   onToggleTheme,
   mobileOpen,
   onCloseMobile,
+  esAdmin,
 }: {
   active: string;
   onNavigate: (id: string) => void;
@@ -316,8 +444,10 @@ export default function Sidebar({
   onToggleTheme: () => void;
   mobileOpen: boolean;
   onCloseMobile: () => void;
+  esAdmin: boolean;
 }) {
   const [collapsed, setCollapsed] = useState(false);
+  const [mostrarSugerencia, setMostrarSugerencia] = useState(false);
   const isLight = theme === "light";
   const activeParent = navItems.find((item) =>
     "children" in item && item.children?.some((c) => c.id === active)
@@ -404,6 +534,33 @@ export default function Sidebar({
       </nav>
 
       <div className="shrink-0 space-y-1 border-t border-edge/10 p-3">
+        {esAdmin && (
+          <button
+            onClick={() => {
+              onNavigate("panel-admin");
+              onCloseMobile();
+            }}
+            className={`flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-colors ${
+              active === "panel-admin" ? "bg-accent/10 text-accent" : "text-accent/50 hover:bg-app hover:text-accent"
+            } ${collapsed ? "justify-center" : ""}`}
+            title="Panel de administrador"
+          >
+            <ShieldIcon />
+            {!collapsed && <span>Panel de administrador</span>}
+          </button>
+        )}
+
+        <button
+          onClick={() => setMostrarSugerencia(true)}
+          className={`flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium text-ink/50 transition-colors hover:bg-app hover:text-ink ${
+            collapsed ? "justify-center" : ""
+          }`}
+          title="Enviar sugerencia"
+        >
+          <MessageIcon />
+          {!collapsed && <span>Enviar sugerencia</span>}
+        </button>
+
         <button
           onClick={onToggleTheme}
           className={`flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium text-ink/50 transition-colors hover:bg-app hover:text-ink ${
@@ -442,6 +599,7 @@ export default function Sidebar({
         </button>
       </div>
       </aside>
+      {mostrarSugerencia && <SugerenciaModal onClose={() => setMostrarSugerencia(false)} />}
     </>
   );
 }

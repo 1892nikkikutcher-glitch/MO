@@ -195,6 +195,18 @@ service cloud.firestore {
       allow write: if isClinicAdmin(ownerId);
     }
 
+    // ============================================================
+    // PANEL DE ADMINISTRADOR (cross-clínica, solo para el dueño de la
+    // plataforma) — nunca se abre lectura/escritura de cliente aquí; todo
+    // pasa por /api/admin/* y /api/sugerencias usando Firebase Admin SDK
+    // (bypassa estas reglas), que verifica el ID token en servidor contra
+    // ADMIN_UID. Mantener esta colección cerrada por completo desde el
+    // cliente es más simple y más seguro que dar una excepción de UID aquí.
+    // ============================================================
+    match /sugerenciasPlataforma/{id} {
+      allow read, write: if false;
+    }
+
     match /{document=**} {
       allow read, write: if false;
     }

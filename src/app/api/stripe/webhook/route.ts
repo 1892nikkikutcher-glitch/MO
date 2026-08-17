@@ -29,7 +29,21 @@ export async function POST(req: NextRequest) {
   }
 
   const actualizarSuscripcion = (clinicUid: string, datos: Record<string, unknown>) =>
-    dbAdmin.collection("users").doc(clinicUid).collection("config").doc("suscripcion").set(datos, { merge: true });
+    dbAdmin
+      .collection("users")
+      .doc(clinicUid)
+      .collection("config")
+      .doc("suscripcion")
+      .set({ ...datos, origenSuscripcion: "stripe" }, { merge: true });
+
+  /** Traduce el status crudo de Stripe al estado normalizado que usa el
+   * Panel de administrador para decidir MRR/"clínicas pagando" — el status
+   * crudo se sigue guardando aparte en stripeStatus, sin traducir. */
+  const estadoSuscripcionDe = (stripeStatus: string): "activa" | "atrasada" | "cancelada" => {
+    if (stripeStatus === "active" || stripeStatus === "trialing") return "activa";
+    if (stripeStatus === "past_due" || stripeStatus === "unpaid") return "atrasada";
+    return "cancelada";
+  };
 
   switch (event.type) {
     case "checkout.session.completed": {
@@ -42,6 +56,7 @@ export async function POST(req: NextRequest) {
           stripeCustomerId: session.customer,
           stripeSubscriptionId: session.subscription,
           stripeStatus: "active",
+          estadoSuscripcion: "activa",
         });
       }
       break;
@@ -50,7 +65,10 @@ export async function POST(req: NextRequest) {
       const subscription = event.data.object as Stripe.Subscription;
       const clinicUid = subscription.metadata?.clinicUid;
       if (clinicUid) {
-        await actualizarSuscripcion(clinicUid, { stripeStatus: subscription.status });
+        await actualizarSuscripcion(clinicUid, {
+          stripeStatus: subscription.status,
+          estadoSuscripcion: estadoSuscripcionDe(subscription.status),
+        });
       }
       break;
     }
@@ -58,7 +76,11 @@ export async function POST(req: NextRequest) {
       const subscription = event.data.object as Stripe.Subscription;
       const clinicUid = subscription.metadata?.clinicUid;
       if (clinicUid) {
-        await actualizarSuscripcion(clinicUid, { planActivo: "prueba", stripeStatus: "canceled" });
+        await actualizarSuscripcion(clinicUid, {
+          planActivo: "prueba",
+          stripeStatus: "canceled",
+          estadoSuscripcion: "cancelada",
+        });
       }
       break;
     }
