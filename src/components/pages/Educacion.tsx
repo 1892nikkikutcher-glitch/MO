@@ -212,7 +212,7 @@ function LaminaDialog({
               onSave({ titulo: titulo.trim(), categoria, contenido: contenido.trim(), imagenUrl })
             }
             disabled={!puedeGuardar}
-            className="rounded-lg bg-gradient-to-r from-accent to-orange-500 px-5 py-2 text-sm font-semibold text-black transition-opacity hover:opacity-90 disabled:opacity-40"
+            className="rounded-lg bg-gradient-to-r from-accent to-accent-2 px-5 py-2 text-sm font-semibold text-black transition-opacity hover:opacity-90 disabled:opacity-40"
           >
             Guardar
           </button>

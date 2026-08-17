@@ -32,6 +32,10 @@
   --edge-rgb: 255 255 255;
   --ink-rgb: 255 255 255;
   --accent-rgb: 251 191 36;
+  /* Segundo color del gradiente de botones primarios (from-accent
+     to-accent-2) — en oscuro es el mismo naranja de siempre (orange-500),
+     sin cambio visual. */
+  --accent-2-rgb: 249 115 22;
   --success-rgb: 52 211 153;
   --danger-rgb: 248 113 113;
   --info-rgb: 96 165 250;
@@ -70,6 +74,11 @@
   --edge-rgb: 64 67 76;
   --ink-rgb: 28 29 34;
   --accent-rgb: 191 87 0;
+  /* En modo claro el acento ya es un naranja quemado — combinarlo con
+     orange-500 (muy brillante) hacía que los botones se vieran "todo
+     naranja". Ámbar más profundo, para que el degradado se note sin
+     saturar de naranja. */
+  --accent-2-rgb: 180 83 9;
   --success-rgb: 4 120 87;
   --danger-rgb: 185 28 28;
   --info-rgb: 29 78 216;

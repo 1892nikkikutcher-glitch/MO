@@ -162,7 +162,7 @@ export default function ConsentimientoInformado({
           )}
           <button
             onClick={handleImprimir}
-            className="ml-auto rounded-lg bg-gradient-to-r from-accent to-orange-500 py-2.5 px-6 text-sm font-semibold text-black transition-opacity hover:opacity-90"
+            className="ml-auto rounded-lg bg-gradient-to-r from-accent to-accent-2 py-2.5 px-6 text-sm font-semibold text-black transition-opacity hover:opacity-90"
           >
             Imprimir para firmar con pluma
           </button>

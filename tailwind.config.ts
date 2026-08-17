@@ -16,6 +16,7 @@ const config: Config = {
         edge: "rgb(var(--edge-rgb) / <alpha-value>)",
         ink: "rgb(var(--ink-rgb) / <alpha-value>)",
         accent: "rgb(var(--accent-rgb) / <alpha-value>)",
+        "accent-2": "rgb(var(--accent-2-rgb) / <alpha-value>)",
         success: "rgb(var(--success-rgb) / <alpha-value>)",
         danger: "rgb(var(--danger-rgb) / <alpha-value>)",
         info: "rgb(var(--info-rgb) / <alpha-value>)",

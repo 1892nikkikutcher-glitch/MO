@@ -286,7 +286,7 @@ export default function Inicio() {
                   </div>
                   <div className="h-2.5 w-full overflow-hidden rounded-full bg-inset">
                     <div
-                      className="h-full rounded-full bg-gradient-to-r from-accent to-orange-500 transition-all"
+                      className="h-full rounded-full bg-gradient-to-r from-accent to-accent-2 transition-all"
                       style={{ width: `${a.porcentaje}%` }}
                     />
                   </div>

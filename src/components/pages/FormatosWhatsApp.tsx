@@ -55,7 +55,7 @@ function PlantillaEditor({
               onGuardar(texto);
               setGuardado(true);
             }}
-            className="rounded-lg bg-gradient-to-r from-accent to-orange-500 px-4 py-2 text-sm font-semibold text-black transition-opacity hover:opacity-90"
+            className="rounded-lg bg-gradient-to-r from-accent to-accent-2 px-4 py-2 text-sm font-semibold text-black transition-opacity hover:opacity-90"
           >
             Guardar Formato
           </button>

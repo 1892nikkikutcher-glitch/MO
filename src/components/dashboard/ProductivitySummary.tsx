@@ -85,7 +85,7 @@ export default function ProductivitySummary({ rango }: { rango: RangoPeriodo }) 
       >
         <div className="mt-2 h-1.5 w-full overflow-hidden rounded-full bg-inset">
           <div
-            className="h-full rounded-full bg-gradient-to-r from-accent to-orange-500 transition-all"
+            className="h-full rounded-full bg-gradient-to-r from-accent to-accent-2 transition-all"
             style={{ width: `${ocupacionPct}%` }}
           />
         </div>

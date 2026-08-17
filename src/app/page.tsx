@@ -226,7 +226,7 @@ export default function Home() {
             <button
               type="submit"
               disabled={isLoading}
-              className="mt-2 w-full rounded-lg bg-gradient-to-r from-amber-400 to-orange-500 py-2.5 text-sm font-semibold text-black disabled:opacity-60"
+              className="mt-2 w-full rounded-lg bg-gradient-to-r from-amber-400 to-accent-2 py-2.5 text-sm font-semibold text-black disabled:opacity-60"
             >
               {isLoading ? "Ingresando..." : "Iniciar Sesión"}
             </button>
@@ -265,7 +265,7 @@ export default function Home() {
             <button
               type="submit"
               disabled={isLoading}
-              className="mt-2 w-full rounded-lg bg-gradient-to-r from-amber-400 to-orange-500 py-2.5 text-sm font-semibold text-black disabled:opacity-60"
+              className="mt-2 w-full rounded-lg bg-gradient-to-r from-amber-400 to-accent-2 py-2.5 text-sm font-semibold text-black disabled:opacity-60"
             >
               {isLoading ? "Creando cuenta..." : "Crear Cuenta"}
             </button>
@@ -300,7 +300,7 @@ export default function Home() {
             <button
               type="submit"
               disabled={isLoading}
-              className="mt-2 w-full rounded-lg bg-gradient-to-r from-amber-400 to-orange-500 py-2.5 text-sm font-semibold text-black disabled:opacity-60"
+              className="mt-2 w-full rounded-lg bg-gradient-to-r from-amber-400 to-accent-2 py-2.5 text-sm font-semibold text-black disabled:opacity-60"
             >
               {isLoading ? "Enviando..." : "Enviar Instrucciones"}
             </button>

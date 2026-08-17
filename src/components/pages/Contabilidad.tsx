@@ -124,7 +124,7 @@ function ContadorDialog({
               onGuardar({ ...form, despacho: form.despacho.trim(), contador: form.contador.trim() })
             }
             disabled={!puedeGuardar}
-            className="flex-1 rounded-lg bg-gradient-to-r from-accent to-orange-500 py-2.5 text-sm font-semibold text-black transition-opacity hover:opacity-90 disabled:opacity-40"
+            className="flex-1 rounded-lg bg-gradient-to-r from-accent to-accent-2 py-2.5 text-sm font-semibold text-black transition-opacity hover:opacity-90 disabled:opacity-40"
           >
             Guardar
           </button>

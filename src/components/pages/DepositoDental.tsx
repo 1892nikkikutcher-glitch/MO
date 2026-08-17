@@ -141,7 +141,7 @@ function AgregarDepositoDialog({
               onAdd({ nombre: nombre.trim(), direccion: direccion.trim(), telefono: telefono.trim() })
             }
             disabled={!puedeGuardar}
-            className="rounded-lg bg-gradient-to-r from-accent to-orange-500 px-5 py-2 text-sm font-semibold text-black transition-opacity hover:opacity-90 disabled:opacity-40"
+            className="rounded-lg bg-gradient-to-r from-accent to-accent-2 px-5 py-2 text-sm font-semibold text-black transition-opacity hover:opacity-90 disabled:opacity-40"
           >
             Guardar
           </button>
@@ -264,7 +264,7 @@ function AgregarFaltanteDialog({
               onAdd({ nombre: nombre.trim(), tipo, cantidad: cantidad.trim(), urgencia, depositoId })
             }
             disabled={!puedeGuardar}
-            className="rounded-lg bg-gradient-to-r from-accent to-orange-500 px-5 py-2 text-sm font-semibold text-black transition-opacity hover:opacity-90 disabled:opacity-40"
+            className="rounded-lg bg-gradient-to-r from-accent to-accent-2 px-5 py-2 text-sm font-semibold text-black transition-opacity hover:opacity-90 disabled:opacity-40"
           >
             Guardar
           </button>
@@ -345,7 +345,7 @@ function AgregarCaducidadDialog({
               puedeGuardar && onAdd({ nombre: nombre.trim(), lote: lote.trim(), fechaCaducidad })
             }
             disabled={!puedeGuardar}
-            className="rounded-lg bg-gradient-to-r from-accent to-orange-500 px-5 py-2 text-sm font-semibold text-black transition-opacity hover:opacity-90 disabled:opacity-40"
+            className="rounded-lg bg-gradient-to-r from-accent to-accent-2 px-5 py-2 text-sm font-semibold text-black transition-opacity hover:opacity-90 disabled:opacity-40"
           >
             Guardar
           </button>

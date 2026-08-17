@@ -46,7 +46,7 @@ export default function Contrasena() {
           <button
             onClick={enviarCorreo}
             disabled={enviando}
-            className="mt-4 rounded-lg bg-gradient-to-r from-accent to-orange-500 px-5 py-2.5 text-sm font-semibold text-black transition-opacity hover:opacity-90 disabled:opacity-40"
+            className="mt-4 rounded-lg bg-gradient-to-r from-accent to-accent-2 px-5 py-2.5 text-sm font-semibold text-black transition-opacity hover:opacity-90 disabled:opacity-40"
           >
             {enviando ? "Enviando..." : "Enviar correo para cambiar mi contraseña"}
           </button>

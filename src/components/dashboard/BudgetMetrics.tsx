@@ -79,7 +79,7 @@ export default function BudgetMetrics() {
           {cantidadHistorica > 0 && (
             <div className="mt-2 h-1.5 w-full overflow-hidden rounded-full bg-inset">
               <div
-                className="h-full rounded-full bg-gradient-to-r from-accent to-orange-500 transition-all"
+                className="h-full rounded-full bg-gradient-to-r from-accent to-accent-2 transition-all"
                 style={{ width: `${conversionPct}%` }}
               />
             </div>
