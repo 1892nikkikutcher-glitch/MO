@@ -392,17 +392,18 @@ export type Recurso = {
   tipo: TipoRecurso;
 };
 
-/** Paleta pastel (fondo de tarjeta de recurso) — clara y poco saturada a
- * propósito: el texto de la cita siempre es negro (alto contraste
- * garantizado sobre cualquiera de estos tonos) y el estatus se distingue
- * por el borde/resplandor de color (ver CITA_ESTATUS_HEX en Agenda.tsx),
- * no por el color de fondo. */
+/** Paleta neón — se usa como franja lateral, resplandor y punto de color
+ * del recurso (médico/unidad) en Agenda, nunca como texto ni relleno
+ * completo de la tarjeta (esa es una superficie neutra, ver --cita-card-bg
+ * en globals.css), así que puede ser tan vivo como se quiera sin afectar
+ * la legibilidad. El estatus de la cita se distingue aparte, con su
+ * propio badge (ver CITA_ESTATUS_HEX en agendaHelpers.ts). */
 export const RECURSO_COLOR_PALETTE = [
-  "#E8C0FC", // Lila
-  "#A8DEFA", // Cielo
-  "#D0F4E0", // Menta
-  "#FCF5BF", // Amarillo pastel
-  "#FF99C8", // Rosa
+  "#C724FF", // Violeta neón
+  "#00E5FF", // Cian neón
+  "#39FF14", // Verde neón
+  "#EEFF00", // Amarillo neón
+  "#FF2E9F", // Rosa neón
 ];
 
 /** Da un color que ningún recurso existente esté usando todavía, para que
