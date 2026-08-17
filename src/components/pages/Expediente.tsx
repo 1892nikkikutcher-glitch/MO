@@ -51,16 +51,16 @@ const estadoPresupuestoColor: Record<EstadoPresupuesto, string> = {
 };
 
 const expedienteTabs = [
-  "Presupuestos",
   "Datos del Paciente",
   "Historia Clínica",
-  "Notas de Evolución y Seguimiento",
-  "Listado de Citas",
-  "Fotografías",
+  "Presupuestos",
   "Pagos",
   "Membresía",
   "Consentimientos Informados y Recetas",
+  "Fotografías",
   "Laboratorios",
+  "Listado de Citas",
+  "Notas de Evolución y Seguimiento",
 ] as const;
 
 type ExpedienteTab = (typeof expedienteTabs)[number];
