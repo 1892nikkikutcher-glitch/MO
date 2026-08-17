@@ -20,6 +20,7 @@ import {
   CITA_ESTATUS_HEX,
   CITA_BORDE_NEUTRO,
   hexToRgba,
+  statusAlpha,
   emojiParaColor,
   getMonday,
   addDays,
@@ -485,7 +486,7 @@ export default function Agenda() {
                   className={`flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-semibold transition-opacity ${c.bg} ${c.text} ${
                     oculto ? "opacity-30" : ""
                   }`}
-                  style={hex ? { color: hex, backgroundColor: hexToRgba(hex, 0.12) } : undefined}
+                  style={hex ? { color: hex, backgroundColor: statusAlpha(hex, 0.16) } : undefined}
                 >
                   <span className={`h-2 w-2 rounded-full ${c.dot}`} style={hex ? { backgroundColor: hex } : undefined} />
                   {total} {estatus}

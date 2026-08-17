@@ -18,22 +18,29 @@ export const estatusColor: Record<CitaEstatus, { bg: string; text: string; dot: 
   "No Asistió": { bg: "bg-danger/20", text: "text-danger", dot: "bg-danger" },
 };
 
-/** Color fijo por estatus de cita, usado como color de PERÍMETRO (borde +
- * resplandor) de la tarjeta — no como color de letra. El interior de la
- * tarjeta es el pastel del recurso y la letra siempre es negra (ambos
- * garantizan contraste alto sin depender del estatus), así que el borde
- * puede usar el tono vivo original sin problema de legibilidad de texto.
- * Agendada se queda sin color propio (borde neutro) porque es el estatus
- * por default y no necesita resaltar. */
+/** Color por estatus de cita (badges/píldoras) — referencia a variables CSS
+ * (definidas en globals.css, con variante propia por tema) en vez de hex
+ * fijo, para que el color sea vivo y con buen contraste tanto en modo
+ * oscuro como en modo claro, no solo en uno de los dos. Agendada se queda
+ * sin color propio (neutro) porque es el estatus por default y no
+ * necesita resaltar. */
 export const CITA_ESTATUS_HEX: Partial<Record<CitaEstatus, string>> = {
-  Confirmada: "#0D3B66", // Ocean Abyss
-  "En espera": "#FFC857", // Sunlit Amber
-  Atendida: "#1FA7A6", // Lagoon Depths
-  Reagendada: "#6C2E7B", // Orchid Dream
-  Cancelada: "#E75480", // Coral Kiss
-  "No Asistió": "#FF8A5B", // Tangerine Tide
+  Confirmada: "var(--status-confirmada)",
+  "En espera": "var(--status-en-espera)",
+  Atendida: "var(--status-atendida)",
+  Reagendada: "var(--status-reagendada)",
+  Cancelada: "var(--status-cancelada)",
+  "No Asistió": "var(--status-no-asistio)",
 };
-export const CITA_BORDE_NEUTRO = "#94a3b8";
+export const CITA_BORDE_NEUTRO = "var(--status-neutro)";
+
+/** Mezcla un color CSS (hex, var(), etc.) con transparente usando
+ * color-mix(), para fondos/glow translúcidos por estatus — a diferencia
+ * de hexToRgba, funciona con variables CSS (que cambian de valor según el
+ * tema) porque la mezcla la resuelve el navegador, no JS. */
+export function statusAlpha(cssColor: string, alpha: number) {
+  return `color-mix(in srgb, ${cssColor} ${Math.round(alpha * 100)}%, transparent)`;
+}
 
 /** WhatsApp no soporta texto de color, así que se usa el círculo de color
  * emoji más parecido (por distancia RGB) al color asignado al recurso, para

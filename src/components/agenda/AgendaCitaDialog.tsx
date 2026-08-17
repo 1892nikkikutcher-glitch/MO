@@ -26,7 +26,7 @@ import {
   duracionOptions,
   addMonths,
   toISODate,
-  hexToRgba,
+  statusAlpha,
   CITA_ESTATUS_HEX,
   CITA_BORDE_NEUTRO,
 } from "@/lib/agendaHelpers";
@@ -340,7 +340,7 @@ export default function AgendaCitaDialog({
                     style={{
                       color: hex,
                       borderColor: hex,
-                      backgroundColor: hexToRgba(hex, activo ? 0.18 : 0.08),
+                      backgroundColor: statusAlpha(hex, activo ? 0.22 : 0.1),
                     }}
                   >
                     {opt}

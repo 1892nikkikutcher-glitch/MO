@@ -16,6 +16,19 @@
      tarjetas pequeñas a la vez) y ligeramente más claro que --app. */
   --cita-card-bg: #141826;
 
+  /* Color de estatus de cita (badges, píldoras) — independiente del color
+     de recurso. Tonos vivos pensados para leerse sobre fondo oscuro; ver
+     el bloque [data-theme="light"] para las variantes de modo claro
+     (mismo tono, ajustado a más saturación/oscuridad para contraste sobre
+     blanco en vez de solo aclarar). */
+  --status-confirmada: #3b82f6;
+  --status-en-espera: #fbbf24;
+  --status-atendida: #2dd4bf;
+  --status-reagendada: #a78bfa;
+  --status-cancelada: #fb7185;
+  --status-no-asistio: #fb923c;
+  --status-neutro: #94a3b8;
+
   --edge-rgb: 255 255 255;
   --ink-rgb: 255 255 255;
   --accent-rgb: 251 191 36;
@@ -41,6 +54,18 @@
   --modal: rgba(255, 255, 255, 0.8);
   --modal-solid: #ffffff;
   --cita-card-bg: #ffffff;
+
+  /* Mismas familias de color que el modo oscuro, pero más oscuras/
+     saturadas — se usan como texto sobre fondo claro (tarjetas, píldoras),
+     así que necesitan suficiente contraste contra blanco, no solo verse
+     "bonitas". Verificado ≥4.5:1 contra blanco y contra --app claro. */
+  --status-confirmada: #1d4ed8;
+  --status-en-espera: #b45309;
+  --status-atendida: #047857;
+  --status-reagendada: #7c3aed;
+  --status-cancelada: #be123c;
+  --status-no-asistio: #c2410c;
+  --status-neutro: #475569;
 
   --edge-rgb: 64 67 76;
   --ink-rgb: 28 29 34;
