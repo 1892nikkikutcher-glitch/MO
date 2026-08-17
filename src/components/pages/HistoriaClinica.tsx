@@ -5,6 +5,7 @@ import Odontograma from "./Odontograma";
 import { usePatientData } from "@/context/PatientDataContext";
 import {
   esNegacionExplicita,
+  esSeccionGinecoObstetrica,
   respuestasVacias,
   type PreguntaTemplate,
   type RespuestaValor,
@@ -285,8 +286,10 @@ export default function HistoriaClinica({ patientId }: { patientId: string }) {
     setRespuestasHistoriaClinica,
     irAPagina,
     setCambiosSinGuardar,
+    patients,
   } = usePatientData();
   const guardadas = historiaClinicaPorPaciente[patientId] ?? respuestasVacias;
+  const esMasculino = patients.find((p) => p.id === patientId)?.sexo === "Masculino";
 
   const [borrador, setBorrador] = useState<RespuestasHistoriaClinica>(guardadas);
   const [guardando, setGuardando] = useState(false);
@@ -379,14 +382,20 @@ export default function HistoriaClinica({ patientId }: { patientId: string }) {
 
       {historiaClinicaTemplate.secciones.map((seccion, i) => (
         <Section key={seccion.id} number={i + 1} title={seccion.titulo}>
-          {seccion.preguntas.map((pregunta) => (
-            <PreguntaRenderer
-              key={pregunta.id}
-              pregunta={pregunta}
-              valor={borrador.porPregunta[pregunta.id]}
-              onChange={(v) => actualizarPregunta(pregunta.id, v)}
-            />
-          ))}
+          {esMasculino && esSeccionGinecoObstetrica(seccion.titulo) ? (
+            <p className="text-sm italic text-ink/40">
+              No aplicable — paciente de sexo masculino.
+            </p>
+          ) : (
+            seccion.preguntas.map((pregunta) => (
+              <PreguntaRenderer
+                key={pregunta.id}
+                pregunta={pregunta}
+                valor={borrador.porPregunta[pregunta.id]}
+                onChange={(v) => actualizarPregunta(pregunta.id, v)}
+              />
+            ))
+          )}
         </Section>
       ))}
 

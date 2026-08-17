@@ -225,6 +225,14 @@ function esSeccionSistemica(titulo: string): boolean {
   );
 }
 
+/** Igual que `esSeccionSistemica`: detecta por título (no por id fijo) para
+ * seguir funcionando aunque la sección se haya renombrado, ya que la
+ * plantilla es editable. Se usa para ocultar la sección en pacientes con
+ * sexo masculino, donde no aplica. */
+export function esSeccionGinecoObstetrica(titulo: string): boolean {
+  return titulo.toLowerCase().includes("gineco");
+}
+
 export type CondicionSistemica = { etiqueta: string; detalle: string };
 
 /** Antecedentes patológicos marcados "Sí" y el texto del Diagnóstico
