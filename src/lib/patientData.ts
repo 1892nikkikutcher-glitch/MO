@@ -399,11 +399,14 @@ export type Recurso = {
  * la legibilidad. El estatus de la cita se distingue aparte, con su
  * propio badge (ver CITA_ESTATUS_HEX en agendaHelpers.ts). */
 export const RECURSO_COLOR_PALETTE = [
-  "#C724FF", // Violeta neón
-  "#00E5FF", // Cian neón
-  "#39FF14", // Verde neón
-  "#EEFF00", // Amarillo neón
-  "#FF2E9F", // Rosa neón
+  "#5D00FF", // Azul violeta
+  "#CEFF05", // Amarillo neón
+  "#3FD3F3", // Azul neón
+  "#8723C4", // Púrpura
+  "#FE0500", // Rojo
+  "#FF2E9B", // Rosa eléctrico
+  "#FF6602", // Naranja
+  "#7E3AEC", // Púrpura azulado
 ];
 
 /** Da un color que ningún recurso existente esté usando todavía, para que
