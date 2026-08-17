@@ -78,6 +78,7 @@ export default function Recetas() {
   const medicos = recursos.filter((r) => r.tipo === "medico");
 
   const [patientId, setPatientId] = useState("");
+  const [busquedaPaciente, setBusquedaPaciente] = useState("");
   const [medico, setMedico] = useState(medicos[0]?.nombre ?? "");
   const [sexo, setSexo] = useState("");
   const [peso, setPeso] = useState("");
@@ -120,10 +121,25 @@ export default function Recetas() {
       : [];
 
   const seleccionarPaciente = (id: string) => {
+    const p = patients.find((pp) => pp.id === id);
     setPatientId(id);
+    setBusquedaPaciente(p ? formatNombreConEdad(p.name, p.birthDate) : "");
     setGuardado(false);
     if (id) cargarDatosPaciente(id);
   };
+
+  const cambiarPaciente = () => {
+    setPatientId("");
+    setBusquedaPaciente("");
+    setGuardado(false);
+  };
+
+  const coincidenciasPaciente =
+    !patientId && busquedaPaciente.trim().length > 0
+      ? patients
+          .filter((p) => p.name.toLowerCase().includes(busquedaPaciente.trim().toLowerCase()))
+          .slice(0, 20)
+      : [];
 
   const abrirConfirmarMedicamento = (m: MedicamentoCatalogo) => {
     setMedicamentoParaConfirmar(m);
@@ -168,6 +184,7 @@ export default function Recetas() {
 
   const nuevaReceta = () => {
     setPatientId("");
+    setBusquedaPaciente("");
     setSexo("");
     setPeso("");
     setEstatura("");
@@ -306,16 +323,49 @@ export default function Recetas() {
               ))}
             </select>
           </div>
-          <div>
+          <div className="relative">
             <label className="mb-1 block text-xs font-medium text-ink/60">Paciente</label>
-            <select value={patientId} onChange={(e) => seleccionarPaciente(e.target.value)} className={inputClass}>
-              <option value="">Selecciona un paciente...</option>
-              {patients.map((p) => (
-                <option key={p.id} value={p.id}>
-                  {formatNombreConEdad(p.name, p.birthDate)}
-                </option>
-              ))}
-            </select>
+            {patientId ? (
+              <div className="flex items-center justify-between rounded-lg border border-success/30 bg-success/10 px-3 py-2 text-sm">
+                <span className="text-ink">{busquedaPaciente}</span>
+                <button
+                  type="button"
+                  onClick={cambiarPaciente}
+                  className="text-xs font-semibold text-success hover:text-success"
+                >
+                  Cambiar
+                </button>
+              </div>
+            ) : (
+              <>
+                <input
+                  type="text"
+                  value={busquedaPaciente}
+                  onChange={(e) => setBusquedaPaciente(e.target.value)}
+                  placeholder="Escribe el nombre completo del paciente..."
+                  className={inputClass}
+                />
+                {coincidenciasPaciente.length > 0 && (
+                  <div className="absolute z-20 mt-1 max-h-56 w-full overflow-y-auto rounded-lg border border-edge/10 bg-modal shadow-card">
+                    {coincidenciasPaciente.map((p) => (
+                      <button
+                        key={p.id}
+                        type="button"
+                        onClick={() => seleccionarPaciente(p.id)}
+                        className="block w-full border-b border-edge/5 px-3 py-2 text-left text-sm text-ink/80 last:border-0 hover:bg-surface"
+                      >
+                        {resaltarCoincidencia(formatNombreConEdad(p.name, p.birthDate), busquedaPaciente.trim())}
+                      </button>
+                    ))}
+                  </div>
+                )}
+                {busquedaPaciente.trim().length > 0 && coincidenciasPaciente.length === 0 && (
+                  <p className="mt-1.5 text-xs text-ink/40">
+                    No se encontró ningún paciente con &quot;{busquedaPaciente.trim()}&quot;.
+                  </p>
+                )}
+              </>
+            )}
           </div>
         </div>
 
@@ -519,10 +569,13 @@ export default function Recetas() {
       {patient && medicamentosRecetados.length > 0 && (
         <div className="hidden border-4 border-black bg-white p-8 text-black print:block">
           <div className="flex items-start justify-between">
-            <div className="w-24 shrink-0">
+            <div className="w-24 shrink-0 text-center">
               {perfilDoctor.logoEscuelaUrl && (
                 // eslint-disable-next-line @next/next/no-img-element
-                <img src={perfilDoctor.logoEscuelaUrl} alt="" className="h-20 w-20 object-contain" />
+                <img src={perfilDoctor.logoEscuelaUrl} alt="" className="mx-auto h-20 w-20 object-contain" />
+              )}
+              {perfilDoctor.escuelaEgreso && (
+                <p className="mt-1 text-[9px] font-semibold leading-tight">{perfilDoctor.escuelaEgreso}</p>
               )}
             </div>
             <div className="flex-1 text-center">

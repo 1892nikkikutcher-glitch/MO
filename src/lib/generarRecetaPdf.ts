@@ -51,6 +51,13 @@ export async function generarRecetaPdf(datos: DatosRecetaPdf): Promise<Blob> {
   dibujarLogo(logoEscuela, marginX, 22);
   dibujarLogo(logoClinica, pageWidth - marginX - 22, 22);
 
+  if (datos.perfilDoctor.escuelaEgreso) {
+    doc.setFont("helvetica", "normal");
+    doc.setFontSize(7);
+    const lineasEscuela = doc.splitTextToSize(datos.perfilDoctor.escuelaEgreso, 26);
+    doc.text(lineasEscuela, marginX + 11, yHeader + 25, { align: "center" });
+  }
+
   doc.setFont("helvetica", "bold");
   doc.setFontSize(14);
   doc.text(datos.perfilDoctor.nombre || datos.medico, pageWidth / 2, yHeader + 6, { align: "center" });
