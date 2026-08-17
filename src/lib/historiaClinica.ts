@@ -391,17 +391,39 @@ export function coincideAlergia(alergias: string, texto: string): string[] {
     .filter((a) => textoNorm.includes(normalizar(a)));
 }
 
-const NEGACIONES_ALERGIA = [
+/** Lista amplia a propósito (variantes de género/número, frases comunes)
+ * para que el doctor no tenga que adivinar la palabra exacta — pero sigue
+ * siendo comparación EXACTA contra el texto completo (no "empieza con" ni
+ * "contiene"), a propósito: es una alerta de seguridad, y una coincidencia
+ * parcial podría marcar como "sin alergia" un texto que en realidad sí
+ * describe una (ej. "Sin alergias, pero es alérgico a penicilina"). */
+export const NEGACIONES_ALERGIA = [
   "negado",
+  "negada",
+  "negados",
+  "negadas",
   "niega",
+  "niega alergias",
   "ninguna",
   "ninguno",
+  "ningunas",
+  "ningunos",
   "ninguna conocida",
   "ninguna referida",
+  "ninguna alergia",
+  "ninguna alergia conocida",
   "no refiere",
+  "no refiere alergias",
   "no presenta",
+  "no presenta alergias",
+  "no tiene",
+  "no tiene alergias",
+  "no aplica",
   "sin alergias",
   "sin alergias conocidas",
+  "sin alergias referidas",
+  "desconoce",
+  "desconocida",
   "no",
   "n/a",
   "na",

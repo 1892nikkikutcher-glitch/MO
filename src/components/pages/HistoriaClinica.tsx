@@ -693,6 +693,16 @@ export default function HistoriaClinica({ patientId }: { patientId: string }) {
               se llama la sustancia — se usará para alertar antes de recetar un medicamento al que
               sea alérgico.
             </p>
+            {estado !== "success" && (
+              <p className="text-xs text-ink/40">
+                Si no tiene alergias, escribe una de estas palabras para que el recuadro se ponga en
+                verde:{" "}
+                <span className="font-medium text-ink/60">
+                  Ninguna, Negado(a), No refiere, Sin alergias, No presenta, No tiene, Desconoce
+                </span>
+                .
+              </p>
+            )}
           </div>
         );
       })()}
