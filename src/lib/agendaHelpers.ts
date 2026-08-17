@@ -34,6 +34,19 @@ export const CITA_ESTATUS_HEX: Partial<Record<CitaEstatus, string>> = {
 };
 export const CITA_BORDE_NEUTRO = "var(--status-neutro)";
 
+/** Mismo mapeo de color que CITA_ESTATUS_HEX, pero como emoji de círculo de
+ * color — para usarlo en texto plano (mensajes de WhatsApp) donde no hay
+ * CSS. Agendada usa el círculo blanco, como equivalente del gris neutro. */
+export const ESTATUS_EMOJI: Record<CitaEstatus, string> = {
+  Agendada: "⚪",
+  Confirmada: "🔵",
+  "En espera": "🟡",
+  Atendida: "🟢",
+  Reagendada: "🟣",
+  Cancelada: "🔴",
+  "No Asistió": "🟠",
+};
+
 /** Mezcla un color CSS (hex, var(), etc.) con transparente usando
  * color-mix(), para fondos/glow translúcidos por estatus — a diferencia
  * de hexToRgba, funciona con variables CSS (que cambian de valor según el

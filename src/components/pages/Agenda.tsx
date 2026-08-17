@@ -19,6 +19,7 @@ import {
   estatusColor,
   CITA_ESTATUS_HEX,
   CITA_BORDE_NEUTRO,
+  ESTATUS_EMOJI,
   hexToRgba,
   statusAlpha,
   emojiParaColor,
@@ -175,7 +176,6 @@ export default function Agenda() {
 
   const totalHeight = (HOUR_END - HOUR_START) * 60 * PX_PER_MIN;
 
-  const recursoPorId = (id: string) => recursos.find((r) => r.id === id);
   const recursoMedico = (cita: CitaAgenda) => resolverMedico(recursos, cita);
   const recursoUnidad = (cita: CitaAgenda) => resolverUnidad(recursos, cita);
 
@@ -326,13 +326,13 @@ export default function Agenda() {
       );
       if (medicosDelDia.length > 0) {
         lineas.push(medicosDelDia.map((r) => `${emojiParaColor(r.color)} ${r.nombre}`).join(" · "));
-        lineas.push("🔴 No confirmada");
+        lineas.push(
+          `${ESTATUS_EMOJI.Agendada} Agendada · ${ESTATUS_EMOJI.Confirmada} Confirmada · ${ESTATUS_EMOJI["En espera"]} En espera · ${ESTATUS_EMOJI.Atendida} Atendida · ${ESTATUS_EMOJI.Reagendada} Reagendada · ${ESTATUS_EMOJI["No Asistió"]} No asistió`
+        );
         lineas.push("");
       }
       citasDelDia.forEach((c) => {
-        const confirmada = c.estatus === "Confirmada" || c.estatus === "Atendida";
-        const colorRecurso = recursoPorId(c.recursoId)?.color;
-        const emoji = confirmada && colorRecurso ? emojiParaColor(colorRecurso) : confirmada ? "🟢" : "🔴";
+        const emoji = ESTATUS_EMOJI[c.estatus] ?? ESTATUS_EMOJI.Agendada;
         lineas.push(`${emoji} ${c.horaInicio}-${c.horaFin} ${nombrePaciente(patients, c)}`);
         if (c.tratamientos?.length) lineas.push(c.tratamientos.join(", "));
         lineas.push("");
