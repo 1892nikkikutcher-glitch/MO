@@ -279,17 +279,19 @@ function IconPago({ size = 22 }: { size?: number }) {
 }
 
 function NuevaRecursoDialog({
+  inicial,
   coloresEnUso,
   onClose,
   onSave,
 }: {
+  inicial?: Recurso;
   coloresEnUso: string[];
   onClose: () => void;
   onSave: (recurso: { nombre: string; tipo: "medico" | "unidad"; color: string }) => void;
 }) {
-  const [nombre, setNombre] = useState("");
-  const [tipo, setTipo] = useState<"medico" | "unidad">("medico");
-  const [color, setColor] = useState(() => elegirColorDisponible(coloresEnUso));
+  const [nombre, setNombre] = useState(inicial?.nombre ?? "");
+  const [tipo, setTipo] = useState<"medico" | "unidad">(inicial?.tipo ?? "medico");
+  const [color, setColor] = useState(() => inicial?.color ?? elegirColorDisponible(coloresEnUso));
 
   const puedeGuardar = nombre.trim().length > 0;
 
@@ -297,7 +299,9 @@ function NuevaRecursoDialog({
     <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/70 p-4">
       <div className="w-full max-w-sm rounded-2xl border border-edge/10 bg-modal p-6">
         <div className="mb-4 flex items-center justify-between">
-          <h3 className="text-base font-semibold text-ink">Nuevo Recurso</h3>
+          <h3 className="text-base font-semibold text-ink">
+            {inicial ? "Editar Recurso" : "Nuevo Recurso"}
+          </h3>
           <button
             onClick={onClose}
             className="flex h-6 w-6 items-center justify-center rounded-full text-ink/50 hover:bg-surface hover:text-ink"
@@ -370,7 +374,7 @@ function NuevaRecursoDialog({
             disabled={!puedeGuardar}
             className="flex-1 rounded-lg bg-gradient-to-r from-accent to-orange-500 py-2 text-sm font-semibold text-black transition-opacity hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-40"
           >
-            Agregar
+            {inicial ? "Guardar" : "Agregar"}
           </button>
         </div>
       </div>
@@ -1064,10 +1068,8 @@ export default function Agenda() {
   });
   const [recursosOcultos, setRecursosOcultos] = useState<Set<string>>(new Set());
   const [estatusOcultos, setEstatusOcultos] = useState<Set<CitaEstatus>>(new Set());
-  const [showRecursoDialog, setShowRecursoDialog] = useState(false);
+  const [recursoDialog, setRecursoDialog] = useState<"nuevo" | Recurso | null>(null);
   const [recursoParaEliminar, setRecursoParaEliminar] = useState<{ id: string; nombre: string } | null>(null);
-  const [recursoEditandoId, setRecursoEditandoId] = useState<string | null>(null);
-  const [nombreEditando, setNombreEditando] = useState("");
   const [dialogState, setDialogState] = useState<{
     initial: Partial<CitaAgenda> & { fecha: string; horaInicio: string };
     isEditing: boolean;
@@ -1119,21 +1121,6 @@ export default function Agenda() {
 
   const eliminarRecurso = (id: string, nombre: string) => {
     setRecursoParaEliminar({ id, nombre });
-  };
-
-  const iniciarEdicionRecurso = (r: Recurso) => {
-    setRecursoEditandoId(r.id);
-    setNombreEditando(r.nombre);
-  };
-
-  const guardarNombreRecurso = () => {
-    const nombre = nombreEditando.trim();
-    if (recursoEditandoId && nombre) {
-      setRecursos((prev) =>
-        prev.map((r) => (r.id === recursoEditandoId ? { ...r, nombre } : r))
-      );
-    }
-    setRecursoEditandoId(null);
   };
 
   const confirmarEliminarRecurso = () => {
@@ -1730,7 +1717,7 @@ export default function Agenda() {
           <div className="mb-3 flex items-center justify-between">
             <h3 className="text-xs font-semibold uppercase tracking-wide text-ink/50">Recursos</h3>
             <button
-              onClick={() => setShowRecursoDialog(true)}
+              onClick={() => setRecursoDialog("nuevo")}
               title="Agregar recurso"
               className="flex h-6 w-6 items-center justify-center rounded-full border border-accent/40 text-accent transition-colors hover:bg-accent/10"
             >
@@ -1740,7 +1727,6 @@ export default function Agenda() {
           <div className="space-y-1.5">
             {recursos.map((r) => {
               const oculto = recursosOcultos.has(r.id);
-              const editando = recursoEditandoId === r.id;
               return (
                 <div
                   key={r.id}
@@ -1748,43 +1734,19 @@ export default function Agenda() {
                     oculto ? "opacity-30" : ""
                   } hover:bg-surface`}
                 >
-                  {editando ? (
-                    <span className="flex min-w-0 flex-1 items-center gap-2">
-                      <span
-                        className="h-3 w-3 shrink-0 rounded-full"
-                        style={{ backgroundColor: r.color, boxShadow: `0 0 6px ${r.color}` }}
-                      />
-                      <input
-                        autoFocus
-                        value={nombreEditando}
-                        onChange={(e) =>
-                          r.tipo === "medico"
-                            ? manejarCambioNombre(e, setNombreEditando)
-                            : setNombreEditando(e.target.value)
-                        }
-                        onBlur={guardarNombreRecurso}
-                        onKeyDown={(e) => {
-                          if (e.key === "Enter") guardarNombreRecurso();
-                          if (e.key === "Escape") setRecursoEditandoId(null);
-                        }}
-                        className="min-w-0 flex-1 rounded border border-accent/40 bg-field px-1.5 py-0.5 text-xs text-ink outline-none"
-                      />
-                    </span>
-                  ) : (
-                    <button onClick={() => toggleRecurso(r.id)} className="flex min-w-0 flex-1 items-center gap-2">
-                      <span
-                        className="h-3 w-3 shrink-0 rounded-full"
-                        style={{ backgroundColor: r.color, boxShadow: `0 0 6px ${r.color}` }}
-                      />
-                      <span className="truncate text-ink/80">{r.nombre}</span>
-                    </button>
-                  )}
+                  <button onClick={() => toggleRecurso(r.id)} className="flex min-w-0 flex-1 items-center gap-2">
+                    <span
+                      className="h-3 w-3 shrink-0 rounded-full"
+                      style={{ backgroundColor: r.color, boxShadow: `0 0 6px ${r.color}` }}
+                    />
+                    <span className="truncate text-ink/80">{r.nombre}</span>
+                  </button>
                   <span className="shrink-0 text-[10px] uppercase text-ink/30">
                     {r.tipo === "medico" ? "Médico" : "Unidad"}
                   </span>
                   <button
-                    onClick={() => iniciarEdicionRecurso(r)}
-                    title="Editar nombre"
+                    onClick={() => setRecursoDialog(r)}
+                    title="Editar recurso"
                     className="shrink-0 px-1 text-ink/40 transition-colors hover:text-accent"
                   >
                     ✎
@@ -1832,14 +1794,21 @@ export default function Agenda() {
         />
       )}
 
-      {showRecursoDialog && (
+      {recursoDialog && (
         <NuevaRecursoDialog
+          inicial={recursoDialog === "nuevo" ? undefined : recursoDialog}
           coloresEnUso={recursos.map((r) => r.color)}
-          onClose={() => setShowRecursoDialog(false)}
-          onSave={(nuevo) => {
-            const recurso = { id: `r${Date.now()}`, ...nuevo };
-            setRecursos((prev) => [...prev, recurso]);
-            setShowRecursoDialog(false);
+          onClose={() => setRecursoDialog(null)}
+          onSave={(datos) => {
+            if (recursoDialog === "nuevo") {
+              const recurso = { id: `r${Date.now()}`, ...datos };
+              setRecursos((prev) => [...prev, recurso]);
+            } else {
+              setRecursos((prev) =>
+                prev.map((r) => (r.id === recursoDialog.id ? { ...r, ...datos } : r))
+              );
+            }
+            setRecursoDialog(null);
           }}
         />
       )}
