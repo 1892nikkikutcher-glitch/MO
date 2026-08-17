@@ -22,12 +22,18 @@ type FaseTratamiento = (typeof fasesTratamiento)[number];
 type PuntoPrioridad = { id: string; texto: string; fase?: FaseTratamiento };
 
 const faseInfo: Record<FaseTratamiento, { titulo: string; descripcion: string }> = {
-  I: { titulo: "Fase I", descripcion: "Remoción de procesos infecciosos" },
-  II: { titulo: "Fase II", descripcion: "Rehabilitación" },
-  III: { titulo: "Fase III", descripcion: "Mantenimiento" },
+  I: {
+    titulo: "Fase I",
+    descripcion: "Motivo de consulta, limpieza bucal. Disminución de carga bacteriana, curetajes cerrados.",
+  },
+  II: { titulo: "Fase II", descripcion: "Operatoria dental" },
+  III: {
+    titulo: "Fase III",
+    descripcion: "Exodoncias, endodoncias, cirugías, injertos, curetajes abiertos.",
+  },
   Ortodoncia: {
-    titulo: "Etapa de Ortodoncia",
-    descripcion: "Independiente de las fases I-III — solo si el caso lo requiere",
+    titulo: "Fase IV",
+    descripcion: "Fase ortodóncica, fase protésica.",
   },
 };
 
@@ -133,7 +139,7 @@ function FaseSection({
   };
 
   return (
-    <div className={`rounded-xl border p-4 ${fase === "Ortodoncia" ? "border-info/25 bg-info/5" : "border-edge/10 bg-inset"}`}>
+    <div className="rounded-xl border border-edge/10 bg-inset p-4">
       <p className="text-sm font-semibold text-ink">{info.titulo}</p>
       <p className="mb-3 text-xs text-ink/50">{info.descripcion}</p>
 
@@ -652,7 +658,7 @@ export default function HistoriaClinica({ patientId }: { patientId: string }) {
         <button
           onClick={guardar}
           disabled={guardando || !hayCambiosSinGuardar}
-          className="shrink-0 rounded-lg bg-gradient-to-r from-accent to-orange-500 px-5 py-2.5 text-sm font-semibold text-black transition-opacity hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-40"
+          className="shrink-0 rounded-lg bg-gradient-to-r from-accent to-accent-2 px-5 py-2.5 text-sm font-semibold text-black transition-opacity hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-40"
         >
           {guardando ? "Guardando…" : yaGuardado ? "Actualizar Historial" : "Guardar Historial"}
         </button>
