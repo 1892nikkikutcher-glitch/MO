@@ -65,7 +65,16 @@ export default function NuevoPresupuesto({
   const [diagnostico, setDiagnostico] = useState(initialBudget?.diagnostico ?? "");
   const [mostrarSugerenciasDiagnostico, setMostrarSugerenciasDiagnostico] = useState(false);
   const [notaProcedimiento, setNotaProcedimiento] = useState("");
-  const [procedimientoSeleccionadoId, setProcedimientoSeleccionadoId] = useState("");
+  /** Se pueden marcar varios procedimientos a la vez (ej. acceso e
+   * instrumentación + instrumentación y obturación + corona, todo en el
+   * mismo OD 16) — "Agregar procedimiento" los agrega como renglones
+   * independientes de una sola vez, todos con los mismos dientes marcados. */
+  const [procedimientosSeleccionadosIds, setProcedimientosSeleccionadosIds] = useState<string[]>([]);
+  const toggleProcedimientoSeleccionado = (id: string) => {
+    setProcedimientosSeleccionadosIds((prev) =>
+      prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]
+    );
+  };
   const [personalizadoNombre, setPersonalizadoNombre] = useState("");
   const [personalizadoPrecio, setPersonalizadoPrecio] = useState("");
   const [mostrarPersonalizado, setMostrarPersonalizado] = useState(false);
@@ -90,7 +99,11 @@ export default function NuevoPresupuesto({
    * unitario) — "Precio Unitario" es siempre el precio por diente. Para un
    * tratamiento con un precio combinado fijo que cubre varios dientes,
    * captura el precio total y marca solo un diente representativo. */
-  const precioUnitarioDelCatalogo = procedimientos.find((p) => p.id === procedimientoSeleccionadoId)?.costoPaciente;
+  const procedimientosSeleccionados = procedimientos.filter((p) =>
+    procedimientosSeleccionadosIds.includes(p.id)
+  );
+  const precioUnitarioDelCatalogo =
+    procedimientosSeleccionados.length === 1 ? procedimientosSeleccionados[0].costoPaciente : undefined;
   const multiplicador = Math.max(selectedTeeth.length, 1);
 
   const agregarItem = (procedure: string, precioUnitario: number) => {
@@ -99,7 +112,7 @@ export default function NuevoPresupuesto({
     setItems((prev) => [
       ...prev,
       {
-        id: `${Date.now()}`,
+        id: `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
         procedure,
         price: precioTotal,
         precioUnitario,
@@ -147,7 +160,7 @@ export default function NuevoPresupuesto({
     setDescuentoPct(item.descuentoPct ? String(item.descuentoPct) : "");
     setPersonalizadoNombre(item.procedure);
     setPersonalizadoPrecio(String(item.precioUnitario ?? item.price));
-    setProcedimientoSeleccionadoId("");
+    setProcedimientosSeleccionadosIds([]);
     setMostrarPersonalizado(true);
   };
 
@@ -164,10 +177,11 @@ export default function NuevoPresupuesto({
   };
 
   const handleAgregarDelCatalogo = () => {
-    const procedimiento = procedimientos.find((p) => p.id === procedimientoSeleccionadoId);
-    if (!procedimiento) return;
-    agregarItem(procedimiento.nombre, procedimiento.costoPaciente);
-    setProcedimientoSeleccionadoId("");
+    if (procedimientosSeleccionados.length === 0) return;
+    procedimientosSeleccionados.forEach((procedimiento) => {
+      agregarItem(procedimiento.nombre, procedimiento.costoPaciente);
+    });
+    setProcedimientosSeleccionadosIds([]);
   };
 
   /** Un procedimiento agregado aquí sin estar en el catálogo (ej. una resina
@@ -459,22 +473,43 @@ export default function NuevoPresupuesto({
               <label className="mb-1 block text-xs font-medium text-ink/60">
                 Listado de procedimiento
               </label>
-              <select
-                value={procedimientoSeleccionadoId}
-                onChange={(e) => setProcedimientoSeleccionadoId(e.target.value)}
-                className="w-full rounded-lg border border-edge/10 bg-field px-3 py-2 text-sm text-ink outline-none focus:border-accent/60"
-              >
-                <option value="">Elige un procedimiento</option>
+              <p className="mb-1.5 text-[11px] text-ink/40">
+                Marca uno o varios — por ejemplo, acceso e instrumentación + instrumentación y
+                obturación + corona, todo en el mismo diente.
+              </p>
+              <div className="max-h-56 space-y-3 overflow-y-auto rounded-lg border border-edge/10 bg-field p-2">
                 {gruposProcedimientos.map((grupo) => (
-                  <optgroup key={grupo.especialidad} label={grupo.especialidad}>
-                    {grupo.procedimientos.map((p) => (
-                      <option key={p.id} value={p.id}>
-                        {p.nombre} — {formatCurrency(p.costoPaciente)}
-                      </option>
-                    ))}
-                  </optgroup>
+                  <div key={grupo.especialidad}>
+                    <p className="px-1 pb-1 text-[10px] font-semibold uppercase tracking-wide text-ink/40">
+                      {grupo.especialidad}
+                    </p>
+                    {grupo.procedimientos.map((p) => {
+                      const checked = procedimientosSeleccionadosIds.includes(p.id);
+                      return (
+                        <label
+                          key={p.id}
+                          className={`flex cursor-pointer items-center justify-between gap-2 rounded-md px-1.5 py-1.5 text-sm transition-colors ${
+                            checked ? "bg-accent/10 text-accent" : "text-ink hover:bg-surface"
+                          }`}
+                        >
+                          <span className="flex items-center gap-2">
+                            <input
+                              type="checkbox"
+                              checked={checked}
+                              onChange={() => toggleProcedimientoSeleccionado(p.id)}
+                              className="accent-[color:var(--accent)]"
+                            />
+                            {p.nombre}
+                          </span>
+                          <span className="whitespace-nowrap text-xs text-ink/50">
+                            {formatCurrency(p.costoPaciente)}
+                          </span>
+                        </label>
+                      );
+                    })}
+                  </div>
                 ))}
-              </select>
+              </div>
             </div>
           )}
 
@@ -492,33 +527,51 @@ export default function NuevoPresupuesto({
             <span className="text-xs text-ink/50">%</span>
           </div>
 
-          {(multiplicador > 1 || Number(descuentoPct) > 0) && (
+          {procedimientosSeleccionados.length > 1 ? (
             <p className="text-xs text-ink/50">
-              {precioUnitarioDelCatalogo !== undefined ? (
-                <>
-                  {formatCurrency(precioUnitarioDelCatalogo)} × {multiplicador}{" "}
-                  {multiplicador === 1 ? "unidad" : "dientes"}
-                  {Number(descuentoPct) > 0 ? ` − ${descuentoPct}%` : ""} ={" "}
-                  {formatCurrency(
-                    Math.round(precioUnitarioDelCatalogo * multiplicador * (1 - (Number(descuentoPct) || 0) / 100) * 100) /
-                      100
-                  )}
-                </>
-              ) : (
-                `Se multiplicará el precio × ${multiplicador} ${multiplicador === 1 ? "unidad" : "dientes"}${
-                  Number(descuentoPct) > 0 ? `, con ${descuentoPct}% de descuento` : ""
-                }.`
+              Se agregarán {procedimientosSeleccionados.length} renglones — cada uno ×{" "}
+              {multiplicador} {multiplicador === 1 ? "unidad" : "dientes"}
+              {Number(descuentoPct) > 0 ? `, con ${descuentoPct}% de descuento` : ""}. Total:{" "}
+              {formatCurrency(
+                procedimientosSeleccionados.reduce(
+                  (sum, p) =>
+                    sum +
+                    Math.round(p.costoPaciente * multiplicador * (1 - (Number(descuentoPct) || 0) / 100) * 100) / 100,
+                  0
+                )
               )}
             </p>
+          ) : (
+            (multiplicador > 1 || Number(descuentoPct) > 0) && (
+              <p className="text-xs text-ink/50">
+                {precioUnitarioDelCatalogo !== undefined ? (
+                  <>
+                    {formatCurrency(precioUnitarioDelCatalogo)} × {multiplicador}{" "}
+                    {multiplicador === 1 ? "unidad" : "dientes"}
+                    {Number(descuentoPct) > 0 ? ` − ${descuentoPct}%` : ""} ={" "}
+                    {formatCurrency(
+                      Math.round(precioUnitarioDelCatalogo * multiplicador * (1 - (Number(descuentoPct) || 0) / 100) * 100) /
+                        100
+                    )}
+                  </>
+                ) : (
+                  `Se multiplicará el precio × ${multiplicador} ${multiplicador === 1 ? "unidad" : "dientes"}${
+                    Number(descuentoPct) > 0 ? `, con ${descuentoPct}% de descuento` : ""
+                  }.`
+                )}
+              </p>
+            )
           )}
 
           {procedimientos.length > 0 && (
             <button
               onClick={handleAgregarDelCatalogo}
-              disabled={!procedimientoSeleccionadoId}
+              disabled={procedimientosSeleccionadosIds.length === 0}
               className="w-full rounded-lg border border-accent/40 py-2.5 text-sm font-semibold text-accent transition-colors hover:bg-accent/10 disabled:cursor-not-allowed disabled:opacity-40"
             >
-              + Agregar procedimiento
+              {procedimientosSeleccionadosIds.length > 1
+                ? `+ Agregar ${procedimientosSeleccionadosIds.length} procedimientos`
+                : "+ Agregar procedimiento"}
             </button>
           )}
 
