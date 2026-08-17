@@ -242,6 +242,33 @@ export type NotaEvolucion = {
   pronostico: string;
 };
 
+export type FotoPaciente = {
+  id: string;
+  url: string;
+  /** Ruta del objeto en Firebase Storage (ej.
+   * "users/{uid}/pacientes/{id}/fotos/extraorales/xyz.jpg") — se guarda
+   * aparte de `url` para poder borrar el archivo del Storage sin tener que
+   * derivarla de la URL de descarga. */
+  path: string;
+  name: string;
+  /** ISO datetime — cuándo se subió. */
+  fecha: string;
+};
+
+/** Documento `users/{clinicUid}/pacientes/{patientId}/fotos/datos` — solo
+ * guarda URLs (apuntan a Firebase Storage); las imágenes en sí nunca viven
+ * en Firestore. `ineFrente`/`ineReverso` son opcionales — no toda clínica
+ * captura la identificación oficial del paciente. */
+export type FotosPaciente = {
+  perfil?: FotoPaciente | null;
+  extraorales: FotoPaciente[];
+  intraorales: FotoPaciente[];
+  ineFrente?: FotoPaciente | null;
+  ineReverso?: FotoPaciente | null;
+};
+
+export const fotosVacias: FotosPaciente = { extraorales: [], intraorales: [] };
+
 export type HorarioAtencion = {
   apertura: string;
   comidaInicio: string;

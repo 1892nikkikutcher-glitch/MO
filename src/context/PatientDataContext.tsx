@@ -42,6 +42,8 @@ import {
   type SuscripcionPlan,
   type CitaAgenda,
   type SolicitudLaboratorio,
+  fotosVacias,
+  type FotosPaciente,
 } from "@/lib/patientData";
 import {
   metaConfigInicial,
@@ -437,6 +439,8 @@ type PatientDataContextValue = {
     patientId: string,
     updater: Updater<RespuestasHistoriaClinica>
   ) => void;
+  fotosPorPaciente: Record<string, FotosPaciente>;
+  setFotosPaciente: (patientId: string, updater: Updater<FotosPaciente>) => void;
   consumirSiguienteFolioReceta: () => string;
   catalogoMedicamentos: MedicamentoCatalogo[];
   setCatalogoMedicamentos: (updater: Updater<MedicamentoCatalogo[]>) => void;
@@ -638,6 +642,7 @@ export function PatientDataProvider({
   const [historiaClinicaPorPaciente, setHistoriaClinicaPorPacienteState] = useState<
     Record<string, RespuestasHistoriaClinica>
   >({});
+  const [fotosPorPaciente, setFotosPorPacienteState] = useState<Record<string, FotosPaciente>>({});
   const subs = useRef<Record<string, Unsubscribe>>({});
   const [navegacionExpediente, setNavegacionExpediente] = useState<NavegacionExpediente>(null);
   const [navegacionNuevaCita, setNavegacionNuevaCita] = useState<NavegacionNuevaCita>(null);
@@ -748,6 +753,14 @@ export function PatientDataProvider({
       subs.current[historiaKey] = onSnapshot(doc(db, path, "respuestas"), (snap) => {
         const next = snap.exists() ? (snap.data() as RespuestasHistoriaClinica) : respuestasVacias;
         setHistoriaClinicaPorPacienteState((prev) => ({ ...prev, [patientId]: next }));
+      });
+    }
+    const fotosKey = `fotos:${patientId}`;
+    if (!subs.current[fotosKey]) {
+      const path = `users/${clinicUid}/pacientes/${patientId}/fotos`;
+      subs.current[fotosKey] = onSnapshot(doc(db, path, "datos"), (snap) => {
+        const next = snap.exists() ? (snap.data() as FotosPaciente) : fotosVacias;
+        setFotosPorPacienteState((prev) => ({ ...prev, [patientId]: next }));
       });
     }
   };
@@ -1236,6 +1249,16 @@ export function PatientDataProvider({
     setHistoriaClinicaPorPacienteState((p) => ({ ...p, [patientId]: next }));
   };
 
+  const setFotosPaciente = (patientId: string, updater: Updater<FotosPaciente>) => {
+    if (!clinicUid) return;
+    const prev = fotosPorPaciente[patientId] ?? fotosVacias;
+    const next = resolveUpdater(updater, prev);
+    setDoc(doc(db, `users/${clinicUid}/pacientes/${patientId}/fotos`, "datos"), next).catch((err) =>
+      console.error(`No se pudo guardar fotos de ${patientId}`, err)
+    );
+    setFotosPorPacienteState((p) => ({ ...p, [patientId]: next }));
+  };
+
   const setMembresiasPaciente = (patientId: string, updater: Updater<PatientMembership[]>) => {
     if (!clinicUid) return;
     setMembresiasPorPacienteState((prev) => {
@@ -1502,6 +1525,8 @@ export function PatientDataProvider({
         setHistoriaClinicaTemplate,
         historiaClinicaPorPaciente,
         setRespuestasHistoriaClinica,
+        fotosPorPaciente,
+        setFotosPaciente,
         consumirSiguienteFolioReceta,
         catalogoMedicamentos,
         setCatalogoMedicamentos,

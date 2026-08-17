@@ -1,0 +1,21 @@
+rules_version = '2';
+service firebase.storage {
+  match /b/{bucket}/o {
+
+    // Fotos de pacientes (perfil, extraorales, intraorales, INE) — mismo
+    // criterio base que la capa "sin cambios" de firestore.rules: acceso
+    // total al dueño de la clínica (uid == clinicId). Cuando los
+    // colaboradores necesiten subir/ver fotos, esto debe ampliarse para
+    // reflejar isActiveMember(clinicId) igual que ya hace firestore.rules
+    // para users/{ownerId}/pacientes/{patientId}/** — no se hizo aquí
+    // todavía para no depender de llamadas cross-servicio (firestore.get)
+    // en reglas de Storage sin poder probarlas antes de desplegar.
+    match /users/{clinicId}/pacientes/{patientId}/fotos/{allPaths=**} {
+      allow read, write: if request.auth != null && request.auth.uid == clinicId;
+    }
+
+    match /{allPaths=**} {
+      allow read, write: if false;
+    }
+  }
+}

@@ -736,7 +736,7 @@ export default function Expediente({
           )}
           {activeTab === "Historia Clínica" && <HistoriaClinica patientId={patient.id} />}
           {activeTab === "Listado de Citas" && <ListadoCitas citas={citasPaciente} recursos={recursos} />}
-          {activeTab === "Fotografías" && <Fotografias />}
+          {activeTab === "Fotografías" && <Fotografias patientId={patient.id} />}
           {activeTab === "Pagos" && (
             <Pagos
               patientId={patient.id}
