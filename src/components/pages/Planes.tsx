@@ -110,7 +110,7 @@ export default function Planes() {
                 className={`mt-6 rounded-lg px-4 py-2.5 text-sm font-semibold transition-opacity ${
                   activo
                     ? "cursor-not-allowed border border-edge/15 text-ink/40"
-                    : "bg-gradient-to-r from-accent to-accent-2 text-black hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50"
+                    : "border border-accent/60 bg-accent/15 text-accent hover:bg-accent/25 disabled:cursor-not-allowed disabled:opacity-50"
                 }`}
               >
                 {activo

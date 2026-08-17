@@ -91,7 +91,7 @@ function DatosPagoDialog({
           </button>
           <button
             onClick={() => onConfirmar({ medico, formaPago, facturar })}
-            className="flex-1 rounded-lg bg-gradient-to-r from-accent to-accent-2 py-2.5 text-sm font-semibold text-black transition-opacity hover:opacity-90"
+            className="flex-1 rounded-lg border border-accent/60 bg-accent/15 py-2.5 text-sm font-semibold text-accent transition-opacity hover:bg-accent/25"
           >
             Confirmar pago
           </button>
@@ -168,7 +168,7 @@ function ActivarMembresiaDialog({
               </button>
               <button
                 onClick={() => setMostrarPago(true)}
-                className="flex-1 rounded-lg bg-gradient-to-r from-accent to-accent-2 py-2.5 text-sm font-semibold text-black transition-opacity hover:opacity-90"
+                className="flex-1 rounded-lg border border-accent/60 bg-accent/15 py-2.5 text-sm font-semibold text-accent transition-opacity hover:bg-accent/25"
               >
                 Continuar
               </button>
@@ -242,7 +242,7 @@ function UsarBeneficioDialog({
               </button>
               <button
                 onClick={() => onUsar(beneficioId, medico)}
-                className="flex-1 rounded-lg bg-gradient-to-r from-accent to-accent-2 py-2.5 text-sm font-semibold text-black transition-opacity hover:opacity-90"
+                className="flex-1 rounded-lg border border-accent/60 bg-accent/15 py-2.5 text-sm font-semibold text-accent transition-opacity hover:bg-accent/25"
               >
                 Registrar uso
               </button>
@@ -334,7 +334,7 @@ export default function MembresiaTab({
         <div className="flex justify-center gap-3">
           <button
             onClick={() => setShowActivar(true)}
-            className="rounded-lg bg-gradient-to-r from-accent to-accent-2 px-4 py-2.5 text-sm font-semibold text-black transition-opacity hover:opacity-90"
+            className="rounded-lg border border-accent/60 bg-accent/15 px-4 py-2.5 text-sm font-semibold text-accent transition-opacity hover:bg-accent/25"
           >
             Activar membresía
           </button>
@@ -409,7 +409,7 @@ export default function MembresiaTab({
       <div className="flex flex-wrap gap-3 pt-2">
         <button
           onClick={() => setShowUsar(true)}
-          className="rounded-lg bg-gradient-to-r from-accent to-accent-2 px-4 py-2 text-xs font-semibold text-black transition-opacity hover:opacity-90"
+          className="rounded-lg border border-accent/60 bg-accent/15 px-4 py-2 text-xs font-semibold text-accent transition-opacity hover:bg-accent/25"
         >
           Usar beneficio
         </button>

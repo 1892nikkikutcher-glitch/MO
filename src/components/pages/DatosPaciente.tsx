@@ -699,7 +699,7 @@ export default function DatosPaciente({
       <div className="flex items-center gap-3">
         <button
           onClick={guardarCambios}
-          className="rounded-lg bg-gradient-to-r from-accent to-accent-2 px-5 py-2.5 text-sm font-semibold text-black transition-opacity hover:opacity-90"
+          className="rounded-lg border border-accent/60 bg-accent/15 px-5 py-2.5 text-sm font-semibold text-accent transition-opacity hover:bg-accent/25"
         >
           Guardar Cambios
         </button>

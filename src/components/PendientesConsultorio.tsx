@@ -105,7 +105,7 @@ export default function PendientesConsultorio() {
           <button
             onClick={guardar}
             disabled={!texto.trim()}
-            className="rounded-lg bg-gradient-to-r from-accent to-accent-2 px-3 py-2 text-xs font-semibold text-black transition-opacity hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-40"
+            className="rounded-lg border border-accent/60 bg-accent/15 px-3 py-2 text-xs font-semibold text-accent transition-opacity hover:bg-accent/25 disabled:cursor-not-allowed disabled:opacity-40"
           >
             Guardar
           </button>

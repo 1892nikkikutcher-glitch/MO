@@ -658,7 +658,7 @@ export default function HistoriaClinica({ patientId }: { patientId: string }) {
         <button
           onClick={guardar}
           disabled={guardando || !hayCambiosSinGuardar}
-          className="shrink-0 rounded-lg bg-gradient-to-r from-accent to-accent-2 px-5 py-2.5 text-sm font-semibold text-black transition-opacity hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-40"
+          className="shrink-0 rounded-lg border border-accent/60 bg-accent/15 px-5 py-2.5 text-sm font-semibold text-accent transition-opacity hover:bg-accent/25 disabled:cursor-not-allowed disabled:opacity-40"
         >
           {guardando ? "Guardando…" : yaGuardado ? "Actualizar Historial" : "Guardar Historial"}
         </button>
