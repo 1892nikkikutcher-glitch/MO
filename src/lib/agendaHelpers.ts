@@ -1,4 +1,4 @@
-import type { CitaAgenda, CitaEstatus, Recurso } from "@/lib/patientData";
+import type { CitaAgenda, CitaEstatus, Patient, Recurso } from "@/lib/patientData";
 
 export const PX_PER_MIN = 1.2;
 export const DIAS_SEMANA = ["lun.", "mar.", "mié.", "jue.", "vie.", "sáb.", "dom."];
@@ -116,6 +116,20 @@ export function minutesToTime(m: number) {
   const h = Math.floor(m / 60);
   const min = m % 60;
   return `${String(h).padStart(2, "0")}:${String(min).padStart(2, "0")}`;
+}
+
+/** El nombre del paciente queda copiado en la propia cita (cita.paciente) al
+ * crearla o editarla, así que si después se corrige el nombre en el
+ * expediente (Pacientes), esa copia queda desactualizada — esta función
+ * siempre prefiere el nombre vigente del expediente cuando la cita sigue
+ * ligada a un patientId real, y solo cae al texto guardado en la cita para
+ * las citas de pacientes no vinculados (nombre libre) o ya eliminados. */
+export function nombrePaciente(patients: Patient[], cita: Pick<CitaAgenda, "patientId" | "paciente">): string {
+  if (cita.patientId) {
+    const p = patients.find((pp) => pp.id === cita.patientId);
+    if (p) return p.name;
+  }
+  return cita.paciente;
 }
 
 export type CitaResoluble = Pick<CitaAgenda, "medicoId" | "unidadId" | "recursoId">;

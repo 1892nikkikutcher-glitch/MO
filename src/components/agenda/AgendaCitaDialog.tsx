@@ -90,9 +90,12 @@ export default function AgendaCitaDialog({
     return "";
   });
   const [patientId, setPatientId] = useState(initial.patientId ?? "");
-  const [searchText, setSearchText] = useState(initial.paciente ?? "");
-  const [showAgregarPago, setShowAgregarPago] = useState(false);
   const patientData = initial.patientId ? patients.find((p) => p.id === initial.patientId) : undefined;
+  // Si la cita ya está ligada a un paciente, se usa su nombre vigente del
+  // expediente en vez del texto que quedó copiado en la cita al crearla —
+  // así una corrección de nombre en Pacientes se refleja aquí de inmediato.
+  const [searchText, setSearchText] = useState(patientData?.name ?? initial.paciente ?? "");
+  const [showAgregarPago, setShowAgregarPago] = useState(false);
 
   useEffect(() => {
     if (initial.patientId) cargarDatosPaciente(initial.patientId);
@@ -467,7 +470,7 @@ export default function AgendaCitaDialog({
                     </p>
                     <button
                       onClick={crearPaciente}
-                      className="mt-2 rounded-lg bg-gradient-to-r from-accent to-orange-500 px-3 py-1.5 text-xs font-semibold text-black transition-opacity hover:opacity-90"
+                      className="mt-2 rounded-lg bg-gradient-to-r from-accent to-accent-2 px-3 py-1.5 text-xs font-semibold text-black transition-opacity hover:opacity-90"
                     >
                       Crear Paciente
                     </button>
@@ -717,7 +720,7 @@ export default function AgendaCitaDialog({
           <button
             onClick={handleGuardar}
             disabled={!puedeGuardar}
-            className="flex-1 rounded-lg bg-gradient-to-r from-accent to-orange-500 py-2.5 text-sm font-semibold text-black transition-opacity hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-40"
+            className="flex-1 rounded-lg bg-gradient-to-r from-accent to-accent-2 py-2.5 text-sm font-semibold text-black transition-opacity hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-40"
           >
             Guardar
           </button>

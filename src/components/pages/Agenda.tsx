@@ -33,6 +33,7 @@ import {
   detectarConflictos,
   formatRangeLabel,
   assignLanes,
+  nombrePaciente,
 } from "@/lib/agendaHelpers";
 import AppointmentStatusBadge from "@/components/agenda/AppointmentStatusBadge";
 import AgendaCitaDialog from "@/components/agenda/AgendaCitaDialog";
@@ -332,7 +333,7 @@ export default function Agenda() {
         const confirmada = c.estatus === "Confirmada" || c.estatus === "Atendida";
         const colorRecurso = recursoPorId(c.recursoId)?.color;
         const emoji = confirmada && colorRecurso ? emojiParaColor(colorRecurso) : confirmada ? "🟢" : "🔴";
-        lineas.push(`${emoji} ${c.horaInicio}-${c.horaFin} ${c.paciente}`);
+        lineas.push(`${emoji} ${c.horaInicio}-${c.horaFin} ${nombrePaciente(patients, c)}`);
         if (c.tratamientos?.length) lineas.push(c.tratamientos.join(", "));
         lineas.push("");
       });
@@ -709,7 +710,7 @@ export default function Agenda() {
                   citasDelDia.length > 0
                     ? citasDelDia
                         .slice(0, 6)
-                        .map((c) => `${c.horaInicio} ${c.paciente}`)
+                        .map((c) => `${c.horaInicio} ${nombrePaciente(patients, c)}`)
                         .join("\n") + (citasDelDia.length > 6 ? `\n+${citasDelDia.length - 6} más` : "")
                     : undefined;
                 return (
@@ -936,7 +937,7 @@ export default function Agenda() {
                             ["--stripe" as string]: stripe,
                             ...(arrastrando ? { boxShadow: `0 0 10px ${hexToRgba(stripe, 0.85)}` } : {}),
                           }}
-                          title={`${cita.horaInicio}–${cita.horaFin} · ${cita.paciente} · ${medico?.nombre ?? unidad?.nombre ?? "Sin asignar"} — arrastra para cambiar el horario`}
+                          title={`${cita.horaInicio}–${cita.horaFin} · ${nombrePaciente(patients, cita)} · ${medico?.nombre ?? unidad?.nombre ?? "Sin asignar"} — arrastra para cambiar el horario`}
                         >
                           <div
                             className="pointer-events-none absolute inset-0"
@@ -944,7 +945,7 @@ export default function Agenda() {
                           />
                           <div className="relative px-1.5 py-1">
                             <div className="truncate font-semibold">
-                              {cita.horaInicio} {cita.paciente}
+                              {cita.horaInicio} {nombrePaciente(patients, cita)}
                             </div>
                             {(cita.tratamientos ?? []).length > 0 && (
                               <div className="truncate text-ink/60">
