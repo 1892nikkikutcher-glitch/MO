@@ -61,6 +61,8 @@ import { formatosWhatsAppInicial, type FormatosWhatsApp } from "@/lib/formatosWh
 import { calcularFechaFin, type MembershipPlan, type PatientMembership, type UsoBeneficio } from "@/lib/membresias";
 import type { Lamina } from "@/lib/laminas";
 import type { Deposito, ArticuloFaltante, ArticuloCaducidad } from "@/lib/depositoDental";
+import type { CentroRadiodiagnostico } from "@/lib/centroRadiodiagnostico";
+import type { LaboratorioDental } from "@/lib/laboratorioDental";
 import type { PagoEliminado } from "@/lib/pagosEliminados";
 import { saldosPendientesInicial, type SaldosPendientesConfig } from "@/lib/saldosPendientes";
 import { laboratoriosPendientesInicial, type LaboratoriosPendientesConfig } from "@/lib/laboratoriosPendientes";
@@ -389,6 +391,10 @@ type PatientDataContextValue = {
   setArticulosFaltantes: (updater: Updater<ArticuloFaltante[]>) => void;
   articulosCaducidad: ArticuloCaducidad[];
   setArticulosCaducidad: (updater: Updater<ArticuloCaducidad[]>) => void;
+  centrosRadiodiagnostico: CentroRadiodiagnostico[];
+  setCentrosRadiodiagnostico: (updater: Updater<CentroRadiodiagnostico[]>) => void;
+  laboratoriosDentales: LaboratorioDental[];
+  setLaboratoriosDentales: (updater: Updater<LaboratorioDental[]>) => void;
   pagosEliminados: PagoEliminado[];
   setPagosEliminados: (updater: Updater<PagoEliminado[]>) => void;
   saldosPendientes: SaldosPendientesConfig;
@@ -575,6 +581,14 @@ export function PatientDataProvider({
   const [articulosCaducidad, setArticulosCaducidad] = useFirestoreList<ArticuloCaducidad>(
     clinicUid,
     "articulosCaducidad"
+  );
+  const [centrosRadiodiagnostico, setCentrosRadiodiagnostico] = useFirestoreList<CentroRadiodiagnostico>(
+    clinicUid,
+    "centrosRadiodiagnostico"
+  );
+  const [laboratoriosDentales, setLaboratoriosDentales] = useFirestoreList<LaboratorioDental>(
+    clinicUid,
+    "laboratoriosDentales"
   );
   const [pagosEliminados, setPagosEliminados] = useFirestoreList<PagoEliminado>(
     clinicUid,
@@ -1486,6 +1500,10 @@ export function PatientDataProvider({
         setArticulosFaltantes,
         articulosCaducidad,
         setArticulosCaducidad,
+        centrosRadiodiagnostico,
+        setCentrosRadiodiagnostico,
+        laboratoriosDentales,
+        setLaboratoriosDentales,
         pagosEliminados,
         setPagosEliminados,
         saldosPendientes,

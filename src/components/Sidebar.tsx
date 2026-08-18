@@ -168,6 +168,32 @@ export const navItems = [
     ),
   },
   {
+    id: "centro-radiodiagnostico",
+    label: "Centro de Radiodiagnóstico",
+    icon: (
+      <path
+        d="M4 4h16v16H4V4ZM8 4v16M16 4v16M4 8h4M4 16h4M16 8h4M16 16h4M12 9v6M9.5 12h5"
+        stroke="currentColor"
+        strokeWidth="1.8"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+    ),
+  },
+  {
+    id: "laboratorio-dental",
+    label: "Laboratorio Dental",
+    icon: (
+      <path
+        d="M9 2h6M10 2v6.5L4.8 18a2 2 0 0 0 1.7 3h11a2 2 0 0 0 1.7-3L14 8.5V2M7 15h10"
+        stroke="currentColor"
+        strokeWidth="1.8"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+    ),
+  },
+  {
     id: "documentos",
     label: "Documentos",
     icon: (

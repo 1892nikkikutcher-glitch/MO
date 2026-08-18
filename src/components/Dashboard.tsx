@@ -23,6 +23,8 @@ import Rpbi from "./pages/Rpbi";
 import Contabilidad from "./pages/Contabilidad";
 import Educacion from "./pages/Educacion";
 import DepositoDental from "./pages/DepositoDental";
+import CentroRadiodiagnostico from "./pages/CentroRadiodiagnostico";
+import LaboratorioDental from "./pages/LaboratorioDental";
 import ProximamenteStub from "./pages/ProximamenteStub";
 import Contrasena from "./pages/Contrasena";
 import ReportePagos from "./pages/ReportePagos";
@@ -77,6 +79,8 @@ const paginasConstruidas = new Set([
   "contabilidad",
   "educacion",
   "deposito-dental",
+  "centro-radiodiagnostico",
+  "laboratorio-dental",
   "contrasena",
   "reportes-bitacora-citas",
   "reportes-procedimientos",
@@ -358,6 +362,8 @@ function DashboardBody({
           {activePage === "contabilidad" && <Contabilidad />}
           {activePage === "educacion" && <Educacion />}
           {activePage === "deposito-dental" && <DepositoDental />}
+          {activePage === "centro-radiodiagnostico" && <CentroRadiodiagnostico />}
+          {activePage === "laboratorio-dental" && <LaboratorioDental />}
           {activePage === "contrasena" && <Contrasena />}
           {activePage === "reportes-bitacora-citas" && <BitacoraCitas />}
           {activePage === "reportes-procedimientos" && <ReporteProcedimientos />}
