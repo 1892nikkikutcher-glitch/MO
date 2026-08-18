@@ -187,7 +187,7 @@ function LaminaDialog({
               ref={inputRef}
               type="file"
               accept="image/*"
-              className="hidden"
+              className="sr-only"
               onChange={(e) => {
                 if (e.target.files && e.target.files[0]) {
                   manejarImagen(e.target.files[0]);
