@@ -42,9 +42,11 @@ export async function GET(req: NextRequest, { params }: Params) {
     .get();
 
   let ultimoAcceso: string | null = null;
+  let correoOwner = "";
   try {
     const userRecord = await authAdmin.getUser(clinic.ownerId);
     ultimoAcceso = userRecord.metadata.lastSignInTime ?? null;
+    correoOwner = userRecord.email ?? "";
   } catch {
     ultimoAcceso = null;
   }
@@ -54,6 +56,9 @@ export async function GET(req: NextRequest, { params }: Params) {
   return NextResponse.json({
     id: clinicId,
     ...clinic,
+    // correoContacto puede venir vacío si nunca se llenó a mano — el correo
+    // de inicio de sesión (Firebase Auth) siempre existe como respaldo.
+    correoContacto: clinic.correoContacto || correoOwner,
     suscripcion: {
       planActivo: suscripcion.planActivo ?? "prueba",
       estadoSuscripcion: suscripcion.estadoSuscripcion ?? "prueba",

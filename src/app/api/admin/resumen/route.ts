@@ -29,9 +29,11 @@ export async function GET(req: NextRequest) {
       const suscripcion = (suscripcionSnap.exists ? suscripcionSnap.data() : {}) as Partial<SuscripcionPlan>;
 
       let ultimaActividad: string | null = null;
+      let correoOwner = "";
       try {
         const userRecord = await authAdmin.getUser(c.ownerId);
         ultimaActividad = userRecord.metadata.lastSignInTime ?? null;
+        correoOwner = userRecord.email ?? "";
       } catch {
         ultimaActividad = null;
       }
@@ -44,7 +46,10 @@ export async function GET(req: NextRequest) {
       return {
         id: c.id,
         nombre: c.nombre || "(sin nombre)",
-        correoContacto: c.correoContacto || "",
+        // correoContacto es un campo que el usuario podría llenar a mano en
+        // Consultorio, pero casi nunca se usa — el correo de inicio de
+        // sesión en Firebase Auth siempre existe, así que es el respaldo.
+        correoContacto: c.correoContacto || correoOwner,
         creadoEl: c.creadoEl ?? null,
         estadoCuenta: c.estadoCuenta ?? "activa",
         usuarios: membersSnap.size,
