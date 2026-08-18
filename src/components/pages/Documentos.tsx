@@ -3,15 +3,24 @@
 import { useState } from "react";
 import { usePatientData } from "@/context/PatientDataContext";
 import ConsentimientoInformado from "./ConsentimientoInformado";
+import ConsentimientoEspecialidad from "./ConsentimientoEspecialidad";
 import ConstanciaPermanencia from "./ConstanciaPermanencia";
 import HojaIndicaciones from "./HojaIndicaciones";
 import { formatNombreConEdad } from "@/lib/patientData";
 import type { TipoHojaIndicaciones } from "@/lib/hojasIndicaciones";
+import {
+  consentimientosEspecialidad,
+  type TipoConsentimientoEspecialidad,
+} from "@/lib/consentimientosEspecialidad";
 
 const inputClass =
   "w-full rounded-lg border border-edge/10 bg-field px-3 py-2 text-sm text-ink outline-none focus:border-accent/60";
 
-type TipoDocumento = "consentimiento" | "constancia" | TipoHojaIndicaciones;
+type TipoDocumento = "consentimiento" | "constancia" | TipoHojaIndicaciones | TipoConsentimientoEspecialidad;
+
+function esConsentimientoEspecialidad(tipo: TipoDocumento): tipo is TipoConsentimientoEspecialidad {
+  return tipo in consentimientosEspecialidad;
+}
 
 const documentosDisponibles: { tipo: TipoDocumento; titulo: string; descripcion: string }[] = [
   {
@@ -44,6 +53,41 @@ const documentosDisponibles: { tipo: TipoDocumento; titulo: string; descripcion:
     titulo: "Indicaciones — Odontopediatría",
     descripcion: "Hoja de cuidados para padres o tutores de pacientes pediátricos.",
   },
+  {
+    tipo: "consentimientoOrtodoncia",
+    titulo: "Consentimiento Informado — Ortodoncia",
+    descripcion: "Autoriza el tratamiento de ortodoncia, con los riesgos propios de la especialidad.",
+  },
+  {
+    tipo: "consentimientoCirugiaBucal",
+    titulo: "Consentimiento Informado — Cirugía Bucal",
+    descripcion: "Autoriza extracciones u otros procedimientos quirúrgicos bucales.",
+  },
+  {
+    tipo: "consentimientoEndodoncia",
+    titulo: "Consentimiento Informado — Endodoncia",
+    descripcion: "Autoriza el tratamiento de conductos, con sus riesgos y posibles complicaciones.",
+  },
+  {
+    tipo: "consentimientoOdontopediatria",
+    titulo: "Consentimiento Informado — Odontopediatría",
+    descripcion: "Autorización del padre, madre o tutor para el tratamiento dental infantil.",
+  },
+  {
+    tipo: "consentimientoProtesisDental",
+    titulo: "Consentimiento Informado — Prótesis Dental",
+    descripcion: "Autoriza el tratamiento de rehabilitación con prótesis dental.",
+  },
+  {
+    tipo: "consentimientoConclusionOrtodoncia",
+    titulo: "Consentimiento — Conclusión de Tratamiento de Ortodoncia",
+    descripcion: "Cierra la fase activa del tratamiento y deja constancia del compromiso de retención.",
+  },
+  {
+    tipo: "consentimientoConformidadProtesis",
+    titulo: "Acuerdo de Conformidad — Prótesis Dental",
+    descripcion: "El paciente confirma haber recibido la prótesis a satisfacción.",
+  },
 ];
 
 export default function Documentos() {
@@ -66,6 +110,9 @@ export default function Documentos() {
     }
     if (documentoActivo === "constancia") {
       return <ConstanciaPermanencia patient={patient} onVolver={onVolver} />;
+    }
+    if (esConsentimientoEspecialidad(documentoActivo)) {
+      return <ConsentimientoEspecialidad patient={patient} tipo={documentoActivo} onVolver={onVolver} />;
     }
     return <HojaIndicaciones patient={patient} tipo={documentoActivo} onVolver={onVolver} />;
   }
