@@ -168,7 +168,7 @@ function GalleryUploadCard({
 }: {
   title: string;
   fotos: FotoPaciente[];
-  onAdd: (files: FileList) => Promise<void>;
+  onAdd: (files: File[]) => Promise<void>;
   onRemove: (foto: FotoPaciente) => void;
 }) {
   const inputRef = useRef<HTMLInputElement>(null);
@@ -195,9 +195,14 @@ function GalleryUploadCard({
           multiple
           className="sr-only"
           onChange={async (e) => {
-            const files = e.target.files;
+            // input.files es la misma FileList en vivo, no una copia: si se
+            // guarda la referencia y luego se limpia e.target.value (para
+            // poder volver a elegir el mismo archivo después), esa misma
+            // FileList queda vacía y "files" también — hay que copiarla a un
+            // arreglo de File antes de limpiar el input.
+            const files = e.target.files ? Array.from(e.target.files) : [];
             e.target.value = "";
-            if (!files || files.length === 0) return;
+            if (files.length === 0) return;
             setSubiendo(true);
             setError("");
             try {
@@ -343,7 +348,7 @@ export default function Fotografias({ patientId }: { patientId: string }) {
         fotos={fotos.extraorales}
         onAdd={async (files) => {
           const nuevas = await Promise.all(
-            Array.from(files).map((file) => subirFotoPaciente(clinicUid!, patientId, "extraorales", file))
+            files.map((file) => subirFotoPaciente(clinicUid!, patientId, "extraorales", file))
           );
           setFotosPaciente(patientId, (prev) => ({ ...prev, extraorales: [...prev.extraorales, ...nuevas] }));
         }}
@@ -361,7 +366,7 @@ export default function Fotografias({ patientId }: { patientId: string }) {
         fotos={fotos.intraorales}
         onAdd={async (files) => {
           const nuevas = await Promise.all(
-            Array.from(files).map((file) => subirFotoPaciente(clinicUid!, patientId, "intraorales", file))
+            files.map((file) => subirFotoPaciente(clinicUid!, patientId, "intraorales", file))
           );
           setFotosPaciente(patientId, (prev) => ({ ...prev, intraorales: [...prev.intraorales, ...nuevas] }));
         }}
