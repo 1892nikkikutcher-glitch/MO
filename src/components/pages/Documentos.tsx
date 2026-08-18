@@ -49,9 +49,15 @@ const documentosDisponibles: { tipo: TipoDocumento; titulo: string; descripcion:
 export default function Documentos() {
   const { patients } = usePatientData();
   const [patientId, setPatientId] = useState("");
+  const [searchText, setSearchText] = useState("");
   const [documentoActivo, setDocumentoActivo] = useState<TipoDocumento | null>(null);
 
   const patient = patients.find((p) => p.id === patientId) ?? null;
+
+  const coincidencias =
+    !patientId && searchText.trim().length > 0
+      ? patients.filter((p) => p.name.toLowerCase().includes(searchText.trim().toLowerCase()))
+      : [];
 
   if (patient && documentoActivo) {
     const onVolver = () => setDocumentoActivo(null);
@@ -68,20 +74,50 @@ export default function Documentos() {
     <div className="space-y-6">
       <div className="rounded-2xl border border-edge/10 bg-surface p-6">
         <label className="mb-1 block text-xs font-medium text-ink/60">Paciente</label>
-        <select
-          value={patientId}
-          onChange={(e) => setPatientId(e.target.value)}
-          className={inputClass}
-        >
-          <option value="">Selecciona un paciente...</option>
-          {patients.map((p) => (
-            <option key={p.id} value={p.id}>
-              {formatNombreConEdad(p.name, p.birthDate)}
-            </option>
-          ))}
-        </select>
-        {!patient && (
-          <p className="mt-2 text-xs text-ink/40">Elige un paciente para poder generar sus documentos.</p>
+        {patient ? (
+          <div className="flex items-center justify-between rounded-lg border border-success/30 bg-success/10 px-3 py-2 text-sm">
+            <span className="text-ink">{formatNombreConEdad(patient.name, patient.birthDate)}</span>
+            <button
+              onClick={() => {
+                setPatientId("");
+                setSearchText("");
+              }}
+              className="text-xs font-semibold text-success hover:text-success"
+            >
+              Cambiar
+            </button>
+          </div>
+        ) : (
+          <>
+            <input
+              type="text"
+              value={searchText}
+              onChange={(e) => setSearchText(e.target.value)}
+              placeholder="Buscar paciente por nombre..."
+              className={inputClass}
+            />
+            {coincidencias.length > 0 && (
+              <div className="mt-1.5 max-h-56 space-y-1 overflow-y-auto rounded-lg border border-edge/10 bg-field p-1.5">
+                {coincidencias.map((p) => (
+                  <button
+                    key={p.id}
+                    onClick={() => {
+                      setPatientId(p.id);
+                      setSearchText("");
+                    }}
+                    className="block w-full rounded-md px-2 py-1.5 text-left text-sm text-ink/80 hover:bg-surface"
+                  >
+                    {formatNombreConEdad(p.name, p.birthDate)}
+                    <span className="ml-2 text-xs text-ink/40">{p.phone}</span>
+                  </button>
+                ))}
+              </div>
+            )}
+            {searchText.trim().length > 0 && coincidencias.length === 0 && (
+              <p className="mt-2 text-xs text-ink/40">No se encontró ningún paciente con ese nombre.</p>
+            )}
+            <p className="mt-2 text-xs text-ink/40">Elige un paciente para poder generar sus documentos.</p>
+          </>
         )}
       </div>
 
