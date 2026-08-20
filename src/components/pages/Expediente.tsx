@@ -239,10 +239,15 @@ function PresupuestosTab({
           setPresupuestos((prev) => {
             if (editingBudget) {
               return prev.map((p) =>
-                p.id === editingBudget.id ? { ...budget, id: p.id, estado: p.estado } : p
+                p.id === editingBudget.id
+                  ? { ...budget, id: p.id, estado: p.estado, editadoManualmente: true }
+                  : p
               );
             }
-            return [{ ...budget, id: `${Date.now()}`, estado: "pendiente" }, ...prev];
+            return [
+              { ...budget, id: `${Date.now()}`, estado: "pendiente", editadoManualmente: true },
+              ...prev,
+            ];
           });
           setEditingBudget(null);
           setView("list");

@@ -294,8 +294,11 @@ export default function AgendaCitaDialog({
           total: montoCosto,
         };
         setPresupuestosPaciente(patientId, (prev) => {
-          const existe = prev.some((p) => p.id === presupuestoId);
-          return existe
+          const existente = prev.find((p) => p.id === presupuestoId);
+          // Si ya alguien lo editó a mano en Presupuestos (ej. ajustó el
+          // precio), no lo pisamos solo porque la cita se volvió a guardar.
+          if (existente?.editadoManualmente) return prev;
+          return existente
             ? prev.map((p) => (p.id === presupuestoId ? presupuestoDeCita : p))
             : [presupuestoDeCita, ...prev];
         });

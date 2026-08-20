@@ -170,6 +170,11 @@ export type SavedBudget = BudgetData & {
   /** Ausente en presupuestos guardados antes de que existiera este campo —
    * tratar como "pendiente" en todo cálculo/UI (`p.estado ?? "pendiente"`). */
   estado?: EstadoPresupuesto;
+  /** true si alguien lo editó a mano desde Presupuestos. Un presupuesto
+   * ligado a una cita (id "pres-cita-<id>") se regenera automáticamente
+   * cada vez que esa cita se vuelve a guardar — sin esta bandera, esa
+   * regeneración pisaba en silencio cualquier ajuste manual de precio. */
+  editadoManualmente?: boolean;
 };
 
 export type Tratamiento = {
@@ -413,6 +418,12 @@ export type ClinicInfo = {
    * de administrador — es el mecanismo principal para revocar acceso, en
    * vez de borrar el documento (que PatientDataContext podría recrear). */
   estadoCuenta?: "activa" | "suspendida" | "cancelada";
+  /** PIN de 4 dígitos para el candado de privacidad del Dashboard Principal
+   * (ocultar cifras financieras cuando la sesión se comparte con
+   * colaboradores). No es un mecanismo de seguridad real — la protección
+   * real es Firebase Auth/reglas de Firestore — solo evita que alguien vea
+   * de reojo la pantalla. */
+  pinPrivacidad?: string;
 };
 
 /** Documento `clinicMembers/{clinicId}_{uid}`. Campo `role` en inglés para
