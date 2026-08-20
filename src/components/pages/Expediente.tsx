@@ -662,7 +662,7 @@ export default function Expediente({
         ← Volver a pacientes
       </button>
 
-      <div className="flex flex-col gap-4 sm:flex-row sm:items-center print:hidden">
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between print:hidden">
         <div className="flex items-center gap-4">
           <div
             className="flex h-16 w-16 shrink-0 items-center justify-center rounded-full text-lg font-bold text-black"
@@ -678,7 +678,7 @@ export default function Expediente({
             </p>
           </div>
         </div>
-        <div className="flex items-center gap-2 sm:shrink-0">
+        <div className="flex flex-wrap items-center gap-2 sm:shrink-0 sm:justify-end">
           <button
             onClick={() => pacienteAnteriorHoy && irAExpediente(pacienteAnteriorHoy.patientId!, activeTab)}
             disabled={!pacienteAnteriorHoy}
@@ -687,7 +687,8 @@ export default function Expediente({
                 ? `Expediente anterior en la agenda de hoy: ${pacienteAnteriorHoy.paciente} (${pacienteAnteriorHoy.horaInicio})`
                 : "No hay un paciente anterior en la agenda de hoy"
             }
-            className="flex h-9 w-9 items-center justify-center rounded-lg border border-edge/15 text-ink/60 transition-colors hover:bg-surface hover:text-ink disabled:cursor-not-allowed disabled:opacity-30 disabled:hover:bg-transparent"
+            style={pacienteAnteriorHoy ? { boxShadow: "0 0 12px -2px rgb(var(--accent-rgb) / 0.6)" } : undefined}
+            className="flex h-9 w-9 items-center justify-center rounded-lg border border-accent/40 text-accent transition-colors hover:bg-accent/15 disabled:cursor-not-allowed disabled:opacity-30 disabled:hover:bg-transparent"
           >
             ←
           </button>
@@ -699,13 +700,15 @@ export default function Expediente({
                 ? `Expediente siguiente en la agenda de hoy: ${pacienteSiguienteHoy.paciente} (${pacienteSiguienteHoy.horaInicio})`
                 : "No hay un paciente siguiente en la agenda de hoy"
             }
-            className="flex h-9 w-9 items-center justify-center rounded-lg border border-edge/15 text-ink/60 transition-colors hover:bg-surface hover:text-ink disabled:cursor-not-allowed disabled:opacity-30 disabled:hover:bg-transparent"
+            style={pacienteSiguienteHoy ? { boxShadow: "0 0 12px -2px rgb(var(--accent-rgb) / 0.6)" } : undefined}
+            className="flex h-9 w-9 items-center justify-center rounded-lg border border-accent/40 text-accent transition-colors hover:bg-accent/15 disabled:cursor-not-allowed disabled:opacity-30 disabled:hover:bg-transparent"
           >
             →
           </button>
           <button
             onClick={enviarResumen}
             title="Enviar resumen del expediente al paciente por WhatsApp"
+            style={{ boxShadow: "0 0 14px -2px rgb(var(--success-rgb) / 0.7)" }}
             className="flex items-center justify-center gap-2 rounded-lg border border-success/40 px-3 py-2 text-xs font-semibold text-success transition-colors hover:bg-success/10"
           >
             <WhatsAppIcon />

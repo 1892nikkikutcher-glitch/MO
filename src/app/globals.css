@@ -36,7 +36,10 @@
      to-accent-2) — en oscuro es el mismo naranja de siempre (orange-500),
      sin cambio visual. */
   --accent-2-rgb: 249 115 22;
-  --success-rgb: 52 211 153;
+  /* Verde neón vivo (green-400) — deliberadamente más brillante que el
+     success-rgb anterior para que el resplandor alrededor de botones tipo
+     "Enviar resumen al paciente" contraste bien sobre el fondo oscuro. */
+  --success-rgb: 74 222 128;
   --danger-rgb: 248 113 113;
   --info-rgb: 96 165 250;
   --warning-rgb: 192 132 252;
@@ -79,7 +82,11 @@
      naranja". Ámbar más profundo, para que el degradado se note sin
      saturar de naranja. */
   --accent-2-rgb: 180 83 9;
-  --success-rgb: 4 120 87;
+  /* Verde militar (army green) en vez de la familia esmeralda — se ve más
+     "apagado" a propósito para modo claro, mientras que oscuro usa un
+     verde neón brillante (ver :root). Contraste verificado: 8.2:1 contra
+     blanco, 7.3:1 contra --app claro. */
+  --success-rgb: 75 83 32;
   --danger-rgb: 185 28 28;
   --info-rgb: 29 78 216;
   --warning-rgb: 126 34 206;
