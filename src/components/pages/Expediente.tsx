@@ -30,6 +30,7 @@ import {
   type Pago,
 } from "@/lib/patientData";
 import { condicionesSistemicasPositivas, esNegacionAlergia } from "@/lib/historiaClinica";
+import { timeToMinutes } from "@/lib/agendaHelpers";
 
 function fechaLargaHoy() {
   const texto = new Date().toLocaleDateString("es-MX", { weekday: "long", day: "numeric", month: "long", year: "numeric" });
@@ -539,6 +540,7 @@ export default function Expediente({
     historiaClinicaPorPaciente,
     cambiosSinGuardar,
     setCambiosSinGuardar,
+    irAExpediente,
   } = usePatientData();
 
   // Historia Clínica y Datos del Paciente avisan aquí (vía contexto) cuando
@@ -622,6 +624,20 @@ export default function Expediente({
     .sort((a, b) => a.fecha.localeCompare(b.fecha) || a.horaInicio.localeCompare(b.horaInicio));
   const ultimaCita = citasPaciente.find((c) => c.fecha < hoyISO && c.estatus !== "Cancelada");
 
+  // Flechas del encabezado: navegan al expediente del paciente anterior/
+  // siguiente en el orden cronológico de las citas de HOY, para poder ir
+  // pasando la agenda del día (notas, pagos, confirmaciones) sin volver a
+  // Pacientes en cada uno. Se queda en la misma pestaña activa.
+  const citasHoyConPaciente = citas
+    .filter((c) => c.fecha === hoyISO && c.patientId)
+    .sort((a, b) => timeToMinutes(a.horaInicio) - timeToMinutes(b.horaInicio));
+  const indiceHoy = citasHoyConPaciente.findIndex((c) => c.patientId === patient.id);
+  const pacienteAnteriorHoy = indiceHoy > 0 ? citasHoyConPaciente[indiceHoy - 1] : null;
+  const pacienteSiguienteHoy =
+    indiceHoy >= 0 && indiceHoy < citasHoyConPaciente.length - 1
+      ? citasHoyConPaciente[indiceHoy + 1]
+      : null;
+
   const enviarResumen = () => {
     const edad = calculateAge(patient.birthDate);
     const texto = buildResumenExpediente(
@@ -662,14 +678,40 @@ export default function Expediente({
             </p>
           </div>
         </div>
-        <button
-          onClick={enviarResumen}
-          title="Enviar resumen del expediente al paciente por WhatsApp"
-          className="flex items-center justify-center gap-2 rounded-lg border border-success/40 px-3 py-2 text-xs font-semibold text-success transition-colors hover:bg-success/10 sm:shrink-0"
-        >
-          <WhatsAppIcon />
-          Enviar resumen al paciente
-        </button>
+        <div className="flex items-center gap-2 sm:shrink-0">
+          <button
+            onClick={() => pacienteAnteriorHoy && irAExpediente(pacienteAnteriorHoy.patientId!, activeTab)}
+            disabled={!pacienteAnteriorHoy}
+            title={
+              pacienteAnteriorHoy
+                ? `Expediente anterior en la agenda de hoy: ${pacienteAnteriorHoy.paciente} (${pacienteAnteriorHoy.horaInicio})`
+                : "No hay un paciente anterior en la agenda de hoy"
+            }
+            className="flex h-9 w-9 items-center justify-center rounded-lg border border-edge/15 text-ink/60 transition-colors hover:bg-surface hover:text-ink disabled:cursor-not-allowed disabled:opacity-30 disabled:hover:bg-transparent"
+          >
+            ←
+          </button>
+          <button
+            onClick={() => pacienteSiguienteHoy && irAExpediente(pacienteSiguienteHoy.patientId!, activeTab)}
+            disabled={!pacienteSiguienteHoy}
+            title={
+              pacienteSiguienteHoy
+                ? `Expediente siguiente en la agenda de hoy: ${pacienteSiguienteHoy.paciente} (${pacienteSiguienteHoy.horaInicio})`
+                : "No hay un paciente siguiente en la agenda de hoy"
+            }
+            className="flex h-9 w-9 items-center justify-center rounded-lg border border-edge/15 text-ink/60 transition-colors hover:bg-surface hover:text-ink disabled:cursor-not-allowed disabled:opacity-30 disabled:hover:bg-transparent"
+          >
+            →
+          </button>
+          <button
+            onClick={enviarResumen}
+            title="Enviar resumen del expediente al paciente por WhatsApp"
+            className="flex items-center justify-center gap-2 rounded-lg border border-success/40 px-3 py-2 text-xs font-semibold text-success transition-colors hover:bg-success/10"
+          >
+            <WhatsAppIcon />
+            Enviar resumen al paciente
+          </button>
+        </div>
       </div>
 
       {patientAlergias && !esNegacionAlergia(patientAlergias) && (

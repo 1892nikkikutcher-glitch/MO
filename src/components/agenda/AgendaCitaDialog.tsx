@@ -132,6 +132,23 @@ export default function AgendaCitaDialog({
   const [repeticiones, setRepeticiones] = useState(3);
   const folioRef = useState(() => initial.folio ?? `F-${Date.now().toString().slice(-6)}`)[0];
 
+  // Flechas del encabezado: al editar una cita, permiten saltar directo al
+  // expediente del paciente anterior/siguiente en el orden cronológico de
+  // citas de ESE día (usando initial.fecha, no el campo de fecha que se
+  // esté editando en el formulario — la cita todavía vive en su fecha
+  // original hasta que se guarde).
+  const citasDelDiaConPaciente = citas
+    .filter((c) => c.fecha === initial.fecha && c.patientId)
+    .sort((a, b) => timeToMinutes(a.horaInicio) - timeToMinutes(b.horaInicio));
+  const indiceCitaActual = isEditing
+    ? citasDelDiaConPaciente.findIndex((c) => c.id === initial.id)
+    : -1;
+  const citaAnterior = indiceCitaActual > 0 ? citasDelDiaConPaciente[indiceCitaActual - 1] : null;
+  const citaSiguiente =
+    indiceCitaActual >= 0 && indiceCitaActual < citasDelDiaConPaciente.length - 1
+      ? citasDelDiaConPaciente[indiceCitaActual + 1]
+      : null;
+
   const coincidencias =
     !patientId && searchText.trim().length > 0
       ? patients.filter((p) => p.name.toLowerCase().includes(searchText.trim().toLowerCase()))
@@ -326,7 +343,38 @@ export default function AgendaCitaDialog({
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4">
       <div className="max-h-[90vh] w-full max-w-5xl overflow-y-auto rounded-2xl border border-edge/10 bg-modal-solid p-6">
         <div className="mb-4 flex items-center justify-between">
-          <div>
+          <div className="flex items-start gap-2">
+            {isEditing && (
+              <div className="flex shrink-0 items-center gap-1 pt-0.5">
+                <button
+                  type="button"
+                  onClick={() => citaAnterior?.patientId && irAExpediente(citaAnterior.patientId)}
+                  disabled={!citaAnterior}
+                  title={
+                    citaAnterior
+                      ? `Expediente anterior: ${patients.find((p) => p.id === citaAnterior.patientId)?.name ?? citaAnterior.paciente} (${citaAnterior.horaInicio})`
+                      : "No hay una cita anterior este día"
+                  }
+                  className="flex h-8 w-8 items-center justify-center rounded-full border border-edge/15 text-ink/60 transition-colors hover:bg-surface hover:text-ink disabled:cursor-not-allowed disabled:opacity-30 disabled:hover:bg-transparent"
+                >
+                  ←
+                </button>
+                <button
+                  type="button"
+                  onClick={() => citaSiguiente?.patientId && irAExpediente(citaSiguiente.patientId)}
+                  disabled={!citaSiguiente}
+                  title={
+                    citaSiguiente
+                      ? `Expediente siguiente: ${patients.find((p) => p.id === citaSiguiente.patientId)?.name ?? citaSiguiente.paciente} (${citaSiguiente.horaInicio})`
+                      : "No hay una cita siguiente este día"
+                  }
+                  className="flex h-8 w-8 items-center justify-center rounded-full border border-edge/15 text-ink/60 transition-colors hover:bg-surface hover:text-ink disabled:cursor-not-allowed disabled:opacity-30 disabled:hover:bg-transparent"
+                >
+                  →
+                </button>
+              </div>
+            )}
+            <div>
             <h2 className="text-lg font-semibold text-ink">
               {isEditing ? "Editar Cita" : "Nueva Cita"}
             </h2>
@@ -353,6 +401,7 @@ export default function AgendaCitaDialog({
                   </button>
                 );
               })}
+            </div>
             </div>
           </div>
           <div className="flex items-center gap-2">
