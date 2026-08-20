@@ -1061,12 +1061,18 @@ export default function Agenda() {
 
       {dialogState && (
         <AgendaCitaDialog
+          // Cambiar de cita (flechas del encabezado) debe re-montar el
+          // diálogo para que sus campos internos (médico, paciente,
+          // tratamientos, etc.) se re-inicialicen desde la nueva cita en
+          // vez de arrastrar lo que había capturado el useState original.
+          key={dialogState.isEditing ? dialogState.initial.id : "nueva"}
           recursos={recursos}
           initial={dialogState.initial}
           isEditing={dialogState.isEditing}
           onClose={() => setDialogState(null)}
           onSave={guardarCita}
           onDelete={dialogState.isEditing ? eliminarCita : undefined}
+          onNavegarCita={(cita) => setDialogState({ initial: cita, isEditing: true })}
         />
       )}
 

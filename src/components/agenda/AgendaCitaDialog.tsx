@@ -51,6 +51,7 @@ export default function AgendaCitaDialog({
   onClose,
   onSave,
   onDelete,
+  onNavegarCita,
 }: {
   recursos: Recurso[];
   initial: Partial<CitaAgenda> & { fecha: string; horaInicio: string };
@@ -58,6 +59,9 @@ export default function AgendaCitaDialog({
   onClose: () => void;
   onSave: (citas: CitaAgenda[]) => void;
   onDelete?: () => void;
+  /** Cambia el diálogo a otra cita (mismas flechas del encabezado) sin
+   * salir de Agenda ni abrir el expediente — solo mueve el diálogo. */
+  onNavegarCita: (cita: CitaAgenda) => void;
 }) {
   const {
     patients,
@@ -342,39 +346,8 @@ export default function AgendaCitaDialog({
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4">
       <div className="max-h-[90vh] w-full max-w-5xl overflow-y-auto rounded-2xl border border-edge/10 bg-modal-solid p-6">
-        <div className="mb-4 flex items-center justify-between">
-          <div className="flex items-start gap-2">
-            {isEditing && (
-              <div className="flex shrink-0 items-center gap-1 pt-0.5">
-                <button
-                  type="button"
-                  onClick={() => citaAnterior?.patientId && irAExpediente(citaAnterior.patientId)}
-                  disabled={!citaAnterior}
-                  title={
-                    citaAnterior
-                      ? `Expediente anterior: ${patients.find((p) => p.id === citaAnterior.patientId)?.name ?? citaAnterior.paciente} (${citaAnterior.horaInicio})`
-                      : "No hay una cita anterior este día"
-                  }
-                  className="flex h-8 w-8 items-center justify-center rounded-full border border-edge/15 text-ink/60 transition-colors hover:bg-surface hover:text-ink disabled:cursor-not-allowed disabled:opacity-30 disabled:hover:bg-transparent"
-                >
-                  ←
-                </button>
-                <button
-                  type="button"
-                  onClick={() => citaSiguiente?.patientId && irAExpediente(citaSiguiente.patientId)}
-                  disabled={!citaSiguiente}
-                  title={
-                    citaSiguiente
-                      ? `Expediente siguiente: ${patients.find((p) => p.id === citaSiguiente.patientId)?.name ?? citaSiguiente.paciente} (${citaSiguiente.horaInicio})`
-                      : "No hay una cita siguiente este día"
-                  }
-                  className="flex h-8 w-8 items-center justify-center rounded-full border border-edge/15 text-ink/60 transition-colors hover:bg-surface hover:text-ink disabled:cursor-not-allowed disabled:opacity-30 disabled:hover:bg-transparent"
-                >
-                  →
-                </button>
-              </div>
-            )}
-            <div>
+        <div className="relative mb-4 flex items-center justify-between">
+          <div>
             <h2 className="text-lg font-semibold text-ink">
               {isEditing ? "Editar Cita" : "Nueva Cita"}
             </h2>
@@ -402,8 +375,37 @@ export default function AgendaCitaDialog({
                 );
               })}
             </div>
-            </div>
           </div>
+          {isEditing && (
+            <div className="absolute left-1/2 top-0 flex -translate-x-1/2 items-center gap-1.5">
+              <button
+                type="button"
+                onClick={() => citaAnterior && onNavegarCita(citaAnterior)}
+                disabled={!citaAnterior}
+                title={
+                  citaAnterior
+                    ? `Cita anterior: ${patients.find((p) => p.id === citaAnterior.patientId)?.name ?? citaAnterior.paciente} (${citaAnterior.horaInicio})`
+                    : "No hay una cita anterior este día"
+                }
+                className="flex h-9 w-9 items-center justify-center rounded-full text-success transition-colors hover:bg-success/15 disabled:cursor-not-allowed disabled:opacity-30 disabled:hover:bg-transparent"
+              >
+                ←
+              </button>
+              <button
+                type="button"
+                onClick={() => citaSiguiente && onNavegarCita(citaSiguiente)}
+                disabled={!citaSiguiente}
+                title={
+                  citaSiguiente
+                    ? `Cita siguiente: ${patients.find((p) => p.id === citaSiguiente.patientId)?.name ?? citaSiguiente.paciente} (${citaSiguiente.horaInicio})`
+                    : "No hay una cita siguiente este día"
+                }
+                className="flex h-9 w-9 items-center justify-center rounded-full text-success transition-colors hover:bg-success/15 disabled:cursor-not-allowed disabled:opacity-30 disabled:hover:bg-transparent"
+              >
+                →
+              </button>
+            </div>
+          )}
           <div className="flex items-center gap-2">
             <button
               type="button"
