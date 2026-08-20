@@ -53,6 +53,7 @@ import ReporteDomiciliacion from "./pages/ReporteDomiciliacion";
 import GlobalAgregarPago from "./GlobalAgregarPago";
 import GlobalNuevoPaciente from "./GlobalNuevoPaciente";
 import PanelAdministrador from "./pages/PanelAdministrador";
+import AsistenteFlotante from "./AsistenteFlotante";
 import { PatientDataProvider, usePatientData } from "@/context/PatientDataContext";
 
 const paginasConstruidas = new Set([
@@ -398,6 +399,8 @@ function DashboardBody({
       {showNuevoPaciente && (
         <GlobalNuevoPaciente onClose={() => setShowNuevoPaciente(false)} />
       )}
+
+      <AsistenteFlotante activePage={activePage} activeLabel={activeLabel} />
     </div>
   );
 }

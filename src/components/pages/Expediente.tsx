@@ -541,7 +541,16 @@ export default function Expediente({
     cambiosSinGuardar,
     setCambiosSinGuardar,
     irAExpediente,
+    setAyudaContexto,
   } = usePatientData();
+
+  // Publica la pestaña activa para que el Asistente flotante muestre ayuda
+  // específica (ej. "cómo hacer un pago") en vez de solo "Pacientes" —
+  // vuelve a null al salir del expediente para no dejar un contexto viejo.
+  useEffect(() => {
+    setAyudaContexto(`pacientes-${activeTab}`);
+    return () => setAyudaContexto(null);
+  }, [activeTab, setAyudaContexto]);
 
   // Historia Clínica y Datos del Paciente avisan aquí (vía contexto) cuando
   // tienen ediciones sin guardar — antes se perdían silenciosamente al

@@ -483,6 +483,12 @@ type PatientDataContextValue = {
   irAPagina: (pageId: string) => void;
   cambiosSinGuardar: string | null;
   setCambiosSinGuardar: (mensaje: string | null) => void;
+  /** Contexto más específico que activePage para el Asistente flotante —
+   * ej. una pestaña del Expediente ("pacientes-Pagos") — para que la ayuda
+   * mostrada sea más precisa que solo el nombre de la página. Vuelve a
+   * null cuando ese componente se desmonta. */
+  ayudaContexto: string | null;
+  setAyudaContexto: (contexto: string | null) => void;
   miRol: RolClinica | null;
   puedeVerFinanzas: boolean;
   clinicInfo: ClinicInfo | null;
@@ -666,6 +672,7 @@ export function PatientDataProvider({
   // por navegación dentro de la app (irAPagina) o al cerrar/recargar la
   // pestaña — para no perder información como pasó antes.
   const [cambiosSinGuardar, setCambiosSinGuardar] = useState<string | null>(null);
+  const [ayudaContexto, setAyudaContexto] = useState<string | null>(null);
 
   useEffect(() => {
     const handler = (e: BeforeUnloadEvent) => {
@@ -1581,6 +1588,8 @@ export function PatientDataProvider({
         irAPagina,
         cambiosSinGuardar,
         setCambiosSinGuardar,
+        ayudaContexto,
+        setAyudaContexto,
         miRol: rol,
         puedeVerFinanzas: rol === "admin",
         clinicInfo,
