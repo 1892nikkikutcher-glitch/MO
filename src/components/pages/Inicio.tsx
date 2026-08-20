@@ -5,6 +5,7 @@ import { usePatientData } from "@/context/PatientDataContext";
 import { calcularEdadDetallada, formatCurrency } from "@/lib/patientData";
 import { calcularAvanceMetas } from "@/lib/metas";
 import { calcularRangoPeriodo, type PeriodoId } from "@/lib/dashboardMetrics";
+import { PrivacidadProvider, usePrivacidad } from "@/context/PrivacidadContext";
 import PendientesConsultorio from "@/components/PendientesConsultorio";
 import PeriodSelector from "@/components/dashboard/PeriodSelector";
 import FinancialSummary from "@/components/dashboard/FinancialSummary";
@@ -118,6 +119,103 @@ function CardShell({ title, children }: { title: string; children: React.ReactNo
   );
 }
 
+function EyeOpenIcon() {
+  return (
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none">
+      <path
+        d="M2 12s3.6-7 10-7 10 7 10 7-3.6 7-10 7-10-7-10-7Z"
+        stroke="currentColor"
+        strokeWidth="1.8"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+      <circle cx="12" cy="12" r="3" stroke="currentColor" strokeWidth="1.8" />
+    </svg>
+  );
+}
+
+function EyeClosedIcon() {
+  return (
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none">
+      <path
+        d="M3 3l18 18M10.6 10.6a3 3 0 0 0 4.2 4.2M6.2 6.7C3.9 8.3 2 12 2 12s3.6 7 10 7c1.9 0 3.5-.5 4.8-1.2M17.9 17.4C20 15.7 22 12 22 12s-1.2-2.3-3.4-4.3A12 12 0 0 0 12 5c-.7 0-1.4.06-2 .17"
+        stroke="currentColor"
+        strokeWidth="1.8"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+    </svg>
+  );
+}
+
+/** Candado de privacidad del Dashboard Principal — mismo patrón que la
+ * app de un banco: cifras financieras ocultas por default (útil cuando la
+ * sesión se comparte con colaboradores en la misma computadora), un PIN de
+ * 4 dígitos las revela para el resto de la sesión. */
+function CandadoPrivacidad() {
+  const { oculto, solicitarRevelar, ocultar } = usePrivacidad();
+  return (
+    <button
+      onClick={oculto ? solicitarRevelar : ocultar}
+      title={oculto ? "Mostrar cifras financieras" : "Ocultar cifras financieras"}
+      className="flex items-center gap-2 rounded-lg border border-edge/15 bg-surface px-3 py-2 text-xs font-semibold text-ink/60 transition-colors hover:text-ink"
+    >
+      {oculto ? <EyeClosedIcon /> : <EyeOpenIcon />}
+      {oculto ? "Cifras ocultas" : "Cifras visibles"}
+    </button>
+  );
+}
+
+function MetasCard({
+  metaMensual,
+  avanceMetas,
+  irAPagina,
+}: {
+  metaMensual: number;
+  avanceMetas: ReturnType<typeof calcularAvanceMetas>;
+  irAPagina: (id: string) => void;
+}) {
+  const { oculto } = usePrivacidad();
+  return (
+    <CardShell title="Metas">
+      {metaMensual <= 0 ? (
+        <p className="text-sm text-ink/40">
+          Aún no configuras tu meta mensual. Ve a{" "}
+          <button
+            onClick={() => irAPagina("administracion-metas")}
+            className="font-semibold text-accent underline decoration-accent/40 underline-offset-2 hover:decoration-accent"
+          >
+            Administración → Metas
+          </button>{" "}
+          para definirla.
+        </p>
+      ) : (
+        <div className="space-y-4">
+          {avanceMetas.map((a) => (
+            <div key={a.label}>
+              <div className="mb-1.5 flex items-center justify-between text-sm">
+                <span className="font-medium text-ink">Meta {a.label}</span>
+                <span className={`text-ink/50 ${oculto ? "blur-[6px] select-none" : ""}`}>
+                  {oculto
+                    ? "••••• / •••••"
+                    : `${formatCurrency(Math.round(a.actual))} / ${formatCurrency(Math.round(a.meta))}`}{" "}
+                  <span className="font-semibold text-accent">· {a.porcentaje}%</span>
+                </span>
+              </div>
+              <div className="h-2.5 w-full overflow-hidden rounded-full bg-inset">
+                <div
+                  className="h-full rounded-full bg-gradient-to-r from-accent to-accent-2 transition-all"
+                  style={{ width: `${a.porcentaje}%` }}
+                />
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+    </CardShell>
+  );
+}
+
 export default function Inicio() {
   const { puedeVerFinanzas, patients, citas, finanzas, metas, estadisticas, irAPagina } = usePatientData();
 
@@ -202,13 +300,17 @@ export default function Inicio() {
     .sort((a, b) => a.nacimiento.getDate() - b.nacimiento.getDate());
 
   return (
+    <PrivacidadProvider>
     <div className="space-y-6">
-      <PeriodSelector
-        periodoId={periodoId}
-        onSelect={setPeriodoId}
-        personalizado={personalizado}
-        onPersonalizadoChange={setPersonalizado}
-      />
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <PeriodSelector
+          periodoId={periodoId}
+          onSelect={setPeriodoId}
+          personalizado={personalizado}
+          onPersonalizadoChange={setPersonalizado}
+        />
+        {puedeVerFinanzas && <CandadoPrivacidad />}
+      </div>
 
       <FinancialSummary rango={rango} />
 
@@ -261,40 +363,7 @@ export default function Inicio() {
       <PendientesConsultorio />
 
       {puedeVerFinanzas && (
-        <CardShell title="Metas">
-          {metas.metaMensual <= 0 ? (
-            <p className="text-sm text-ink/40">
-              Aún no configuras tu meta mensual. Ve a{" "}
-              <button
-                onClick={() => irAPagina("administracion-metas")}
-                className="font-semibold text-accent underline decoration-accent/40 underline-offset-2 hover:decoration-accent"
-              >
-                Administración → Metas
-              </button>{" "}
-              para definirla.
-            </p>
-          ) : (
-            <div className="space-y-4">
-              {avanceMetas.map((a) => (
-                <div key={a.label}>
-                  <div className="mb-1.5 flex items-center justify-between text-sm">
-                    <span className="font-medium text-ink">Meta {a.label}</span>
-                    <span className="text-ink/50">
-                      {formatCurrency(Math.round(a.actual))} / {formatCurrency(Math.round(a.meta))}{" "}
-                      <span className="font-semibold text-accent">· {a.porcentaje}%</span>
-                    </span>
-                  </div>
-                  <div className="h-2.5 w-full overflow-hidden rounded-full bg-inset">
-                    <div
-                      className="h-full rounded-full bg-gradient-to-r from-accent to-accent-2 transition-all"
-                      style={{ width: `${a.porcentaje}%` }}
-                    />
-                  </div>
-                </div>
-              ))}
-            </div>
-          )}
-        </CardShell>
+        <MetasCard metaMensual={metas.metaMensual} avanceMetas={avanceMetas} irAPagina={irAPagina} />
       )}
 
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
@@ -317,5 +386,6 @@ export default function Inicio() {
         </CardShell>
       </div>
     </div>
+    </PrivacidadProvider>
   );
 }

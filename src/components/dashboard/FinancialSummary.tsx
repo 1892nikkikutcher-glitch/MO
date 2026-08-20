@@ -53,6 +53,7 @@ export default function FinancialSummary({ rango }: { rango: RangoPeriodo }) {
         value={formatCurrency(ingresosPeriodo)}
         color="#ffb020"
         wide
+        sensible
         comparison={
           comparacionIngresos === null
             ? null
@@ -76,6 +77,7 @@ export default function FinancialSummary({ rango }: { rango: RangoPeriodo }) {
         label="Ticket Promedio"
         value={formatCurrency(ticketPromedio)}
         color="#2ee67a"
+        sensible
         tooltip="Ingresos cobrados entre número de pagos registrados históricamente."
       />
 
@@ -83,6 +85,7 @@ export default function FinancialSummary({ rango }: { rango: RangoPeriodo }) {
         label="Saldo Pendiente"
         value={formatCurrency(saldoPendiente)}
         color="#ff3b3b"
+        sensible
         tooltip="Presupuestado histórico menos lo efectivamente cobrado."
       />
 
@@ -90,6 +93,7 @@ export default function FinancialSummary({ rango }: { rango: RangoPeriodo }) {
         label={`Ingreso / Hora Clínica (${rango.label})`}
         value={horasClinicasPeriodo > 0 ? formatCurrency(ingresoPorHora) : "—"}
         color="#b84dff"
+        sensible
         tooltip={
           horasClinicasPeriodo > 0
             ? `Ingresos del periodo entre ${horasClinicasPeriodo} h clínicas trabajadas (duración de citas Atendidas).`

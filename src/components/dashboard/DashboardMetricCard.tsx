@@ -1,6 +1,7 @@
 "use client";
 
 import type { ReactNode } from "react";
+import { usePrivacidad } from "@/context/PrivacidadContext";
 
 /** Franja de acento + resplandor neón muy sutil — mismo tratamiento que el
  * resto de las tarjetas KPI del dashboard (ver Inicio.tsx). */
@@ -32,6 +33,7 @@ export default function DashboardMetricCard({
   comparison,
   onClick,
   wide,
+  sensible,
   children,
 }: {
   label: string;
@@ -41,8 +43,13 @@ export default function DashboardMetricCard({
   comparison?: { pct: number; favorable: boolean } | null;
   onClick?: () => void;
   wide?: boolean;
+  /** true en cifras financieras — se enmascaran cuando el candado de
+   * privacidad del Dashboard Principal está cerrado. */
+  sensible?: boolean;
   children?: ReactNode;
 }) {
+  const { oculto } = usePrivacidad();
+  const enmascarado = sensible && oculto;
   const Wrapper = onClick ? "button" : "div";
 
   return (
@@ -54,8 +61,10 @@ export default function DashboardMetricCard({
       style={{ boxShadow: neonShadow(color) }}
     >
       <div className="flex items-center gap-1.5">
-        <div className="text-xl font-bold text-ink">{value}</div>
-        {comparison && (
+        <div className={`text-xl font-bold text-ink ${enmascarado ? "blur-[6px] select-none" : ""}`}>
+          {enmascarado ? "••••••" : value}
+        </div>
+        {comparison && !enmascarado && (
           <span
             className={`text-xs font-semibold ${comparison.favorable ? "text-success" : "text-danger"}`}
             title="vs. periodo anterior"
@@ -72,7 +81,7 @@ export default function DashboardMetricCard({
           </span>
         )}
       </div>
-      {children}
+      {!enmascarado && children}
     </Wrapper>
   );
 }

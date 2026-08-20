@@ -1,6 +1,7 @@
 "use client";
 
 import { usePatientData } from "@/context/PatientDataContext";
+import { usePrivacidad } from "@/context/PrivacidadContext";
 import { formatCurrency } from "@/lib/patientData";
 import { produccionPorTratamiento } from "@/lib/reportes";
 import { ingresosPorMes, ocupacionPorSemana, pacientesNuevosPorMes } from "@/lib/dashboardMetrics";
@@ -10,17 +11,30 @@ import HorizontalBarList from "./charts/HorizontalBarList";
 function ChartCard({
   title,
   caption,
+  sensible,
   children,
 }: {
   title: string;
   caption?: string;
+  /** true en gráficas financieras — se enmascaran con el candado de
+   * privacidad del Dashboard Principal cerrado. */
+  sensible?: boolean;
   children: React.ReactNode;
 }) {
+  const { oculto } = usePrivacidad();
+  const enmascarado = sensible && oculto;
   return (
     <div className="rounded-2xl border border-edge/10 bg-surface p-6">
       <h3 className="text-sm font-semibold uppercase tracking-wide text-ink/60">{title}</h3>
       {caption && <p className="mt-1 text-xs text-ink/40">{caption}</p>}
-      <div className="mt-5">{children}</div>
+      <div className="relative mt-5">
+        <div className={enmascarado ? "pointer-events-none select-none blur-md" : ""}>{children}</div>
+        {enmascarado && (
+          <div className="absolute inset-0 flex items-center justify-center text-xs font-semibold text-ink/50">
+            Cifras ocultas
+          </div>
+        )}
+      </div>
     </div>
   );
 }
@@ -51,7 +65,7 @@ export default function DashboardCharts() {
   return (
     <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
       {puedeVerFinanzas && (
-        <ChartCard title="Ingresos" caption="Últimos 12 meses, cobrado real por mes.">
+        <ChartCard title="Ingresos" caption="Últimos 12 meses, cobrado real por mes." sensible>
           <BarChart data={datosIngresos} color="#ffb020" formatValue={(v) => formatCurrency(v)} />
         </ChartCard>
       )}
@@ -67,6 +81,7 @@ export default function DashboardCharts() {
       {puedeVerFinanzas && (
         <ChartCard
           title="Producción por Tratamiento"
+          sensible
           caption={
             topTratamientos.length === 0
               ? "Aún no hay citas Atendidas con tratamientos del catálogo para calcularlo."

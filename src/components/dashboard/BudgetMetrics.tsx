@@ -49,18 +49,21 @@ export default function BudgetMetrics() {
               label="Valor Presupuestado"
               value={formatCurrency(estadisticas.totalPresupuestado)}
               color="#ffb020"
+              sensible
               tooltip="Suma histórica de todos los presupuestos creados."
             />
             <DashboardMetricCard
               label="Presupuestos Aceptados"
               value={formatCurrency(porEstado.aceptado.valor)}
               color="#2ee67a"
+              sensible
               tooltip="Valor de los presupuestos marcados como Aceptado."
             />
             <DashboardMetricCard
               label="Presupuestos Pendientes"
               value={formatCurrency(valorPendiente)}
               color="#3aa8ff"
+              sensible
               tooltip={`${cantidadPendiente} presupuesto(s) sin marcar como Aceptado, Rechazado o Expirado — aún sin respuesta del paciente.`}
             />
           </>
