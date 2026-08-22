@@ -91,8 +91,12 @@ service cloud.firestore {
       // registro de miembro admin (atado al ownerId del doc de la clínica, nunca
       // a "si no hay miembros todavía" para evitar apropiaciones).
       // MO añade un tercer caso: quien se registra puede auto-crear su propia
-      // membresía NO-admin si existe una invitación pendiente que coincide con
-      // su correo — así el colaborador "reclama" el lugar que el dueño le dejó.
+      // membresía (de cualquier rol, incluido "admin" — ej. un segundo doctor
+      // que debe ver finanzas) si existe una invitación pendiente que
+      // coincide con su correo Y con ese rol exacto — así el colaborador
+      // "reclama" el lugar que el dueño le dejó. El rol viene del invite
+      // (creado solo por un admin existente), nunca de lo que el invitado
+      // decida escribir, así que esto no permite auto-otorgarse admin.
       allow create: if isClinicAdmin(memberId.split('_')[0])
         || (signedIn()
             && memberId == memberId.split('_')[0] + '_' + request.auth.uid
@@ -100,7 +104,6 @@ service cloud.firestore {
             && get(/databases/$(database)/documents/clinics/$(memberId.split('_')[0])).data.ownerId == request.auth.uid)
         || (signedIn()
             && memberId == memberId.split('_')[0] + '_' + request.auth.uid
-            && request.resource.data.role != 'admin'
             && request.resource.data.uid == request.auth.uid
             && existsClaimableInvite(memberId.split('_')[0], request.resource.data.role));
       // Un admin puede modificar cualquier membresía de su clínica.
@@ -196,6 +199,63 @@ service cloud.firestore {
     match /users/{ownerId}/medicamentos/{medicamentoId} {
       allow read: if isActiveMember(ownerId);
       allow write: if isClinicAdmin(ownerId);
+    }
+
+    // Colecciones operativas (no financieras) que faltaban aquí — sin esto,
+    // un colaborador (incluso rol "admin") recibía "permission-denied" al
+    // entrar a estos módulos, porque no calzaban con ninguna regla de arriba
+    // y caían en la regla base de users/{userId}/** (solo el dueño).
+    match /users/{ownerId}/depositosDentales/{id} {
+      allow read, write: if isActiveMember(ownerId);
+    }
+    match /users/{ownerId}/articulosFaltantes/{id} {
+      allow read, write: if isActiveMember(ownerId);
+    }
+    match /users/{ownerId}/articulosCaducidad/{id} {
+      allow read, write: if isActiveMember(ownerId);
+    }
+    match /users/{ownerId}/centrosRadiodiagnostico/{id} {
+      allow read, write: if isActiveMember(ownerId);
+    }
+    match /users/{ownerId}/laboratoriosDentales/{id} {
+      allow read, write: if isActiveMember(ownerId);
+    }
+    match /users/{ownerId}/laminas/{id} {
+      allow read, write: if isActiveMember(ownerId);
+    }
+    match /users/{ownerId}/encuestas/{id} {
+      allow read, write: if isActiveMember(ownerId);
+    }
+    match /users/{ownerId}/domiciliaciones/{id} {
+      allow read, write: if isActiveMember(ownerId);
+    }
+    match /users/{ownerId}/promociones/{id} {
+      allow read, write: if isActiveMember(ownerId);
+    }
+    match /users/{ownerId}/aseguradoras/{id} {
+      allow read, write: if isActiveMember(ownerId);
+    }
+    match /users/{ownerId}/empresasRpbi/{id} {
+      allow read, write: if isActiveMember(ownerId);
+    }
+    match /users/{ownerId}/contadores/{id} {
+      allow read, write: if isActiveMember(ownerId);
+    }
+    match /users/{ownerId}/otsLog/{id} {
+      allow read, write: if isActiveMember(ownerId);
+    }
+    match /users/{ownerId}/presupuestosLog/{id} {
+      allow read, write: if isActiveMember(ownerId);
+    }
+    match /users/{ownerId}/pendientes/{id} {
+      allow read, write: if isActiveMember(ownerId);
+    }
+    // Financiero — mismo criterio que pagos: solo admin.
+    match /users/{ownerId}/pagosEliminados/{id} {
+      allow read, write: if isClinicAdmin(ownerId);
+    }
+    match /users/{ownerId}/gastos/{id} {
+      allow read, write: if isClinicAdmin(ownerId);
     }
 
     // ============================================================
