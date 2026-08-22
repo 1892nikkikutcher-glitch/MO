@@ -55,6 +55,29 @@ function WhatsappCell({ valor, onGuardar }: { valor: string; onGuardar: (valor: 
   );
 }
 
+/** Igual que WhatsappCell pero solo dispara onGuardar con un correo que al
+ * menos "parece" correo — una invitación sin correo no puede detectarse
+ * sola al iniciar sesión, así que vale la pena evitar guardar algo a medias
+ * (ej. un nombre a medio escribir) que dé la falsa impresión de que ya
+ * quedó completa. */
+function CorreoCell({ valor, onGuardar }: { valor: string; onGuardar: (valor: string) => void }) {
+  const [texto, setTexto] = useState(valor);
+
+  return (
+    <input
+      type="email"
+      value={texto}
+      onChange={(e) => setTexto(e.target.value)}
+      onBlur={() => {
+        const limpio = texto.trim();
+        if (limpio && limpio !== valor && limpio.includes("@")) onGuardar(limpio);
+      }}
+      placeholder="Agregar correo…"
+      className="w-44 rounded-md border border-accent/40 bg-field px-2 py-1 text-xs text-ink placeholder-ink/30 outline-none focus:border-accent/60"
+    />
+  );
+}
+
 export default function Colaboradores() {
   const {
     miRol,
@@ -65,6 +88,7 @@ export default function Colaboradores() {
     invitarColaborador,
     eliminarInvitacion,
     actualizarWhatsappInvitacion,
+    actualizarCorreoInvitacion,
     eliminarColaborador,
     actualizarRolColaborador,
     actualizarWhatsappColaborador,
@@ -90,7 +114,7 @@ export default function Colaboradores() {
     );
   }
 
-  const puedeInvitar = nombre.trim().length > 0 && correo.trim().length > 0;
+  const puedeInvitar = nombre.trim().length > 0 && (correo.trim().length > 0 || whatsapp.trim().length > 0);
 
   const guardarNombreClinica = () => {
     if (!nombreClinica.trim()) return;
@@ -135,10 +159,17 @@ export default function Colaboradores() {
       </div>
 
       <div className="rounded-2xl border border-accent/30 bg-accent/10 p-4 text-sm text-accent">
-        Los colaboradores con rol &quot;Colaborador&quot; pueden ver pacientes, agenda, recetas y
-        presupuestos, pero <strong>no</strong> ven pagos ni cortes de caja — esa información queda
-        reservada al dueño (rol &quot;Admin&quot;). Al agregar un correo aquí, esa persona debe
-        registrarse en MO con ese mismo correo; en cuanto entre, verá una invitación para unirse.
+        <p>
+          Los colaboradores con rol &quot;Colaborador&quot; pueden ver pacientes, agenda, recetas y
+          presupuestos, pero <strong>no</strong> ven pagos ni cortes de caja — esa información queda
+          reservada al dueño (rol &quot;Admin&quot;).
+        </p>
+        <p className="mt-2">
+          Puedes invitar con correo, con WhatsApp, o con ambos. <strong>Ojo:</strong> MO solo inicia
+          sesión por correo — si invitas nada más con WhatsApp, esa persona igual necesitará
+          registrarse con algún correo, y la invitación no se le mostrará sola hasta que captures ese
+          correo aquí (puedes agregarlo después, en la fila de la invitación pendiente).
+        </p>
       </div>
 
       <div className="space-y-3 rounded-2xl border border-edge/10 bg-surface p-6">
@@ -164,7 +195,7 @@ export default function Colaboradores() {
             type="text"
             value={whatsapp}
             onChange={(e) => setWhatsapp(e.target.value)}
-            placeholder="Número de WhatsApp (opcional)"
+            placeholder="Número de WhatsApp"
             className={inputClass}
           />
           <select value={rol} onChange={(e) => setRol(e.target.value as RolClinica)} className={inputClass}>
@@ -188,7 +219,7 @@ export default function Colaboradores() {
           </h3>
           <div className="space-y-2">
             {invitacionesPendientes.map((inv) => {
-              const inviteId = `${inv.clinicId}_${inv.email}`;
+              const inviteId = inv.id ?? `${inv.clinicId}_${inv.email}`;
               const telefonoLimpio = (inv.whatsapp ?? "").replace(/\D/g, "");
               return (
                 <div
@@ -197,10 +228,20 @@ export default function Colaboradores() {
                 >
                   <div>
                     <span className="font-medium text-ink">{inv.nombre}</span>{" "}
-                    <span className="text-ink/50">· {inv.email}</span>{" "}
+                    {inv.email ? (
+                      <span className="text-ink/50">· {inv.email}</span>
+                    ) : (
+                      <span className="font-semibold text-danger">· Sin correo (no se detectará sola)</span>
+                    )}{" "}
                     <span className="capitalize text-ink/40">· {inv.role}</span>
                   </div>
                   <div className="flex flex-wrap items-center gap-2">
+                    {!inv.email && (
+                      <CorreoCell
+                        valor=""
+                        onGuardar={(correo) => actualizarCorreoInvitacion(inviteId, correo)}
+                      />
+                    )}
                     <WhatsappCell
                       valor={inv.whatsapp ?? ""}
                       onGuardar={(whatsapp) => actualizarWhatsappInvitacion(inviteId, whatsapp)}

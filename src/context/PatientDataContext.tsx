@@ -501,6 +501,7 @@ type PatientDataContextValue = {
   invitarColaborador: (data: { nombre: string; correo: string; whatsapp: string; rol: RolClinica }) => Promise<void>;
   eliminarInvitacion: (inviteId: string) => Promise<void>;
   actualizarWhatsappInvitacion: (inviteId: string, whatsapp: string) => Promise<void>;
+  actualizarCorreoInvitacion: (inviteId: string, correo: string) => Promise<void>;
   eliminarColaborador: (memberId: string) => Promise<void>;
   actualizarRolColaborador: (memberId: string, rol: RolClinica) => Promise<void>;
   actualizarWhatsappColaborador: (memberId: string, whatsapp: string) => Promise<void>;
@@ -711,7 +712,7 @@ export function PatientDataProvider({
         where("clinicId", "==", clinicUid),
         where("status", "==", "pending")
       ),
-      (snap) => setInvitacionesPendientes(snap.docs.map((d) => d.data() as ClinicInvite))
+      (snap) => setInvitacionesPendientes(snap.docs.map((d) => ({ ...(d.data() as ClinicInvite), id: d.id })))
     );
     return () => {
       unsubMembers();
@@ -1434,7 +1435,14 @@ export function PatientDataProvider({
   }) => {
     if (!clinicUid) return;
     const correo = data.correo.trim().toLowerCase();
-    await setDoc(doc(db, "clinicInvites", `${clinicUid}_${correo}`), {
+    // Con correo: id determinístico clinicId_correo — lo que la sesión que
+    // se registra con ese correo puede "reclamar" sola (ver reglas de
+    // Firestore / existsClaimableInvite). Sin correo (solo WhatsApp) no hay
+    // forma de detectar esa sesión automáticamente, así que se usa un id
+    // aparte; agregar el correo después (actualizarCorreoInvitacion) migra
+    // la invitación al id correcto para que sí se pueda reclamar.
+    const inviteId = correo ? `${clinicUid}_${correo}` : `${clinicUid}_pendiente_${Date.now()}`;
+    await setDoc(doc(db, "clinicInvites", inviteId), {
       clinicId: clinicUid,
       nombreClinica: clinicInfo?.nombre || perfilDoctor.nombre || "",
       email: correo,
@@ -1450,9 +1458,26 @@ export function PatientDataProvider({
   };
 
   const actualizarWhatsappInvitacion = async (inviteId: string, whatsapp: string) => {
-    const invite = invitacionesPendientes.find((i) => `${i.clinicId}_${i.email}` === inviteId);
+    const invite = invitacionesPendientes.find((i) => i.id === inviteId);
     if (!invite) return;
     await setDoc(doc(db, "clinicInvites", inviteId), { ...invite, whatsapp }, { merge: true });
+  };
+
+  /** Completa el correo de una invitación que se creó solo con WhatsApp. Como
+   * el id del documento debe ser clinicId_correo para que esa persona pueda
+   * reclamarla sola al iniciar sesión, esto migra el documento (crea uno
+   * nuevo con el id correcto y borra el viejo) en vez de solo actualizar el
+   * campo — de lo contrario el correo quedaría guardado pero la invitación
+   * seguiría sin poder detectarse automáticamente. */
+  const actualizarCorreoInvitacion = async (inviteId: string, correo: string) => {
+    const invite = invitacionesPendientes.find((i) => i.id === inviteId);
+    if (!invite || !clinicUid) return;
+    const correoLimpio = correo.trim().toLowerCase();
+    if (!correoLimpio || correoLimpio === invite.email) return;
+    const nuevoId = `${clinicUid}_${correoLimpio}`;
+    const { id: _id, ...datos } = invite;
+    await setDoc(doc(db, "clinicInvites", nuevoId), { ...datos, email: correoLimpio });
+    if (nuevoId !== inviteId) await deleteDoc(doc(db, "clinicInvites", inviteId));
   };
 
   const eliminarColaborador = async (memberId: string) => {
@@ -1609,6 +1634,7 @@ export function PatientDataProvider({
         invitarColaborador,
         eliminarInvitacion,
         actualizarWhatsappInvitacion,
+        actualizarCorreoInvitacion,
         eliminarColaborador,
         actualizarRolColaborador,
         actualizarWhatsappColaborador,

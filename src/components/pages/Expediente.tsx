@@ -298,11 +298,18 @@ function PresupuestosTab({
                         <span className="text-ink/80">
                           {item.procedure}
                           {item.teeth.length > 0 && (
-                            <span className="ml-2 text-xs font-semibold text-accent/80">
+                            <span className="ml-2 rounded bg-accent/10 px-1.5 py-0.5 text-xs font-semibold text-accent/80">
                               OD {[...item.teeth].sort((a, b) => a - b).join(", ")}
                             </span>
                           )}
-                          {item.note && <span className="ml-2 text-xs text-ink/40">{item.note}</span>}
+                          {/* Característica del renglón (ej. "arcada superior" en una
+                              prótesis) — en su propia píldora para no confundirse con
+                              el nombre del procedimiento o con el diente marcado. */}
+                          {item.note && (
+                            <span className="ml-2 rounded bg-ink/10 px-1.5 py-0.5 text-xs text-ink/50">
+                              {item.note}
+                            </span>
+                          )}
                         </span>
                         <span className="shrink-0 rounded bg-inset px-2 py-0.5 text-xs text-ink/60">
                           {formatCurrency(item.price)}

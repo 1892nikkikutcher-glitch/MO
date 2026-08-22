@@ -438,8 +438,12 @@ export type ClinicMember = {
   status: "active";
 };
 
-/** Documento `clinicInvites/{clinicId}_{correo}` — pendiente hasta que se reclama. */
+/** Documento `clinicInvites/{clinicId}_{correo}` cuando hay correo — pendiente
+ * hasta que se reclama. Sin correo (solo WhatsApp) usa un id distinto, ver
+ * invitarColaborador; en ese caso la invitación no puede auto-detectarse al
+ * iniciar sesión (eso requiere el correo exacto) hasta que se le agregue uno. */
 export type ClinicInvite = {
+  id?: string;
   clinicId: string;
   nombreClinica: string;
   email: string;
