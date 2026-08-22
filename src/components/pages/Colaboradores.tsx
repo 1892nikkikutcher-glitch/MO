@@ -228,20 +228,16 @@ export default function Colaboradores() {
                 >
                   <div>
                     <span className="font-medium text-ink">{inv.nombre}</span>{" "}
-                    {inv.email ? (
-                      <span className="text-ink/50">· {inv.email}</span>
-                    ) : (
-                      <span className="font-semibold text-danger">· Sin correo (no se detectará sola)</span>
-                    )}{" "}
                     <span className="capitalize text-ink/40">· {inv.role}</span>
+                    {!inv.email && (
+                      <span className="ml-2 font-semibold text-danger">Sin correo — no se detectará sola</span>
+                    )}
                   </div>
                   <div className="flex flex-wrap items-center gap-2">
-                    {!inv.email && (
-                      <CorreoCell
-                        valor=""
-                        onGuardar={(correo) => actualizarCorreoInvitacion(inviteId, correo)}
-                      />
-                    )}
+                    <CorreoCell
+                      valor={inv.email}
+                      onGuardar={(correo) => actualizarCorreoInvitacion(inviteId, correo)}
+                    />
                     <WhatsappCell
                       valor={inv.whatsapp ?? ""}
                       onGuardar={(whatsapp) => actualizarWhatsappInvitacion(inviteId, whatsapp)}
