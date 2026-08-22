@@ -500,6 +500,7 @@ type PatientDataContextValue = {
   invitacionesPendientes: ClinicInvite[];
   invitarColaborador: (data: { nombre: string; correo: string; whatsapp: string; rol: RolClinica }) => Promise<void>;
   eliminarInvitacion: (inviteId: string) => Promise<void>;
+  actualizarWhatsappInvitacion: (inviteId: string, whatsapp: string) => Promise<void>;
   eliminarColaborador: (memberId: string) => Promise<void>;
   actualizarRolColaborador: (memberId: string, rol: RolClinica) => Promise<void>;
   actualizarWhatsappColaborador: (memberId: string, whatsapp: string) => Promise<void>;
@@ -1448,6 +1449,12 @@ export function PatientDataProvider({
     await deleteDoc(doc(db, "clinicInvites", inviteId));
   };
 
+  const actualizarWhatsappInvitacion = async (inviteId: string, whatsapp: string) => {
+    const invite = invitacionesPendientes.find((i) => `${i.clinicId}_${i.email}` === inviteId);
+    if (!invite) return;
+    await setDoc(doc(db, "clinicInvites", inviteId), { ...invite, whatsapp }, { merge: true });
+  };
+
   const eliminarColaborador = async (memberId: string) => {
     const miembro = colaboradoresActivos.find((c) => `${c.clinicId}_${c.uid}` === memberId);
     await deleteDoc(doc(db, "clinicMembers", memberId));
@@ -1601,6 +1608,7 @@ export function PatientDataProvider({
         invitacionesPendientes,
         invitarColaborador,
         eliminarInvitacion,
+        actualizarWhatsappInvitacion,
         eliminarColaborador,
         actualizarRolColaborador,
         actualizarWhatsappColaborador,

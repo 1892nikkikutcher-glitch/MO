@@ -9,6 +9,35 @@ import ConfirmarEliminar from "@/components/ConfirmarEliminar";
 const inputClass =
   "w-full rounded-lg border border-edge/10 bg-field px-3 py-2 text-sm text-ink placeholder-ink/30 outline-none focus:border-accent/60";
 
+function WhatsAppIcon() {
+  return (
+    <svg width="15" height="15" viewBox="0 0 24 24" fill="none">
+      <path
+        d="M3 21l1.4-4.2A8.5 8.5 0 1 1 8.3 20.5L3 21ZM8.5 8.3c.2-.5.4-.5.6-.5h.5c.2 0 .4 0 .5.3.2.4.6 1.4.7 1.5.1.1.1.3 0 .4-.1.2-.2.3-.3.4-.2.2-.3.3-.1.6.7 1.1 1.4 1.7 2.5 2.3.2.1.3.1.4-.1.2-.2.5-.6.7-.8.1-.2.3-.2.5-.1.5.2 1.3.6 1.5.7.2.1.3.1.4.3.1.2.1.9-.2 1.4-.3.5-1.1.9-1.6 1-.5 0-1.1.1-3.4-.9-2.4-1.1-3.9-3.5-4.1-3.7-.1-.2-1-1.3-1-2.5s.6-1.7.8-2Z"
+        stroke="currentColor"
+        strokeWidth="1.4"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+    </svg>
+  );
+}
+
+/** Mensaje con las instrucciones para que el invitado se registre con el
+ * correo exacto de la invitación y la acepte — pensado para reenviar la
+ * invitación por WhatsApp cuando el correo se pierde entre spam/promociones. */
+function buildMensajeInvitacion(nombre: string, nombreClinica: string, email: string): string {
+  const origen = typeof window !== "undefined" ? window.location.origin : "";
+  return `Hola ${nombre}, te invité a colaborar conmigo en MO (nuestra plataforma de gestión odontológica) en "${nombreClinica || "mi clínica"}".
+
+Para entrar:
+1. Ve a ${origen}
+2. Regístrate (o inicia sesión si ya tienes cuenta) con este correo exacto: ${email}
+3. En cuanto entres, verás la invitación para unirte — solo acéptala.
+
+Cualquier duda, aquí te ayudo.`;
+}
+
 function WhatsappCell({ valor, onGuardar }: { valor: string; onGuardar: (valor: string) => void }) {
   const [texto, setTexto] = useState(valor);
 
@@ -35,6 +64,7 @@ export default function Colaboradores() {
     invitacionesPendientes,
     invitarColaborador,
     eliminarInvitacion,
+    actualizarWhatsappInvitacion,
     eliminarColaborador,
     actualizarRolColaborador,
     actualizarWhatsappColaborador,
@@ -157,25 +187,54 @@ export default function Colaboradores() {
             Invitaciones Pendientes
           </h3>
           <div className="space-y-2">
-            {invitacionesPendientes.map((inv) => (
-              <div
-                key={`${inv.clinicId}_${inv.email}`}
-                className="flex items-center justify-between rounded-xl border border-edge/10 bg-surface p-3 text-sm"
-              >
-                <div>
-                  <span className="font-medium text-ink">{inv.nombre}</span>{" "}
-                  <span className="text-ink/50">· {inv.email}</span>{" "}
-                  {inv.whatsapp && <span className="text-ink/50">· {inv.whatsapp}</span>}{" "}
-                  <span className="capitalize text-ink/40">· {inv.role}</span>
-                </div>
-                <button
-                  onClick={() => eliminarInvitacion(`${inv.clinicId}_${inv.email}`)}
-                  className="text-xs font-semibold text-danger hover:text-danger"
+            {invitacionesPendientes.map((inv) => {
+              const inviteId = `${inv.clinicId}_${inv.email}`;
+              const telefonoLimpio = (inv.whatsapp ?? "").replace(/\D/g, "");
+              return (
+                <div
+                  key={inviteId}
+                  className="flex flex-col gap-3 rounded-xl border border-edge/10 bg-surface p-3 text-sm sm:flex-row sm:items-center sm:justify-between"
                 >
-                  Cancelar
-                </button>
-              </div>
-            ))}
+                  <div>
+                    <span className="font-medium text-ink">{inv.nombre}</span>{" "}
+                    <span className="text-ink/50">· {inv.email}</span>{" "}
+                    <span className="capitalize text-ink/40">· {inv.role}</span>
+                  </div>
+                  <div className="flex flex-wrap items-center gap-2">
+                    <WhatsappCell
+                      valor={inv.whatsapp ?? ""}
+                      onGuardar={(whatsapp) => actualizarWhatsappInvitacion(inviteId, whatsapp)}
+                    />
+                    <button
+                      onClick={() =>
+                        window.open(
+                          `https://wa.me/${telefonoLimpio}?text=${encodeURIComponent(
+                            buildMensajeInvitacion(inv.nombre, inv.nombreClinica, inv.email)
+                          )}`,
+                          "_blank"
+                        )
+                      }
+                      disabled={!telefonoLimpio}
+                      title={
+                        telefonoLimpio
+                          ? "Enviar/reenviar la invitación por WhatsApp"
+                          : "Agrega un número de WhatsApp para poder enviarla por aquí"
+                      }
+                      className="flex items-center gap-1.5 rounded-lg border border-success/30 px-2.5 py-1.5 text-xs font-semibold text-success/80 transition-colors hover:border-success hover:text-success disabled:cursor-not-allowed disabled:opacity-30 disabled:hover:border-success/30 disabled:hover:text-success/80"
+                    >
+                      <WhatsAppIcon />
+                      Enviar por WhatsApp
+                    </button>
+                    <button
+                      onClick={() => eliminarInvitacion(inviteId)}
+                      className="text-xs font-semibold text-danger hover:text-danger"
+                    >
+                      Cancelar
+                    </button>
+                  </div>
+                </div>
+              );
+            })}
           </div>
         </div>
       )}
