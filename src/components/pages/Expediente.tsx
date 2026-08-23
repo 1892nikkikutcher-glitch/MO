@@ -696,7 +696,7 @@ export default function Expediente({
           ←
         </button>
 
-        <div className="flex min-w-0 flex-1 items-center gap-4">
+        <div className="flex w-full items-center gap-4 sm:w-auto sm:min-w-0 sm:flex-1">
           <div
             className="flex h-16 w-16 shrink-0 items-center justify-center rounded-full text-lg font-bold text-black"
             style={{ backgroundColor: avatarColor }}
