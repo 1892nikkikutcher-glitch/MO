@@ -8,4 +8,7 @@ export type Pendiente = {
   completado: boolean;
   creadoEn: string;
   completadoEn: string | null;
+  /** true si ya se copió a Faltantes por Surtir (Depósito Dental) — evita
+   * mandarlo dos veces por accidente. */
+  enviadoADeposito?: boolean;
 };

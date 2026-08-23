@@ -3,7 +3,22 @@
 import { useState } from "react";
 import { usePatientData } from "@/context/PatientDataContext";
 import type { Pendiente } from "@/lib/pendientes";
+import type { ArticuloFaltante } from "@/lib/depositoDental";
 import ConfirmarEliminar from "@/components/ConfirmarEliminar";
+
+function BoxIcon() {
+  return (
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none">
+      <path
+        d="M21 8 12 3 3 8l9 5 9-5ZM3 8v9l9 5M21 8v9l-9 5M12 13v9"
+        stroke="currentColor"
+        strokeWidth="1.8"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+    </svg>
+  );
+}
 
 function TrashIcon() {
   return (
@@ -20,7 +35,7 @@ function TrashIcon() {
 }
 
 export default function PendientesConsultorio() {
-  const { pendientes, setPendientes } = usePatientData();
+  const { pendientes, setPendientes, setArticulosFaltantes } = usePatientData();
   const [agregando, setAgregando] = useState(false);
   const [texto, setTexto] = useState("");
   const [verCompletados, setVerCompletados] = useState(false);
@@ -60,6 +75,24 @@ export default function PendientesConsultorio() {
 
   const eliminar = (id: string) => {
     setPendientes((prev) => prev.filter((x) => x.id !== id));
+  };
+
+  /** Copia el texto del pendiente a Faltantes por Surtir (Depósito Dental)
+   * — para algo como "comprar una corona para un paciente", así no hay que
+   * escribirlo dos veces ni llevar dos listas separadas de compras. */
+  const enviarADeposito = (p: Pendiente) => {
+    const nuevo: ArticuloFaltante = {
+      id: `f${Date.now()}`,
+      nombre: p.texto,
+      tipo: "Otro",
+      cantidad: "",
+      urgencia: "Media",
+      depositoId: "",
+      surtido: false,
+      creadoEn: new Date().toISOString(),
+    };
+    setArticulosFaltantes((prev) => [nuevo, ...prev]);
+    setPendientes((prev) => prev.map((x) => (x.id === p.id ? { ...x, enviadoADeposito: true } : x)));
   };
 
   return (
@@ -137,6 +170,19 @@ export default function PendientesConsultorio() {
               className="h-4 w-4 shrink-0 accent-accent"
             />
             <span className="flex-1 text-sm text-ink">{p.texto}</span>
+            <button
+              onClick={() => !p.enviadoADeposito && enviarADeposito(p)}
+              disabled={p.enviadoADeposito}
+              title={
+                p.enviadoADeposito
+                  ? "Ya está en Faltantes por Surtir (Depósito Dental)"
+                  : "Agregar también a Faltantes por Surtir (Depósito Dental)"
+              }
+              className="flex shrink-0 items-center gap-1.5 rounded-lg border border-edge/15 px-2 py-1 text-xs font-medium text-ink/50 transition-colors hover:border-accent/50 hover:text-accent disabled:cursor-default disabled:border-success/30 disabled:text-success/70 disabled:hover:border-success/30 disabled:hover:text-success/70"
+            >
+              <BoxIcon />
+              {p.enviadoADeposito ? "En Depósito Dental" : "Depósito Dental"}
+            </button>
             <button
               onClick={() => setPendienteAEliminar(p)}
               title="Eliminar pendiente"
