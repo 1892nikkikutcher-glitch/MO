@@ -14,6 +14,28 @@ export const tipoPreguntaLabel: Record<TipoPregunta, string> = {
   listaPrioridad: "Lista numerada (plan de tratamiento)",
 };
 
+/** Fases del plan de tratamiento — mismo vocabulario en Historia Clínica
+ * (plan sugerido) y en Presupuestos (para agrupar el historial completo de
+ * un paciente por tandas de tratamiento). */
+export const fasesTratamiento = ["I", "II", "III", "Ortodoncia"] as const;
+export type FaseTratamiento = (typeof fasesTratamiento)[number];
+
+export const faseInfo: Record<FaseTratamiento, { titulo: string; descripcion: string }> = {
+  I: {
+    titulo: "Fase I",
+    descripcion: "Motivo de consulta, limpieza bucal. Disminución de carga bacteriana, curetajes cerrados.",
+  },
+  II: { titulo: "Fase II", descripcion: "Operatoria dental" },
+  III: {
+    titulo: "Fase III",
+    descripcion: "Exodoncias, endodoncias, cirugías, injertos, curetajes abiertos.",
+  },
+  Ortodoncia: {
+    titulo: "Fase IV",
+    descripcion: "Fase ortodóncica, fase protésica.",
+  },
+};
+
 export type PreguntaTemplate = {
   id: string;
   tipo: TipoPregunta;

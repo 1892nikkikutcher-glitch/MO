@@ -3,6 +3,7 @@
 import { useEffect, useState, type Dispatch, type SetStateAction } from "react";
 import NuevoPresupuesto from "./NuevoPresupuesto";
 import PresupuestoImpreso from "./PresupuestoImpreso";
+import PresupuestoTotalImpreso from "./PresupuestoTotalImpreso";
 import DatosPaciente from "./DatosPaciente";
 import HistoriaClinica from "./HistoriaClinica";
 import ListadoCitas from "./ListadoCitas";
@@ -184,6 +185,7 @@ function PresupuestosTab({
   const [view, setView] = useState<"list" | "form">("list");
   const [editingBudget, setEditingBudget] = useState<SavedBudget | null>(null);
   const [printTarget, setPrintTarget] = useState<SavedBudget | null>(null);
+  const [printAll, setPrintAll] = useState(false);
   const [enviandoWhatsAppId, setEnviandoWhatsAppId] = useState<string | null>(null);
   const [presupuestoAEliminar, setPresupuestoAEliminar] = useState<SavedBudget | null>(null);
 
@@ -192,6 +194,12 @@ function PresupuestosTab({
       window.print();
     }
   }, [printTarget]);
+
+  useEffect(() => {
+    if (printAll) {
+      window.print();
+    }
+  }, [printAll]);
 
   const enviarPresupuestoGuardado = async (budget: SavedBudget) => {
     if (enviandoWhatsAppId) return;
@@ -263,16 +271,27 @@ function PresupuestosTab({
         <h3 className="text-sm font-semibold uppercase tracking-wide text-ink/60">
           Presupuestos
         </h3>
-        <button
-          onClick={() => {
-            setEditingBudget(null);
-            setView("form");
-          }}
-          className="rounded-lg border border-accent/50 bg-accent/10 px-4 py-2 text-xs font-semibold text-accent transition-colors hover:bg-accent/20"
-          style={{ boxShadow: "0 0 12px -2px rgb(var(--accent-rgb) / 0.5)" }}
-        >
-          + Nuevo Presupuesto
-        </button>
+        <div className="flex items-center gap-2">
+          {presupuestos.length > 0 && (
+            <button
+              onClick={() => setPrintAll(true)}
+              title="Imprime todos los folios de este paciente juntos, con el total general"
+              className="rounded-lg border border-edge/15 px-4 py-2 text-xs font-semibold text-ink/70 transition-colors hover:bg-surface"
+            >
+              Imprimir presupuesto completo
+            </button>
+          )}
+          <button
+            onClick={() => {
+              setEditingBudget(null);
+              setView("form");
+            }}
+            className="rounded-lg border border-accent/50 bg-accent/10 px-4 py-2 text-xs font-semibold text-accent transition-colors hover:bg-accent/20"
+            style={{ boxShadow: "0 0 12px -2px rgb(var(--accent-rgb) / 0.5)" }}
+          >
+            + Nuevo Presupuesto
+          </button>
+        </div>
       </div>
 
       {presupuestos.length === 0 ? (
@@ -421,6 +440,16 @@ function PresupuestosTab({
           diagnostico={printTarget.diagnostico}
           items={printTarget.items}
           total={printTarget.total}
+        />
+      )}
+
+      {printAll && (
+        <PresupuestoTotalImpreso
+          presupuestos={presupuestos}
+          fechaLarga={fechaLargaHoy()}
+          pacienteNombre={patient.name}
+          pacienteCorreo={patient.email ?? ""}
+          pacienteTelefono={patient.phone}
         />
       )}
     </div>
