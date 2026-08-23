@@ -379,11 +379,15 @@ export default function Colaboradores() {
                         </select>
                       </td>
                       <td className="px-6 py-3">
-                        <RecursosVisiblesCell
-                          recursos={recursos}
-                          seleccionados={c.recursosVisibles}
-                          onGuardar={(ids) => actualizarRecursosVisiblesColaborador(memberId, ids)}
-                        />
+                        {esUnoMismo ? (
+                          <span className="text-xs text-ink/40">Todos (eres el dueño)</span>
+                        ) : (
+                          <RecursosVisiblesCell
+                            recursos={recursos}
+                            seleccionados={c.recursosVisibles}
+                            onGuardar={(ids) => actualizarRecursosVisiblesColaborador(memberId, ids)}
+                          />
+                        )}
                       </td>
                       <td className="px-6 py-3 text-right">
                         {!esUnoMismo && (
