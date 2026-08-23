@@ -346,7 +346,7 @@ export default function AgendaCitaDialog({
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4">
       <div className="max-h-[90vh] w-full max-w-5xl overflow-y-auto rounded-2xl border border-edge/10 bg-modal-solid p-6">
-        <div className="relative mb-4 flex items-center justify-between">
+        <div className="mb-4 flex flex-col gap-3 sm:relative sm:flex-row sm:items-center sm:justify-between">
           <div>
             <h2 className="text-lg font-semibold text-ink">
               {isEditing ? "Editar Cita" : "Nueva Cita"}
@@ -377,7 +377,10 @@ export default function AgendaCitaDialog({
             </div>
           </div>
           {isEditing && (
-            <div className="absolute left-1/2 top-0 flex -translate-x-1/2 items-center gap-1.5">
+            // En mobile son parte del flujo normal (su propia fila, centradas);
+            // desde sm: se posicionan absolutas para quedar centradas sobre
+            // todo el encabezado sin chocar con el título ni los íconos.
+            <div className="flex items-center justify-center gap-1.5 sm:absolute sm:left-1/2 sm:top-0 sm:-translate-x-1/2">
               <button
                 type="button"
                 onClick={() => citaAnterior && onNavegarCita(citaAnterior)}
