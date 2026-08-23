@@ -55,6 +55,24 @@ function WhatsappCell({ valor, onGuardar }: { valor: string; onGuardar: (valor: 
   );
 }
 
+function NombreCell({ valor, onGuardar }: { valor: string; onGuardar: (valor: string) => void }) {
+  const [texto, setTexto] = useState(valor);
+
+  return (
+    <input
+      type="text"
+      value={texto}
+      onChange={(e) => manejarCambioNombre(e, setTexto)}
+      onBlur={() => {
+        const limpio = texto.trim();
+        if (limpio && limpio !== valor) onGuardar(limpio);
+      }}
+      placeholder="Nombre completo"
+      className="w-36 rounded-md border border-edge/10 bg-field px-2 py-1 text-xs text-ink placeholder-ink/30 outline-none focus:border-accent/60"
+    />
+  );
+}
+
 /** Igual que WhatsappCell pero solo dispara onGuardar con un correo que al
  * menos "parece" correo — una invitación sin correo no puede detectarse
  * sola al iniciar sesión, así que vale la pena evitar guardar algo a medias
@@ -143,6 +161,8 @@ export default function Colaboradores() {
     eliminarColaborador,
     actualizarRolColaborador,
     actualizarWhatsappColaborador,
+    actualizarNombreColaborador,
+    actualizarCorreoColaborador,
   } = usePatientData();
 
   const [nombreClinica, setNombreClinica] = useState(clinicInfo?.nombre ?? "");
@@ -359,8 +379,18 @@ export default function Colaboradores() {
                   const esUnoMismo = c.clinicId === c.uid;
                   return (
                     <tr key={memberId} className="border-b border-edge/5 last:border-0">
-                      <td className="px-6 py-3 text-ink">{c.nombre || "—"}</td>
-                      <td className="px-6 py-3 text-ink/70">{c.correo}</td>
+                      <td className="px-6 py-3">
+                        <NombreCell
+                          valor={c.nombre}
+                          onGuardar={(nombre) => actualizarNombreColaborador(memberId, nombre)}
+                        />
+                      </td>
+                      <td className="px-6 py-3">
+                        <CorreoCell
+                          valor={c.correo}
+                          onGuardar={(correo) => actualizarCorreoColaborador(memberId, correo)}
+                        />
+                      </td>
                       <td className="px-6 py-3">
                         <WhatsappCell
                           valor={c.whatsapp ?? ""}

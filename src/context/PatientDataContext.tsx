@@ -518,6 +518,8 @@ type PatientDataContextValue = {
   eliminarColaborador: (memberId: string) => Promise<void>;
   actualizarRolColaborador: (memberId: string, rol: RolClinica) => Promise<void>;
   actualizarWhatsappColaborador: (memberId: string, whatsapp: string) => Promise<void>;
+  actualizarNombreColaborador: (memberId: string, nombre: string) => Promise<void>;
+  actualizarCorreoColaborador: (memberId: string, correo: string) => Promise<void>;
 };
 
 const PatientDataContext = createContext<PatientDataContextValue | null>(null);
@@ -1515,6 +1517,21 @@ export function PatientDataProvider({
     await setDoc(doc(db, "clinicMembers", memberId), { ...miembro, whatsapp }, { merge: true });
   };
 
+  const actualizarNombreColaborador = async (memberId: string, nombre: string) => {
+    const miembro = colaboradoresActivos.find((c) => `${c.clinicId}_${c.uid}` === memberId);
+    if (!miembro) return;
+    await setDoc(doc(db, "clinicMembers", memberId), { ...miembro, nombre }, { merge: true });
+  };
+
+  /** Solo actualiza el correo de contacto guardado en clinicMembers — no
+   * cambia el correo real de inicio de sesión en Firebase Auth, que es lo
+   * que de verdad determina el acceso. */
+  const actualizarCorreoColaborador = async (memberId: string, correo: string) => {
+    const miembro = colaboradoresActivos.find((c) => `${c.clinicId}_${c.uid}` === memberId);
+    if (!miembro) return;
+    await setDoc(doc(db, "clinicMembers", memberId), { ...miembro, correo }, { merge: true });
+  };
+
   /** null o arreglo vacío = sin restricción (ve todos los calendarios). Un
    * arreglo con al menos un id limita a ese colaborador a solo esos
    * recursos — reforzado también en firestore.rules, no es solo un filtro
@@ -1667,6 +1684,8 @@ export function PatientDataProvider({
         eliminarColaborador,
         actualizarRolColaborador,
         actualizarWhatsappColaborador,
+        actualizarNombreColaborador,
+        actualizarCorreoColaborador,
       }}
     >
       {children}
