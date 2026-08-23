@@ -238,6 +238,11 @@ function useClinicInfo(clinicUid: string | null) {
 function useClinicResolution(authUid: string, authEmail: string) {
   const [clinicUid, setClinicUid] = useState<string | null>(null);
   const [rol, setRol] = useState<RolClinica | null>(null);
+  // null = sin restricción (ve todos los recursos/calendarios, como el
+  // dueño o un colaborador al que nunca se le configuró un límite).
+  // Un arreglo (incluso vacío se trata como sin restricción, ver abajo)
+  // limita la Agenda/citas a esos recursos únicamente.
+  const [misRecursosVisibles, setMisRecursosVisibles] = useState<string[] | null>(null);
   const [pendingInvite, setPendingInvite] = useState<ClinicInvite | null>(null);
   const [resolved, setResolved] = useState(false);
 
@@ -265,6 +270,9 @@ function useClinicResolution(authUid: string, authEmail: string) {
         if (!cancelled) {
           setClinicUid(externa.clinicId);
           setRol(externa.role);
+          setMisRecursosVisibles(
+            externa.recursosVisibles && externa.recursosVisibles.length > 0 ? externa.recursosVisibles : null
+          );
         }
       } else {
         const propia = membresias.find((m) => m.clinicId === authUid);
@@ -354,7 +362,7 @@ function useClinicResolution(authUid: string, authEmail: string) {
 
   const rechazarInvite = () => setPendingInvite(null);
 
-  return { clinicUid, rol, resolved, pendingInvite, aceptarInvite, rechazarInvite };
+  return { clinicUid, rol, misRecursosVisibles, resolved, pendingInvite, aceptarInvite, rechazarInvite };
 }
 
 export type NavegacionExpediente = { patientId: string; tab?: string } | null;
@@ -490,6 +498,11 @@ type PatientDataContextValue = {
   ayudaContexto: string | null;
   setAyudaContexto: (contexto: string | null) => void;
   miRol: RolClinica | null;
+  /** null = ve todos los recursos/calendarios de la Agenda. Un arreglo
+   * limita qué recursos (médicos/unidades) puede ver este colaborador —
+   * ver actualizarRecursosVisiblesColaborador. */
+  misRecursosVisibles: string[] | null;
+  actualizarRecursosVisiblesColaborador: (memberId: string, recursoIds: string[] | null) => Promise<void>;
   puedeVerFinanzas: boolean;
   clinicInfo: ClinicInfo | null;
   setClinicInfo: (updater: Updater<ClinicInfo>) => void;
@@ -520,7 +533,7 @@ export function PatientDataProvider({
   onIrAPagina?: (pageId: string) => void;
   children: ReactNode;
 }) {
-  const { clinicUid, rol, resolved, pendingInvite, aceptarInvite, rechazarInvite } =
+  const { clinicUid, rol, misRecursosVisibles, resolved, pendingInvite, aceptarInvite, rechazarInvite } =
     useClinicResolution(uid, userEmail);
   const [clinicInfo, setClinicInfo] = useClinicInfo(clinicUid);
 
@@ -1502,6 +1515,20 @@ export function PatientDataProvider({
     await setDoc(doc(db, "clinicMembers", memberId), { ...miembro, whatsapp }, { merge: true });
   };
 
+  /** null o arreglo vacío = sin restricción (ve todos los calendarios). Un
+   * arreglo con al menos un id limita a ese colaborador a solo esos
+   * recursos — reforzado también en firestore.rules, no es solo un filtro
+   * de interfaz. */
+  const actualizarRecursosVisiblesColaborador = async (memberId: string, recursoIds: string[] | null) => {
+    const miembro = colaboradoresActivos.find((c) => `${c.clinicId}_${c.uid}` === memberId);
+    if (!miembro) return;
+    await setDoc(
+      doc(db, "clinicMembers", memberId),
+      { ...miembro, recursosVisibles: recursoIds && recursoIds.length > 0 ? recursoIds : [] },
+      { merge: true }
+    );
+  };
+
   if (!resolved) {
     return (
       <div className="flex min-h-screen items-center justify-center bg-app text-ink/40">
@@ -1623,6 +1650,8 @@ export function PatientDataProvider({
         ayudaContexto,
         setAyudaContexto,
         miRol: rol,
+        misRecursosVisibles,
+        actualizarRecursosVisiblesColaborador,
         puedeVerFinanzas: rol === "admin",
         clinicInfo,
         setClinicInfo,

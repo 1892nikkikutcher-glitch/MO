@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { usePatientData } from "@/context/PatientDataContext";
-import type { RolClinica } from "@/lib/patientData";
+import type { RolClinica, Recurso } from "@/lib/patientData";
 import { manejarCambioNombre } from "@/lib/textoNombre";
 import ConfirmarEliminar from "@/components/ConfirmarEliminar";
 
@@ -78,6 +78,55 @@ function CorreoCell({ valor, onGuardar }: { valor: string; onGuardar: (valor: st
   );
 }
 
+/** Multi-selección compacta de a cuáles recursos (médicos/unidades) puede
+ * ver este colaborador en la Agenda — "Ver todos" (sin restricción, por
+ * default) o una lista específica, ej. solo la unidad "Almoloya". */
+function RecursosVisiblesCell({
+  recursos,
+  seleccionados,
+  onGuardar,
+}: {
+  recursos: Recurso[];
+  seleccionados: string[] | undefined;
+  onGuardar: (ids: string[] | null) => void;
+}) {
+  const restringido = (seleccionados?.length ?? 0) > 0;
+
+  return (
+    <details className="relative">
+      <summary className="w-40 cursor-pointer list-none rounded-md border border-edge/10 bg-field px-2 py-1 text-xs text-ink outline-none hover:border-accent/40">
+        {restringido ? `${seleccionados!.length} calendario(s)` : "Todos los calendarios"}
+      </summary>
+      <div className="absolute z-10 mt-1 w-56 space-y-1.5 rounded-lg border border-edge/10 bg-modal p-3 shadow-lg">
+        <label className="flex items-center gap-2 border-b border-edge/10 pb-1.5 text-xs font-semibold text-ink">
+          <input type="checkbox" checked={!restringido} onChange={() => onGuardar(null)} />
+          Ver todos los calendarios
+        </label>
+        <div className="max-h-40 space-y-1 overflow-y-auto">
+          {recursos.map((r) => {
+            const marcado = seleccionados?.includes(r.id) ?? false;
+            return (
+              <label key={r.id} className="flex items-center gap-2 text-xs text-ink/80">
+                <input
+                  type="checkbox"
+                  checked={marcado}
+                  onChange={() => {
+                    const actuales = seleccionados ?? [];
+                    const siguientes = marcado ? actuales.filter((id) => id !== r.id) : [...actuales, r.id];
+                    onGuardar(siguientes);
+                  }}
+                />
+                <span className="h-2 w-2 shrink-0 rounded-full" style={{ backgroundColor: r.color }} />
+                {r.nombre}
+              </label>
+            );
+          })}
+        </div>
+      </div>
+    </details>
+  );
+}
+
 export default function Colaboradores() {
   const {
     miRol,
@@ -85,6 +134,8 @@ export default function Colaboradores() {
     setClinicInfo,
     colaboradoresActivos,
     invitacionesPendientes,
+    recursos,
+    actualizarRecursosVisiblesColaborador,
     invitarColaborador,
     eliminarInvitacion,
     actualizarWhatsappInvitacion,
@@ -169,6 +220,11 @@ export default function Colaboradores() {
           sesión por correo — si invitas nada más con WhatsApp, esa persona igual necesitará
           registrarse con algún correo, y la invitación no se le mostrará sola hasta que captures ese
           correo aquí (puedes agregarlo después, en la fila de la invitación pendiente).
+        </p>
+        <p className="mt-2">
+          En &quot;Calendarios que ve&quot; controlas qué recursos (médicos/unidades) de la Agenda
+          puede ver cada colaborador — por default ve todos; puedes limitarlo a solo uno o algunos
+          (ej. solo la unidad de otro consultorio).
         </p>
       </div>
 
@@ -293,6 +349,7 @@ export default function Colaboradores() {
                   <th className="px-6 py-3 font-medium">Correo</th>
                   <th className="px-6 py-3 font-medium">WhatsApp</th>
                   <th className="px-6 py-3 font-medium">Rol</th>
+                  <th className="px-6 py-3 font-medium">Calendarios que ve</th>
                   <th className="px-6 py-3 text-right font-medium">Quitar</th>
                 </tr>
               </thead>
@@ -320,6 +377,13 @@ export default function Colaboradores() {
                           <option value="colaborador">Colaborador</option>
                           <option value="admin">Admin</option>
                         </select>
+                      </td>
+                      <td className="px-6 py-3">
+                        <RecursosVisiblesCell
+                          recursos={recursos}
+                          seleccionados={c.recursosVisibles}
+                          onGuardar={(ids) => actualizarRecursosVisiblesColaborador(memberId, ids)}
+                        />
                       </td>
                       <td className="px-6 py-3 text-right">
                         {!esUnoMismo && (

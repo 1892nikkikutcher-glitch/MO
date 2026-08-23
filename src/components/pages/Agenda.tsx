@@ -72,9 +72,9 @@ function useCitasEnRango(clinicUid: string | null, desdeISO: string, hastaISO: s
 
 export default function Agenda() {
   const {
-    recursos,
+    recursos: recursosDeLaClinica,
     setRecursos,
-    citas,
+    citas: citasDeLaClinica,
     setCitas,
     clinicUid,
     horario,
@@ -86,7 +86,25 @@ export default function Agenda() {
     colaboradoresActivos,
     irAPagina,
     procedimientos,
+    misRecursosVisibles,
   } = usePatientData();
+  // Si este colaborador tiene un límite de calendarios configurado
+  // (Administración → Colaboradores), toda la Agenda — tarjetas, columnas,
+  // conflictos, recordatorios de WhatsApp — trabaja solo con ese
+  // subconjunto. La restricción real vive en firestore.rules; esto es para
+  // que la interfaz tampoco muestre lo que no debe.
+  const recursos = misRecursosVisibles
+    ? recursosDeLaClinica.filter((r) => misRecursosVisibles.includes(r.id))
+    : recursosDeLaClinica;
+  const idsRecursosVisibles = new Set(recursos.map((r) => r.id));
+  const citas = misRecursosVisibles
+    ? citasDeLaClinica.filter(
+        (c) =>
+          (!!c.medicoId && idsRecursosVisibles.has(c.medicoId)) ||
+          (!!c.unidadId && idsRecursosVisibles.has(c.unidadId)) ||
+          (!!c.recursoId && idsRecursosVisibles.has(c.recursoId))
+      )
+    : citasDeLaClinica;
   /** La agenda siempre se ve/agenda de 7am a 22h como base (para casos
    * extemporáneos), pero si el horario de atención configurado es más
    * amplio, se extiende para que ese horario quede disponible también. */

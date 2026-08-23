@@ -436,6 +436,10 @@ export type ClinicMember = {
   whatsapp?: string;
   role: RolClinica;
   status: "active";
+  /** Ausente o vacío = sin restricción, ve todos los recursos/calendarios
+   * de la Agenda. Con al menos un id de recurso (médico o unidad), limita
+   * qué citas puede ver/editar este colaborador — ver firestore.rules. */
+  recursosVisibles?: string[];
 };
 
 /** Documento `clinicInvites/{clinicId}_{correo}` cuando hay correo — pendiente
