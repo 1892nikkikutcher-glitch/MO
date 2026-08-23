@@ -42,6 +42,26 @@ service cloud.firestore {
       return isActiveMember(clinicId) && memberRole(clinicId) in ['odontologo', 'admin'];
     }
 
+    // MO: un colaborador puede tener limitado a cuáles recursos (médicos/
+    // unidades) de la Agenda puede ver — configurado en Administración >
+    // Colaboradores (campo recursosVisibles en clinicMembers). Ausente o
+    // vacío = sin restricción (ve todos, comportamiento de siempre).
+    function tieneAccesoACita(clinicId, citaData) {
+      // .get(key, default) en vez de acceso directo (citaData.medicoId) a
+      // propósito: una cita legada puede no tener alguno de estos campos
+      // en absoluto (no solo en null), y el acceso directo a una llave
+      // ausente truena la regla completa en vez de simplemente dar false.
+      let limite = memberDoc(clinicId).data.get('recursosVisibles', []);
+      let medicoId = citaData.get('medicoId', null);
+      let unidadId = citaData.get('unidadId', null);
+      let recursoId = citaData.get('recursoId', null);
+      return isActiveMember(clinicId)
+        && (limite.size() == 0
+            || (medicoId != null && medicoId in limite)
+            || (unidadId != null && unidadId in limite)
+            || (recursoId != null && recursoId in limite));
+    }
+
     // MO: verifica si hay una invitación pendiente reclamable para el correo
     // de la sesión actual, con el mismo rol que se está intentando auto-asignar.
     function existsClaimableInvite(clinicId, role) {
@@ -167,7 +187,8 @@ service cloud.firestore {
       allow read, write: if isActiveMember(ownerId);
     }
     match /users/{ownerId}/citas/{citaId} {
-      allow read, write: if isActiveMember(ownerId);
+      allow read, update, delete: if tieneAccesoACita(ownerId, resource.data);
+      allow create: if tieneAccesoACita(ownerId, request.resource.data);
     }
     match /users/{ownerId}/config/{configId} {
       allow read: if isActiveMember(ownerId);
