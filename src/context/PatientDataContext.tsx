@@ -72,6 +72,7 @@ import {
 } from "@/lib/presupuestosPendientesDetalle";
 import type { PresupuestoLogEntry } from "@/lib/presupuestosLog";
 import type { OtLogEntry } from "@/lib/otsLog";
+import type { RecetaLogEntry } from "@/lib/recetasLog";
 import type { EncuestaEnviada } from "@/lib/encuestas";
 import type { Pendiente } from "@/lib/pendientes";
 import type { Domiciliacion } from "@/lib/domiciliacion";
@@ -412,6 +413,8 @@ type PatientDataContextValue = {
   setPresupuestosLog: (updater: Updater<PresupuestoLogEntry[]>) => void;
   otsLog: OtLogEntry[];
   setOtsLog: (updater: Updater<OtLogEntry[]>) => void;
+  recetasLog: RecetaLogEntry[];
+  setRecetasLog: (updater: Updater<RecetaLogEntry[]>) => void;
   domiciliaciones: Domiciliacion[];
   setDomiciliaciones: (updater: Updater<Domiciliacion[]>) => void;
   encuestas: EncuestaEnviada[];
@@ -622,6 +625,7 @@ export function PatientDataProvider({
     "presupuestosLog"
   );
   const [otsLog, setOtsLog] = useFirestoreList<OtLogEntry>(clinicUid, "otsLog");
+  const [recetasLog, setRecetasLog] = useFirestoreList<RecetaLogEntry>(clinicUid, "recetasLog");
   const [domiciliaciones, setDomiciliaciones] = useFirestoreList<Domiciliacion>(
     clinicUid,
     "domiciliaciones"
@@ -1170,14 +1174,33 @@ export function PatientDataProvider({
     setPagosPorPacienteState((prev) => ({ ...prev, [patientId]: next }));
   };
 
+  /** Agrega a `recetasLog` (tabla al final de Recetas) cada receta nueva —
+   * bitácora de creación, mismo patrón que `presupuestosLog`/`otsLog`. */
+  const registrarLogRecetas = (patientId: string, prevArr: Receta[], next: Receta[]) => {
+    const prevIds = new Set(prevArr.map((r) => r.id));
+    const nuevas = next.filter((r) => !prevIds.has(r.id));
+    if (nuevas.length === 0) return;
+    const patientName = patients.find((p) => p.id === patientId)?.name ?? "";
+    const entradas: RecetaLogEntry[] = nuevas.map((r) => ({
+      id: r.id,
+      patientId,
+      patientName,
+      folio: r.folio,
+      fecha: r.fecha,
+      medico: r.medico,
+      medicamentos: r.medicamentos.map((m) => m.nombre),
+      creadoEn: new Date().toISOString(),
+    }));
+    setRecetasLog((prev) => [...entradas, ...prev]);
+  };
+
   const setRecetasPaciente = (patientId: string, updater: Updater<Receta[]>) => {
     if (!clinicUid) return;
-    setRecetasPorPacienteState((prev) => {
-      const prevArr = prev[patientId] ?? [];
-      const next = resolveUpdater(updater, prevArr);
-      syncFirestoreList(`users/${clinicUid}/pacientes/${patientId}/recetas`, prevArr, next);
-      return { ...prev, [patientId]: next };
-    });
+    const prevArr = recetasPorPaciente[patientId] ?? [];
+    const next = resolveUpdater(updater, prevArr);
+    syncFirestoreList(`users/${clinicUid}/pacientes/${patientId}/recetas`, prevArr, next);
+    registrarLogRecetas(patientId, prevArr, next);
+    setRecetasPorPacienteState((prev) => ({ ...prev, [patientId]: next }));
   };
 
   /** Agrega a `otsLog` (Reportes → OTs) cada solicitud de laboratorio nueva
@@ -1596,6 +1619,8 @@ export function PatientDataProvider({
         setPresupuestosLog,
         otsLog,
         setOtsLog,
+        recetasLog,
+        setRecetasLog,
         domiciliaciones,
         setDomiciliaciones,
         encuestas,

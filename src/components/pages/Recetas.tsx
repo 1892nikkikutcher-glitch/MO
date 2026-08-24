@@ -51,6 +51,20 @@ function horaActualFormateada() {
 }
 
 
+function TrashIcon() {
+  return (
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none">
+      <path
+        d="M3 6h18M8 6V4a1 1 0 0 1 1-1h6a1 1 0 0 1 1 1v2m2 0-1 14a1 1 0 0 1-1 1H7a1 1 0 0 1-1-1L5 6h14Z"
+        stroke="currentColor"
+        strokeWidth="1.8"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+    </svg>
+  );
+}
+
 function fechaLargaHoy() {
   const texto = new Date().toLocaleDateString("es-MX", {
     weekday: "long",
@@ -74,6 +88,8 @@ export default function Recetas() {
     consumirSiguienteFolioReceta,
     historiaClinicaPorPaciente,
     historiaClinicaTemplate,
+    recetasLog,
+    setRecetasLog,
   } = usePatientData();
   const medicos = recursos.filter((r) => r.tipo === "medico");
 
@@ -96,6 +112,7 @@ export default function Recetas() {
   const [folioActual, setFolioActual] = useState<string | null>(null);
   const [horaActual, setHoraActual] = useState<string | null>(null);
   const [enviandoWhatsApp, setEnviandoWhatsApp] = useState(false);
+  const [busquedaBitacora, setBusquedaBitacora] = useState("");
 
   const patient = patients.find((p) => p.id === patientId) ?? null;
   const edad = patient ? calculateAge(patient.birthDate) : null;
@@ -307,6 +324,17 @@ export default function Recetas() {
   };
 
   const recetasPrevias = patientId ? recetasPorPaciente[patientId] ?? [] : [];
+
+  const busquedaBitacoraTrim = busquedaBitacora.trim().toLowerCase();
+  const bitacoraFiltrada = [...recetasLog]
+    .sort((a, b) => b.creadoEn.localeCompare(a.creadoEn))
+    .filter(
+      (r) =>
+        !busquedaBitacoraTrim ||
+        r.patientName.toLowerCase().includes(busquedaBitacoraTrim) ||
+        r.medicamentos.some((m) => m.toLowerCase().includes(busquedaBitacoraTrim)) ||
+        r.folio.toLowerCase().includes(busquedaBitacoraTrim)
+    );
   const esMedicamentoPediatrico = medicamentoParaConfirmar?.tipoPaciente === "pediatrico";
 
   return (
@@ -564,6 +592,77 @@ export default function Recetas() {
           </div>
         </div>
       )}
+
+      <div className="space-y-4 print:hidden">
+        <div className="flex flex-wrap items-end justify-between gap-3">
+          <div>
+            <h3 className="text-sm font-semibold uppercase tracking-wide text-ink/60">
+              Recetas expedidas
+            </h3>
+            <p className="mt-1 text-xs text-ink/40">
+              Bitácora de todas las recetas guardadas, para poder consultarlas después sin abrir
+              cada expediente.
+            </p>
+          </div>
+          <input
+            type="text"
+            value={busquedaBitacora}
+            onChange={(e) => setBusquedaBitacora(e.target.value)}
+            placeholder="Buscar por paciente, medicamento o folio..."
+            className={`${inputClass} sm:w-72`}
+          />
+        </div>
+
+        {bitacoraFiltrada.length === 0 ? (
+          <div className="rounded-2xl border border-dashed border-edge/15 bg-surface p-10 text-center text-sm text-ink/40">
+            {recetasLog.length === 0
+              ? "Aún no se ha guardado ninguna receta."
+              : "Ninguna receta coincide con esa búsqueda."}
+          </div>
+        ) : (
+          <div className="overflow-x-auto rounded-2xl border border-edge/10 bg-surface">
+            <table className="w-full text-left text-sm">
+              <thead>
+                <tr className="border-b border-edge/10 text-xs uppercase tracking-wide text-ink/40">
+                  <th className="px-6 py-3 font-medium">Fecha</th>
+                  <th className="px-6 py-3 font-medium">Folio</th>
+                  <th className="px-6 py-3 font-medium">Paciente</th>
+                  <th className="px-6 py-3 font-medium">Médico</th>
+                  <th className="px-6 py-3 font-medium">Medicamentos</th>
+                  <th className="px-6 py-3 text-right font-medium">Acción</th>
+                </tr>
+              </thead>
+              <tbody>
+                {bitacoraFiltrada.map((r) => (
+                  <tr key={r.id} className="border-b border-edge/5 last:border-0">
+                    <td className="px-6 py-3 whitespace-nowrap text-ink/60">{r.fecha}</td>
+                    <td className="px-6 py-3 text-ink/60">{r.folio}</td>
+                    <td className="px-6 py-3">
+                      <button
+                        onClick={() => irAExpediente(r.patientId)}
+                        className="font-medium text-ink underline decoration-ink/20 underline-offset-2 hover:text-accent hover:decoration-accent/50"
+                      >
+                        {r.patientName}
+                      </button>
+                    </td>
+                    <td className="px-6 py-3 text-ink/60">{r.medico}</td>
+                    <td className="px-6 py-3 text-ink/70">{r.medicamentos.join(", ") || "—"}</td>
+                    <td className="px-6 py-3 text-right">
+                      <button
+                        onClick={() => setRecetasLog((prev) => prev.filter((x) => x.id !== r.id))}
+                        title="Quitar de esta bitácora (no borra la receta del expediente)"
+                        className="ml-auto flex h-7 w-7 items-center justify-center rounded-full border border-danger/20 text-danger/50 transition-colors hover:border-danger/60 hover:text-danger"
+                      >
+                        <TrashIcon />
+                      </button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </div>
 
       {/* Receta imprimible — formato tipo COPRISEM */}
       {patient && medicamentosRecetados.length > 0 && (
