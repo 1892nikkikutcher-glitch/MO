@@ -708,62 +708,97 @@ export default function Expediente({
       </button>
 
       {/* Orden pedido: flecha — información del paciente — enviar resumen —
-          flecha, en una sola fila que en pantallas angostas hace wrap
-          manteniendo ese mismo orden de lectura. */}
-      <div className="flex flex-wrap items-center gap-3 print:hidden">
-        <button
-          onClick={() => pacienteAnteriorHoy && irAExpediente(pacienteAnteriorHoy.patientId!, activeTab)}
-          disabled={!pacienteAnteriorHoy}
-          title={
-            pacienteAnteriorHoy
-              ? `Expediente anterior en la agenda de hoy: ${pacienteAnteriorHoy.paciente} (${pacienteAnteriorHoy.horaInicio})`
-              : "No hay un paciente anterior en la agenda de hoy"
-          }
-          style={{ boxShadow: "0 0 12px -2px rgb(var(--accent-rgb) / 0.6)" }}
-          className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-accent/40 text-accent transition-colors hover:bg-accent/15 disabled:cursor-not-allowed disabled:opacity-30 disabled:hover:bg-transparent"
-        >
-          ←
-        </button>
-
-        <div className="flex w-full items-center gap-4 lg:w-auto lg:min-w-0 lg:flex-1">
-          <div
-            className="flex h-16 w-16 shrink-0 items-center justify-center rounded-full text-lg font-bold text-black"
-            style={{ backgroundColor: avatarColor }}
+          flecha. Las flechas quedan fijas en los extremos (justify-between)
+          y el contenido de en medio hace su propio wrap en pantallas
+          angostas. Naranja neón = activa (hay paciente), rosa neón =
+          inactiva (no hay) — con una leyenda siempre visible debajo (no solo
+          tooltip) para que quede claro en ambos casos, incluso en celular. */}
+      <div className="flex items-start justify-between gap-3 print:hidden">
+        <div className="flex shrink-0 flex-col items-center gap-1">
+          <button
+            onClick={() => pacienteAnteriorHoy && irAExpediente(pacienteAnteriorHoy.patientId!, activeTab)}
+            disabled={!pacienteAnteriorHoy}
+            title={
+              pacienteAnteriorHoy
+                ? `Expediente anterior en la agenda de hoy: ${pacienteAnteriorHoy.paciente} (${pacienteAnteriorHoy.horaInicio})`
+                : "No hay un paciente anterior en la agenda de hoy"
+            }
+            style={{
+              boxShadow: pacienteAnteriorHoy
+                ? "0 0 12px -2px rgb(var(--accent-rgb) / 0.6)"
+                : "0 0 12px -2px rgb(244 114 182 / 0.6)",
+            }}
+            className={`flex h-9 w-9 items-center justify-center rounded-lg border text-lg transition-colors disabled:cursor-not-allowed ${
+              pacienteAnteriorHoy
+                ? "border-accent/40 text-accent hover:bg-accent/15"
+                : "border-pink-400/50 text-pink-400"
+            }`}
           >
-            {initials}
-          </div>
-          <div className="min-w-0 flex-1">
-            <h2 className="text-xl font-semibold text-ink">{formatNombreConEdad(patient.name, patient.birthDate)}</h2>
-            <p className="mt-1 text-sm text-ink/50">
-              {patient.phone} · {formatDate(patient.birthDate)}
-              {patient.birthDate && ` · ${formatEdad(patient.birthDate)}`}
-            </p>
-          </div>
+            ←
+          </button>
+          <span className="max-w-[6rem] text-center text-[10px] leading-tight text-ink/40">
+            {pacienteAnteriorHoy
+              ? `${pacienteAnteriorHoy.paciente} · ${pacienteAnteriorHoy.horaInicio}`
+              : "No disponible"}
+          </span>
         </div>
 
-        <button
-          onClick={enviarResumen}
-          title="Enviar resumen del expediente al paciente por WhatsApp"
-          style={{ boxShadow: "0 0 14px -2px rgb(var(--success-rgb) / 0.7)" }}
-          className="flex shrink-0 items-center justify-center gap-2 rounded-lg border border-success/40 px-3 py-2 text-xs font-semibold text-success transition-colors hover:bg-success/10"
-        >
-          <WhatsAppIcon />
-          Enviar resumen al paciente
-        </button>
+        <div className="flex min-w-0 flex-1 flex-wrap items-center justify-center gap-4">
+          <div className="flex w-full items-center gap-4 lg:w-auto lg:min-w-0 lg:flex-1">
+            <div
+              className="flex h-16 w-16 shrink-0 items-center justify-center rounded-full text-lg font-bold text-black"
+              style={{ backgroundColor: avatarColor }}
+            >
+              {initials}
+            </div>
+            <div className="min-w-0 flex-1">
+              <h2 className="text-xl font-semibold text-ink">{formatNombreConEdad(patient.name, patient.birthDate)}</h2>
+              <p className="mt-1 text-sm text-ink/50">
+                {patient.phone} · {formatDate(patient.birthDate)}
+                {patient.birthDate && ` · ${formatEdad(patient.birthDate)}`}
+              </p>
+            </div>
+          </div>
 
-        <button
-          onClick={() => pacienteSiguienteHoy && irAExpediente(pacienteSiguienteHoy.patientId!, activeTab)}
-          disabled={!pacienteSiguienteHoy}
-          title={
-            pacienteSiguienteHoy
-              ? `Expediente siguiente en la agenda de hoy: ${pacienteSiguienteHoy.paciente} (${pacienteSiguienteHoy.horaInicio})`
-              : "No hay un paciente siguiente en la agenda de hoy"
-          }
-          style={{ boxShadow: "0 0 12px -2px rgb(var(--accent-rgb) / 0.6)" }}
-          className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-accent/40 text-accent transition-colors hover:bg-accent/15 disabled:cursor-not-allowed disabled:opacity-30 disabled:hover:bg-transparent"
-        >
-          →
-        </button>
+          <button
+            onClick={enviarResumen}
+            title="Enviar resumen del expediente al paciente por WhatsApp"
+            style={{ boxShadow: "0 0 14px -2px rgb(var(--success-rgb) / 0.7)" }}
+            className="flex shrink-0 items-center justify-center gap-2 rounded-lg border border-success/40 px-3 py-2 text-xs font-semibold text-success transition-colors hover:bg-success/10"
+          >
+            <WhatsAppIcon />
+            Enviar resumen al paciente
+          </button>
+        </div>
+
+        <div className="flex shrink-0 flex-col items-center gap-1">
+          <button
+            onClick={() => pacienteSiguienteHoy && irAExpediente(pacienteSiguienteHoy.patientId!, activeTab)}
+            disabled={!pacienteSiguienteHoy}
+            title={
+              pacienteSiguienteHoy
+                ? `Expediente siguiente en la agenda de hoy: ${pacienteSiguienteHoy.paciente} (${pacienteSiguienteHoy.horaInicio})`
+                : "No hay un paciente siguiente en la agenda de hoy"
+            }
+            style={{
+              boxShadow: pacienteSiguienteHoy
+                ? "0 0 12px -2px rgb(var(--accent-rgb) / 0.6)"
+                : "0 0 12px -2px rgb(244 114 182 / 0.6)",
+            }}
+            className={`flex h-9 w-9 items-center justify-center rounded-lg border text-lg transition-colors disabled:cursor-not-allowed ${
+              pacienteSiguienteHoy
+                ? "border-accent/40 text-accent hover:bg-accent/15"
+                : "border-pink-400/50 text-pink-400"
+            }`}
+          >
+            →
+          </button>
+          <span className="max-w-[6rem] text-center text-[10px] leading-tight text-ink/40">
+            {pacienteSiguienteHoy
+              ? `${pacienteSiguienteHoy.paciente} · ${pacienteSiguienteHoy.horaInicio}`
+              : "No disponible"}
+          </span>
+        </div>
       </div>
 
       {patientAlergias && !esNegacionAlergia(patientAlergias) && (
