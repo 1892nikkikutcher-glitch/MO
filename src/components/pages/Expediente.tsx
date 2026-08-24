@@ -15,6 +15,7 @@ import NotasEvolucion from "./NotasEvolucion";
 import MembresiaTab from "./MembresiaTab";
 import { usePatientData } from "@/context/PatientDataContext";
 import { generarPresupuestoPdf } from "@/lib/generarPresupuestoPdf";
+import { generarPresupuestoTotalPdf } from "@/lib/generarPresupuestoTotalPdf";
 import { enviarPdfPorWhatsapp } from "@/lib/enviarPdfWhatsapp";
 import { slugify } from "@/lib/textoNombre";
 import {
@@ -187,7 +188,23 @@ function PresupuestosTab({
   const [printTarget, setPrintTarget] = useState<SavedBudget | null>(null);
   const [printAll, setPrintAll] = useState(false);
   const [enviandoWhatsAppId, setEnviandoWhatsAppId] = useState<string | null>(null);
+  const [enviandoCompleto, setEnviandoCompleto] = useState(false);
   const [presupuestoAEliminar, setPresupuestoAEliminar] = useState<SavedBudget | null>(null);
+  /** Vacío = incluir TODOS los folios en "presupuesto completo" (imprimir o
+   * enviar) — al marcar uno o más folios puntuales, el completo se arma
+   * solo con esos, para poder entregar/enviar nada más lo que aplica (ej.
+   * solo los de una fase o los ya aceptados). */
+  const [foliosSeleccionados, setFoliosSeleccionados] = useState<Set<string>>(new Set());
+  const toggleFolioSeleccionado = (id: string) => {
+    setFoliosSeleccionados((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  };
+  const presupuestosParaCompleto =
+    foliosSeleccionados.size > 0 ? presupuestos.filter((p) => foliosSeleccionados.has(p.id)) : presupuestos;
 
   useEffect(() => {
     if (printTarget) {
@@ -237,6 +254,39 @@ function PresupuestosTab({
     }
   };
 
+  const enviarPresupuestoCompleto = async () => {
+    if (enviandoCompleto || presupuestosParaCompleto.length === 0) return;
+    const ventanaWhatsApp = window.open("", "_blank");
+    const nombreArchivo = `Presupuesto_completo_${slugify(patient.name)}_${slugify(fechaLargaHoy())}.pdf`;
+    const granTotal = presupuestosParaCompleto.reduce((sum, p) => sum + p.total, 0);
+    const caption = `Plan de tratamiento completo — ${patient.name} · ${presupuestosParaCompleto.length} folio(s) · Total ${formatCurrency(granTotal)}`;
+
+    setEnviandoCompleto(true);
+    try {
+      const blob = await generarPresupuestoTotalPdf({
+        presupuestos: presupuestosParaCompleto,
+        fechaLarga: fechaLargaHoy(),
+        pacienteNombre: patient.name,
+        pacienteCorreo: patient.email ?? "",
+        pacienteTelefono: patient.phone,
+        perfilDoctor,
+      });
+      await enviarPdfPorWhatsapp({
+        blob,
+        nombreArchivo,
+        telefono: patient.phone,
+        caption,
+        ventanaPrevia: ventanaWhatsApp,
+      });
+    } catch (err) {
+      console.error("No se pudo generar el PDF del presupuesto completo", err);
+      ventanaWhatsApp?.close();
+      alert("No se pudo generar el PDF del presupuesto completo. Intenta de nuevo.");
+    } finally {
+      setEnviandoCompleto(false);
+    }
+  };
+
   if (view === "form") {
     return (
       <NuevoPresupuesto
@@ -267,19 +317,34 @@ function PresupuestosTab({
 
   return (
     <div className="space-y-4">
-      <div className="flex items-center justify-between">
+      <div className="flex flex-wrap items-center justify-between gap-3">
         <h3 className="text-sm font-semibold uppercase tracking-wide text-ink/60">
           Presupuestos
         </h3>
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2">
           {presupuestos.length > 0 && (
-            <button
-              onClick={() => setPrintAll(true)}
-              title="Imprime todos los folios de este paciente juntos, con el total general"
-              className="rounded-lg border border-edge/15 px-4 py-2 text-xs font-semibold text-ink/70 transition-colors hover:bg-surface"
-            >
-              Imprimir presupuesto completo
-            </button>
+            <>
+              <span className="text-xs text-ink/40">
+                {foliosSeleccionados.size > 0
+                  ? `${presupuestosParaCompleto.length} de ${presupuestos.length} folio(s) marcados`
+                  : "Marca folios abajo para elegir cuáles incluir (si no, va todo)"}
+              </span>
+              <button
+                onClick={() => setPrintAll(true)}
+                title="Imprime los folios marcados (o todos, si no marcaste ninguno) juntos, con el total general"
+                className="rounded-lg border border-edge/15 px-4 py-2 text-xs font-semibold text-ink/70 transition-colors hover:bg-surface"
+              >
+                Imprimir presupuesto completo
+              </button>
+              <button
+                onClick={enviarPresupuestoCompleto}
+                disabled={enviandoCompleto}
+                title="Envía por WhatsApp los folios marcados (o todos, si no marcaste ninguno) juntos, con el total general"
+                className="rounded-lg border border-success/40 px-4 py-2 text-xs font-semibold text-success transition-colors hover:bg-success/10 disabled:cursor-not-allowed disabled:opacity-40"
+              >
+                {enviandoCompleto ? "Generando PDF…" : "Enviar presupuesto completo"}
+              </button>
+            </>
           )}
           <button
             onClick={() => {
@@ -300,14 +365,22 @@ function PresupuestosTab({
         </div>
       ) : (
         <div className="overflow-hidden rounded-2xl border border-edge/10 bg-surface print:hidden">
-          <div className="grid grid-cols-[64px_1fr_auto] gap-3 border-b border-edge/10 px-4 py-3 text-xs font-semibold uppercase tracking-wide text-ink/40">
+          <div className="grid grid-cols-[24px_64px_1fr_auto] gap-3 border-b border-edge/10 px-4 py-3 text-xs font-semibold uppercase tracking-wide text-ink/40">
+            <span />
             <span>Folio</span>
             <span>Tratamiento</span>
             <span className="text-right">Acción</span>
           </div>
           <div className="divide-y divide-edge/5">
             {presupuestos.map((p) => (
-              <div key={p.id} className="grid grid-cols-[64px_1fr_auto] items-start gap-3 px-4 py-4">
+              <div key={p.id} className="grid grid-cols-[24px_64px_1fr_auto] items-start gap-3 px-4 py-4">
+                <input
+                  type="checkbox"
+                  checked={foliosSeleccionados.has(p.id)}
+                  onChange={() => toggleFolioSeleccionado(p.id)}
+                  title="Incluir este folio en el presupuesto completo (imprimir/enviar)"
+                  className="mt-1.5 accent-[color:var(--accent)]"
+                />
                 <div className="pt-1 text-sm font-medium text-ink/70">{p.folio}</div>
 
                 <div>
@@ -445,7 +518,7 @@ function PresupuestosTab({
 
       {printAll && (
         <PresupuestoTotalImpreso
-          presupuestos={presupuestos}
+          presupuestos={presupuestosParaCompleto}
           fechaLarga={fechaLargaHoy()}
           pacienteNombre={patient.name}
           pacienteCorreo={patient.email ?? ""}
