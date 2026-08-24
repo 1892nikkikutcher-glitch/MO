@@ -492,28 +492,17 @@ export default function Agenda() {
             </button>
           </div>
         )}
+        {/* 1. Lugar y fecha: en qué período estás parado, y controles para saltar a otra fecha. */}
         <div className="flex flex-wrap items-center justify-between gap-3">
-          <div className="flex flex-wrap gap-2">
-            {conteoEstatus.map(({ estatus, total }) => {
-              const oculto = estatusOcultos.has(estatus);
-              const c = estatusColor[estatus];
-              const hex = CITA_ESTATUS_HEX[estatus];
-              return (
-                <button
-                  key={estatus}
-                  onClick={() => toggleEstatus(estatus)}
-                  className={`flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-semibold transition-opacity ${c.bg} ${c.text} ${
-                    oculto ? "opacity-30" : ""
-                  }`}
-                  style={hex ? { color: hex, backgroundColor: statusAlpha(hex, 0.16) } : undefined}
-                >
-                  <span className={`h-2 w-2 rounded-full ${c.dot}`} style={hex ? { backgroundColor: hex } : undefined} />
-                  {total} {estatus}
-                </button>
-              );
-            })}
-          </div>
-
+          <h2 className="text-lg font-semibold text-ink">
+            {vista === "dia"
+              ? `${DIAS_SEMANA[(diaSeleccionado.getDay() + 6) % 7]} ${diaSeleccionado.getDate()} de ${MESES[diaSeleccionado.getMonth()]} de ${diaSeleccionado.getFullYear()}`
+              : vista === "3dias"
+                ? formatRangeLabel(diaSeleccionado, addDays(diaSeleccionado, 2))
+                : vista === "mes"
+                  ? `${MESES[mesActual.getMonth()].charAt(0).toUpperCase()}${MESES[mesActual.getMonth()].slice(1)} de ${mesActual.getFullYear()}`
+                  : formatRangeLabel(weekStart, addDays(weekStart, 6))}
+          </h2>
           <div className="flex flex-wrap items-center gap-2">
             <input
               type="date"
@@ -540,122 +529,30 @@ export default function Agenda() {
             >
               Hoy
             </button>
-
-            <div className="flex items-center gap-1.5 rounded-lg border border-edge/10 p-0.5">
-              <span className="pl-1.5 text-[10px] font-semibold uppercase tracking-wide text-ink/40">Ver por</span>
-              {(
-                [
-                  { id: "todos", label: "Todos" },
-                  { id: "medicos", label: "Médicos" },
-                  { id: "unidades", label: "Unidades" },
-                ] as const
-              ).map((op) => (
-                <button
-                  key={op.id}
-                  onClick={() => setVistaRecurso(op.id)}
-                  className={`rounded-md px-2.5 py-1 text-xs font-semibold transition-colors ${
-                    vistaRecurso === op.id ? "bg-accent/15 text-accent" : "text-ink/50"
-                  }`}
-                >
-                  {op.label}
-                </button>
-              ))}
-            </div>
-
-            <div className="flex rounded-lg border border-edge/10 p-0.5">
-              <button
-                onClick={() => setVista("semana")}
-                className={`rounded-md px-3 py-1 text-xs font-semibold transition-colors ${
-                  vista === "semana" ? "bg-accent/15 text-accent" : "text-ink/50"
-                }`}
-              >
-                Semana
-              </button>
-              <button
-                onClick={() => setVista("3dias")}
-                className={`rounded-md px-3 py-1 text-xs font-semibold transition-colors ${
-                  vista === "3dias" ? "bg-accent/15 text-accent" : "text-ink/50"
-                }`}
-              >
-                3 días
-              </button>
-              <button
-                onClick={() => setVista("dia")}
-                className={`rounded-md px-3 py-1 text-xs font-semibold transition-colors ${
-                  vista === "dia" ? "bg-accent/15 text-accent" : "text-ink/50"
-                }`}
-              >
-                Día
-              </button>
-              <button
-                onClick={() => setVista("mes")}
-                className={`rounded-md px-3 py-1 text-xs font-semibold transition-colors ${
-                  vista === "mes" ? "bg-accent/15 text-accent" : "text-ink/50"
-                }`}
-              >
-                Mes
-              </button>
-            </div>
-            <button
-              onClick={() =>
-                vista === "dia"
-                  ? setDiaSeleccionado((d) => addDays(d, -1))
-                  : vista === "3dias"
-                    ? setDiaSeleccionado((d) => addDays(d, -3))
-                    : vista === "mes"
-                      ? setMesActual((m) => new Date(m.getFullYear(), m.getMonth() - 1, 1))
-                      : setWeekStart((w) => addDays(w, -7))
-              }
-              className="flex h-7 w-7 items-center justify-center rounded-lg border border-edge/10 text-ink/60 hover:bg-surface"
-            >
-              ‹
-            </button>
-            <button
-              onClick={() =>
-                vista === "dia"
-                  ? setDiaSeleccionado((d) => addDays(d, 1))
-                  : vista === "3dias"
-                    ? setDiaSeleccionado((d) => addDays(d, 3))
-                    : vista === "mes"
-                      ? setMesActual((m) => new Date(m.getFullYear(), m.getMonth() + 1, 1))
-                      : setWeekStart((w) => addDays(w, 7))
-              }
-              className="flex h-7 w-7 items-center justify-center rounded-lg border border-edge/10 text-ink/60 hover:bg-surface"
-            >
-              ›
-            </button>
-            <button
-              onClick={exportarAGoogleCalendar}
-              title={
-                vista === "dia"
-                  ? "Descarga la agenda diaria (.ics) para importar en Google Calendar u otro calendario — uso interno de la clínica"
-                  : "Descarga la agenda general de la clínica (.ics) para importar en Google Calendar u otro calendario — uso interno"
-              }
-              className="flex items-center gap-1.5 rounded-lg border border-edge/10 px-3 py-1.5 text-xs font-semibold text-ink/70 transition-colors hover:bg-surface hover:text-ink"
-            >
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" className="shrink-0">
-                <path
-                  d="M12 15V3m0 12-4-4m4 4 4-4M4 17v2a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-2"
-                  stroke="currentColor"
-                  strokeWidth="1.8"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                />
-              </svg>
-              Exportar a Google Calendar
-            </button>
           </div>
         </div>
 
-        <h2 className="text-lg font-semibold text-ink">
-          {vista === "dia"
-            ? `${DIAS_SEMANA[(diaSeleccionado.getDay() + 6) % 7]} ${diaSeleccionado.getDate()} de ${MESES[diaSeleccionado.getMonth()]} de ${diaSeleccionado.getFullYear()}`
-            : vista === "3dias"
-              ? formatRangeLabel(diaSeleccionado, addDays(diaSeleccionado, 2))
-              : vista === "mes"
-                ? `${MESES[mesActual.getMonth()].charAt(0).toUpperCase()}${MESES[mesActual.getMonth()].slice(1)} de ${mesActual.getFullYear()}`
-                : formatRangeLabel(weekStart, addDays(weekStart, 6))}
-        </h2>
+        {/* 2. Estatus de cita. */}
+        <div className="flex flex-wrap gap-2">
+          {conteoEstatus.map(({ estatus, total }) => {
+            const oculto = estatusOcultos.has(estatus);
+            const c = estatusColor[estatus];
+            const hex = CITA_ESTATUS_HEX[estatus];
+            return (
+              <button
+                key={estatus}
+                onClick={() => toggleEstatus(estatus)}
+                className={`flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-semibold transition-opacity ${c.bg} ${c.text} ${
+                  oculto ? "opacity-30" : ""
+                }`}
+                style={hex ? { color: hex, backgroundColor: statusAlpha(hex, 0.16) } : undefined}
+              >
+                <span className={`h-2 w-2 rounded-full ${c.dot}`} style={hex ? { backgroundColor: hex } : undefined} />
+                {total} {estatus}
+              </button>
+            );
+          })}
+        </div>
 
         <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-6">
           {(() => {
@@ -698,6 +595,113 @@ export default function Agenda() {
               </div>
             ));
           })()}
+        </div>
+
+        {/* 4. Tira de vistas de calendario, médicos/unidades, flechas y exportar. */}
+        <div className="flex flex-wrap items-center gap-2">
+          <div className="flex items-center gap-1.5 rounded-lg border border-edge/10 p-0.5">
+            <span className="pl-1.5 text-[10px] font-semibold uppercase tracking-wide text-ink/40">Ver por</span>
+            {(
+              [
+                { id: "todos", label: "Todos" },
+                { id: "medicos", label: "Médicos" },
+                { id: "unidades", label: "Unidades" },
+              ] as const
+            ).map((op) => (
+              <button
+                key={op.id}
+                onClick={() => setVistaRecurso(op.id)}
+                className={`rounded-md px-2.5 py-1 text-xs font-semibold transition-colors ${
+                  vistaRecurso === op.id ? "bg-accent/15 text-accent" : "text-ink/50"
+                }`}
+              >
+                {op.label}
+              </button>
+            ))}
+          </div>
+
+          <div className="flex rounded-lg border border-edge/10 p-0.5">
+            <button
+              onClick={() => setVista("semana")}
+              className={`rounded-md px-3 py-1 text-xs font-semibold transition-colors ${
+                vista === "semana" ? "bg-accent/15 text-accent" : "text-ink/50"
+              }`}
+            >
+              Semana
+            </button>
+            <button
+              onClick={() => setVista("3dias")}
+              className={`rounded-md px-3 py-1 text-xs font-semibold transition-colors ${
+                vista === "3dias" ? "bg-accent/15 text-accent" : "text-ink/50"
+              }`}
+            >
+              3 días
+            </button>
+            <button
+              onClick={() => setVista("dia")}
+              className={`rounded-md px-3 py-1 text-xs font-semibold transition-colors ${
+                vista === "dia" ? "bg-accent/15 text-accent" : "text-ink/50"
+              }`}
+            >
+              Día
+            </button>
+            <button
+              onClick={() => setVista("mes")}
+              className={`rounded-md px-3 py-1 text-xs font-semibold transition-colors ${
+                vista === "mes" ? "bg-accent/15 text-accent" : "text-ink/50"
+              }`}
+            >
+              Mes
+            </button>
+          </div>
+          <button
+            onClick={() =>
+              vista === "dia"
+                ? setDiaSeleccionado((d) => addDays(d, -1))
+                : vista === "3dias"
+                  ? setDiaSeleccionado((d) => addDays(d, -3))
+                  : vista === "mes"
+                    ? setMesActual((m) => new Date(m.getFullYear(), m.getMonth() - 1, 1))
+                    : setWeekStart((w) => addDays(w, -7))
+            }
+            className="flex h-7 w-7 items-center justify-center rounded-lg border border-edge/10 text-ink/60 hover:bg-surface"
+          >
+            ‹
+          </button>
+          <button
+            onClick={() =>
+              vista === "dia"
+                ? setDiaSeleccionado((d) => addDays(d, 1))
+                : vista === "3dias"
+                  ? setDiaSeleccionado((d) => addDays(d, 3))
+                  : vista === "mes"
+                    ? setMesActual((m) => new Date(m.getFullYear(), m.getMonth() + 1, 1))
+                    : setWeekStart((w) => addDays(w, 7))
+            }
+            className="flex h-7 w-7 items-center justify-center rounded-lg border border-edge/10 text-ink/60 hover:bg-surface"
+          >
+            ›
+          </button>
+          <button
+            onClick={exportarAGoogleCalendar}
+            title={
+              vista === "dia"
+                ? "Descarga la agenda diaria (.ics) para importar en Google Calendar u otro calendario — uso interno de la clínica"
+                : "Descarga la agenda general de la clínica (.ics) para importar en Google Calendar u otro calendario — uso interno"
+            }
+            className="flex items-center gap-1.5 rounded-lg border border-edge/10 px-3 py-1.5 text-xs font-semibold text-ink/70 transition-colors hover:bg-surface hover:text-ink"
+          >
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" className="shrink-0">
+              <path
+                d="M12 15V3m0 12-4-4m4 4 4-4M4 17v2a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-2"
+                stroke="currentColor"
+                strokeWidth="1.8"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              />
+            </svg>
+            Exportar a Google Calendar
+          </button>
         </div>
 
         {vista === "mes" && (
