@@ -88,12 +88,11 @@ export const ayudaPaginas: Record<string, AyudaPagina> = {
       "Aquí ves la vigencia de la membresía activa del paciente y qué beneficios ya usó.",
     ],
   },
-  "pacientes-Consentimientos Informados y Recetas": {
-    titulo: "Expediente — Consentimientos Informados y Recetas",
-    resumen: "Genera recetas médicas y cartas de consentimiento informado ya prellenadas con los datos del paciente y del doctor.",
+  "pacientes-Consentimientos Informados": {
+    titulo: "Expediente — Consentimientos Informados",
+    resumen: "Genera cartas de consentimiento informado ya prellenadas con los datos del paciente y del doctor.",
     puntos: [
       "El módulo Documentos (menú lateral) tiene el catálogo completo de consentimientos por especialidad (ortodoncia, cirugía bucal, endodoncia, odontopediatría, prótesis) además del general.",
-      "Las recetas muestran una alerta si el paciente tiene alergias o condiciones sistémicas registradas en Historia Clínica, para tenerlo presente al recetar.",
     ],
   },
   "pacientes-Fotografías": {

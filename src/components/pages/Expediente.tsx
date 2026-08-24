@@ -58,7 +58,7 @@ const expedienteTabs = [
   "Presupuestos",
   "Pagos",
   "Membresía",
-  "Consentimientos Informados y Recetas",
+  "Consentimientos Informados",
   "Fotografías",
   "Laboratorios",
   "Listado de Citas",
@@ -845,7 +845,7 @@ export default function Expediente({
               setPagos={setPagos}
             />
           )}
-          {activeTab === "Consentimientos Informados y Recetas" && (
+          {activeTab === "Consentimientos Informados" && (
             <ConsentimientoInformado patient={patient} />
           )}
           {activeTab === "Laboratorios" && <Laboratorios patientId={patient.id} />}
@@ -860,7 +860,7 @@ export default function Expediente({
             activeTab !== "Fotografías" &&
             activeTab !== "Pagos" &&
             activeTab !== "Membresía" &&
-            activeTab !== "Consentimientos Informados y Recetas" &&
+            activeTab !== "Consentimientos Informados" &&
             activeTab !== "Laboratorios" &&
             activeTab !== "Notas de Evolución y Seguimiento" && (
               <div className="rounded-2xl border border-dashed border-edge/15 bg-surface p-10 text-center text-sm text-ink/40">
