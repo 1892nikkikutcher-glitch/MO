@@ -5,7 +5,9 @@ import {
   formatCurrency,
   buildReciboTexto,
   computeTratamientosPendientes,
+  tratamientosDeDisponibles,
   type SavedBudget,
+  type Tratamiento,
   type TratamientoPendiente,
   type LineaPago,
   type Pago,
@@ -114,19 +116,41 @@ function EliminarPagoDialog({
 
 function EditarPagoDialog({
   pago,
+  presupuestos,
   onClose,
   onSave,
 }: {
   pago: Pago;
+  presupuestos: SavedBudget[];
   onClose: () => void;
   onSave: (pago: Pago) => void;
 }) {
   const [lineas, setLineas] = useState<LineaPago[]>(() => pago.lineas.map((l) => ({ ...l })));
   const total = lineas.reduce((sum, l) => sum + l.monto, 0);
   const puedeGuardar = total > 0;
+  const tratamientosDisponibles: Tratamiento[] = tratamientosDeDisponibles(presupuestos);
 
   const actualizarMonto = (id: string, monto: number) => {
     setLineas((prev) => prev.map((l) => (l.id === id ? { ...l, monto: Math.max(0, monto) } : l)));
+  };
+
+  /** Reasigna a qué tratamiento pertenece un renglón — por ejemplo, cuando
+   * se anotó el pago en el tratamiento equivocado (dos citas del mismo tipo
+   * en el paciente, y se confundió cuál era cuál). "__otro__" lo deja como
+   * concepto libre, sin ligarlo a ningún renglón del presupuesto. */
+  const actualizarTratamiento = (id: string, valor: string) => {
+    setLineas((prev) =>
+      prev.map((l) => {
+        if (l.id !== id) return l;
+        if (valor === "__otro__") return { ...l, tratamientoId: null, folio: null };
+        const t = tratamientosDisponibles.find((x) => x.id === valor);
+        return t ? { ...l, tratamientoId: t.id, folio: t.folio, label: t.label } : l;
+      })
+    );
+  };
+
+  const actualizarLabelLibre = (id: string, label: string) => {
+    setLineas((prev) => prev.map((l) => (l.id === id ? { ...l, label } : l)));
   };
 
   return (
@@ -142,28 +166,54 @@ function EditarPagoDialog({
           </button>
         </div>
         <p className="mb-4 text-xs text-ink/40">
-          Corrige el monto de cada concepto — por ejemplo, si se anotó de menos o de más al
-          registrar el pago.
+          Corrige el monto o el tratamiento de cada concepto — por ejemplo, si se anotó de menos o
+          de más, o si se ligó al tratamiento equivocado al registrar el pago.
         </p>
         <div className="space-y-2">
-          {lineas.map((l) => (
-            <div
-              key={l.id}
-              className="flex items-center justify-between gap-3 rounded-lg border border-edge/10 bg-inset px-3 py-2 text-sm"
-            >
-              <span className="min-w-0 flex-1 truncate text-ink/80">{l.label}</span>
-              <span className="flex shrink-0 items-center gap-1 text-ink/60">
-                $
-                <input
-                  type="number"
-                  min={0}
-                  value={l.monto}
-                  onChange={(e) => actualizarMonto(l.id, Number(e.target.value))}
-                  className="w-24 rounded-md border border-edge/10 bg-field px-1.5 py-1 text-right text-sm text-ink outline-none focus:border-accent/60"
-                />
-              </span>
-            </div>
-          ))}
+          {lineas.map((l) => {
+            const esLibre =
+              !l.tratamientoId || !tratamientosDisponibles.some((t) => t.id === l.tratamientoId);
+            return (
+              <div
+                key={l.id}
+                className="space-y-1.5 rounded-lg border border-edge/10 bg-inset px-3 py-2 text-sm"
+              >
+                <div className="flex items-center gap-2">
+                  <select
+                    value={esLibre ? "__otro__" : l.tratamientoId!}
+                    onChange={(e) => actualizarTratamiento(l.id, e.target.value)}
+                    className="min-w-0 flex-1 rounded-md border border-edge/10 bg-field px-2 py-1.5 text-sm text-ink outline-none focus:border-accent/60"
+                  >
+                    {tratamientosDisponibles.map((t) => (
+                      <option key={t.id} value={t.id}>
+                        #{t.folio} — {t.label}
+                      </option>
+                    ))}
+                    <option value="__otro__">Otro concepto (texto libre)</option>
+                  </select>
+                  <span className="flex shrink-0 items-center gap-1 text-ink/60">
+                    $
+                    <input
+                      type="number"
+                      min={0}
+                      value={l.monto}
+                      onChange={(e) => actualizarMonto(l.id, Number(e.target.value))}
+                      className="w-24 rounded-md border border-edge/10 bg-field px-1.5 py-1 text-right text-sm text-ink outline-none focus:border-accent/60"
+                    />
+                  </span>
+                </div>
+                {esLibre && (
+                  <input
+                    type="text"
+                    value={l.label}
+                    onChange={(e) => actualizarLabelLibre(l.id, e.target.value)}
+                    placeholder="Ej. Membresía, concepto libre..."
+                    className="w-full rounded-md border border-edge/10 bg-field px-2 py-1.5 text-xs text-ink placeholder-ink/30 outline-none focus:border-accent/60"
+                  />
+                )}
+              </div>
+            );
+          })}
         </div>
         <div className="mt-4 flex items-center justify-between rounded-lg border border-edge/10 bg-inset px-3 py-2">
           <span className="text-xs uppercase tracking-wide text-ink/40">Nuevo total</span>
@@ -1000,7 +1050,7 @@ export default function Pagos({
                     <div className="ml-auto flex w-fit items-center gap-1.5">
                       <button
                         onClick={() => setPagoAEditar(pago)}
-                        title="Editar monto del pago"
+                        title="Editar pago (monto o tratamiento)"
                         className="flex h-7 w-7 items-center justify-center rounded-full border border-edge/15 text-ink/50 transition-colors hover:border-accent/50 hover:text-accent"
                       >
                         ✎
@@ -1069,6 +1119,7 @@ export default function Pagos({
       {pagoAEditar && (
         <EditarPagoDialog
           pago={pagoAEditar}
+          presupuestos={presupuestos}
           onClose={() => setPagoAEditar(null)}
           onSave={(pago) => {
             upsertPago(pago);
