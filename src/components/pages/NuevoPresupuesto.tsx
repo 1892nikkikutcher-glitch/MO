@@ -4,7 +4,12 @@ import { useState } from "react";
 import Odontograma from "./Odontograma";
 import PresupuestoImpreso from "./PresupuestoImpreso";
 import { usePatientData } from "@/context/PatientDataContext";
-import { agruparPorEspecialidad, especialidadesPredefinidas, type Procedimiento } from "@/lib/procedimientos";
+import {
+  agruparPorEspecialidad,
+  especialidadesPredefinidas,
+  esProcedimientoActivo,
+  type Procedimiento,
+} from "@/lib/procedimientos";
 import { generarPresupuestoPdf } from "@/lib/generarPresupuestoPdf";
 import { enviarPdfPorWhatsapp } from "@/lib/enviarPdfWhatsapp";
 import { slugify } from "@/lib/textoNombre";
@@ -51,7 +56,8 @@ export default function NuevoPresupuesto({
   const patientName = patient.name;
   const { recursos, procedimientos, setProcedimientos, perfilDoctor, irAPagina } = usePatientData();
   const medicos = recursos.filter((r) => r.tipo === "medico");
-  const gruposProcedimientos = agruparPorEspecialidad(procedimientos);
+  const procedimientosActivos = procedimientos.filter(esProcedimientoActivo);
+  const gruposProcedimientos = agruparPorEspecialidad(procedimientosActivos);
   const [enviandoWhatsApp, setEnviandoWhatsApp] = useState(false);
 
   const isEditing = Boolean(initialBudget);
@@ -378,7 +384,7 @@ export default function NuevoPresupuesto({
             </div>
           </div>
 
-          {procedimientos.length === 0 ? (
+          {procedimientosActivos.length === 0 ? (
             <p className="rounded-lg border border-dashed border-edge/15 p-3 text-xs text-ink/40">
               Aún no hay procedimientos en tu catálogo — configúralos en{" "}
               <button
@@ -484,7 +490,7 @@ export default function NuevoPresupuesto({
             )
           )}
 
-          {procedimientos.length > 0 && (
+          {procedimientosActivos.length > 0 && (
             <button
               onClick={handleAgregarDelCatalogo}
               disabled={procedimientosSeleccionadosIds.length === 0}

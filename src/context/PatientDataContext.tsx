@@ -79,6 +79,8 @@ import type { Domiciliacion } from "@/lib/domiciliacion";
 import type { Promocion, Aseguradora, EmpresaRPBI, Contador } from "@/lib/catalogosVarios";
 import type { PersonalAsistencia, RegistroAsistencia } from "@/lib/asistencia";
 import type { Procedimiento } from "@/lib/procedimientos";
+import { catalogoRecomendado } from "@/lib/catalogoRecomendado";
+import { crearProcedimientoDesdeTemplate, idDesdeCodigo } from "@/lib/importarCatalogoRecomendado";
 import { catalogoInicial, type MedicamentoCatalogo } from "@/lib/medicamentos";
 import {
   plantillaInicial,
@@ -292,6 +294,20 @@ function useClinicResolution(authUid: string, authEmail: string) {
               role: "admin",
               status: "active",
             } satisfies ClinicMember);
+            // Catálogo recomendado de tratamientos — solo los 20 principales
+            // (nunca los servicios complementarios), sin precios, para que
+            // el odontólogo los configure a su manera. Ver
+            // src/lib/catalogoRecomendado.ts.
+            const ahora = new Date().toISOString();
+            const batchCatalogo = writeBatch(db);
+            catalogoRecomendado.forEach((plantilla) => {
+              const id = idDesdeCodigo(plantilla.codigo);
+              batchCatalogo.set(doc(db, `users/${authUid}/procedimientos`, id), {
+                id,
+                ...crearProcedimientoDesdeTemplate(plantilla, ahora),
+              } satisfies Procedimiento);
+            });
+            await batchCatalogo.commit();
           } catch (err) {
             console.error("No se pudo crear la clínica del usuario", err);
           }
@@ -449,6 +465,7 @@ type PatientDataContextValue = {
   marcarLlegadaCita: (citaId: string, hora: string | null) => void;
   procedimientos: Procedimiento[];
   setProcedimientos: (updater: Updater<Procedimiento[]>) => void;
+  importarCatalogoProcedimientos: (nuevos: Procedimiento[]) => Promise<void>;
   historiaClinicaTemplate: HistoriaClinicaTemplate;
   setHistoriaClinicaTemplate: (updater: Updater<HistoriaClinicaTemplate>) => void;
   historiaClinicaPorPaciente: Record<string, RespuestasHistoriaClinica>;
@@ -844,6 +861,20 @@ export function PatientDataProvider({
       hechos += lote.length;
       onProgreso?.(hechos, nuevos.length);
     }
+  };
+
+  /** Escribe con id determinista (`proc_<codigo>`) para que reimportar el
+   * catálogo recomendado nunca duplique — un envío repetido sobrescribe el
+   * mismo documento en vez de crear uno nuevo. La lista local se actualiza
+   * sola vía el listener ya activo, igual que `importarPacientes`. */
+  const importarCatalogoProcedimientos = async (nuevos: Procedimiento[]) => {
+    if (!clinicUid || nuevos.length === 0) return;
+    const path = `users/${clinicUid}/procedimientos`;
+    const batch = writeBatch(db);
+    nuevos.forEach((data) => {
+      batch.set(doc(db, path, data.id), data);
+    });
+    await batch.commit();
   };
 
   const irAExpediente = (patientId: string, tab?: string) => {
@@ -1647,6 +1678,7 @@ export function PatientDataProvider({
         marcarLlegadaCita,
         procedimientos,
         setProcedimientos,
+        importarCatalogoProcedimientos,
         historiaClinicaTemplate,
         setHistoriaClinicaTemplate,
         historiaClinicaPorPaciente,

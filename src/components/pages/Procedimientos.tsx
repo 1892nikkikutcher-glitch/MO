@@ -7,9 +7,12 @@ import {
   especialidadesPredefinidas,
   agruparPorEspecialidad,
   formatDuracion,
+  esProcedimientoActivo,
   type Procedimiento,
 } from "@/lib/procedimientos";
 import ConfirmarEliminar from "@/components/ConfirmarEliminar";
+import ImportarCatalogoDialog from "@/components/procedimientos/ImportarCatalogoDialog";
+import GuiaConfiguracion from "@/components/procedimientos/GuiaConfiguracion";
 
 const inputClass =
   "w-full rounded-lg border border-edge/10 bg-field px-3 py-2 text-sm text-ink placeholder-ink/30 outline-none focus:border-accent/60";
@@ -21,6 +24,7 @@ function procedimientoVacio(): Omit<Procedimiento, "id"> {
     costoPaciente: 0,
     costoOdontologo: 0,
     duracionMinutos: 30,
+    activo: true,
   };
 }
 
@@ -153,6 +157,16 @@ function ProcedimientoDialog({
               />
             </div>
           </div>
+
+          <label className="flex items-center gap-2 text-sm text-ink/70">
+            <input
+              type="checkbox"
+              checked={form.activo !== false}
+              onChange={(e) => setForm((prev) => ({ ...prev, activo: e.target.checked }))}
+              className="accent-[color:var(--accent)]"
+            />
+            Procedimiento activo (visible al armar presupuestos)
+          </label>
         </div>
 
         <div className="mt-6 flex gap-3">
@@ -179,6 +193,8 @@ export default function Procedimientos() {
   const { miRol, procedimientos, setProcedimientos } = usePatientData();
   const [editando, setEditando] = useState<Procedimiento | "nuevo" | null>(null);
   const [procedimientoAEliminar, setProcedimientoAEliminar] = useState<Procedimiento | null>(null);
+  const [mostrarImportar, setMostrarImportar] = useState(false);
+  const [guiaAbiertaId, setGuiaAbiertaId] = useState<string | null>(null);
 
   if (miRol !== "admin") {
     return (
@@ -190,9 +206,14 @@ export default function Procedimientos() {
 
   const guardarProcedimiento = (data: Omit<Procedimiento, "id">) => {
     if (editando && editando !== "nuevo") {
-      setProcedimientos((prev) => prev.map((p) => (p.id === editando.id ? { ...p, ...data } : p)));
+      setProcedimientos((prev) =>
+        prev.map((p) =>
+          p.id === editando.id ? { ...p, ...data, actualizadoEl: new Date().toISOString() } : p
+        )
+      );
     } else {
-      const nuevo: Procedimiento = { id: `proc${Date.now()}`, ...data };
+      const ahora = new Date().toISOString();
+      const nuevo: Procedimiento = { id: `proc${Date.now()}`, ...data, creadoEl: ahora, actualizadoEl: ahora };
       setProcedimientos((prev) => [...prev, nuevo]);
     }
     setEditando(null);
@@ -200,6 +221,16 @@ export default function Procedimientos() {
 
   const eliminarProcedimiento = (id: string) => {
     setProcedimientos((prev) => prev.filter((p) => p.id !== id));
+  };
+
+  const alternarActivo = (id: string) => {
+    setProcedimientos((prev) =>
+      prev.map((p) =>
+        p.id === id
+          ? { ...p, activo: !esProcedimientoActivo(p), actualizadoEl: new Date().toISOString() }
+          : p
+      )
+    );
   };
 
   const grupos = agruparPorEspecialidad(procedimientos);
@@ -217,6 +248,20 @@ export default function Procedimientos() {
           style={{ boxShadow: "0 0 12px -2px rgb(var(--accent-rgb) / 0.5)" }}
         >
           + Agregar procedimiento
+        </button>
+      </div>
+
+      <div className="rounded-2xl border border-edge/10 bg-surface p-5">
+        <h3 className="text-sm font-semibold text-ink">Catálogo recomendado</h3>
+        <p className="mt-1 text-xs text-ink/50">
+          Agrega los tratamientos más utilizados en los consultorios dentales de México. Puedes
+          modificar nombres, precios, duraciones y variantes de acuerdo con tu forma de trabajar.
+        </p>
+        <button
+          onClick={() => setMostrarImportar(true)}
+          className="mt-3 rounded-lg border border-accent/40 px-4 py-2 text-xs font-semibold text-accent transition-colors hover:bg-accent/10"
+        >
+          Cargar catálogo recomendado
         </button>
       </div>
 
@@ -240,31 +285,56 @@ export default function Procedimientos() {
                   <span className="text-right">Acción</span>
                 </div>
                 <div className="divide-y divide-edge/5">
-                  {grupo.procedimientos.map((p) => (
-                    <div
-                      key={p.id}
-                      className="grid grid-cols-[1fr_120px_130px_100px_auto] items-center gap-3 px-4 py-3"
-                    >
-                      <span className="text-sm font-medium text-ink">{p.nombre}</span>
-                      <span className="text-sm text-ink/70">{formatCurrency(p.costoPaciente)}</span>
-                      <span className="text-sm text-ink/70">{formatCurrency(p.costoOdontologo)}</span>
-                      <span className="text-sm text-ink/70">{formatDuracion(p.duracionMinutos)}</span>
-                      <div className="flex justify-end gap-2">
-                        <button
-                          onClick={() => setEditando(p)}
-                          className="rounded-lg border border-edge/15 px-2.5 py-1 text-xs text-ink/70 hover:bg-surface2"
-                        >
-                          Editar
-                        </button>
-                        <button
-                          onClick={() => setProcedimientoAEliminar(p)}
-                          className="rounded-lg border border-danger/30 px-2.5 py-1 text-xs text-danger hover:bg-danger/10"
-                        >
-                          Eliminar
-                        </button>
+                  {grupo.procedimientos.map((p) => {
+                    const activo = esProcedimientoActivo(p);
+                    const tieneGuia = Boolean(p.origenPlantillaId);
+                    return (
+                      <div key={p.id} className={`px-4 py-3 ${activo ? "" : "opacity-50"}`}>
+                        <div className="grid grid-cols-[1fr_120px_130px_100px_auto] items-center gap-3">
+                          <span className="flex items-center gap-2 text-sm font-medium text-ink">
+                            {p.nombre}
+                            {!activo && (
+                              <span className="rounded-full bg-ink/10 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-ink/40">
+                                Inactivo
+                              </span>
+                            )}
+                            {tieneGuia && (
+                              <button
+                                onClick={() => setGuiaAbiertaId(guiaAbiertaId === p.id ? null : p.id)}
+                                className="text-[10px] font-semibold uppercase tracking-wide text-accent/70 hover:text-accent"
+                              >
+                                {guiaAbiertaId === p.id ? "Ocultar guía ▴" : "Guía ▾"}
+                              </button>
+                            )}
+                          </span>
+                          <span className="text-sm text-ink/70">{formatCurrency(p.costoPaciente)}</span>
+                          <span className="text-sm text-ink/70">{formatCurrency(p.costoOdontologo)}</span>
+                          <span className="text-sm text-ink/70">{formatDuracion(p.duracionMinutos)}</span>
+                          <div className="flex justify-end gap-2">
+                            <button
+                              onClick={() => setEditando(p)}
+                              className="rounded-lg border border-edge/15 px-2.5 py-1 text-xs text-ink/70 hover:bg-surface2"
+                            >
+                              Editar
+                            </button>
+                            <button
+                              onClick={() => alternarActivo(p.id)}
+                              className="rounded-lg border border-edge/15 px-2.5 py-1 text-xs text-ink/70 hover:bg-surface2"
+                            >
+                              {activo ? "Desactivar" : "Activar"}
+                            </button>
+                            <button
+                              onClick={() => setProcedimientoAEliminar(p)}
+                              className="rounded-lg border border-danger/30 px-2.5 py-1 text-xs text-danger hover:bg-danger/10"
+                            >
+                              Eliminar
+                            </button>
+                          </div>
+                        </div>
+                        {tieneGuia && guiaAbiertaId === p.id && <GuiaConfiguracion procedimiento={p} />}
                       </div>
-                    </div>
-                  ))}
+                    );
+                  })}
                 </div>
               </div>
             </div>
@@ -291,6 +361,8 @@ export default function Procedimientos() {
           }}
         />
       )}
+
+      {mostrarImportar && <ImportarCatalogoDialog onClose={() => setMostrarImportar(false)} />}
     </div>
   );
 }

@@ -16,6 +16,8 @@ export const especialidadesPredefinidas = [
   "Radiología",
 ] as const;
 
+export type VisibilidadProcedimiento = "interna" | "publica";
+
 export type Procedimiento = {
   id: string;
   nombre: string;
@@ -23,7 +25,30 @@ export type Procedimiento = {
   costoPaciente: number;
   costoOdontologo: number;
   duracionMinutos: number;
+  /** Ausente o true = activo. Desactivar oculta el procedimiento del picker
+   * de Nuevo Presupuesto sin borrarlo (a diferencia de eliminar, que sí es
+   * permanente). */
+  activo?: boolean;
+  /** "interna" (solo uso del consultorio) o "publica". Hoy no existe ninguna
+   * pantalla de paciente en la plataforma que lea este campo — se guarda
+   * correctamente para cuando exista, sin efecto visible todavía. */
+  visibilidad?: VisibilidadProcedimiento;
+  precioPromocional?: number;
+  /** Costo de insumos/laboratorio — distinto de costoOdontologo, que es la
+   * comisión del odontólogo. */
+  costoInterno?: number;
+  notasInternas?: string;
+  /** Código permanente del catálogo recomendado (ej. "CON-VAL") si este
+   * procedimiento se creó a partir de una plantilla — es la clave que evita
+   * duplicados al reimportar. Ausente = creado manualmente por la clínica. */
+  origenPlantillaId?: string;
+  creadoEl?: string;
+  actualizadoEl?: string;
 };
+
+export function esProcedimientoActivo(p: Procedimiento): boolean {
+  return p.activo !== false;
+}
 
 export function agruparPorEspecialidad(
   procedimientos: Procedimiento[]
