@@ -22,8 +22,10 @@ import {
   descargarArchivoInterconsultaApi,
   editarPerfilProfesionalApi,
   registrarContrarreferenciaApi,
+  registrarEventoApi,
   resolverSolicitudAccesoApi,
   revocarAccesoApi,
+  revocarConsentimientoApi,
   subirArchivoInterconsultaApi,
   subirEvidenciaVerificacionApi,
   transicionarEstadoApi,
@@ -153,6 +155,7 @@ function PerfilTab() {
         await editarPerfilProfesionalApi(uid, body);
       } else {
         await crearPerfilProfesionalApi(body);
+        await registrarEventoApi("professional_profile_created");
       }
       setOk(true);
     } catch (err) {
@@ -763,6 +766,16 @@ function SalaDelCaso({ interconsulta, onVolver }: { interconsulta: Interconsulta
     }
   }
 
+  async function revocarConsentimiento() {
+    if (!confirm("¿Revocar el consentimiento registrado para compartir este caso?")) return;
+    const motivo = window.prompt("Motivo de la revocación (opcional):") ?? undefined;
+    try {
+      await revocarConsentimientoApi(interconsulta.consentimientoId, motivo || undefined);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "No se pudo revocar el consentimiento.");
+    }
+  }
+
   const tieneJustificacion = notaTransicion.trim().length > 0;
   const siguientesPosibles: InterconsultaEstado[] = [
     "accepted",
@@ -875,7 +888,55 @@ function SalaDelCaso({ interconsulta, onVolver }: { interconsulta: Interconsulta
             Registrar contrarreferencia
           </button>
         )}
+
+        {interconsulta.historialEstados.length > 0 && (
+          <div className="mt-4 border-t border-edge/10 pt-3">
+            <p className="mb-2 text-xs font-medium text-ink/40">Historial</p>
+            <div className="space-y-1">
+              {interconsulta.historialEstados
+                .slice()
+                .reverse()
+                .map((h, i) => (
+                  <div key={i} className="text-xs text-ink/60">
+                    <span className="font-medium text-ink/80">{interconsultaEstadoLabel[h.estado]}</span> ·{" "}
+                    {new Date(h.fecha).toLocaleString("es-MX")}
+                    {h.nota && <span> — {h.nota}</span>}
+                  </div>
+                ))}
+            </div>
+          </div>
+        )}
       </div>
+
+      {interconsulta.contrarreferencia && (
+        <div className="rounded-2xl border border-edge/10 bg-surface p-5">
+          <div className="mb-3 flex items-center justify-between">
+            <h3 className="text-sm font-semibold text-ink">Contrarreferencia</h3>
+            {interconsulta.contrarreferencia.esBorrador && (
+              <span className="rounded-full bg-warning/10 px-2 py-0.5 text-[11px] font-medium text-warning">Borrador</span>
+            )}
+          </div>
+          <div className="space-y-2 text-sm">
+            <div>
+              <p className="text-xs text-ink/40">Resumen de la atención</p>
+              <p className="text-ink/80">{interconsulta.contrarreferencia.resumenAtencion}</p>
+            </div>
+            <div>
+              <p className="text-xs text-ink/40">Estado actual del paciente</p>
+              <p className="text-ink/80">{interconsulta.contrarreferencia.estadoActual}</p>
+            </div>
+            {interconsulta.contrarreferencia.recomendaciones && (
+              <div>
+                <p className="text-xs text-ink/40">Recomendaciones</p>
+                <p className="text-ink/80">{interconsulta.contrarreferencia.recomendaciones}</p>
+              </div>
+            )}
+            <p className="text-xs text-ink/40">
+              {new Date(interconsulta.contrarreferencia.fecha).toLocaleString("es-MX")}
+            </p>
+          </div>
+        </div>
+      )}
 
       <div className="rounded-2xl border border-edge/10 bg-surface p-5">
         <h3 className="mb-3 text-sm font-semibold text-ink">Participantes</h3>
@@ -893,6 +954,11 @@ function SalaDelCaso({ interconsulta, onVolver }: { interconsulta: Interconsulta
             </div>
           ))}
         </div>
+        {esRemitente && (
+          <button onClick={revocarConsentimiento} className="mt-3 text-xs text-danger hover:underline">
+            Revocar consentimiento de compartir este caso
+          </button>
+        )}
       </div>
 
       <div className="rounded-2xl border border-edge/10 bg-surface p-5">
@@ -963,6 +1029,8 @@ function InvitarColegaDialog({ interconsultaId, onClose }: { interconsultaId: st
   const [nombre, setNombre] = useState("");
   const [correo, setCorreo] = useState("");
   const [enlace, setEnlace] = useState<string | null>(null);
+  const [invitacionId, setInvitacionId] = useState<string | null>(null);
+  const [copiado, setCopiado] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [enviando, setEnviando] = useState(false);
 
@@ -970,18 +1038,31 @@ function InvitarColegaDialog({ interconsultaId, onClose }: { interconsultaId: st
     setEnviando(true);
     setError(null);
     try {
-      const { enlace: url } = await crearInvitacionApi({
+      const { id, enlace: url } = await crearInvitacionApi({
         interconsultaId,
         destinatarioNombre: nombre || undefined,
         destinatarioCorreo: correo,
         canal: "copiar_enlace",
       });
       setEnlace(url);
+      setInvitacionId(id);
     } catch (err) {
       setError(err instanceof Error ? err.message : "No se pudo crear la invitación.");
     } finally {
       setEnviando(false);
     }
+  }
+
+  async function copiar() {
+    if (!enlace) return;
+    try {
+      await navigator.clipboard.writeText(enlace);
+      setCopiado(true);
+    } catch {
+      // Algunos navegadores bloquean el portapapeles fuera de HTTPS/gesto
+      // directo — el input de abajo se puede seleccionar/copiar a mano.
+    }
+    registrarEventoApi("invite_shared", { invitacionId: invitacionId ?? undefined, interconsultaId }).catch(() => {});
   }
 
   return (
@@ -1016,7 +1097,10 @@ function InvitarColegaDialog({ interconsultaId, onClose }: { interconsultaId: st
           <div className="space-y-3">
             <p className="text-sm text-ink/70">Comparte este enlace con tu colega (vence en 7 días, un solo uso):</p>
             <input readOnly className={inputClass} value={enlace} onFocus={(e) => e.target.select()} />
-            <div className="flex justify-end">
+            <div className="flex justify-end gap-2">
+              <button onClick={copiar} className={botonSecundario}>
+                {copiado ? "¡Copiado!" : "Copiar enlace"}
+              </button>
               <button onClick={onClose} className={botonPrimario}>
                 Listo
               </button>

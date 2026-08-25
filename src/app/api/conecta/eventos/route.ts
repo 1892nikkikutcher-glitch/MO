@@ -3,7 +3,7 @@ import { verificarSesion } from "@/lib/adminAuth";
 import { dbAdmin } from "@/lib/firebaseAdmin";
 import { eventoCrecimientoSchema } from "@/lib/conectaSchemas";
 import { eventoTieneCamposClinicos } from "@/lib/moConecta";
-import { nowISO } from "@/lib/conectaServer";
+import { nowISO, sinIndefinidos } from "@/lib/conectaServer";
 
 /** Único punto por el que el cliente puede registrar un evento de
  * crecimiento — lista blanca de tipos (Zod enum) más un filtro defensivo
@@ -17,14 +17,14 @@ export async function POST(req: NextRequest) {
   const parsed = eventoCrecimientoSchema.safeParse(await req.json().catch(() => ({})));
   if (!parsed.success) return NextResponse.json({ error: "Evento no reconocido." }, { status: 400 });
 
-  const evento = {
+  const evento = sinIndefinidos({
     tipo: parsed.data.tipo,
     fecha: nowISO(),
     uid: sesion.uid,
     interconsultaId: parsed.data.interconsultaId,
     invitacionId: parsed.data.invitacionId,
     fuenteAdquisicion: parsed.data.fuenteAdquisicion,
-  };
+  });
   if (eventoTieneCamposClinicos(evento)) {
     return NextResponse.json({ error: "Evento rechazado." }, { status: 400 });
   }
