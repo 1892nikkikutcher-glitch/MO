@@ -141,6 +141,13 @@ export const invitacionCrearSchema = z
   })
   .strict();
 
+export const revocarAccesoSchema = z
+  .object({
+    uidARevocar: z.string().trim().min(1).max(200),
+    motivo: z.string().trim().max(1000).optional(),
+  })
+  .strict();
+
 export const solicitudAccesoResolverSchema = z
   .object({
     accion: z.enum(["aprobar", "rechazar"]),
