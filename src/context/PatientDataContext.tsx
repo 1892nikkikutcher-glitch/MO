@@ -1062,6 +1062,54 @@ export function PatientDataProvider({
     setPresupuestosLog((prev) => [...entradas, ...prev]);
   };
 
+  /** id de LineItem -> etiqueta/folio vigentes — mismo criterio que
+   * `tratamientosDeDisponibles` (note || procedure, folio del presupuesto). */
+  const mapaTratamientoPorId = (presupuestos: SavedBudget[]) => {
+    const mapa: Record<string, { label: string; folio: string }> = {};
+    presupuestos.forEach((p) => {
+      p.items.forEach((item) => {
+        mapa[item.id] = { label: item.note || item.procedure, folio: p.folio };
+      });
+    });
+    return mapa;
+  };
+
+  /** Un pago guarda una COPIA de la etiqueta/folio del tratamiento al
+   * momento de crearse o reasignarse (Pagos.tsx) — si después se edita el
+   * nombre/nota o el folio de ese tratamiento en Presupuestos, esa copia se
+   * queda obsoleta y Pagos sigue mostrando el nombre viejo, que es
+   * exactamente la confusión reportada. Aquí se refresca esa copia en
+   * cuanto cambia; el monto pagado NUNCA se toca — es historial real de lo
+   * cobrado, independiente de si el precio del tratamiento cambió después. */
+  const sincronizarEtiquetasPagos = (patientId: string, prevPres: SavedBudget[], nextPres: SavedBudget[]) => {
+    const mapaAnterior = mapaTratamientoPorId(prevPres);
+    const mapaNuevo = mapaTratamientoPorId(nextPres);
+    const cambios: Record<string, { label: string; folio: string }> = {};
+    Object.entries(mapaNuevo).forEach(([id, actual]) => {
+      const anterior = mapaAnterior[id];
+      if (anterior && (anterior.label !== actual.label || anterior.folio !== actual.folio)) {
+        cambios[id] = actual;
+      }
+    });
+    if (Object.keys(cambios).length === 0) return;
+
+    let huboCambio = false;
+    const pagosActualizados = (pagosPorPaciente[patientId] ?? []).map((pago) => {
+      let lineasCambiaron = false;
+      const lineas = pago.lineas.map((linea) => {
+        const cambio = linea.tratamientoId ? cambios[linea.tratamientoId] : undefined;
+        if (!cambio) return linea;
+        lineasCambiaron = true;
+        return { ...linea, label: cambio.label, folio: cambio.folio };
+      });
+      if (!lineasCambiaron) return pago;
+      huboCambio = true;
+      return { ...pago, lineas };
+    });
+
+    if (huboCambio) setPagosPaciente(patientId, () => pagosActualizados);
+  };
+
   const setPresupuestosPaciente = (patientId: string, updater: Updater<SavedBudget[]>) => {
     if (!clinicUid) return;
     const prevArr = presupuestosPorPaciente[patientId] ?? [];
@@ -1072,6 +1120,7 @@ export function PatientDataProvider({
     registrarSaldoPendiente(patientId, next, pagosPorPaciente[patientId] ?? []);
     registrarLogPresupuestos(patientId, prevArr, next);
     setPresupuestosPorPacienteState((prev) => ({ ...prev, [patientId]: next }));
+    sincronizarEtiquetasPagos(patientId, prevArr, next);
   };
 
   /** Refleja en `config/finanzas` el neto por fecha (alta, edición o baja de
