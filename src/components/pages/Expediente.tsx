@@ -32,7 +32,7 @@ import {
   type Pago,
 } from "@/lib/patientData";
 import { condicionesSistemicasPositivas, esNegacionAlergia } from "@/lib/historiaClinica";
-import { timeToMinutes } from "@/lib/agendaHelpers";
+import { timeToMinutes, toISODate, getMonday, addDays } from "@/lib/agendaHelpers";
 
 function fechaLargaHoy() {
   const texto = new Date().toLocaleDateString("es-MX", { weekday: "long", day: "numeric", month: "long", year: "numeric" });
@@ -559,7 +559,7 @@ function ExpedienteSidePanel({
   sugerirPrevencion: boolean;
   formatDate: (date: string) => string;
 }) {
-  const hoyISO = new Date().toISOString().slice(0, 10);
+  const hoyISO = toISODate(new Date());
   const fechaSugerida = ultimaCita ? addMonthsISO(ultimaCita.fecha, 6) : null;
   const mostrarSugerencia = sugerirPrevencion && citasFuturas.length === 0 && fechaSugerida;
   const sugerenciaVencida = mostrarSugerencia && fechaSugerida! <= hoyISO;
@@ -733,7 +733,7 @@ export default function Expediente({
       })()
     : "";
 
-  const hoyISO = new Date().toISOString().slice(0, 10);
+  const hoyISO = toISODate(new Date());
   const citasPaciente = citas
     .filter((c) => c.patientId === patient.id)
     .sort((a, b) => b.fecha.localeCompare(a.fecha) || b.horaInicio.localeCompare(a.horaInicio));
@@ -743,17 +743,22 @@ export default function Expediente({
   const ultimaCita = citasPaciente.find((c) => c.fecha < hoyISO && c.estatus !== "Cancelada");
 
   // Flechas del encabezado: navegan al expediente del paciente anterior/
-  // siguiente en el orden cronológico de las citas de HOY, para poder ir
-  // pasando la agenda del día (notas, pagos, confirmaciones) sin volver a
-  // Pacientes en cada uno. Se queda en la misma pestaña activa.
-  const citasHoyConPaciente = citas
-    .filter((c) => c.fecha === hoyISO && c.patientId)
-    .sort((a, b) => timeToMinutes(a.horaInicio) - timeToMinutes(b.horaInicio));
-  const indiceHoy = citasHoyConPaciente.findIndex((c) => c.patientId === patient.id);
-  const pacienteAnteriorHoy = indiceHoy > 0 ? citasHoyConPaciente[indiceHoy - 1] : null;
+  // siguiente en el orden cronológico de las citas de TODA LA SEMANA en
+  // curso (lunes a domingo) — no solo el día de hoy — para poder ir
+  // completando notas/pagos de días que se quedaron pendientes sin volver a
+  // Pacientes en cada uno; al llegar al final de un día, sigue con el
+  // primero del día siguiente de la misma semana. Se queda en la misma
+  // pestaña activa.
+  const inicioSemana = toISODate(getMonday(new Date()));
+  const finSemana = toISODate(addDays(getMonday(new Date()), 6));
+  const citasSemanaConPaciente = citas
+    .filter((c) => c.fecha >= inicioSemana && c.fecha <= finSemana && c.patientId)
+    .sort((a, b) => a.fecha.localeCompare(b.fecha) || timeToMinutes(a.horaInicio) - timeToMinutes(b.horaInicio));
+  const indiceHoy = citasSemanaConPaciente.findIndex((c) => c.patientId === patient.id);
+  const pacienteAnteriorHoy = indiceHoy > 0 ? citasSemanaConPaciente[indiceHoy - 1] : null;
   const pacienteSiguienteHoy =
-    indiceHoy >= 0 && indiceHoy < citasHoyConPaciente.length - 1
-      ? citasHoyConPaciente[indiceHoy + 1]
+    indiceHoy >= 0 && indiceHoy < citasSemanaConPaciente.length - 1
+      ? citasSemanaConPaciente[indiceHoy + 1]
       : null;
 
   const enviarResumen = () => {
@@ -793,8 +798,8 @@ export default function Expediente({
           disabled={!pacienteAnteriorHoy}
           title={
             pacienteAnteriorHoy
-              ? `Expediente anterior en la agenda de hoy: ${pacienteAnteriorHoy.paciente} (${pacienteAnteriorHoy.horaInicio})`
-              : "No hay un paciente anterior en la agenda de hoy"
+              ? `Expediente anterior en la agenda de esta semana: ${pacienteAnteriorHoy.paciente} (${formatFechaCita(pacienteAnteriorHoy.fecha)} ${pacienteAnteriorHoy.horaInicio})`
+              : "No hay un paciente anterior en la agenda de esta semana"
           }
           style={{
             boxShadow: pacienteAnteriorHoy
@@ -843,8 +848,8 @@ export default function Expediente({
           disabled={!pacienteSiguienteHoy}
           title={
             pacienteSiguienteHoy
-              ? `Expediente siguiente en la agenda de hoy: ${pacienteSiguienteHoy.paciente} (${pacienteSiguienteHoy.horaInicio})`
-              : "No hay un paciente siguiente en la agenda de hoy"
+              ? `Expediente siguiente en la agenda de esta semana: ${pacienteSiguienteHoy.paciente} (${formatFechaCita(pacienteSiguienteHoy.fecha)} ${pacienteSiguienteHoy.horaInicio})`
+              : "No hay un paciente siguiente en la agenda de esta semana"
           }
           style={{
             boxShadow: pacienteSiguienteHoy
@@ -864,13 +869,13 @@ export default function Expediente({
       <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-1 text-[11px] leading-tight print:hidden">
         <span className={pacienteAnteriorHoy ? "text-accent/80" : "text-pink-400/80"}>
           ← {pacienteAnteriorHoy
-            ? `Anterior: ${pacienteAnteriorHoy.paciente} · ${pacienteAnteriorHoy.horaInicio}`
-            : "Sin paciente anterior en la agenda de hoy"}
+            ? `Anterior: ${pacienteAnteriorHoy.paciente} · ${formatFechaCita(pacienteAnteriorHoy.fecha)} ${pacienteAnteriorHoy.horaInicio}`
+            : "Sin paciente anterior en la agenda de esta semana"}
         </span>
         <span className={pacienteSiguienteHoy ? "text-accent/80" : "text-pink-400/80"}>
           {pacienteSiguienteHoy
-            ? `Siguiente: ${pacienteSiguienteHoy.paciente} · ${pacienteSiguienteHoy.horaInicio}`
-            : "Sin paciente siguiente en la agenda de hoy"} →
+            ? `Siguiente: ${pacienteSiguienteHoy.paciente} · ${formatFechaCita(pacienteSiguienteHoy.fecha)} ${pacienteSiguienteHoy.horaInicio}`
+            : "Sin paciente siguiente en la agenda de esta semana"} →
         </span>
       </div>
 
