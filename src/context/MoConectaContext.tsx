@@ -12,6 +12,8 @@ import { collection, doc, onSnapshot, query, where, type Unsubscribe } from "fir
 import { db } from "@/lib/firebase";
 import type { AfiliacionClinica, Interconsulta, PerfilProfesionalPrivado, PerfilProfesionalPublico } from "@/lib/moConecta";
 
+export type PacientePreseleccionado = { patientId: string; patientName: string };
+
 type MoConectaContextValue = {
   uid: string;
   perfilPublico: PerfilProfesionalPublico | null;
@@ -22,6 +24,12 @@ type MoConectaContextValue = {
   casosEnviados: Interconsulta[];
   casosRecibidos: Interconsulta[];
   cargando: boolean;
+  /** Paciente elegido desde Expediente (botón "Solicitar interconsulta") para
+   * saltar directo al directorio con el paciente ya decidido, en vez de
+   * tener que volver a buscarlo dentro del wizard. */
+  pacientePreseleccionado: PacientePreseleccionado | null;
+  prepararInterconsulta: (patientId: string, patientName: string) => void;
+  limpiarPacientePreseleccionado: () => void;
 };
 
 const MoConectaContext = createContext<MoConectaContextValue | null>(null);
@@ -34,37 +42,61 @@ export function MoConectaProvider({ uid, children }: { uid: string; children: Re
   const [misCasos, setMisCasos] = useState<Interconsulta[]>([]);
   const [cargandoPerfil, setCargandoPerfil] = useState(true);
   const [cargandoCasos, setCargandoCasos] = useState(true);
+  const [pacientePreseleccionado, setPacientePreseleccionado] = useState<PacientePreseleccionado | null>(null);
 
   useEffect(() => {
     if (!uid) return;
     const unsubs: Unsubscribe[] = [];
 
+    const conError = (nombre: string) => (err: unknown) =>
+      console.error(`MoConecta: listener "${nombre}" falló @ ${new Date().toISOString()}`, err);
+
     unsubs.push(
-      onSnapshot(doc(db, "perfilesProfesionalesPublicos", uid), (snap) => {
-        setPerfilPublico(snap.exists() ? (snap.data() as PerfilProfesionalPublico) : null);
-        setCargandoPerfil(false);
-      })
+      onSnapshot(
+        doc(db, "perfilesProfesionalesPublicos", uid),
+        (snap) => {
+          setPerfilPublico(snap.exists() ? (snap.data() as PerfilProfesionalPublico) : null);
+          setCargandoPerfil(false);
+        },
+        conError("perfilPublico")
+      )
     );
     unsubs.push(
-      onSnapshot(doc(db, "perfilesProfesionalesPrivados", uid), (snap) => {
-        setPerfilPrivado(snap.exists() ? (snap.data() as PerfilProfesionalPrivado) : null);
-      })
+      onSnapshot(
+        doc(db, "perfilesProfesionalesPrivados", uid),
+        (snap) => {
+          setPerfilPrivado(snap.exists() ? (snap.data() as PerfilProfesionalPrivado) : null);
+        },
+        conError("perfilPrivado")
+      )
     );
     unsubs.push(
-      onSnapshot(query(collection(db, "perfilesProfesionalesPublicos"), where("activoEnDirectorio", "==", true)), (snap) => {
-        setDirectorio(snap.docs.map((d) => d.data() as PerfilProfesionalPublico));
-      })
+      onSnapshot(
+        query(collection(db, "perfilesProfesionalesPublicos"), where("activoEnDirectorio", "==", true)),
+        (snap) => {
+          setDirectorio(snap.docs.map((d) => d.data() as PerfilProfesionalPublico));
+        },
+        conError("directorio")
+      )
     );
     unsubs.push(
-      onSnapshot(query(collection(db, "afiliaciones"), where("uid", "==", uid)), (snap) => {
-        setMisAfiliaciones(snap.docs.map((d) => d.data() as AfiliacionClinica));
-      })
+      onSnapshot(
+        query(collection(db, "afiliaciones"), where("uid", "==", uid)),
+        (snap) => {
+          setMisAfiliaciones(snap.docs.map((d) => d.data() as AfiliacionClinica));
+        },
+        conError("afiliaciones")
+      )
     );
     unsubs.push(
-      onSnapshot(query(collection(db, "interconsultas"), where("participantesAutorizados", "array-contains", uid)), (snap) => {
-        setMisCasos(snap.docs.map((d) => d.data() as Interconsulta));
-        setCargandoCasos(false);
-      })
+      onSnapshot(
+        query(collection(db, "interconsultas"), where("participantesAutorizados", "array-contains", uid)),
+        (snap) => {
+          setMisCasos(snap.docs.map((d) => d.data() as Interconsulta));
+          setCargandoCasos(false);
+        },
+        conError("interconsultas")
+      )
     );
 
     return () => unsubs.forEach((u) => u());
@@ -85,6 +117,9 @@ export function MoConectaProvider({ uid, children }: { uid: string; children: Re
         casosEnviados,
         casosRecibidos,
         cargando: cargandoPerfil || cargandoCasos,
+        pacientePreseleccionado,
+        prepararInterconsulta: (patientId, patientName) => setPacientePreseleccionado({ patientId, patientName }),
+        limpiarPacientePreseleccionado: () => setPacientePreseleccionado(null),
       }}
     >
       {children}

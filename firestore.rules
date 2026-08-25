@@ -332,7 +332,15 @@ service cloud.firestore {
     }
 
     match /interconsultas/{id} {
-      allow read: if esParticipanteInterconsulta(id);
+      // OJO: aquí se compara request.auth.uid contra resource.data
+      // directamente (no esParticipanteInterconsulta(), que hace un get()
+      // extra sobre este MISMO documento) — con una consulta de lista
+      // (MoConectaContext.tsx filtra con array-contains sobre esta
+      // colección), un get() propio dentro de la regla hace que Firestore
+      // rechace la consulta completa con "permission-denied", incluso con
+      // la colección vacía. Comparar directo contra resource.data sí es
+      // válido para listas.
+      allow read: if signedIn() && request.auth.uid in resource.data.participantesAutorizados;
       allow write: if false; // solo /api/conecta/interconsultas/*
     }
     match /interconsultas/{id}/mensajes/{msgId} {
