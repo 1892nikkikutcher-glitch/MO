@@ -345,6 +345,7 @@ function PerfilTab() {
 function DirectorioTab({ onCasoCreado }: { onCasoCreado: (interconsultaId: string) => void }) {
   const { directorio, uid, pacientePreseleccionado, limpiarPacientePreseleccionado } = useMoConecta();
   const [destinatario, setDestinatario] = useState<{ uid: string; nombreCompleto: string } | null>(null);
+  const [invitandoExterno, setInvitandoExterno] = useState(false);
   const colegas = directorio.filter((p) => p.uid !== uid);
 
   return (
@@ -360,6 +361,11 @@ function DirectorioTab({ onCasoCreado }: { onCasoCreado: (interconsultaId: strin
           </button>
         </div>
       )}
+
+      <button onClick={() => setInvitandoExterno(true)} className={botonSecundario}>
+        ¿Tu colega no está en MO? Invítalo por enlace
+      </button>
+
       {colegas.length === 0 && (
         <p className="text-sm text-ink/50">Todavía no hay colegas con el directorio activo. Sé de los primeros.</p>
       )}
@@ -404,6 +410,16 @@ function DirectorioTab({ onCasoCreado }: { onCasoCreado: (interconsultaId: strin
           }}
         />
       )}
+      {invitandoExterno && (
+        <NuevaInterconsultaDialog
+          destinatario={null}
+          onClose={() => setInvitandoExterno(false)}
+          onCreada={(id) => {
+            setInvitandoExterno(false);
+            onCasoCreado(id);
+          }}
+        />
+      )}
     </div>
   );
 }
@@ -413,7 +429,7 @@ function NuevaInterconsultaDialog({
   onClose,
   onCreada,
 }: {
-  destinatario: { uid: string; nombreCompleto: string };
+  destinatario: { uid: string; nombreCompleto: string } | null;
   onClose: () => void;
   onCreada: (id: string) => void;
 }) {
@@ -443,11 +459,11 @@ function NuevaInterconsultaDialog({
         motivo,
         preguntaClinica,
         prioridad,
-        destinatarioUid: destinatario.uid,
+        destinatarioUid: destinatario?.uid,
         informacionMinima: informacionMinima || undefined,
         consentimiento: {
-          destinatarioTipo: "odontologo_registrado",
-          destinatarioId: destinatario.uid,
+          destinatarioTipo: destinatario ? "odontologo_registrado" : "invitacion",
+          destinatarioId: destinatario?.uid,
           finalidad: "Interconsulta odontológica para valoración/tratamiento del paciente.",
           informacionCompartida: ["Resumen de historia clínica", "Motivo y pregunta clínica", especialidadSolicitada].filter(
             Boolean
@@ -466,7 +482,14 @@ function NuevaInterconsultaDialog({
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4">
       <div className="max-h-[90vh] w-full max-w-lg overflow-y-auto rounded-2xl border border-edge/10 bg-modal p-6">
-        <h2 className="mb-4 text-lg font-semibold text-ink">Enviar interconsulta a {destinatario.nombreCompleto}</h2>
+        <h2 className="mb-4 text-lg font-semibold text-ink">
+          {destinatario ? `Enviar interconsulta a ${destinatario.nombreCompleto}` : "Nueva interconsulta para invitar por enlace"}
+        </h2>
+        {!destinatario && (
+          <p className="mb-3 text-sm text-ink/60">
+            Crea el caso primero; después de guardarlo podrás generar un enlace seguro para invitar a tu colega.
+          </p>
+        )}
 
         <div className="space-y-3">
           <div>
