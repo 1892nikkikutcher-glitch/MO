@@ -23,6 +23,9 @@
     "xlsx": "^0.18.5",
     "zod": "^4.4.3"
   },
+  "overrides": {
+    "jose": "5.9.6"
+  },
   "devDependencies": {
     "@firebase/rules-unit-testing": "^5.0.2",
     "@types/node": "^20",
