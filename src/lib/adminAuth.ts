@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { authAdmin } from "./firebaseAdmin";
 
-export type SesionVerificada = { uid: string; email: string | null };
+export type SesionVerificada = { uid: string; email: string | null; emailVerificado: boolean };
 
 async function decodificarToken(req: NextRequest): Promise<SesionVerificada | null> {
   const header = req.headers.get("authorization");
@@ -9,7 +9,7 @@ async function decodificarToken(req: NextRequest): Promise<SesionVerificada | nu
   if (!idToken) return null;
   try {
     const decoded = await authAdmin.verifyIdToken(idToken);
-    return { uid: decoded.uid, email: decoded.email ?? null };
+    return { uid: decoded.uid, email: decoded.email ?? null, emailVerificado: decoded.email_verified === true };
   } catch {
     return null;
   }

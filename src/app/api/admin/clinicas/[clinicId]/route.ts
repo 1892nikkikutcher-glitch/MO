@@ -123,6 +123,19 @@ export async function PATCH(req: NextRequest, { params }: Params) {
     return NextResponse.json({ ok: true });
   }
 
+  if (accion === "otorgar-fundadora") {
+    const hasta = new Date();
+    hasta.setDate(hasta.getDate() + 90);
+    await dbAdmin
+      .collection("clinics")
+      .doc(clinicId)
+      .set(
+        { planConectaId: "clinica_fundadora", fundadoraHasta: hasta.toISOString() } satisfies Partial<ClinicInfo>,
+        { merge: true }
+      );
+    return NextResponse.json({ ok: true, fundadoraHasta: hasta.toISOString() });
+  }
+
   return NextResponse.json({ error: "Acción no reconocida." }, { status: 400 });
 }
 

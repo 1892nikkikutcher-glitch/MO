@@ -294,6 +294,82 @@ service cloud.firestore {
       allow read, write: if false;
     }
 
+    // ============================================================
+    // MO CONECTA — red profesional de interconsultas entre odontólogos
+    // (cross-clínica, aditivo, aislado del resto de la app).
+    //
+    // Principio de menor privilegio absoluto: NINGUNA colección de aquí
+    // abajo admite escritura desde el cliente — todo pasa por
+    // /api/conecta/* y /api/admin/conecta/* usando Firebase Admin SDK
+    // (bypassa estas reglas), igual que el Panel de administrador arriba.
+    // El cliente únicamente lee, en tiempo real, lo que ya le corresponde
+    // como dueño/participante — nunca escribe directo, ni siquiera su
+    // propio perfil.
+    // ============================================================
+
+    function esParticipanteInterconsulta(interconsultaId) {
+      return signedIn()
+        && request.auth.uid in
+           get(/databases/$(database)/documents/interconsultas/$(interconsultaId)).data.participantesAutorizados;
+    }
+
+    match /perfilesProfesionalesPublicos/{uid} {
+      allow read: if signedIn(); // directorio — visible a cualquier odontólogo autenticado
+      allow write: if false;     // solo POST/PATCH /api/conecta/perfiles
+    }
+    match /perfilesProfesionalesPrivados/{uid} {
+      allow read: if signedIn() && request.auth.uid == uid;
+      allow write: if false;
+    }
+    match /perfilesProfesionalesAdmin/{uid} {
+      allow read, write: if false; // ni el propio dueño — solo dbAdmin
+    }
+
+    match /afiliaciones/{id} {
+      allow read: if signedIn()
+        && (resource.data.uid == request.auth.uid || isClinicAdmin(resource.data.clinicaId));
+      allow write: if false; // solo /api/conecta/afiliaciones
+    }
+
+    match /interconsultas/{id} {
+      allow read: if esParticipanteInterconsulta(id);
+      allow write: if false; // solo /api/conecta/interconsultas/*
+    }
+    match /interconsultas/{id}/mensajes/{msgId} {
+      allow read: if esParticipanteInterconsulta(id);
+      allow write: if false;
+    }
+    match /interconsultas/{id}/eventos/{eventoId} {
+      allow read: if esParticipanteInterconsulta(id);
+      allow write: if false; // auditoría — inmutable, nunca desde el cliente
+    }
+    match /interconsultas/{id}/solicitudesAcceso/{solicitudId} {
+      allow read: if esParticipanteInterconsulta(id)
+        || (signedIn() && resource.data.solicitanteUid == request.auth.uid);
+      allow write: if false;
+    }
+
+    match /consentimientosInterconsulta/{id} {
+      allow read: if signedIn() && resource.data.odontologoUid == request.auth.uid;
+      allow write: if false; // documento original inmutable — solo se crea/lee vía servidor
+    }
+    match /consentimientosInterconsulta/{id}/revocaciones/{revId} {
+      allow read: if signedIn()
+        && get(/databases/$(database)/documents/consentimientosInterconsulta/$(id)).data.odontologoUid == request.auth.uid;
+      allow write: if false;
+    }
+
+    match /invitacionesConecta/{id} {
+      allow read, write: if false; // nunca desde el cliente — todo pasa por /api/conecta/invitaciones/*
+    }
+    match /eventosCrecimientoConecta/{id} {
+      allow read, write: if false; // solo superadmin vía dbAdmin
+    }
+    match /configuracionConecta/{id} {
+      allow read: if signedIn(); // transparencia — cualquiera puede ver la política vigente
+      allow write: if false;     // solo /api/admin/conecta/*
+    }
+
     match /{document=**} {
       allow read, write: if false;
     }

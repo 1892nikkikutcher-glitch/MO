@@ -424,6 +424,11 @@ export type ClinicInfo = {
    * real es Firebase Auth/reglas de Firestore — solo evita que alguien vea
    * de reojo la pantalla. */
   pinPrivacidad?: string;
+  /** Plan de MO Conecta de esta clínica y, si es "clinica_fundadora", hasta
+   * cuándo dura esa ventana de 90 días — ver moConecta.ts (fundadoraActiva).
+   * Solo el Panel de administrador otorga "clinica_fundadora". */
+  planConectaId?: "mo_red" | "mo_pro_individual" | "clinica_fundadora";
+  fundadoraHasta?: string;
 };
 
 /** Documento `clinicMembers/{clinicId}_{uid}`. Campo `role` en inglés para
