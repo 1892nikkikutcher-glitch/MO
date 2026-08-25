@@ -14,6 +14,7 @@ import Laboratorios from "./Laboratorios";
 import NotasEvolucion from "./NotasEvolucion";
 import MembresiaTab from "./MembresiaTab";
 import { usePatientData } from "@/context/PatientDataContext";
+import { useMoConecta } from "@/context/MoConectaContext";
 import { generarPresupuestoPdf } from "@/lib/generarPresupuestoPdf";
 import { generarPresupuestoTotalPdf } from "@/lib/generarPresupuestoTotalPdf";
 import { enviarPdfPorWhatsapp } from "@/lib/enviarPdfWhatsapp";
@@ -650,8 +651,10 @@ export default function Expediente({
     cambiosSinGuardar,
     setCambiosSinGuardar,
     irAExpediente,
+    irAPagina,
     setAyudaContexto,
   } = usePatientData();
+  const { prepararInterconsulta } = useMoConecta();
 
   // Publica la pestaña activa para que el Asistente flotante muestre ayuda
   // específica (ej. "cómo hacer un pago") en vez de solo "Pacientes" —
@@ -840,6 +843,18 @@ export default function Expediente({
           >
             <WhatsAppIcon />
             Enviar resumen al paciente
+          </button>
+
+          <button
+            onClick={() => {
+              prepararInterconsulta(patient.id, patient.name);
+              irAPagina("mo-conecta");
+            }}
+            title="Enviar este caso a un colega para interconsulta por MO Conecta"
+            style={{ boxShadow: "0 0 14px -2px rgb(var(--accent-rgb) / 0.7)" }}
+            className="flex shrink-0 items-center justify-center gap-2 rounded-lg border border-accent/40 px-3 py-2 text-xs font-semibold text-accent transition-colors hover:bg-accent/10"
+          >
+            Solicitar interconsulta
           </button>
         </div>
 

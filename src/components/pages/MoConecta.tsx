@@ -63,8 +63,8 @@ function EstadoBadge({ estado }: { estado: InterconsultaEstado }) {
 }
 
 export default function MoConecta() {
-  const [tab, setTab] = useState<"perfil" | "directorio" | "casos">("perfil");
-  const { perfilPublico } = useMoConecta();
+  const { perfilPublico, pacientePreseleccionado } = useMoConecta();
+  const [tab, setTab] = useState<"perfil" | "directorio" | "casos">(pacientePreseleccionado ? "directorio" : "perfil");
   const [casoAbierto, setCasoAbierto] = useState<string | null>(null);
 
   return (
@@ -343,12 +343,23 @@ function PerfilTab() {
 }
 
 function DirectorioTab({ onCasoCreado }: { onCasoCreado: (interconsultaId: string) => void }) {
-  const { directorio, uid } = useMoConecta();
+  const { directorio, uid, pacientePreseleccionado, limpiarPacientePreseleccionado } = useMoConecta();
   const [destinatario, setDestinatario] = useState<{ uid: string; nombreCompleto: string } | null>(null);
   const colegas = directorio.filter((p) => p.uid !== uid);
 
   return (
     <div className="space-y-4">
+      {pacientePreseleccionado && (
+        <div className="flex items-center justify-between gap-3 rounded-lg border border-accent/30 bg-accent/10 px-3 py-2 text-sm text-accent">
+          <span>
+            Interconsulta para <strong>{pacientePreseleccionado.patientName}</strong> — elige a continuación el colega
+            destinatario.
+          </span>
+          <button onClick={limpiarPacientePreseleccionado} className="text-xs underline hover:no-underline">
+            Quitar
+          </button>
+        </div>
+      )}
       {colegas.length === 0 && (
         <p className="text-sm text-ink/50">Todavía no hay colegas con el directorio activo. Sé de los primeros.</p>
       )}
@@ -407,7 +418,8 @@ function NuevaInterconsultaDialog({
   onCreada: (id: string) => void;
 }) {
   const { clinicUid, patients } = usePatientData();
-  const [pacienteId, setPacienteId] = useState("");
+  const { pacientePreseleccionado, limpiarPacientePreseleccionado } = useMoConecta();
+  const [pacienteId, setPacienteId] = useState(pacientePreseleccionado?.patientId ?? "");
   const [especialidadSolicitada, setEspecialidadSolicitada] = useState("");
   const [motivo, setMotivo] = useState("");
   const [preguntaClinica, setPreguntaClinica] = useState("");
@@ -442,6 +454,7 @@ function NuevaInterconsultaDialog({
           ),
         },
       });
+      limpiarPacientePreseleccionado();
       onCreada(interconsulta.id);
     } catch (err) {
       setError(err instanceof Error ? err.message : "No se pudo crear la interconsulta.");
