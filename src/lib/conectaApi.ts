@@ -7,6 +7,21 @@
 import { auth } from "./firebase";
 import type { CategoriaArchivoInterconsulta, InterconsultaEstado, PrioridadInterconsulta } from "./moConecta";
 
+/** Cuando la ruta rechaza el body por Zod, `detalles.fieldErrors` trae el
+ * motivo exacto por campo (ej. `{ modalidadAtencion: ["Invalid enum value..."] }`)
+ * — sin esto, el clínico solo veía "Datos de perfil inválidos." sin saber
+ * cuál campo corregir ni por qué. */
+function mensajeDeError(data: { error?: string; detalles?: { fieldErrors?: Record<string, string[]> } }): string {
+  const base = data.error || "Ocurrió un error.";
+  const fieldErrors = data.detalles?.fieldErrors;
+  if (!fieldErrors) return base;
+  const detalle = Object.entries(fieldErrors)
+    .filter(([, mensajes]) => Array.isArray(mensajes) && mensajes.length > 0)
+    .map(([campo, mensajes]) => `${campo}: ${mensajes.join(", ")}`)
+    .join(" · ");
+  return detalle ? `${base} (${detalle})` : base;
+}
+
 async function llamarApi(path: string, options: RequestInit = {}) {
   const token = await auth.currentUser?.getIdToken();
   const res = await fetch(path, {
@@ -18,7 +33,7 @@ async function llamarApi(path: string, options: RequestInit = {}) {
     },
   });
   const data = await res.json().catch(() => ({}));
-  if (!res.ok) throw new Error(data.error || "Ocurrió un error.");
+  if (!res.ok) throw new Error(mensajeDeError(data));
   return data;
 }
 

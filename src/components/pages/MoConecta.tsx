@@ -33,6 +33,7 @@ import {
 import { collection, onSnapshot, query, where } from "firebase/firestore";
 import { useEffect } from "react";
 import { db } from "@/lib/firebase";
+import { manejarCambioNombre } from "@/lib/textoNombre";
 import type { MensajeInterconsulta } from "@/lib/conectaMensajes";
 import type { SolicitudAcceso } from "@/lib/invitacionesConecta";
 
@@ -201,7 +202,7 @@ function PerfilTab() {
           <input
             className={inputClass}
             value={form.nombreCompleto}
-            onChange={(e) => setForm((f) => ({ ...f, nombreCompleto: e.target.value }))}
+            onChange={(e) => manejarCambioNombre(e, (v) => setForm((f) => ({ ...f, nombreCompleto: v })))}
           />
         </div>
         <div>
@@ -209,7 +210,7 @@ function PerfilTab() {
           <input
             className={inputClass}
             value={form.universidad}
-            onChange={(e) => setForm((f) => ({ ...f, universidad: e.target.value }))}
+            onChange={(e) => manejarCambioNombre(e, (v) => setForm((f) => ({ ...f, universidad: v })))}
           />
         </div>
         <div>
@@ -217,7 +218,7 @@ function PerfilTab() {
           <input
             className={inputClass}
             value={form.municipio}
-            onChange={(e) => setForm((f) => ({ ...f, municipio: e.target.value }))}
+            onChange={(e) => manejarCambioNombre(e, (v) => setForm((f) => ({ ...f, municipio: v })))}
           />
         </div>
         <div>
@@ -225,7 +226,7 @@ function PerfilTab() {
           <input
             className={inputClass}
             value={form.estado}
-            onChange={(e) => setForm((f) => ({ ...f, estado: e.target.value }))}
+            onChange={(e) => manejarCambioNombre(e, (v) => setForm((f) => ({ ...f, estado: v })))}
           />
         </div>
         <div className="sm:col-span-2">
