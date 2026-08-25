@@ -5,11 +5,13 @@ import { useMoConecta } from "@/context/MoConectaContext";
 import { usePatientData } from "@/context/PatientDataContext";
 import {
   interconsultaEstadoLabel,
+  modalidadesAtencion,
   puedeTransicionar,
   TEXTO_DISCLAIMER_CONSENTIMIENTO,
   type CategoriaArchivoInterconsulta,
   type Interconsulta,
   type InterconsultaEstado,
+  type ModalidadAtencion,
   type PrioridadInterconsulta,
 } from "@/lib/moConecta";
 import {
@@ -126,7 +128,7 @@ function PerfilTab() {
     descripcion: perfilPublico?.descripcion ?? "",
     municipio: perfilPublico?.municipio ?? "",
     estado: perfilPublico?.estado ?? "",
-    modalidadAtencion: perfilPublico?.modalidadAtencion ?? "",
+    modalidadAtencion: perfilPublico?.modalidadAtencion ?? ([] as ModalidadAtencion[]),
     horariosGenerales: perfilPublico?.horariosGenerales ?? "",
     aceptaInterconsultas: perfilPublico?.aceptaInterconsultas ?? true,
     tiposCasosRecibe: (perfilPublico?.tiposCasosRecibe ?? []).join(", "),
@@ -243,12 +245,38 @@ function PerfilTab() {
         </div>
         <div>
           <label className={labelClass}>Modalidad de atención</label>
-          <input
-            className={inputClass}
-            value={form.modalidadAtencion}
-            onChange={(e) => setForm((f) => ({ ...f, modalidadAtencion: e.target.value }))}
-            placeholder="Consultorio, a domicilio, ambos"
-          />
+          <div className="space-y-1.5 rounded-lg border border-edge/10 bg-field px-3 py-2">
+            {modalidadesAtencion.map((m) => (
+              <label key={m} className="flex items-center gap-2 text-sm text-ink/80">
+                <input
+                  type="checkbox"
+                  checked={form.modalidadAtencion.includes(m)}
+                  onChange={(e) =>
+                    setForm((f) => ({
+                      ...f,
+                      modalidadAtencion: e.target.checked
+                        ? [...f.modalidadAtencion, m]
+                        : f.modalidadAtencion.filter((x) => x !== m),
+                    }))
+                  }
+                />
+                {m}
+              </label>
+            ))}
+            <label className="flex items-center gap-2 border-t border-edge/10 pt-1.5 text-sm text-ink/80">
+              <input
+                type="checkbox"
+                checked={form.modalidadAtencion.length === modalidadesAtencion.length}
+                onChange={(e) =>
+                  setForm((f) => ({
+                    ...f,
+                    modalidadAtencion: e.target.checked ? [...modalidadesAtencion] : [],
+                  }))
+                }
+              />
+              Todas las anteriores
+            </label>
+          </div>
         </div>
         <div>
           <label className={labelClass}>Horarios generales</label>

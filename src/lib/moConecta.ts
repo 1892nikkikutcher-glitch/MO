@@ -12,6 +12,9 @@
 
 export type EstadoVerificacion = "pendiente" | "verificado" | "rechazado";
 
+export const modalidadesAtencion = ["Consultorio", "Clínica dental", "Hospital", "Consulta externa"] as const;
+export type ModalidadAtencion = (typeof modalidadesAtencion)[number];
+
 /** Perfil dividido en TRES documentos por persona (uid = id en los tres):
  * público (directorio), privado (solo el dueño) y admin (solo el
  * superadministrador, ni el propio dueño lo lee) — ver §2 del plan. Los
@@ -42,7 +45,7 @@ export type PerfilProfesionalPublico = {
   clinicaNombre?: string;
   municipio?: string;
   estado?: string;
-  modalidadAtencion?: string;
+  modalidadAtencion?: ModalidadAtencion[];
   horariosGenerales?: string;
   aceptaInterconsultas: boolean;
   tiposCasosRecibe?: string[];

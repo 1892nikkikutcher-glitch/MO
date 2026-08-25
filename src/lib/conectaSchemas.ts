@@ -5,6 +5,7 @@
  * `participantesAutorizados`, fechas de servidor, uids, etc. */
 
 import { z } from "zod";
+import { modalidadesAtencion } from "./moConecta";
 
 const camposPerfil = {
   nombreCompleto: z.string().trim().min(1).max(200),
@@ -14,7 +15,7 @@ const camposPerfil = {
   descripcion: z.string().trim().max(2000),
   municipio: z.string().trim().max(150),
   estado: z.string().trim().max(150),
-  modalidadAtencion: z.string().trim().max(200),
+  modalidadAtencion: z.array(z.enum(modalidadesAtencion)).max(modalidadesAtencion.length),
   horariosGenerales: z.string().trim().max(300),
   aceptaInterconsultas: z.boolean(),
   tiposCasosRecibe: z.array(z.string().trim().min(1).max(100)).max(20),
