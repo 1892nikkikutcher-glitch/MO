@@ -194,6 +194,19 @@ export const navItems = [
     ),
   },
   {
+    id: "mo-conecta",
+    label: "MO Conecta",
+    icon: (
+      <path
+        d="M18 8a3 3 0 1 0 0-6 3 3 0 0 0 0 6ZM6 14a3 3 0 1 0 0-6 3 3 0 0 0 0 6ZM18 22a3 3 0 1 0 0-6 3 3 0 0 0 0 6ZM8.6 12.3l6.8-4.6M8.6 11.7l6.8 4.6"
+        stroke="currentColor"
+        strokeWidth="1.8"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+    ),
+  },
+  {
     id: "documentos",
     label: "Documentos",
     icon: (

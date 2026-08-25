@@ -55,6 +55,8 @@ import GlobalNuevoPaciente from "./GlobalNuevoPaciente";
 import PanelAdministrador from "./pages/PanelAdministrador";
 import AsistenteFlotante from "./AsistenteFlotante";
 import { PatientDataProvider, usePatientData } from "@/context/PatientDataContext";
+import { MoConectaProvider } from "@/context/MoConectaContext";
+import MoConecta from "./pages/MoConecta";
 
 const paginasConstruidas = new Set([
   "inicio",
@@ -105,6 +107,7 @@ const paginasConstruidas = new Set([
   "reportes-ots",
   "reportes-domiciliacion",
   "panel-admin",
+  "mo-conecta",
 ]);
 
 const quickActions = [
@@ -343,6 +346,7 @@ function DashboardBody({
           </h1>
           {activePage === "inicio" && <Inicio />}
           {activePage === "panel-admin" && <PanelAdministrador />}
+          {activePage === "mo-conecta" && <MoConecta />}
           {activePage === "pacientes" && <Pacientes />}
           {activePage === "agenda" && <Agenda />}
           {activePage === "recetas" && <Recetas />}
@@ -423,22 +427,24 @@ export default function Dashboard({
 
   return (
     <PatientDataProvider uid={uid} userEmail={userEmail} onIrAPagina={setActivePage}>
-      <InvitePrompt />
-      <DashboardBody
-        activePage={activePage}
-        setActivePage={setActivePage}
-        theme={theme}
-        setTheme={setTheme}
-        mobileMenuOpen={mobileMenuOpen}
-        setMobileMenuOpen={setMobileMenuOpen}
-        showRegistrarPago={showRegistrarPago}
-        setShowRegistrarPago={setShowRegistrarPago}
-        showNuevoPaciente={showNuevoPaciente}
-        setShowNuevoPaciente={setShowNuevoPaciente}
-        userEmail={userEmail}
-        onLogout={onLogout}
-        esAdmin={esAdmin}
-      />
+      <MoConectaProvider uid={uid}>
+        <InvitePrompt />
+        <DashboardBody
+          activePage={activePage}
+          setActivePage={setActivePage}
+          theme={theme}
+          setTheme={setTheme}
+          mobileMenuOpen={mobileMenuOpen}
+          setMobileMenuOpen={setMobileMenuOpen}
+          showRegistrarPago={showRegistrarPago}
+          setShowRegistrarPago={setShowRegistrarPago}
+          showNuevoPaciente={showNuevoPaciente}
+          setShowNuevoPaciente={setShowNuevoPaciente}
+          userEmail={userEmail}
+          onLogout={onLogout}
+          esAdmin={esAdmin}
+        />
+      </MoConectaProvider>
     </PatientDataProvider>
   );
 }
