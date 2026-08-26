@@ -110,6 +110,19 @@ function DonutChart({
   );
 }
 
+/** Agrupa varios bloques del Dashboard Principal bajo un encabezado de
+ * categoría (Finanzas / Pacientes) — puramente visual, no cambia qué se
+ * calcula ni quién lo puede ver; cada bloque interno conserva sus propios
+ * candados de permisos (puedeVerFinanzas, etc.). */
+function SeccionDashboard({ titulo, children }: { titulo: string; children: React.ReactNode }) {
+  return (
+    <div className="space-y-4">
+      <h2 className="border-b border-edge/10 pb-2 text-lg font-semibold text-ink">{titulo}</h2>
+      <div className="space-y-6">{children}</div>
+    </div>
+  );
+}
+
 function CardShell({ title, children }: { title: string; children: React.ReactNode }) {
   return (
     <div className="rounded-2xl border border-edge/10 bg-surface p-6">
@@ -301,7 +314,7 @@ export default function Inicio() {
 
   return (
     <PrivacidadProvider>
-    <div className="space-y-6">
+    <div className="space-y-8">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <PeriodSelector
           periodoId={periodoId}
@@ -312,79 +325,85 @@ export default function Inicio() {
         {puedeVerFinanzas && <CandadoPrivacidad />}
       </div>
 
-      <FinancialSummary rango={rango} />
-
-      <ProductivitySummary rango={rango} />
-
-      <BudgetMetrics />
-
-      <AppointmentMetrics rango={rango} />
-
+      {/* Alertas y pendientes: listas accionables, no indicadores por
+          categoría — se muestran antes de agrupar el resto por Finanzas y
+          Pacientes. */}
       <AttentionAlerts />
-
-      <DashboardCharts />
-
-      <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-6">
-        <div
-          className="rounded-xl border border-edge/10 bg-surface p-4"
-          style={{ boxShadow: neonShadow("#3aa8ff") }}
-        >
-          <div className="text-xl font-bold text-ink">{patients.length}</div>
-          <div className="mt-1 text-[11px] uppercase tracking-wide text-ink/40">Total de Expedientes</div>
-        </div>
-        {kpisVisibles.map((kpi) => (
-          <div
-            key={kpi.label}
-            className="rounded-xl border border-edge/10 bg-surface p-4"
-            style={{ boxShadow: neonShadow(kpi.color) }}
-          >
-            <div className="text-xl font-bold text-ink">{kpi.value}</div>
-            <div className="mt-1 text-[11px] uppercase tracking-wide text-ink/40">{kpi.label}</div>
-          </div>
-        ))}
-        <div
-          className="rounded-xl border border-edge/10 bg-surface p-4"
-          style={{ boxShadow: neonShadow("#ff3d9a") }}
-        >
-          <div className="text-xl font-bold text-ink">{cumpleanerosDelMes.length}</div>
-          <div className="mt-1 text-[11px] uppercase tracking-wide text-ink/40">
-            Cumpleaños Este Mes
-          </div>
-        </div>
-        <div
-          className="rounded-xl border border-edge/10 bg-surface p-4"
-          style={{ boxShadow: neonShadow("#b84dff") }}
-        >
-          <div className="text-xl font-bold text-ink">{edadPromedio ?? "—"}</div>
-          <div className="mt-1 text-[11px] uppercase tracking-wide text-ink/40">Edad Promedio</div>
-        </div>
-      </div>
-
       <PendientesConsultorio />
 
-      {puedeVerFinanzas && (
-        <MetasCard metaMensual={metas.metaMensual} avanceMetas={avanceMetas} irAPagina={irAPagina} />
-      )}
+      <SeccionDashboard titulo="Finanzas">
+        <FinancialSummary rango={rango} />
+        <BudgetMetrics />
+        {puedeVerFinanzas && (
+          <MetasCard metaMensual={metas.metaMensual} avanceMetas={avanceMetas} irAPagina={irAPagina} />
+        )}
+        {kpisVisibles.length > 0 && (
+          <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-6">
+            {kpisVisibles.map((kpi) => (
+              <div
+                key={kpi.label}
+                className="rounded-xl border border-edge/10 bg-surface p-4"
+                style={{ boxShadow: neonShadow(kpi.color) }}
+              >
+                <div className="text-xl font-bold text-ink">{kpi.value}</div>
+                <div className="mt-1 text-[11px] uppercase tracking-wide text-ink/40">{kpi.label}</div>
+              </div>
+            ))}
+          </div>
+        )}
+      </SeccionDashboard>
 
-      <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
-        <CardShell title="Tipos de Paciente">
-          <DonutChart data={patientTypeData} />
-        </CardShell>
+      <SeccionDashboard titulo="Pacientes">
+        <ProductivitySummary rango={rango} />
+        <AppointmentMetrics rango={rango} />
+        <DashboardCharts />
 
-        <CardShell title={`Citas por Estatus de ${MESES[hoy.getMonth()]}`}>
-          <DonutChart
-            data={citasPorEstatusData}
-            center={
-              <>
-                <span className="text-4xl font-bold text-ink">{citasPorMes}</span>
-                <span className="mt-1 text-[10px] uppercase tracking-wide text-ink/40">
-                  citas este mes
-                </span>
-              </>
-            }
-          />
-        </CardShell>
-      </div>
+        <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-6">
+          <div
+            className="rounded-xl border border-edge/10 bg-surface p-4"
+            style={{ boxShadow: neonShadow("#3aa8ff") }}
+          >
+            <div className="text-xl font-bold text-ink">{patients.length}</div>
+            <div className="mt-1 text-[11px] uppercase tracking-wide text-ink/40">Total de Expedientes</div>
+          </div>
+          <div
+            className="rounded-xl border border-edge/10 bg-surface p-4"
+            style={{ boxShadow: neonShadow("#ff3d9a") }}
+          >
+            <div className="text-xl font-bold text-ink">{cumpleanerosDelMes.length}</div>
+            <div className="mt-1 text-[11px] uppercase tracking-wide text-ink/40">
+              Cumpleaños Este Mes
+            </div>
+          </div>
+          <div
+            className="rounded-xl border border-edge/10 bg-surface p-4"
+            style={{ boxShadow: neonShadow("#b84dff") }}
+          >
+            <div className="text-xl font-bold text-ink">{edadPromedio ?? "—"}</div>
+            <div className="mt-1 text-[11px] uppercase tracking-wide text-ink/40">Edad Promedio</div>
+          </div>
+        </div>
+
+        <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
+          <CardShell title="Tipos de Paciente">
+            <DonutChart data={patientTypeData} />
+          </CardShell>
+
+          <CardShell title={`Citas por Estatus de ${MESES[hoy.getMonth()]}`}>
+            <DonutChart
+              data={citasPorEstatusData}
+              center={
+                <>
+                  <span className="text-4xl font-bold text-ink">{citasPorMes}</span>
+                  <span className="mt-1 text-[10px] uppercase tracking-wide text-ink/40">
+                    citas este mes
+                  </span>
+                </>
+              }
+            />
+          </CardShell>
+        </div>
+      </SeccionDashboard>
     </div>
     </PrivacidadProvider>
   );
