@@ -502,6 +502,7 @@ function PerfilTab() {
     tiempoRespuestaHabitual: perfilPublico?.tiempoRespuestaHabitual ?? "",
     activoEnDirectorio: perfilPublico?.activoEnDirectorio ?? false,
     cedulaProfesional: perfilPrivado?.cedulaProfesional ?? "",
+    cedulaEspecialidad: perfilPrivado?.cedulaEspecialidad ?? "",
     telefonoProfesional: perfilPrivado?.telefonoProfesional ?? "",
   });
 
@@ -676,6 +677,15 @@ function PerfilTab() {
             className={inputClass}
             value={form.cedulaProfesional}
             onChange={(e) => setForm((f) => ({ ...f, cedulaProfesional: e.target.value }))}
+          />
+        </div>
+        <div>
+          <label className={labelClass}>Cédula de especialidad (si aplica)</label>
+          <input
+            className={inputClass}
+            value={form.cedulaEspecialidad}
+            onChange={(e) => setForm((f) => ({ ...f, cedulaEspecialidad: e.target.value }))}
+            placeholder="Solo si ya cuentas con ella"
           />
         </div>
         <div>

@@ -44,6 +44,7 @@ async function resumenMoConecta() {
         estadoVerificacion: p.estadoVerificacion,
         correo: privado?.correo ?? null,
         cedulaProfesional: privado?.cedulaProfesional ?? null,
+        cedulaEspecialidad: privado?.cedulaEspecialidad ?? null,
         tieneEvidencia: Boolean(privado?.evidenciaVerificacionStoragePath),
       };
     });

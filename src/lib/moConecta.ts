@@ -61,6 +61,7 @@ export type PerfilProfesionalPrivado = {
   /** Sensible — nunca se expone en el directorio público, solo al dueño del
    * perfil y al superadministrador. */
   cedulaProfesional?: string;
+  cedulaEspecialidad?: string;
   telefonoProfesional?: string;
   correo?: string;
   /** Ruta de Storage, nunca una URL — ver §6/estrategia de archivos. */

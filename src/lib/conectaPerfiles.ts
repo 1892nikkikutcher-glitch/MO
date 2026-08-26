@@ -34,6 +34,7 @@ export async function crearPerfilProfesional(
     uid,
     correo: correoSesion ?? undefined,
     cedulaProfesional: body.cedulaProfesional as string | undefined,
+    cedulaEspecialidad: body.cedulaEspecialidad as string | undefined,
     telefonoProfesional: body.telefonoProfesional as string | undefined,
   });
 
@@ -62,6 +63,7 @@ export async function editarPerfilProfesional(
 
   const actualizacionPrivada = sinIndefinidos({
     cedulaProfesional: body.cedulaProfesional as string | undefined,
+    cedulaEspecialidad: body.cedulaEspecialidad as string | undefined,
     telefonoProfesional: body.telefonoProfesional as string | undefined,
   });
 

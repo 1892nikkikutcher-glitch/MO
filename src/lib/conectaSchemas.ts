@@ -25,6 +25,7 @@ const camposPerfil = {
   // Van a perfilesProfesionalesPrivados, no al documento público — la ruta
   // los separa antes de llamar filtrarCamposPerfilPublico.
   cedulaProfesional: z.string().trim().max(50),
+  cedulaEspecialidad: z.string().trim().max(50),
   telefonoProfesional: z.string().trim().max(30),
 };
 
