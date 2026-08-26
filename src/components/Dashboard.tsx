@@ -1,6 +1,7 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import { auth } from "@/lib/firebase";
 import Sidebar, { navItems } from "./Sidebar";
 import Inicio from "./pages/Inicio";
 import Pacientes from "./pages/Pacientes";
@@ -154,6 +155,56 @@ function InvitePrompt() {
             {enviando ? "Uniendo…" : "Unirme"}
           </button>
         </div>
+      </div>
+    </div>
+  );
+}
+
+/** Recordatorio de confidencialidad — una vez por sesión de inicio de
+ * sesión (sessionStorage, no localStorage: reaparece si cierran sesión y
+ * vuelven a entrar, pero no en cada recarga/navegación mientras siguen
+ * adentro). Se muestra antes de que el dentista capture cualquier dato. */
+function AvisoConfidencialidad() {
+  const [visible, setVisible] = useState(false);
+
+  useEffect(() => {
+    const uid = auth.currentUser?.uid;
+    if (!uid) return;
+    const clave = `avisoConfidencialidadVisto:${uid}`;
+    if (!sessionStorage.getItem(clave)) setVisible(true);
+  }, []);
+
+  function cerrar() {
+    const uid = auth.currentUser?.uid;
+    if (uid) sessionStorage.setItem(`avisoConfidencialidadVisto:${uid}`, "1");
+    setVisible(false);
+  }
+
+  if (!visible) return null;
+
+  return (
+    <div className="fixed inset-0 z-[80] flex items-center justify-center bg-black/80 p-4">
+      <div className="w-full max-w-md rounded-2xl border border-edge/10 bg-modal p-6">
+        <h3 className="text-base font-semibold text-ink">Antes de continuar</h3>
+        <p className="mt-3 text-sm text-ink/70">
+          Tanto tu información como consultorio como los datos de tus pacientes se manejan de forma privada en MO:
+          solo tu cuenta y tu equipo autorizado tienen acceso a tu expediente clínico, protegido por las reglas de
+          seguridad de la plataforma.
+        </p>
+        <p className="mt-2 text-sm text-ink/70">
+          Si compartes un caso mediante MO Conecta, solo el colega que tú elijas — verificado por su correo — puede
+          verlo.
+        </p>
+        <p className="mt-2 text-xs text-ink/50">
+          Este aviso es un recordatorio de cómo protege tus datos la plataforma; no sustituye el aviso de privacidad
+          que debes tener con tus pacientes conforme a la ley aplicable (LFPDPPP y demás normativa vigente).
+        </p>
+        <button
+          onClick={cerrar}
+          className="mt-5 w-full rounded-lg border border-accent/60 bg-accent/15 py-2.5 text-sm font-semibold text-accent transition-opacity hover:bg-accent/25"
+        >
+          Entendido
+        </button>
       </div>
     </div>
   );
@@ -428,6 +479,7 @@ export default function Dashboard({
   return (
     <PatientDataProvider uid={uid} userEmail={userEmail} onIrAPagina={setActivePage}>
       <MoConectaProvider uid={uid}>
+        <AvisoConfidencialidad />
         <InvitePrompt />
         <DashboardBody
           activePage={activePage}
