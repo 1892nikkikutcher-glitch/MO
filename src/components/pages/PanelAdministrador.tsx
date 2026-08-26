@@ -37,6 +37,7 @@ type PerfilPendienteResumen = {
   correo: string | null;
   cedulaProfesional: string | null;
   cedulaEspecialidad: string | null;
+  especialidadCedula: string | null;
   tieneEvidencia: boolean;
 };
 
@@ -419,7 +420,8 @@ function PerfilPendienteRow({ perfil, onCambio }: { perfil: PerfilPendienteResum
           <p className="font-medium text-ink">{perfil.nombreCompleto || "(sin nombre)"}</p>
           <p className="text-xs text-ink/50">
             {perfil.correo || "sin correo"} {perfil.cedulaProfesional && `· Cédula ${perfil.cedulaProfesional}`}
-            {perfil.cedulaEspecialidad && ` · Cédula especialidad ${perfil.cedulaEspecialidad}`}
+            {perfil.cedulaEspecialidad &&
+              ` · Cédula especialidad ${perfil.cedulaEspecialidad}${perfil.especialidadCedula ? ` (${perfil.especialidadCedula})` : ""}`}
           </p>
         </div>
         <span className={`rounded-full px-2 py-0.5 text-xs font-semibold ${estadoVerificacionLabel[perfil.estadoVerificacion].clase}`}>

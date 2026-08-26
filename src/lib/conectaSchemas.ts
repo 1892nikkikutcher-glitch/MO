@@ -26,6 +26,7 @@ const camposPerfil = {
   // los separa antes de llamar filtrarCamposPerfilPublico.
   cedulaProfesional: z.string().trim().max(50),
   cedulaEspecialidad: z.string().trim().max(50),
+  especialidadCedula: z.string().trim().max(150),
   telefonoProfesional: z.string().trim().max(30),
 };
 

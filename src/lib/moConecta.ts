@@ -62,6 +62,10 @@ export type PerfilProfesionalPrivado = {
    * perfil y al superadministrador. */
   cedulaProfesional?: string;
   cedulaEspecialidad?: string;
+  /** Nombre de la especialidad que certifica cedulaEspecialidad (ej.
+   * "Ortodoncia") — distinto de areasPractica, que es la lista pública de
+   * áreas que el profesional declara atender. */
+  especialidadCedula?: string;
   telefonoProfesional?: string;
   correo?: string;
   /** Ruta de Storage, nunca una URL — ver §6/estrategia de archivos. */

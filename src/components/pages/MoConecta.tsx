@@ -503,6 +503,7 @@ function PerfilTab() {
     activoEnDirectorio: perfilPublico?.activoEnDirectorio ?? false,
     cedulaProfesional: perfilPrivado?.cedulaProfesional ?? "",
     cedulaEspecialidad: perfilPrivado?.cedulaEspecialidad ?? "",
+    especialidadCedula: perfilPrivado?.especialidadCedula ?? "",
     telefonoProfesional: perfilPrivado?.telefonoProfesional ?? "",
   });
 
@@ -686,6 +687,16 @@ function PerfilTab() {
             value={form.cedulaEspecialidad}
             onChange={(e) => setForm((f) => ({ ...f, cedulaEspecialidad: e.target.value }))}
             placeholder="Solo si ya cuentas con ella"
+          />
+        </div>
+        <div>
+          <label className={labelClass}>Especialidad que certifica esa cédula</label>
+          <input
+            className={inputClass}
+            value={form.especialidadCedula}
+            onChange={(e) => setForm((f) => ({ ...f, especialidadCedula: e.target.value }))}
+            placeholder="Ej. Ortodoncia"
+            disabled={!form.cedulaEspecialidad.trim()}
           />
         </div>
         <div>
