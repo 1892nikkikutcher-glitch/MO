@@ -242,7 +242,12 @@ function QuickActionsBar({
   return (
     <div className="flex items-center gap-1 sm:flex-1 sm:justify-between sm:gap-0">
       {visibles.map((action) => {
-        const icon = navItems.find((item) => item.id === action.pageId)?.icon;
+        // Si pageId es un hijo de un submenú (ej. "deposito-dental" bajo
+        // "Proveedores"), los hijos no tienen ícono propio — se usa el del
+        // padre en su lugar.
+        const icon =
+          navItems.find((item) => item.id === action.pageId)?.icon ??
+          navItems.find((item) => "children" in item && item.children?.some((c) => c.id === action.pageId))?.icon;
         const badge = "badge" in action ? action.badge : undefined;
         return (
           <button

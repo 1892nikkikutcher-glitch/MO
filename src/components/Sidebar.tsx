@@ -155,43 +155,22 @@ export const navItems = [
     ),
   },
   {
-    id: "deposito-dental",
-    label: "Depósito Dental",
+    id: "proveedores",
+    label: "Proveedores",
     icon: (
       <path
-        d="M21 8 12 3 3 8l9 5 9-5ZM3 8v9l9 5M21 8v9l-9 5M12 13v9"
+        d="M3 21V10l9-6 9 6v11M3 21h18M7 21v-6h4v6M15 13h3M15 16h3"
         stroke="currentColor"
         strokeWidth="1.8"
         strokeLinecap="round"
         strokeLinejoin="round"
       />
     ),
-  },
-  {
-    id: "centro-radiodiagnostico",
-    label: "Centro de Radiodiagnóstico",
-    icon: (
-      <path
-        d="M4 4h16v16H4V4ZM8 4v16M16 4v16M4 8h4M4 16h4M16 8h4M16 16h4M12 9v6M9.5 12h5"
-        stroke="currentColor"
-        strokeWidth="1.8"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-      />
-    ),
-  },
-  {
-    id: "laboratorio-dental",
-    label: "Laboratorio Dental",
-    icon: (
-      <path
-        d="M9 2h6M10 2v6.5L4.8 18a2 2 0 0 0 1.7 3h11a2 2 0 0 0 1.7-3L14 8.5V2M7 15h10"
-        stroke="currentColor"
-        strokeWidth="1.8"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-      />
-    ),
+    children: [
+      { id: "deposito-dental", label: "Depósito Dental" },
+      { id: "laboratorio-dental", label: "Laboratorio Dental" },
+      { id: "centro-radiodiagnostico", label: "Centro de Radiodiagnóstico" },
+    ],
   },
   {
     id: "mo-conecta",
