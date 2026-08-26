@@ -50,13 +50,28 @@ const botonPrimario =
 const botonSecundario =
   "rounded-lg border border-edge/10 bg-surface px-4 py-2 text-sm text-ink/70 transition-colors hover:text-ink";
 
+/** wa.me exige el número completo con código de país, sin "+" ni espacios.
+ * Si capturan solo los 10 dígitos locales (el caso normal en México), se
+ * antepone "52" — WhatsApp ya no requiere el "1" extra para celulares
+ * mexicanos que pedía hace años. Si ya trae más de 10 dígitos se asume que
+ * el código de país ya viene incluido. */
+function numeroWhatsappCompleto(numero: string): string {
+  const soloDigitos = numero.replace(/\D/g, "");
+  if (soloDigitos.length === 10) return `52${soloDigitos}`;
+  return soloDigitos;
+}
+
 /** El mensaje ya incluye el enlace de invitación — que es la misma página
  * de /conecta/invite/[token] con su propio mini inicio de sesión/registro,
  * así que compartir por WhatsApp también sirve como puerta de entrada para
- * que cualquier colega se dé de alta en MO sin pasar primero por "/". */
-function enviarInvitacionPorWhatsApp(nombreDestinatario: string, enlace: string) {
+ * que cualquier colega se dé de alta en MO sin pasar primero por "/". Con
+ * número de WhatsApp se manda directo a ese contacto; sin él, WhatsApp
+ * abre su selector de contactos (mismo comportamiento de antes). */
+function enviarInvitacionPorWhatsApp(nombreDestinatario: string, enlace: string, numeroWhatsapp?: string) {
   const mensaje = buildMensajeInvitacionConecta(nombreDestinatario || "colega", enlace);
-  window.open(`https://wa.me/?text=${encodeURIComponent(mensaje)}`, "_blank");
+  const numero = numeroWhatsapp ? numeroWhatsappCompleto(numeroWhatsapp) : "";
+  const destino = numero ? `https://wa.me/${numero}` : "https://wa.me/";
+  window.open(`${destino}?text=${encodeURIComponent(mensaje)}`, "_blank");
 }
 
 const estadoColor: Record<InterconsultaEstado, string> = {
@@ -652,6 +667,7 @@ function NuevaInterconsultaDialog({
   const [informacionMinima, setInformacionMinima] = useState("");
   const [nombreEspecialista, setNombreEspecialista] = useState("");
   const [correoEspecialista, setCorreoEspecialista] = useState("");
+  const [whatsappEspecialista, setWhatsappEspecialista] = useState("");
   const [aceptaConsentimiento, setAceptaConsentimiento] = useState(false);
   const [enviando, setEnviando] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -733,7 +749,10 @@ function NuevaInterconsultaDialog({
           </p>
           <input readOnly className={inputClass} value={enlace} onFocus={(e) => e.target.select()} />
           <div className="mt-4 flex flex-wrap justify-end gap-2">
-            <button onClick={() => enviarInvitacionPorWhatsApp(nombreEspecialista, enlace)} className={botonSecundario}>
+            <button
+              onClick={() => enviarInvitacionPorWhatsApp(nombreEspecialista, enlace, whatsappEspecialista)}
+              className={botonSecundario}
+            >
               Enviar por WhatsApp
             </button>
             <button onClick={copiarEnlace} className={botonSecundario}>
@@ -779,6 +798,16 @@ function NuevaInterconsultaDialog({
                   value={correoEspecialista}
                   onChange={(e) => setCorreoEspecialista(e.target.value)}
                   placeholder="para identificarlo al reclamar el enlace"
+                />
+              </div>
+              <div>
+                <label className={labelClass}>WhatsApp del especialista (opcional)</label>
+                <input
+                  className={inputClass}
+                  type="tel"
+                  value={whatsappEspecialista}
+                  onChange={(e) => setWhatsappEspecialista(e.target.value)}
+                  placeholder="10 dígitos — para mandarle el enlace directo si no revisa su correo"
                 />
               </div>
             </>
@@ -1289,6 +1318,7 @@ function SalaDelCaso({ interconsulta, onVolver }: { interconsulta: Interconsulta
 function InvitarColegaDialog({ interconsultaId, onClose }: { interconsultaId: string; onClose: () => void }) {
   const [nombre, setNombre] = useState("");
   const [correo, setCorreo] = useState("");
+  const [whatsapp, setWhatsapp] = useState("");
   const [enlace, setEnlace] = useState<string | null>(null);
   const [invitacionId, setInvitacionId] = useState<string | null>(null);
   const [copiado, setCopiado] = useState(false);
@@ -1340,6 +1370,16 @@ function InvitarColegaDialog({ interconsultaId, onClose }: { interconsultaId: st
               <label className={labelClass}>Correo del colega</label>
               <input className={inputClass} type="email" value={correo} onChange={(e) => setCorreo(e.target.value)} />
             </div>
+            <div>
+              <label className={labelClass}>WhatsApp del colega (opcional)</label>
+              <input
+                className={inputClass}
+                type="tel"
+                value={whatsapp}
+                onChange={(e) => setWhatsapp(e.target.value)}
+                placeholder="10 dígitos — para mandarle el enlace directo si no revisa su correo"
+              />
+            </div>
             <p className="text-xs text-ink/50">
               El enlace solo se puede reclamar identificándose con ese correo (verificado por Firebase) — si alguien más
               lo abre con otra identidad, se te pedirá aprobar su acceso antes de que vea el caso.
@@ -1359,7 +1399,7 @@ function InvitarColegaDialog({ interconsultaId, onClose }: { interconsultaId: st
             <p className="text-sm text-ink/70">Comparte este enlace con tu colega (vence en 7 días, un solo uso):</p>
             <input readOnly className={inputClass} value={enlace} onFocus={(e) => e.target.select()} />
             <div className="flex flex-wrap justify-end gap-2">
-              <button onClick={() => enviarInvitacionPorWhatsApp(nombre, enlace)} className={botonSecundario}>
+              <button onClick={() => enviarInvitacionPorWhatsApp(nombre, enlace, whatsapp)} className={botonSecundario}>
                 Enviar por WhatsApp
               </button>
               <button onClick={copiar} className={botonSecundario}>
