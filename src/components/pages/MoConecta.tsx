@@ -11,6 +11,8 @@ import {
   type CategoriaArchivoInterconsulta,
   type Interconsulta,
   type InterconsultaEstado,
+  type AfiliacionClinica,
+  type EstadoAfiliacion,
   type ModalidadAtencion,
   type PrioridadInterconsulta,
 } from "@/lib/moConecta";
@@ -23,9 +25,11 @@ import {
   editarPerfilProfesionalApi,
   registrarContrarreferenciaApi,
   registrarEventoApi,
+  resolverAfiliacionApi,
   resolverSolicitudAccesoApi,
   revocarAccesoApi,
   revocarConsentimientoApi,
+  solicitarAfiliacionApi,
   subirArchivoInterconsultaApi,
   subirEvidenciaVerificacionApi,
   transicionarEstadoApi,
@@ -79,7 +83,9 @@ function EstadoBadge({ estado }: { estado: InterconsultaEstado }) {
 
 export default function MoConecta() {
   const { perfilPublico, pacientePreseleccionado } = useMoConecta();
-  const [tab, setTab] = useState<"perfil" | "directorio" | "casos">(pacientePreseleccionado ? "directorio" : "perfil");
+  const [tab, setTab] = useState<"perfil" | "directorio" | "casos" | "afiliacion">(
+    pacientePreseleccionado ? "directorio" : "perfil"
+  );
   const [casoAbierto, setCasoAbierto] = useState<string | null>(null);
 
   return (
@@ -94,6 +100,7 @@ export default function MoConecta() {
           { id: "perfil" as const, label: "Mi perfil" },
           { id: "directorio" as const, label: "Directorio" },
           { id: "casos" as const, label: "Mis casos" },
+          { id: "afiliacion" as const, label: "Afiliación" },
         ].map((t) => (
           <button
             key={t.id}
@@ -117,12 +124,172 @@ export default function MoConecta() {
         />
       )}
       {tab === "casos" && <CasosTab casoAbiertoId={casoAbierto} onAbrirCaso={setCasoAbierto} />}
+      {tab === "afiliacion" && <AfiliacionTab />}
 
       {!perfilPublico && tab !== "perfil" && (
         <p className="rounded-lg border border-warning/30 bg-warning/10 p-3 text-sm text-warning">
           Todavía no creas tu perfil profesional — ve a la pestaña &quot;Mi perfil&quot; para aparecer en el directorio y
           poder enviar o recibir interconsultas.
         </p>
+      )}
+    </div>
+  );
+}
+
+const estadoAfiliacionLabel: Record<EstadoAfiliacion, string> = {
+  pendiente: "Pendiente",
+  activa: "Activa",
+  rechazada: "Rechazada",
+  revocada: "Revocada",
+};
+
+const estadoAfiliacionColor: Record<EstadoAfiliacion, string> = {
+  pendiente: "bg-warning/10 text-warning",
+  activa: "bg-success/10 text-success",
+  rechazada: "bg-danger/10 text-danger",
+  revocada: "bg-danger/10 text-danger",
+};
+
+function AfiliacionTab() {
+  const { misAfiliaciones, directorio } = useMoConecta();
+  const { clinicUid, clinicInfo, puedeVerFinanzas } = usePatientData();
+  const [solicitudesRecibidas, setSolicitudesRecibidas] = useState<AfiliacionClinica[]>([]);
+  const [error, setError] = useState<string | null>(null);
+  const [solicitando, setSolicitando] = useState(false);
+
+  useEffect(() => {
+    // Solo el admin de la clínica puede LEER las afiliaciones recibidas
+    // (firestore.rules) — para un colaborador sin ese rol, ni se intenta.
+    if (!clinicUid || !puedeVerFinanzas) return;
+    const unsub = onSnapshot(
+      query(collection(db, "afiliaciones"), where("clinicaId", "==", clinicUid)),
+      (snap) => setSolicitudesRecibidas(snap.docs.map((d) => d.data() as AfiliacionClinica)),
+      (err) => console.error('MoConecta: listener "afiliacionesRecibidas" falló', err)
+    );
+    return unsub;
+  }, [clinicUid, puedeVerFinanzas]);
+
+  const miAfiliacionActual = misAfiliaciones.find((a) => a.clinicaId === clinicUid);
+  const otrasAfiliaciones = misAfiliaciones.filter((a) => a.clinicaId !== clinicUid);
+
+  async function solicitar() {
+    if (!clinicUid) return;
+    setSolicitando(true);
+    setError(null);
+    try {
+      await solicitarAfiliacionApi(clinicUid);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "No se pudo solicitar la afiliación.");
+    } finally {
+      setSolicitando(false);
+    }
+  }
+
+  async function resolver(id: string, accion: "aceptar" | "rechazar" | "revocar") {
+    setError(null);
+    try {
+      await resolverAfiliacionApi(id, accion);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "No se pudo resolver la afiliación.");
+    }
+  }
+
+  function nombreDe(uid: string): string {
+    return directorio.find((p) => p.uid === uid)?.nombreCompleto || uid;
+  }
+
+  const pendientes = solicitudesRecibidas.filter((a) => a.estado === "pendiente");
+  const activas = solicitudesRecibidas.filter((a) => a.estado === "activa");
+
+  return (
+    <div className="max-w-2xl space-y-6">
+      <p className="text-sm text-ink/60">
+        Afiliarte a una clínica hace que tu perfil del directorio muestre su nombre — útil si un profesional trabaja en
+        más de una clínica, o quiere que se vea con cuál está identificado.
+      </p>
+
+      <div className="rounded-2xl border border-edge/10 bg-surface p-5">
+        <h3 className="mb-3 text-sm font-semibold text-ink">Mi afiliación</h3>
+        {error && <p className="mb-2 text-sm text-danger">{error}</p>}
+        {clinicInfo && (
+          <div className="flex flex-wrap items-center justify-between gap-3 text-sm">
+            <span className="text-ink/70">
+              Tu clínica actual: <strong className="text-ink">{clinicInfo.nombre}</strong>
+            </span>
+            {miAfiliacionActual ? (
+              <span className={`rounded-full px-2.5 py-1 text-xs font-medium ${estadoAfiliacionColor[miAfiliacionActual.estado]}`}>
+                {estadoAfiliacionLabel[miAfiliacionActual.estado]}
+              </span>
+            ) : (
+              <button onClick={solicitar} disabled={solicitando} className={botonPrimario}>
+                {solicitando ? "Solicitando…" : "Solicitar afiliación a esta clínica"}
+              </button>
+            )}
+          </div>
+        )}
+      </div>
+
+      {otrasAfiliaciones.length > 0 && (
+        <div className="rounded-2xl border border-edge/10 bg-surface p-5">
+          <h3 className="mb-3 text-sm font-semibold text-ink">Otras afiliaciones</h3>
+          <div className="space-y-1.5 text-sm">
+            {otrasAfiliaciones.map((a) => (
+              <div key={a.id} className="flex items-center justify-between">
+                <span className="text-ink/70">{a.clinicaNombre}</span>
+                <span className={`rounded-full px-2 py-0.5 text-xs font-medium ${estadoAfiliacionColor[a.estado]}`}>
+                  {estadoAfiliacionLabel[a.estado]}
+                </span>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {puedeVerFinanzas && (
+        <div className="rounded-2xl border border-edge/10 bg-surface p-5">
+          <h3 className="mb-3 text-sm font-semibold text-ink">Solicitudes de afiliación a tu clínica</h3>
+          {pendientes.length === 0 && <p className="text-sm text-ink/50">No hay solicitudes pendientes.</p>}
+          <div className="space-y-2">
+            {pendientes.map((a) => (
+              <div
+                key={a.id}
+                className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-edge/10 p-3 text-sm"
+              >
+                <span className="text-ink/70">{nombreDe(a.uid)}</span>
+                <div className="flex gap-2">
+                  <button
+                    onClick={() => resolver(a.id, "aceptar")}
+                    className="rounded-lg bg-success/15 px-3 py-1 text-xs font-medium text-success"
+                  >
+                    Aceptar
+                  </button>
+                  <button
+                    onClick={() => resolver(a.id, "rechazar")}
+                    className="rounded-lg bg-danger/15 px-3 py-1 text-xs font-medium text-danger"
+                  >
+                    Rechazar
+                  </button>
+                </div>
+              </div>
+            ))}
+          </div>
+
+          {activas.length > 0 && (
+            <div className="mt-4 border-t border-edge/10 pt-3">
+              <p className="mb-2 text-xs font-medium text-ink/40">Afiliados activos</p>
+              <div className="space-y-1.5">
+                {activas.map((a) => (
+                  <div key={a.id} className="flex items-center justify-between text-sm">
+                    <span className="text-ink/70">{nombreDe(a.uid)}</span>
+                    <button onClick={() => resolver(a.id, "revocar")} className="text-xs text-danger hover:underline">
+                      Revocar
+                    </button>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
       )}
     </div>
   );
