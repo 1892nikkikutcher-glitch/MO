@@ -166,17 +166,21 @@ function InvitePrompt() {
  * adentro). Se muestra antes de que el dentista capture cualquier dato. */
 function AvisoConfidencialidad() {
   const [visible, setVisible] = useState(false);
+  const [noMostrarDeNuevo, setNoMostrarDeNuevo] = useState(false);
 
   useEffect(() => {
     const uid = auth.currentUser?.uid;
     if (!uid) return;
-    const clave = `avisoConfidencialidadVisto:${uid}`;
-    if (!sessionStorage.getItem(clave)) setVisible(true);
+    if (localStorage.getItem(`avisoConfidencialidadOculto:${uid}`)) return;
+    if (!sessionStorage.getItem(`avisoConfidencialidadVisto:${uid}`)) setVisible(true);
   }, []);
 
   function cerrar() {
     const uid = auth.currentUser?.uid;
-    if (uid) sessionStorage.setItem(`avisoConfidencialidadVisto:${uid}`, "1");
+    if (uid) {
+      sessionStorage.setItem(`avisoConfidencialidadVisto:${uid}`, "1");
+      if (noMostrarDeNuevo) localStorage.setItem(`avisoConfidencialidadOculto:${uid}`, "1");
+    }
     setVisible(false);
   }
 
@@ -199,6 +203,10 @@ function AvisoConfidencialidad() {
           Este aviso es un recordatorio de cómo protege tus datos la plataforma; no sustituye el aviso de privacidad
           que debes tener con tus pacientes conforme a la ley aplicable (LFPDPPP y demás normativa vigente).
         </p>
+        <label className="mt-4 flex items-center gap-2 text-sm text-ink/70">
+          <input type="checkbox" checked={noMostrarDeNuevo} onChange={(e) => setNoMostrarDeNuevo(e.target.checked)} />
+          No volver a mostrar este mensaje
+        </label>
         <button
           onClick={cerrar}
           className="mt-5 w-full rounded-lg border border-accent/60 bg-accent/15 py-2.5 text-sm font-semibold text-accent transition-opacity hover:bg-accent/25"
