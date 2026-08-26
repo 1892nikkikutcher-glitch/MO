@@ -3,6 +3,8 @@
 import { useEffect, useState } from "react";
 import { auth } from "@/lib/firebase";
 import { planesDisponibles, type PlanId, type CategoriaSugerencia, type EstadoSugerencia } from "@/lib/patientData";
+import { adminOtorgarFundadoraApi, adminVerificarPerfilApi, verEvidenciaVerificacionApi } from "@/lib/conectaApi";
+import type { EstadoVerificacion } from "@/lib/moConecta";
 
 type ClinicaResumen = {
   id: string;
@@ -28,6 +30,27 @@ type SugerenciaResumen = {
   fecha: string;
 };
 
+type PerfilPendienteResumen = {
+  uid: string;
+  nombreCompleto: string;
+  estadoVerificacion: EstadoVerificacion;
+  correo: string | null;
+  cedulaProfesional: string | null;
+  tieneEvidencia: boolean;
+};
+
+type MoConectaResumen = {
+  perfilesTotal: number;
+  perfilesVerificados: number;
+  perfilesPendientes: PerfilPendienteResumen[];
+  interconsultasTotal: number;
+  interconsultasPorEstado: Record<string, number>;
+  invitacionesTotal: number;
+  invitacionesReclamadas: number;
+  afiliacionesActivas: number;
+  eventosUltimos30Dias: Record<string, number>;
+};
+
 type Resumen = {
   consultoriosRegistrados: number;
   usuariosTotales: number;
@@ -42,6 +65,7 @@ type Resumen = {
   churnMensual: number | null;
   clinicas: ClinicaResumen[];
   sugerencias: SugerenciaResumen[];
+  moConecta: MoConectaResumen;
 };
 
 const inputClass =
@@ -355,6 +379,108 @@ function DetalleClinicaModal({ clinicId, onClose }: { clinicId: string; onClose:
   );
 }
 
+const estadoVerificacionLabel: Record<EstadoVerificacion, { texto: string; clase: string }> = {
+  pendiente: { texto: "Pendiente", clase: "bg-warning/10 text-warning" },
+  verificado: { texto: "Verificado", clase: "bg-success/10 text-success" },
+  rechazado: { texto: "Rechazado", clase: "bg-danger/10 text-danger" },
+};
+
+function PerfilPendienteRow({ perfil, onCambio }: { perfil: PerfilPendienteResumen; onCambio: () => void }) {
+  const [accionando, setAccionando] = useState(false);
+  const [error, setError] = useState("");
+
+  async function resolver(accion: "verificar" | "rechazar") {
+    setAccionando(true);
+    setError("");
+    try {
+      await adminVerificarPerfilApi(perfil.uid, { accion });
+      onCambio();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "No se pudo actualizar.");
+    } finally {
+      setAccionando(false);
+    }
+  }
+
+  async function verEvidencia() {
+    setError("");
+    try {
+      await verEvidenciaVerificacionApi(perfil.uid);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "No se pudo abrir la evidencia.");
+    }
+  }
+
+  return (
+    <div className="rounded-xl border border-edge/10 p-3 text-sm">
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <div>
+          <p className="font-medium text-ink">{perfil.nombreCompleto || "(sin nombre)"}</p>
+          <p className="text-xs text-ink/50">
+            {perfil.correo || "sin correo"} {perfil.cedulaProfesional && `· Cédula ${perfil.cedulaProfesional}`}
+          </p>
+        </div>
+        <span className={`rounded-full px-2 py-0.5 text-xs font-semibold ${estadoVerificacionLabel[perfil.estadoVerificacion].clase}`}>
+          {estadoVerificacionLabel[perfil.estadoVerificacion].texto}
+        </span>
+      </div>
+      {error && <p className="mt-2 text-xs text-danger">{error}</p>}
+      <div className="mt-2 flex flex-wrap gap-2">
+        <button
+          onClick={verEvidencia}
+          disabled={!perfil.tieneEvidencia}
+          className="text-xs font-semibold text-ink/50 hover:text-ink disabled:opacity-30"
+          title={perfil.tieneEvidencia ? "Ver evidencia de cédula" : "Todavía no sube evidencia"}
+        >
+          Ver evidencia
+        </button>
+        <button
+          onClick={() => resolver("verificar")}
+          disabled={accionando}
+          className="text-xs font-semibold text-success hover:text-success disabled:opacity-40"
+        >
+          Verificar
+        </button>
+        <button
+          onClick={() => resolver("rechazar")}
+          disabled={accionando}
+          className="text-xs font-semibold text-danger hover:text-danger disabled:opacity-40"
+        >
+          Rechazar
+        </button>
+      </div>
+    </div>
+  );
+}
+
+function MoConectaSeccion({ resumen, onCambio }: { resumen: MoConectaResumen; onCambio: () => void }) {
+  return (
+    <div className="space-y-4">
+      <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-6">
+        <MetricCard label="Perfiles MO Conecta" value={String(resumen.perfilesTotal)} />
+        <MetricCard label="Perfiles verificados" value={String(resumen.perfilesVerificados)} />
+        <MetricCard label="Interconsultas totales" value={String(resumen.interconsultasTotal)} />
+        <MetricCard label="Invitaciones creadas" value={String(resumen.invitacionesTotal)} />
+        <MetricCard label="Invitaciones reclamadas" value={String(resumen.invitacionesReclamadas)} />
+        <MetricCard label="Afiliaciones activas" value={String(resumen.afiliacionesActivas)} />
+      </div>
+
+      <div className="rounded-2xl border border-edge/10 bg-surface p-4">
+        <p className="mb-3 text-sm font-semibold text-ink">Verificación de perfiles — MO Conecta</p>
+        {resumen.perfilesPendientes.length === 0 ? (
+          <p className="text-sm text-ink/40">No hay perfiles pendientes de revisión.</p>
+        ) : (
+          <div className="space-y-2">
+            {resumen.perfilesPendientes.map((p) => (
+              <PerfilPendienteRow key={p.uid} perfil={p} onCambio={onCambio} />
+            ))}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
 export default function PanelAdministrador() {
   const [resumen, setResumen] = useState<Resumen | null>(null);
   const [error, setError] = useState("");
@@ -383,6 +509,19 @@ export default function PanelAdministrador() {
       cargar();
     } catch (err) {
       setError(err instanceof Error ? err.message : "No se pudo cambiar el estado.");
+    } finally {
+      setAccionandoId(null);
+    }
+  };
+
+  const otorgarFundadora = async (clinica: ClinicaResumen) => {
+    if (!confirm(`¿Otorgar Clínica Fundadora (90 días) a ${clinica.nombre}?`)) return;
+    setAccionandoId(clinica.id);
+    try {
+      await adminOtorgarFundadoraApi(clinica.id);
+      cargar();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "No se pudo otorgar Clínica Fundadora.");
     } finally {
       setAccionandoId(null);
     }
@@ -485,6 +624,14 @@ export default function PanelAdministrador() {
                     <button onClick={() => setClinicaEliminar(c)} className="text-xs text-danger/60 hover:text-danger">
                       Eliminar
                     </button>
+                    <button
+                      onClick={() => otorgarFundadora(c)}
+                      disabled={accionandoId === c.id}
+                      title="Otorgar Clínica Fundadora de MO Conecta (90 días)"
+                      className="text-xs font-semibold text-accent/70 hover:text-accent disabled:opacity-40"
+                    >
+                      Fundadora
+                    </button>
                   </div>
                 </td>
               </tr>
@@ -492,6 +639,8 @@ export default function PanelAdministrador() {
           </tbody>
         </table>
       </div>
+
+      <MoConectaSeccion resumen={resumen.moConecta} onCambio={cargar} />
 
       <div className="rounded-2xl border border-edge/10 bg-surface p-4">
         <p className="mb-3 text-sm font-semibold text-ink">Sugerencias recibidas</p>

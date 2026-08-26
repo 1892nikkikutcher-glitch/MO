@@ -234,3 +234,20 @@ export function adminVerificarPerfilApi(
 export function adminOtorgarFundadoraApi(clinicId: string) {
   return llamarApi(`/api/admin/clinicas/${clinicId}`, { method: "PATCH", body: JSON.stringify({ accion: "otorgar-fundadora" }) });
 }
+
+/** Abre la evidencia de cédula en una pestaña nueva — se descarga como blob
+ * autenticado (nunca una URL directa) y se le da una URL de objeto local
+ * solo para que el navegador la muestre. */
+export async function verEvidenciaVerificacionApi(uid: string): Promise<void> {
+  const token = await auth.currentUser?.getIdToken();
+  const res = await fetch(`/api/admin/conecta/perfiles/${uid}/evidencia`, {
+    headers: { Authorization: `Bearer ${token ?? ""}` },
+  });
+  if (!res.ok) {
+    const data = await res.json().catch(() => ({}));
+    throw new Error(data.error || "No se pudo abrir la evidencia.");
+  }
+  const blob = await res.blob();
+  const url = URL.createObjectURL(blob);
+  window.open(url, "_blank");
+}
