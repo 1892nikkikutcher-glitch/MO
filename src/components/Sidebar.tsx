@@ -502,7 +502,14 @@ export default function Sidebar({
         />
       )}
       <aside
-        className={`fixed inset-y-0 left-0 z-50 flex h-screen flex-col border-r border-edge/10 bg-app transition-transform duration-200 print:hidden md:static md:translate-x-0 md:transition-[width] ${
+        // OJO: en md+ es "sticky", no "static" — el layout de Dashboard usa
+        // min-h-screen (la página completa crece con el contenido, no solo
+        // el <main>), así que un sidebar "static" de h-screen se desplazaba
+        // junto con la página al hacer scroll hacia abajo, dejando ver solo
+        // un "recorte" de la barra según cuánto se hubiera scrolleado — con
+        // "sticky top-0" se queda fijo en la ventana sin importar qué tan
+        // larga sea la página.
+        className={`fixed inset-y-0 left-0 z-50 flex h-screen flex-col border-r border-edge/10 bg-app transition-transform duration-200 print:hidden md:sticky md:top-0 md:translate-x-0 md:transition-[width] ${
           mobileOpen ? "translate-x-0" : "-translate-x-full"
         } ${collapsed ? "md:w-[4.5rem]" : "w-64"}`}
       >
