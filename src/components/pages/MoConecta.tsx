@@ -34,6 +34,7 @@ import { collection, onSnapshot, query, where } from "firebase/firestore";
 import { useEffect } from "react";
 import { db } from "@/lib/firebase";
 import { manejarCambioNombre } from "@/lib/textoNombre";
+import { buildMensajeInvitacionConecta } from "@/lib/invitacionesConecta";
 import type { MensajeInterconsulta } from "@/lib/conectaMensajes";
 import type { SolicitudAcceso } from "@/lib/invitacionesConecta";
 
@@ -44,6 +45,15 @@ const botonPrimario =
   "rounded-lg bg-accent px-4 py-2 text-sm font-semibold text-black transition-opacity hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50";
 const botonSecundario =
   "rounded-lg border border-edge/10 bg-surface px-4 py-2 text-sm text-ink/70 transition-colors hover:text-ink";
+
+/** El mensaje ya incluye el enlace de invitación — que es la misma página
+ * de /conecta/invite/[token] con su propio mini inicio de sesión/registro,
+ * así que compartir por WhatsApp también sirve como puerta de entrada para
+ * que cualquier colega se dé de alta en MO sin pasar primero por "/". */
+function enviarInvitacionPorWhatsApp(nombreDestinatario: string, enlace: string) {
+  const mensaje = buildMensajeInvitacionConecta(nombreDestinatario || "colega", enlace);
+  window.open(`https://wa.me/?text=${encodeURIComponent(mensaje)}`, "_blank");
+}
 
 const estadoColor: Record<InterconsultaEstado, string> = {
   sent: "bg-ink/10 text-ink/60",
@@ -473,9 +483,14 @@ function NuevaInterconsultaDialog({
   const [preguntaClinica, setPreguntaClinica] = useState("");
   const [prioridad, setPrioridad] = useState<PrioridadInterconsulta>("ordinaria");
   const [informacionMinima, setInformacionMinima] = useState("");
+  const [nombreEspecialista, setNombreEspecialista] = useState("");
+  const [correoEspecialista, setCorreoEspecialista] = useState("");
   const [aceptaConsentimiento, setAceptaConsentimiento] = useState(false);
   const [enviando, setEnviando] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [interconsultaCreadaId, setInterconsultaCreadaId] = useState<string | null>(null);
+  const [enlace, setEnlace] = useState<string | null>(null);
+  const [copiado, setCopiado] = useState(false);
 
   const pacienteSeleccionado = patients.find((p) => p.id === pacienteId);
 
@@ -503,12 +518,67 @@ function NuevaInterconsultaDialog({
         },
       });
       limpiarPacientePreseleccionado();
-      onCreada(interconsulta.id);
+
+      if (destinatario) {
+        onCreada(interconsulta.id);
+        return;
+      }
+
+      // Sin destinatario del directorio: se crea la invitación de una vez con
+      // el contacto del especialista, en el mismo paso — sin esto, el caso
+      // quedaba creado "para nadie" hasta un segundo clic aparte en la Sala
+      // del Caso para recién ahí generar el enlace.
+      const { enlace: url } = await crearInvitacionApi({
+        interconsultaId: interconsulta.id,
+        destinatarioNombre: nombreEspecialista || undefined,
+        destinatarioCorreo: correoEspecialista,
+        canal: "copiar_enlace",
+      });
+      setInterconsultaCreadaId(interconsulta.id);
+      setEnlace(url);
     } catch (err) {
       setError(err instanceof Error ? err.message : "No se pudo crear la interconsulta.");
     } finally {
       setEnviando(false);
     }
+  }
+
+  async function copiarEnlace() {
+    if (!enlace) return;
+    try {
+      await navigator.clipboard.writeText(enlace);
+      setCopiado(true);
+    } catch {
+      // El input de abajo se puede seleccionar/copiar a mano si el navegador
+      // bloquea el portapapeles.
+    }
+    registrarEventoApi("invite_shared", { interconsultaId: interconsultaCreadaId ?? undefined }).catch(() => {});
+  }
+
+  if (enlace) {
+    return (
+      <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4">
+        <div className="w-full max-w-md rounded-2xl border border-edge/10 bg-modal p-6">
+          <h2 className="mb-4 text-lg font-semibold text-ink">Interconsulta creada</h2>
+          <p className="mb-3 text-sm text-ink/70">
+            Comparte este enlace con {nombreEspecialista || "el especialista"} (vence en 7 días, un solo uso). Al abrirlo,
+            si no tiene cuenta en MO puede crearla ahí mismo.
+          </p>
+          <input readOnly className={inputClass} value={enlace} onFocus={(e) => e.target.select()} />
+          <div className="mt-4 flex flex-wrap justify-end gap-2">
+            <button onClick={() => enviarInvitacionPorWhatsApp(nombreEspecialista, enlace)} className={botonSecundario}>
+              Enviar por WhatsApp
+            </button>
+            <button onClick={copiarEnlace} className={botonSecundario}>
+              {copiado ? "¡Copiado!" : "Copiar enlace"}
+            </button>
+            <button onClick={() => interconsultaCreadaId && onCreada(interconsultaCreadaId)} className={botonPrimario}>
+              Ir al caso
+            </button>
+          </div>
+        </div>
+      </div>
+    );
   }
 
   return (
@@ -519,11 +589,33 @@ function NuevaInterconsultaDialog({
         </h2>
         {!destinatario && (
           <p className="mb-3 text-sm text-ink/60">
-            Crea el caso primero; después de guardarlo podrás generar un enlace seguro para invitar a tu colega.
+            Al guardar, se genera de una vez el enlace seguro para tu colega — solo necesitamos su contacto abajo.
           </p>
         )}
 
         <div className="space-y-3">
+          {!destinatario && (
+            <>
+              <div>
+                <label className={labelClass}>Nombre del especialista (opcional)</label>
+                <input
+                  className={inputClass}
+                  value={nombreEspecialista}
+                  onChange={(e) => manejarCambioNombre(e, setNombreEspecialista)}
+                />
+              </div>
+              <div>
+                <label className={labelClass}>Correo del especialista</label>
+                <input
+                  className={inputClass}
+                  type="email"
+                  value={correoEspecialista}
+                  onChange={(e) => setCorreoEspecialista(e.target.value)}
+                  placeholder="para identificarlo al reclamar el enlace"
+                />
+              </div>
+            </>
+          )}
           <div>
             <label className={labelClass}>Paciente</label>
             <select className={inputClass} value={pacienteId} onChange={(e) => setPacienteId(e.target.value)}>
@@ -608,7 +700,8 @@ function NuevaInterconsultaDialog({
               !especialidadSolicitada.trim() ||
               !motivo.trim() ||
               !preguntaClinica.trim() ||
-              !aceptaConsentimiento
+              !aceptaConsentimiento ||
+              (!destinatario && !correoEspecialista.trim())
             }
             className={botonPrimario}
           >
@@ -1098,7 +1191,10 @@ function InvitarColegaDialog({ interconsultaId, onClose }: { interconsultaId: st
           <div className="space-y-3">
             <p className="text-sm text-ink/70">Comparte este enlace con tu colega (vence en 7 días, un solo uso):</p>
             <input readOnly className={inputClass} value={enlace} onFocus={(e) => e.target.select()} />
-            <div className="flex justify-end gap-2">
+            <div className="flex flex-wrap justify-end gap-2">
+              <button onClick={() => enviarInvitacionPorWhatsApp(nombre, enlace)} className={botonSecundario}>
+                Enviar por WhatsApp
+              </button>
               <button onClick={copiar} className={botonSecundario}>
                 {copiado ? "¡Copiado!" : "Copiar enlace"}
               </button>
