@@ -96,57 +96,228 @@ function EstadoBadge({ estado }: { estado: InterconsultaEstado }) {
   );
 }
 
+type TabId = "resumen" | "directorio" | "interconsultas" | "perfil" | "afiliacion";
+
 export default function MoConecta() {
   const { perfilPublico, pacientePreseleccionado } = useMoConecta();
-  const [tab, setTab] = useState<"perfil" | "directorio" | "casos" | "afiliacion">(
-    pacientePreseleccionado ? "directorio" : "perfil"
-  );
+  const [tab, setTab] = useState<TabId>(pacientePreseleccionado ? "directorio" : "resumen");
   const [casoAbierto, setCasoAbierto] = useState<string | null>(null);
+  const [mostrarNuevaInterconsulta, setMostrarNuevaInterconsulta] = useState(false);
+  const [mostrarInvitarOdontologo, setMostrarInvitarOdontologo] = useState(false);
+
+  function irAlCasoCreado(id: string) {
+    setMostrarNuevaInterconsulta(false);
+    setMostrarInvitarOdontologo(false);
+    setCasoAbierto(id);
+    setTab("interconsultas");
+  }
 
   return (
     <div className="space-y-6">
       <p className="max-w-3xl text-sm text-ink/60">
-        MO Conecta es la red profesional entre odontólogos dentro de MO: encuentra colegas, envía interconsultas con el
-        expediente mínimo necesario y da seguimiento al caso sin salir de la plataforma.
+        Colabora con otros odontólogos, refiere pacientes y recibe contrarreferencias de manera segura.
       </p>
 
-      <div className="flex gap-2 border-b border-edge/10">
-        {[
-          { id: "perfil" as const, label: "Mi perfil" },
-          { id: "directorio" as const, label: "Directorio" },
-          { id: "casos" as const, label: "Mis casos" },
-          { id: "afiliacion" as const, label: "Afiliación" },
-        ].map((t) => (
-          <button
-            key={t.id}
-            onClick={() => setTab(t.id)}
-            className={`px-4 py-2 text-sm font-medium transition-colors ${
-              tab === t.id ? "border-b-2 border-accent text-accent" : "text-ink/50 hover:text-ink"
-            }`}
-          >
-            {t.label}
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <div className="flex gap-2 border-b border-edge/10">
+          {[
+            { id: "resumen" as const, label: "Resumen" },
+            { id: "directorio" as const, label: "Directorio" },
+            { id: "interconsultas" as const, label: "Interconsultas" },
+            { id: "perfil" as const, label: "Mi perfil" },
+            { id: "afiliacion" as const, label: "Afiliación" },
+          ].map((t) => (
+            <button
+              key={t.id}
+              onClick={() => setTab(t.id)}
+              className={`px-4 py-2 text-sm font-medium transition-colors ${
+                tab === t.id ? "border-b-2 border-accent text-accent" : "text-ink/50 hover:text-ink"
+              }`}
+            >
+              {t.label}
+            </button>
+          ))}
+        </div>
+
+        <div className="flex gap-2 pb-2">
+          <button onClick={() => setMostrarInvitarOdontologo(true)} className={botonSecundario}>
+            Invitar odontólogo
           </button>
-        ))}
+          <button onClick={() => setMostrarNuevaInterconsulta(true)} className={botonPrimario}>
+            + Nueva interconsulta
+          </button>
+        </div>
       </div>
 
-      {tab === "perfil" && <PerfilTab />}
+      {tab === "resumen" && (
+        <ResumenTab
+          onIrATab={setTab}
+          onNuevaInterconsulta={() => setMostrarNuevaInterconsulta(true)}
+          onAbrirCaso={(id) => {
+            setCasoAbierto(id);
+            setTab("interconsultas");
+          }}
+        />
+      )}
       {tab === "directorio" && (
         <DirectorioTab
           onCasoCreado={(id) => {
             setCasoAbierto(id);
-            setTab("casos");
+            setTab("interconsultas");
           }}
+          onInvitarOdontologo={() => setMostrarInvitarOdontologo(true)}
+          onIrAPerfil={() => setTab("perfil")}
         />
       )}
-      {tab === "casos" && <CasosTab casoAbiertoId={casoAbierto} onAbrirCaso={setCasoAbierto} />}
+      {tab === "interconsultas" && <CasosTab casoAbiertoId={casoAbierto} onAbrirCaso={setCasoAbierto} />}
+      {tab === "perfil" && <PerfilTab />}
       {tab === "afiliacion" && <AfiliacionTab />}
 
-      {!perfilPublico && tab !== "perfil" && (
+      {!perfilPublico && tab !== "perfil" && tab !== "resumen" && (
         <p className="rounded-lg border border-warning/30 bg-warning/10 p-3 text-sm text-warning">
           Todavía no creas tu perfil profesional — ve a la pestaña &quot;Mi perfil&quot; para aparecer en el directorio y
           poder enviar o recibir interconsultas.
         </p>
       )}
+
+      {mostrarNuevaInterconsulta && (
+        <NuevaInterconsultaDialog
+          destinatarioInicial={null}
+          onClose={() => setMostrarNuevaInterconsulta(false)}
+          onCreada={irAlCasoCreado}
+        />
+      )}
+      {mostrarInvitarOdontologo && (
+        <NuevaInterconsultaDialog
+          destinatarioInicial={null}
+          forzarExterno
+          onClose={() => setMostrarInvitarOdontologo(false)}
+          onCreada={irAlCasoCreado}
+        />
+      )}
+    </div>
+  );
+}
+
+function GuiaPaso({ hecho, texto }: { hecho: boolean; texto: string }) {
+  return (
+    <div className="flex items-center gap-2 text-sm">
+      <span
+        className={`flex h-5 w-5 shrink-0 items-center justify-center rounded-full text-[11px] font-bold ${
+          hecho ? "bg-success/15 text-success" : "bg-ink/10 text-ink/40"
+        }`}
+      >
+        {hecho ? "✓" : ""}
+      </span>
+      <span className={hecho ? "text-ink/50 line-through" : "text-ink/80"}>{texto}</span>
+    </div>
+  );
+}
+
+function ResumenTab({
+  onIrATab,
+  onNuevaInterconsulta,
+  onAbrirCaso,
+}: {
+  onIrATab: (tab: TabId) => void;
+  onNuevaInterconsulta: () => void;
+  onAbrirCaso: (id: string) => void;
+}) {
+  const { perfilPublico, directorio, uid, casosEnviados, casosRecibidos, misCasos } = useMoConecta();
+
+  const activas: InterconsultaEstado[] = ["sent", "received", "accepted", "patient_contacted", "scheduled", "in_treatment"];
+  const concluidasEstados: InterconsultaEstado[] = ["completed", "counter_referral_sent", "closed", "cancelled", "rejected"];
+  const pendientes = misCasos.filter((c) => activas.includes(c.estado)).length;
+  const concluidas = misCasos.filter((c) => concluidasEstados.includes(c.estado)).length;
+
+  const tieneColegas = directorio.filter((p) => p.uid !== uid).length > 0;
+  const yaEnvioAlguno = casosEnviados.length > 0;
+  const yaRecibioContrarreferencia = misCasos.some((c) => c.contrarreferencia);
+
+  const recientes = misCasos
+    .slice()
+    .sort((a, b) => b.actualizadoEl.localeCompare(a.actualizadoEl))
+    .slice(0, 5);
+
+  return (
+    <div className="space-y-6">
+      <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+        {[
+          { label: "Enviadas", valor: casosEnviados.length },
+          { label: "Recibidas", valor: casosRecibidos.length },
+          { label: "Pendientes", valor: pendientes },
+          { label: "Concluidas", valor: concluidas },
+        ].map((s) => (
+          <div key={s.label} className="rounded-2xl border border-edge/10 bg-surface p-4">
+            <p className="text-2xl font-semibold text-ink">{s.valor}</p>
+            <p className="text-xs text-ink/50">{s.label}</p>
+          </div>
+        ))}
+      </div>
+
+      <div className="rounded-2xl border border-edge/10 bg-surface p-5">
+        <h3 className="mb-3 text-sm font-semibold text-ink">Primeros pasos</h3>
+        <div className="space-y-2">
+          <GuiaPaso hecho={!!perfilPublico} texto="Completa tu perfil profesional" />
+          <GuiaPaso hecho={tieneColegas} texto="Busca o invita a un colega" />
+          <GuiaPaso hecho={yaEnvioAlguno} texto="Envía tu primera interconsulta" />
+          <GuiaPaso hecho={yaRecibioContrarreferencia} texto="Recibe una contrarreferencia" />
+        </div>
+      </div>
+
+      {!tieneColegas ? (
+        <TarjetaBienvenida onCompletarPerfil={() => onIrATab("perfil")} onInvitar={onNuevaInterconsulta} />
+      ) : (
+        <div className="rounded-2xl border border-edge/10 bg-surface p-5">
+          <div className="mb-3 flex items-center justify-between">
+            <h3 className="text-sm font-semibold text-ink">Casos recientes</h3>
+            <button onClick={() => onIrATab("interconsultas")} className="text-xs text-accent hover:underline">
+              Ver todas
+            </button>
+          </div>
+          {recientes.length === 0 ? (
+            <p className="text-sm text-ink/50">Todavía no tienes interconsultas. Empieza con &quot;+ Nueva interconsulta&quot;.</p>
+          ) : (
+            <div className="space-y-2">
+              {recientes.map((c) => (
+                <button
+                  key={c.id}
+                  onClick={() => onAbrirCaso(c.id)}
+                  className="flex w-full items-center justify-between gap-3 rounded-xl border border-edge/10 p-3 text-left transition-colors hover:border-accent/40"
+                >
+                  <div className="min-w-0">
+                    <p className="truncate text-sm font-medium text-ink">
+                      {c.resumenPaciente.nombre} · {c.especialidadSolicitada}
+                    </p>
+                    <p className="truncate text-xs text-ink/50">{c.motivo}</p>
+                  </div>
+                  <EstadoBadge estado={c.estado} />
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function TarjetaBienvenida({ onCompletarPerfil, onInvitar }: { onCompletarPerfil: () => void; onInvitar: () => void }) {
+  return (
+    <div className="rounded-2xl border border-edge/10 bg-surface p-8 text-center">
+      <h3 className="text-lg font-semibold text-ink">Tu red profesional comienza aquí</h3>
+      <p className="mx-auto mt-2 max-w-md text-sm text-ink/60">
+        Encuentra especialistas, comparte únicamente la información autorizada y da seguimiento a tus interconsultas
+        desde MO.
+      </p>
+      <div className="mt-5 flex flex-wrap justify-center gap-2">
+        <button onClick={onCompletarPerfil} className={botonSecundario}>
+          Completar mi perfil
+        </button>
+        <button onClick={onInvitar} className={botonPrimario}>
+          Invitar a un colega
+        </button>
+      </div>
     </div>
   );
 }
@@ -566,11 +737,47 @@ function PerfilTab() {
   );
 }
 
-function DirectorioTab({ onCasoCreado }: { onCasoCreado: (interconsultaId: string) => void }) {
+function DirectorioTab({
+  onCasoCreado,
+  onInvitarOdontologo,
+  onIrAPerfil,
+}: {
+  onCasoCreado: (interconsultaId: string) => void;
+  onInvitarOdontologo: () => void;
+  onIrAPerfil: () => void;
+}) {
   const { directorio, uid, pacientePreseleccionado, limpiarPacientePreseleccionado } = useMoConecta();
   const [destinatario, setDestinatario] = useState<{ uid: string; nombreCompleto: string } | null>(null);
-  const [invitandoExterno, setInvitandoExterno] = useState(false);
+  const [busqueda, setBusqueda] = useState("");
+  const [filtroEspecialidad, setFiltroEspecialidad] = useState("");
+  const [filtroMunicipio, setFiltroMunicipio] = useState("");
+  const [filtroModalidad, setFiltroModalidad] = useState<ModalidadAtencion | "">("");
+  const [soloUrgencias, setSoloUrgencias] = useState(false);
+  const [soloVerificados, setSoloVerificados] = useState(false);
+
   const colegas = directorio.filter((p) => p.uid !== uid);
+
+  const especialidades = Array.from(new Set(colegas.flatMap((p) => p.areasPractica))).sort();
+  const municipios = Array.from(new Set(colegas.map((p) => p.municipio).filter(Boolean))).sort() as string[];
+
+  const colegasFiltrados = colegas.filter((p) => {
+    const texto = busqueda.trim().toLowerCase();
+    if (
+      texto &&
+      !p.nombreCompleto.toLowerCase().includes(texto) &&
+      !p.areasPractica.some((a) => a.toLowerCase().includes(texto))
+    )
+      return false;
+    if (filtroEspecialidad && !p.areasPractica.includes(filtroEspecialidad)) return false;
+    if (filtroMunicipio && p.municipio !== filtroMunicipio) return false;
+    if (filtroModalidad && !(p.modalidadAtencion ?? []).includes(filtroModalidad)) return false;
+    if (soloUrgencias && !p.aceptaUrgencias) return false;
+    if (soloVerificados && p.estadoVerificacion !== "verificado") return false;
+    return true;
+  });
+
+  const hayFiltrosActivos =
+    !!busqueda || !!filtroEspecialidad || !!filtroMunicipio || !!filtroModalidad || soloUrgencias || soloVerificados;
 
   return (
     <div className="space-y-4">
@@ -586,60 +793,120 @@ function DirectorioTab({ onCasoCreado }: { onCasoCreado: (interconsultaId: strin
         </div>
       )}
 
-      <button onClick={() => setInvitandoExterno(true)} className={botonSecundario}>
-        ¿Tu colega no está en MO? Invítalo por enlace
-      </button>
-
-      {colegas.length === 0 && (
-        <p className="text-sm text-ink/50">Todavía no hay colegas con el directorio activo. Sé de los primeros.</p>
-      )}
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
-        {colegas.map((p) => (
-          <div key={p.uid} className="rounded-2xl border border-edge/10 bg-surface p-4">
-            <div className="flex items-start justify-between gap-2">
-              <h3 className="font-semibold text-ink">{p.nombreCompleto}</h3>
-              {p.estadoVerificacion === "verificado" && (
-                <span className="shrink-0 rounded-full bg-success/10 px-2 py-0.5 text-[11px] font-medium text-success">
-                  Verificado
-                </span>
-              )}
-            </div>
-            {p.clinicaNombre && <p className="mt-1 text-xs text-ink/50">{p.clinicaNombre}</p>}
-            {(p.municipio || p.estado) && (
-              <p className="text-xs text-ink/50">{[p.municipio, p.estado].filter(Boolean).join(", ")}</p>
-            )}
-            {p.areasPractica.length > 0 && (
-              <p className="mt-2 text-xs text-ink/70">{p.areasPractica.join(" · ")}</p>
-            )}
-            {p.descripcion && <p className="mt-2 text-xs text-ink/60">{p.descripcion}</p>}
-            <button
-              onClick={() => setDestinatario({ uid: p.uid, nombreCompleto: p.nombreCompleto })}
-              className={`${botonPrimario} mt-3 w-full text-center`}
-              disabled={!p.aceptaInterconsultas}
-              title={p.aceptaInterconsultas ? "Enviar interconsulta" : "Este colega no está recibiendo interconsultas ahora"}
+      {colegas.length === 0 ? (
+        <TarjetaBienvenida onCompletarPerfil={onIrAPerfil} onInvitar={onInvitarOdontologo} />
+      ) : (
+        <>
+          <div className="flex flex-wrap items-center gap-2 rounded-2xl border border-edge/10 bg-surface p-3">
+            <input
+              className={`${inputClass} max-w-xs`}
+              placeholder="Buscar por nombre o especialidad…"
+              value={busqueda}
+              onChange={(e) => setBusqueda(e.target.value)}
+            />
+            <select
+              className={`${inputClass} w-auto`}
+              value={filtroEspecialidad}
+              onChange={(e) => setFiltroEspecialidad(e.target.value)}
             >
-              Enviar interconsulta
-            </button>
+              <option value="">Especialidad</option>
+              {especialidades.map((e) => (
+                <option key={e} value={e}>
+                  {e}
+                </option>
+              ))}
+            </select>
+            <select className={`${inputClass} w-auto`} value={filtroMunicipio} onChange={(e) => setFiltroMunicipio(e.target.value)}>
+              <option value="">Municipio</option>
+              {municipios.map((m) => (
+                <option key={m} value={m}>
+                  {m}
+                </option>
+              ))}
+            </select>
+            <select
+              className={`${inputClass} w-auto`}
+              value={filtroModalidad}
+              onChange={(e) => setFiltroModalidad(e.target.value as ModalidadAtencion | "")}
+            >
+              <option value="">Modalidad</option>
+              {modalidadesAtencion.map((m) => (
+                <option key={m} value={m}>
+                  {m}
+                </option>
+              ))}
+            </select>
+            <label className="flex items-center gap-1.5 text-xs text-ink/70">
+              <input type="checkbox" checked={soloUrgencias} onChange={(e) => setSoloUrgencias(e.target.checked)} />
+              Acepta urgencias
+            </label>
+            <label className="flex items-center gap-1.5 text-xs text-ink/70">
+              <input type="checkbox" checked={soloVerificados} onChange={(e) => setSoloVerificados(e.target.checked)} />
+              Verificados
+            </label>
+            {hayFiltrosActivos && (
+              <button
+                onClick={() => {
+                  setBusqueda("");
+                  setFiltroEspecialidad("");
+                  setFiltroMunicipio("");
+                  setFiltroModalidad("");
+                  setSoloUrgencias(false);
+                  setSoloVerificados(false);
+                }}
+                className="text-xs text-ink/50 hover:text-ink"
+              >
+                Limpiar filtros
+              </button>
+            )}
           </div>
-        ))}
-      </div>
+
+          <button onClick={onInvitarOdontologo} className={botonSecundario}>
+            ¿Tu colega no está en MO? Invítalo por enlace
+          </button>
+
+          {colegasFiltrados.length === 0 && (
+            <p className="text-sm text-ink/50">Ningún colega coincide con estos filtros.</p>
+          )}
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+            {colegasFiltrados.map((p) => (
+              <div key={p.uid} className="rounded-2xl border border-edge/10 bg-surface p-4">
+                <div className="flex items-start justify-between gap-2">
+                  <h3 className="font-semibold text-ink">{p.nombreCompleto}</h3>
+                  {p.estadoVerificacion === "verificado" && (
+                    <span className="shrink-0 rounded-full bg-success/10 px-2 py-0.5 text-[11px] font-medium text-success">
+                      Verificado
+                    </span>
+                  )}
+                </div>
+                {p.clinicaNombre && <p className="mt-1 text-xs text-ink/50">{p.clinicaNombre}</p>}
+                {(p.municipio || p.estado) && (
+                  <p className="text-xs text-ink/50">{[p.municipio, p.estado].filter(Boolean).join(", ")}</p>
+                )}
+                {p.areasPractica.length > 0 && (
+                  <p className="mt-2 text-xs text-ink/70">{p.areasPractica.join(" · ")}</p>
+                )}
+                {p.descripcion && <p className="mt-2 text-xs text-ink/60">{p.descripcion}</p>}
+                <button
+                  onClick={() => setDestinatario({ uid: p.uid, nombreCompleto: p.nombreCompleto })}
+                  className={`${botonPrimario} mt-3 w-full text-center`}
+                  disabled={!p.aceptaInterconsultas}
+                  title={p.aceptaInterconsultas ? "Enviar interconsulta" : "Este colega no está recibiendo interconsultas ahora"}
+                >
+                  Enviar interconsulta
+                </button>
+              </div>
+            ))}
+          </div>
+        </>
+      )}
 
       {destinatario && (
         <NuevaInterconsultaDialog
-          destinatario={destinatario}
+          destinatarioInicial={destinatario}
           onClose={() => setDestinatario(null)}
           onCreada={(id) => {
             setDestinatario(null);
-            onCasoCreado(id);
-          }}
-        />
-      )}
-      {invitandoExterno && (
-        <NuevaInterconsultaDialog
-          destinatario={null}
-          onClose={() => setInvitandoExterno(false)}
-          onCreada={(id) => {
-            setInvitandoExterno(false);
             onCasoCreado(id);
           }}
         />
@@ -648,17 +915,26 @@ function DirectorioTab({ onCasoCreado }: { onCasoCreado: (interconsultaId: strin
   );
 }
 
+type DestinatarioElegido = { uid: string; nombreCompleto: string };
+
 function NuevaInterconsultaDialog({
-  destinatario,
+  destinatarioInicial,
+  forzarExterno,
   onClose,
   onCreada,
 }: {
-  destinatario: { uid: string; nombreCompleto: string } | null;
+  destinatarioInicial: DestinatarioElegido | null;
+  forzarExterno?: boolean;
   onClose: () => void;
   onCreada: (id: string) => void;
 }) {
   const { clinicUid, patients } = usePatientData();
-  const { pacientePreseleccionado, limpiarPacientePreseleccionado } = useMoConecta();
+  const { pacientePreseleccionado, limpiarPacientePreseleccionado, directorio, uid: miUid } = useMoConecta();
+  const [destinatario, setDestinatario] = useState<DestinatarioElegido | null>(destinatarioInicial);
+  const [modo, setModo] = useState<"elegir" | "formulario">(
+    destinatarioInicial || forzarExterno ? "formulario" : "elegir"
+  );
+  const [busquedaColega, setBusquedaColega] = useState("");
   const [pacienteId, setPacienteId] = useState(pacientePreseleccionado?.patientId ?? "");
   const [especialidadSolicitada, setEspecialidadSolicitada] = useState("");
   const [motivo, setMotivo] = useState("");
@@ -767,9 +1043,88 @@ function NuevaInterconsultaDialog({
     );
   }
 
+  if (modo === "elegir") {
+    const colegas = directorio.filter((p) => p.uid !== miUid);
+    const texto = busquedaColega.trim().toLowerCase();
+    const colegasFiltrados = texto
+      ? colegas.filter(
+          (p) =>
+            p.nombreCompleto.toLowerCase().includes(texto) ||
+            p.areasPractica.some((a) => a.toLowerCase().includes(texto))
+        )
+      : colegas;
+
+    return (
+      <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4">
+        <div className="max-h-[90vh] w-full max-w-lg overflow-y-auto rounded-2xl border border-edge/10 bg-modal p-6">
+          <h2 className="mb-1 text-lg font-semibold text-ink">Nueva interconsulta</h2>
+          <p className="mb-4 text-sm text-ink/60">¿A qué colega quieres enviársela?</p>
+
+          <input
+            className={inputClass}
+            placeholder="Buscar por nombre o especialidad…"
+            value={busquedaColega}
+            onChange={(e) => setBusquedaColega(e.target.value)}
+            autoFocus
+          />
+
+          <div className="mt-3 max-h-72 space-y-2 overflow-y-auto">
+            {colegasFiltrados.map((p) => (
+              <button
+                key={p.uid}
+                onClick={() => {
+                  setDestinatario({ uid: p.uid, nombreCompleto: p.nombreCompleto });
+                  setModo("formulario");
+                }}
+                disabled={!p.aceptaInterconsultas}
+                className="flex w-full items-center justify-between gap-3 rounded-lg border border-edge/10 p-3 text-left text-sm transition-colors hover:border-accent/40 disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                <div className="min-w-0">
+                  <p className="truncate font-medium text-ink">{p.nombreCompleto}</p>
+                  {p.areasPractica.length > 0 && (
+                    <p className="truncate text-xs text-ink/50">{p.areasPractica.join(" · ")}</p>
+                  )}
+                </div>
+                {p.estadoVerificacion === "verificado" && (
+                  <span className="shrink-0 rounded-full bg-success/10 px-2 py-0.5 text-[11px] font-medium text-success">
+                    Verificado
+                  </span>
+                )}
+              </button>
+            ))}
+            {colegasFiltrados.length === 0 && (
+              <p className="py-2 text-sm text-ink/50">Ningún colega coincide con esa búsqueda.</p>
+            )}
+          </div>
+
+          <button
+            onClick={() => setModo("formulario")}
+            className="mt-4 w-full rounded-lg border border-dashed border-edge/20 p-3 text-center text-sm text-ink/60 hover:border-accent/40 hover:text-ink"
+          >
+            ¿Tu colega no está en MO? Invítalo por enlace
+          </button>
+
+          <div className="mt-5 flex justify-end">
+            <button onClick={onClose} className={botonSecundario}>
+              Cancelar
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4">
       <div className="max-h-[90vh] w-full max-w-lg overflow-y-auto rounded-2xl border border-edge/10 bg-modal p-6">
+        {!destinatarioInicial && !forzarExterno && (
+          <button
+            onClick={() => setModo("elegir")}
+            className="mb-3 text-xs text-ink/50 hover:text-ink hover:underline"
+          >
+            ← Elegir de mi directorio
+          </button>
+        )}
         <h2 className="mb-4 text-lg font-semibold text-ink">
           {destinatario ? `Enviar interconsulta a ${destinatario.nombreCompleto}` : "Nueva interconsulta para invitar por enlace"}
         </h2>
@@ -999,6 +1354,7 @@ function useSolicitudesAcceso(interconsultaId: string) {
 
 function SalaDelCaso({ interconsulta, onVolver }: { interconsulta: Interconsulta; onVolver: () => void }) {
   const { uid } = useMoConecta();
+  const { irAPagina } = usePatientData();
   const mensajes = useMensajes(interconsulta.id);
   const solicitudesAcceso = useSolicitudesAcceso(interconsulta.id);
   const esRemitente = interconsulta.odontologoRemitenteUid === uid;
@@ -1080,9 +1436,16 @@ function SalaDelCaso({ interconsulta, onVolver }: { interconsulta: Interconsulta
 
   return (
     <div className="space-y-4">
-      <button onClick={onVolver} className="text-sm text-ink/60 hover:text-ink">
-        ← Volver a mis casos
-      </button>
+      <div className="flex items-center justify-between">
+        <button onClick={onVolver} className="text-sm text-ink/60 hover:text-ink">
+          ← Volver a interconsultas
+        </button>
+        {esRemitente && (
+          <button onClick={() => irAPagina("pacientes")} className="text-sm text-ink/60 hover:text-ink">
+            Volver al expediente del paciente →
+          </button>
+        )}
+      </div>
 
       <div className="rounded-2xl border border-edge/10 bg-surface p-5">
         <div className="flex flex-wrap items-start justify-between gap-3">
