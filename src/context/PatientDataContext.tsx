@@ -88,6 +88,7 @@ import {
   type HistoriaClinicaTemplate,
   type RespuestasHistoriaClinica,
 } from "@/lib/historiaClinica";
+import { actualizarFrecuencias, vocabularioNotasInicial, type VocabularioNotas } from "@/lib/vocabularioNotas";
 
 type Updater<T> = T | ((prev: T) => T);
 
@@ -486,6 +487,11 @@ type PatientDataContextValue = {
   setGastos: (updater: Updater<Gasto[]>) => void;
   horario: HorarioAtencion;
   setHorario: (updater: Updater<HorarioAtencion>) => void;
+  vocabularioNotas: VocabularioNotas;
+  /** Aprende las palabras relevantes de una nota de evolución recién
+   * guardada — alimenta el autocompletado propio de Notas de Evolución
+   * (ver src/lib/vocabularioNotas.ts), compartido por toda la clínica. */
+  registrarPalabrasDeNota: (textoNota: string) => void;
   perfilDoctor: PerfilDoctor;
   setPerfilDoctor: (updater: Updater<PerfilDoctor>) => void;
   suscripcion: SuscripcionPlan;
@@ -564,6 +570,11 @@ export function PatientDataProvider({
   const [citas, setCitas] = useFirestoreList<CitaAgenda>(clinicUid, "citas");
   const [gastos, setGastos] = useFirestoreList<Gasto>(clinicUid, "gastos");
   const [horario, setHorario] = useFirestoreDoc<HorarioAtencion>(clinicUid, "horario", horarioInicial);
+  const [vocabularioNotas, setVocabularioNotas] = useFirestoreDoc<VocabularioNotas>(
+    clinicUid,
+    "vocabularioNotas",
+    vocabularioNotasInicial
+  );
   const [perfilDoctor, setPerfilDoctor] = useFirestoreDoc<PerfilDoctor>(
     clinicUid,
     "perfilDoctor",
@@ -1745,6 +1756,9 @@ export function PatientDataProvider({
         setGastos,
         horario,
         setHorario,
+        vocabularioNotas,
+        registrarPalabrasDeNota: (textoNota: string) =>
+          setVocabularioNotas((prev) => ({ palabras: actualizarFrecuencias(prev.palabras, textoNota) })),
         perfilDoctor,
         setPerfilDoctor,
         suscripcion,

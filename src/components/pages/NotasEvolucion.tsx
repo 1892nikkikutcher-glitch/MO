@@ -1,8 +1,9 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { usePatientData } from "@/context/PatientDataContext";
 import type { NotaEvolucion } from "@/lib/patientData";
+import { sugerencias, type Sugerencia } from "@/lib/vocabularioNotas";
 
 const psoapCampos = [
   {
@@ -58,9 +59,95 @@ function todayFormatted() {
   });
 }
 
+/** Textarea con autocompletado propio de MO (diccionario dental + palabras
+ * frecuentes de la clínica) en vez del corrector nativo del navegador — ver
+ * src/lib/vocabularioNotas.ts para el porqué. `spellCheck={false}` apaga el
+ * corrector nativo, que no se puede enseñar vocabulario clínico y termina
+ * sugiriendo reemplazos incorrectos (ej. "sistémico" → "sistemático"). */
+function CampoConSugerencias({
+  value,
+  onChange,
+  placeholder,
+  vocabularioClinica,
+}: {
+  value: string;
+  onChange: (v: string) => void;
+  placeholder: string;
+  vocabularioClinica: Record<string, number>;
+}) {
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const [cursor, setCursor] = useState(0);
+
+  const antesDelCursor = value.slice(0, cursor);
+  const coincidencia = antesDelCursor.match(/[a-záéíóúñü]+$/i);
+  const palabraActual = coincidencia?.[0] ?? "";
+  const inicioPalabra = coincidencia ? cursor - palabraActual.length : cursor;
+  const listaSugerencias: Sugerencia[] = palabraActual ? sugerencias(palabraActual, vocabularioClinica) : [];
+
+  function aplicarSugerencia(palabra: string) {
+    const nuevoValor = `${value.slice(0, inicioPalabra)}${palabra} ${value.slice(cursor)}`;
+    onChange(nuevoValor);
+    const nuevaPosicion = inicioPalabra + palabra.length + 1;
+    requestAnimationFrame(() => {
+      textareaRef.current?.focus();
+      textareaRef.current?.setSelectionRange(nuevaPosicion, nuevaPosicion);
+    });
+  }
+
+  return (
+    <div>
+      <textarea
+        ref={textareaRef}
+        value={value}
+        onChange={(e) => {
+          onChange(e.target.value);
+          setCursor(e.target.selectionStart ?? e.target.value.length);
+        }}
+        onClick={(e) => setCursor(e.currentTarget.selectionStart ?? 0)}
+        onKeyUp={(e) => setCursor(e.currentTarget.selectionStart ?? 0)}
+        onKeyDown={(e) => {
+          if (e.key === "Tab" && listaSugerencias.length > 0) {
+            e.preventDefault();
+            aplicarSugerencia(listaSugerencias[0].palabra);
+          }
+        }}
+        placeholder={placeholder}
+        rows={2}
+        spellCheck={false}
+        className={`${inputClass} resize-none`}
+      />
+      {listaSugerencias.length > 0 && (
+        <div className="mt-1.5 flex flex-wrap gap-1.5">
+          {listaSugerencias.map((s) => (
+            <button
+              key={s.palabra}
+              type="button"
+              onClick={() => aplicarSugerencia(s.palabra)}
+              title={s.fuente === "clinica" ? "De tu clínica" : "Diccionario dental"}
+              className={`rounded-full border px-2.5 py-0.5 text-[11px] font-medium transition-colors ${
+                s.fuente === "clinica"
+                  ? "border-accent/40 bg-accent/10 text-accent hover:bg-accent/20"
+                  : "border-edge/15 bg-field text-ink/60 hover:bg-surface2"
+              }`}
+            >
+              {s.palabra}
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
 export default function NotasEvolucion({ patientId }: { patientId: string }) {
-  const { recursos, notasEvolucionPorPaciente, setNotasEvolucionPaciente, setCambiosSinGuardar } =
-    usePatientData();
+  const {
+    recursos,
+    notasEvolucionPorPaciente,
+    setNotasEvolucionPaciente,
+    setCambiosSinGuardar,
+    vocabularioNotas,
+    registrarPalabrasDeNota,
+  } = usePatientData();
   const medicos = recursos.filter((r) => r.tipo === "medico");
   const notas = notasEvolucionPorPaciente[patientId] ?? [];
 
@@ -98,6 +185,9 @@ export default function NotasEvolucion({ patientId }: { patientId: string }) {
       pronostico: form.pronostico.trim(),
     };
     setNotasEvolucionPaciente(patientId, (prev) => [nota, ...prev]);
+    registrarPalabrasDeNota(
+      [nota.presentacion, nota.subjetivo, nota.objetivo, nota.analisis, nota.pronostico].join(" ")
+    );
     setForm(emptyForm);
   };
 
@@ -137,12 +227,11 @@ export default function NotasEvolucion({ patientId }: { patientId: string }) {
                 </span>
                 {campo.label}
               </label>
-              <textarea
+              <CampoConSugerencias
                 value={form[campo.key]}
-                onChange={(e) => setForm((prev) => ({ ...prev, [campo.key]: e.target.value }))}
+                onChange={(v) => setForm((prev) => ({ ...prev, [campo.key]: v }))}
                 placeholder={campo.placeholder}
-                rows={2}
-                className={`${inputClass} resize-none`}
+                vocabularioClinica={vocabularioNotas.palabras}
               />
             </div>
           ))}
