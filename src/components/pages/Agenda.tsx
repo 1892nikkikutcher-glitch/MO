@@ -475,7 +475,7 @@ export default function Agenda() {
   }, [citasVisibles, rangoResumen, horario, vistaRecurso]);
 
   return (
-    <div className="flex flex-col gap-6">
+    <div className="mx-auto flex w-full max-w-[1600px] flex-col gap-6">
       <div className="min-w-0 flex-1 space-y-4">
         {avisoConflicto && (
           <div className="flex items-start justify-between gap-3 rounded-xl border border-warning/30 bg-warning/10 p-3 text-xs text-warning">
