@@ -549,6 +549,26 @@ function addMonthsISO(fechaISO: string, months: number): string {
   return d.toISOString().slice(0, 10);
 }
 
+/** Meses calendario completos entre dos fechas ISO (no solo días/30) — un
+ * paciente visto el 15 de enero sigue "en el mes 0" hasta el 15 de febrero,
+ * no antes. */
+function mesesEntreFechasISO(desdeISO: string, hastaISO: string): number {
+  const desde = new Date(`${desdeISO}T00:00:00`);
+  const hasta = new Date(`${hastaISO}T00:00:00`);
+  let meses = (hasta.getFullYear() - desde.getFullYear()) * 12 + (hasta.getMonth() - desde.getMonth());
+  if (hasta.getDate() < desde.getDate()) meses -= 1;
+  return Math.max(0, meses);
+}
+
+/** Color según qué tan reciente fue la última consulta — verde: menos de 6
+ * meses, amarillo: de 6 a 12 meses, rojo: más de un año. */
+function colorUltimaCita(fechaISO: string, hoyISO: string): string {
+  const meses = mesesEntreFechasISO(fechaISO, hoyISO);
+  if (meses < 6) return "text-success";
+  if (meses < 12) return "text-warning";
+  return "text-danger";
+}
+
 function ExpedienteSidePanel({
   citasFuturas,
   ultimaCita,
@@ -574,7 +594,10 @@ function ExpedienteSidePanel({
 
         {ultimaCita && (
           <p className="mb-3 text-xs text-ink/50">
-            Última cita: <span className="font-medium text-ink/70">{formatDate(ultimaCita.fecha)}</span>
+            Última cita:{" "}
+            <span className={`font-medium ${colorUltimaCita(ultimaCita.fecha, hoyISO)}`}>
+              {formatDate(ultimaCita.fecha)}
+            </span>
           </p>
         )}
 
