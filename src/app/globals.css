@@ -76,7 +76,10 @@
 
   --edge-rgb: 64 67 76;
   --ink-rgb: 28 29 34;
-  --accent-rgb: 191 87 0;
+  /* #bf360c — más rojizo/oscuro que el naranja Longhorns puro (#bf5700),
+     probando si se aprecia mejor sobre el fondo claro. Fácil de revertir a
+     191 87 0 si al verlo en vivo se prefiere el tono original. */
+  --accent-rgb: 191 54 12;
   /* En modo claro el acento ya es un naranja quemado — combinarlo con
      orange-500 (muy brillante) hacía que los botones se vieran "todo
      naranja". Ámbar más profundo, para que el degradado se note sin
@@ -178,6 +181,41 @@ select option {
   background-color: #ffffff;
   color: #1c1d22;
 }
+
+/* Las utilidades de opacidad de Tailwind (text-ink/40, bg-accent/15, etc.)
+   aplican la misma fracción alfa en los dos temas, pero --ink es casi negro
+   sobre fondo claro (no casi blanco sobre fondo oscuro) — la misma fracción
+   que en oscuro se ve perfectamente legible (blanco aclarado sobre negro) en
+   claro se ve deslavada (negro aclarado hacia blanco pierde contraste mucho
+   más rápido). Se sube el alfa efectivo solo en modo claro, manteniendo el
+   mismo orden relativo entre niveles (40 sigue más tenue que 60, etc.) —
+   nada cambia en modo oscuro. Mismo problema con --accent (naranja
+   Longhorns, #bf5700): los fondos/bordes translúcidos de baja opacidad se
+   veían casi imperceptibles sobre el fondo claro. */
+[data-theme="light"] .text-ink\/20 { color: rgb(var(--ink-rgb) / 0.3); }
+[data-theme="light"] .text-ink\/30 { color: rgb(var(--ink-rgb) / 0.42); }
+[data-theme="light"] .text-ink\/35 { color: rgb(var(--ink-rgb) / 0.48); }
+[data-theme="light"] .text-ink\/40 { color: rgb(var(--ink-rgb) / 0.55); }
+[data-theme="light"] .text-ink\/50 { color: rgb(var(--ink-rgb) / 0.64); }
+[data-theme="light"] .text-ink\/60 { color: rgb(var(--ink-rgb) / 0.74); }
+[data-theme="light"] .text-ink\/70 { color: rgb(var(--ink-rgb) / 0.82); }
+[data-theme="light"] .text-ink\/80 { color: rgb(var(--ink-rgb) / 0.9); }
+
+[data-theme="light"] .bg-accent\/5 { background-color: rgb(var(--accent-rgb) / 0.08); }
+[data-theme="light"] .bg-accent\/10 { background-color: rgb(var(--accent-rgb) / 0.16); }
+[data-theme="light"] .bg-accent\/15 { background-color: rgb(var(--accent-rgb) / 0.22); }
+[data-theme="light"] .bg-accent\/20 { background-color: rgb(var(--accent-rgb) / 0.3); }
+[data-theme="light"] .bg-accent\/25 { background-color: rgb(var(--accent-rgb) / 0.36); }
+[data-theme="light"] .border-accent\/25 { border-color: rgb(var(--accent-rgb) / 0.35); }
+[data-theme="light"] .border-accent\/30 { border-color: rgb(var(--accent-rgb) / 0.4); }
+[data-theme="light"] .border-accent\/40 { border-color: rgb(var(--accent-rgb) / 0.5); }
+[data-theme="light"] .border-accent\/50 { border-color: rgb(var(--accent-rgb) / 0.58); }
+[data-theme="light"] .border-accent\/60 { border-color: rgb(var(--accent-rgb) / 0.68); }
+[data-theme="light"] .border-accent\/70 { border-color: rgb(var(--accent-rgb) / 0.78); }
+[data-theme="light"] .text-accent\/50 { color: rgb(var(--accent-rgb) / 0.6); }
+[data-theme="light"] .text-accent\/60 { color: rgb(var(--accent-rgb) / 0.68); }
+[data-theme="light"] .text-accent\/70 { color: rgb(var(--accent-rgb) / 0.78); }
+[data-theme="light"] .text-accent\/80 { color: rgb(var(--accent-rgb) / 0.88); }
 
 /* Márgenes de impresión más chicos que los ~1" que pone Chrome por
    default — sin esto, documentos que sí caben en una hoja (ej.
