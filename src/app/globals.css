@@ -195,14 +195,14 @@ select option {
    nada cambia en modo oscuro. Mismo problema con --accent (naranja
    Longhorns, #bf5700): los fondos/bordes translúcidos de baja opacidad se
    veían casi imperceptibles sobre el fondo claro. */
-[data-theme="light"] .text-ink\/20 { color: rgb(var(--ink-rgb) / 0.38); }
-[data-theme="light"] .text-ink\/30 { color: rgb(var(--ink-rgb) / 0.5); }
-[data-theme="light"] .text-ink\/35 { color: rgb(var(--ink-rgb) / 0.56); }
-[data-theme="light"] .text-ink\/40 { color: rgb(var(--ink-rgb) / 0.64); }
-[data-theme="light"] .text-ink\/50 { color: rgb(var(--ink-rgb) / 0.73); }
-[data-theme="light"] .text-ink\/60 { color: rgb(var(--ink-rgb) / 0.82); }
-[data-theme="light"] .text-ink\/70 { color: rgb(var(--ink-rgb) / 0.88); }
-[data-theme="light"] .text-ink\/80 { color: rgb(var(--ink-rgb) / 0.94); }
+[data-theme="light"] .text-ink\/20 { color: rgb(var(--ink-rgb) / 0.55); }
+[data-theme="light"] .text-ink\/30 { color: rgb(var(--ink-rgb) / 0.65); }
+[data-theme="light"] .text-ink\/35 { color: rgb(var(--ink-rgb) / 0.7); }
+[data-theme="light"] .text-ink\/40 { color: rgb(var(--ink-rgb) / 0.75); }
+[data-theme="light"] .text-ink\/50 { color: rgb(var(--ink-rgb) / 0.82); }
+[data-theme="light"] .text-ink\/60 { color: rgb(var(--ink-rgb) / 0.88); }
+[data-theme="light"] .text-ink\/70 { color: rgb(var(--ink-rgb) / 0.93); }
+[data-theme="light"] .text-ink\/80 { color: rgb(var(--ink-rgb) / 0.97); }
 
 [data-theme="light"] .bg-accent\/5 { background-color: rgb(var(--accent-rgb) / 0.08); }
 [data-theme="light"] .bg-accent\/10 { background-color: rgb(var(--accent-rgb) / 0.16); }
