@@ -15,7 +15,9 @@ import {
   getDocs,
   onSnapshot,
   query,
+  serverTimestamp,
   setDoc,
+  updateDoc,
   where,
   writeBatch,
   type Unsubscribe,
@@ -45,7 +47,17 @@ import {
   fotosVacias,
   type FotosPaciente,
 } from "@/lib/patientData";
-import { esNotaV2, type NotaEvolucionAny } from "@/lib/notasEvolucion";
+import {
+  esNotaV2,
+  notaEvolucionV2Inicial,
+  validarNotaParaFirmar,
+  type AclaracionNota,
+  type DiagnosticoPaciente,
+  type EncabezadoNota,
+  type ModoCaptura,
+  type NotaEvolucionAny,
+  type NotaEvolucionV2,
+} from "@/lib/notasEvolucion";
 import {
   metaConfigInicial,
   finanzasInicial,
@@ -384,7 +396,7 @@ function useClinicResolution(authUid: string, authEmail: string) {
   return { clinicUid, rol, misRecursosVisibles, resolved, pendingInvite, aceptarInvite, rechazarInvite };
 }
 
-export type NavegacionExpediente = { patientId: string; tab?: string } | null;
+export type NavegacionExpediente = { patientId: string; tab?: string; citaId?: string } | null;
 
 export type NavegacionNuevaCita = { patientId: string; tratamiento: string } | null;
 
@@ -418,6 +430,24 @@ type PatientDataContextValue = {
    * implementación) — v2 usa métodos dedicados que se agregan en la Fase 1. */
   notasEvolucionPorPaciente: Record<string, NotaEvolucionAny[]>;
   setNotasEvolucionPaciente: (patientId: string, updater: Updater<NotaEvolucion[]>) => void;
+  /** Escrituras dedicadas de notas v2 ("Registrar atención de hoy") — NUNCA
+   * usan el diff de array completo de setNotasEvolucionPaciente (ver su
+   * comentario). Cada una es un setDoc/updateDoc puntual por id. */
+  crearBorradorNota: (patientId: string, nota: NotaEvolucionV2) => Promise<void>;
+  guardarBorradorNota: (patientId: string, nota: NotaEvolucionV2) => Promise<void>;
+  marcarListaParaRevision: (patientId: string, notaId: string) => Promise<void>;
+  firmarNota: (patientId: string, nota: NotaEvolucionV2) => Promise<void>;
+  agregarAclaracionNota: (
+    patientId: string,
+    notaId: string,
+    aclaracion: { motivo: string; contenido: string }
+  ) => Promise<void>;
+  /** Catálogo de diagnósticos por paciente (Sección 3 de "Registrar
+   * atención de hoy") — reconfirmar uno existente en una nota nueva agrega
+   * una entrada nueva (origen "confirmado_de_historial"), nunca reescribe
+   * la vieja. */
+  diagnosticosPorPaciente: Record<string, DiagnosticoPaciente[]>;
+  setDiagnosticosPaciente: (patientId: string, updater: Updater<DiagnosticoPaciente[]>) => void;
   membershipPlanes: MembershipPlan[];
   setMembershipPlanes: (updater: Updater<MembershipPlan[]>) => void;
   laminas: Lamina[];
@@ -517,7 +547,7 @@ type PatientDataContextValue = {
   setFormatosWhatsapp: (updater: Updater<FormatosWhatsApp>) => void;
   cargarDatosPaciente: (patientId: string) => void;
   navegacionExpediente: NavegacionExpediente;
-  irAExpediente: (patientId: string, tab?: string) => void;
+  irAExpediente: (patientId: string, tab?: string, citaId?: string) => void;
   consumirNavegacionExpediente: () => void;
   navegacionNuevaCita: NavegacionNuevaCita;
   sugerirNuevaCita: (patientId: string, tratamiento: string) => void;
@@ -716,6 +746,7 @@ export function PatientDataProvider({
   const [notasEvolucionPorPaciente, setNotasEvolucionPorPacienteState] = useState<
     Record<string, NotaEvolucionAny[]>
   >({});
+  const [diagnosticosPorPaciente, setDiagnosticosPorPacienteState] = useState<Record<string, DiagnosticoPaciente[]>>({});
   const [membresiasPorPaciente, setMembresiasPorPacienteState] = useState<
     Record<string, PatientMembership[]>
   >({});
@@ -802,6 +833,14 @@ export function PatientDataProvider({
       subs.current[recetasKey] = onSnapshot(collection(db, path), (snap) => {
         const next = snap.docs.map((d) => ({ ...(d.data() as Receta), id: d.id }));
         setRecetasPorPacienteState((prev) => ({ ...prev, [patientId]: next }));
+      });
+    }
+    const diagnosticosKey = `diagnosticos:${patientId}`;
+    if (!subs.current[diagnosticosKey]) {
+      const path = `users/${clinicUid}/pacientes/${patientId}/diagnosticos`;
+      subs.current[diagnosticosKey] = onSnapshot(collection(db, path), (snap) => {
+        const next = snap.docs.map((d) => ({ ...(d.data() as DiagnosticoPaciente), id: d.id }));
+        setDiagnosticosPorPacienteState((prev) => ({ ...prev, [patientId]: next }));
       });
     }
     const laboratoriosKey = `laboratorios:${patientId}`;
@@ -899,10 +938,10 @@ export function PatientDataProvider({
     await batch.commit();
   };
 
-  const irAExpediente = (patientId: string, tab?: string) => {
+  const irAExpediente = (patientId: string, tab?: string, citaId?: string) => {
     if (cambiosSinGuardar && !window.confirm(`${cambiosSinGuardar} ¿Salir sin guardar?`)) return;
     setCambiosSinGuardar(null);
-    setNavegacionExpediente({ patientId, tab });
+    setNavegacionExpediente({ patientId, tab, citaId });
     onIrAPagina?.("pacientes");
   };
 
@@ -1305,6 +1344,14 @@ export function PatientDataProvider({
     setRecetasPorPacienteState((prev) => ({ ...prev, [patientId]: next }));
   };
 
+  const setDiagnosticosPaciente = (patientId: string, updater: Updater<DiagnosticoPaciente[]>) => {
+    if (!clinicUid) return;
+    const prevArr = diagnosticosPorPaciente[patientId] ?? [];
+    const next = resolveUpdater(updater, prevArr);
+    syncFirestoreList(`users/${clinicUid}/pacientes/${patientId}/diagnosticos`, prevArr, next);
+    setDiagnosticosPorPacienteState((prev) => ({ ...prev, [patientId]: next }));
+  };
+
   /** Agrega a `otsLog` (Reportes → OTs) cada solicitud de laboratorio nueva
    * — bitácora de creación, mismo patrón que `presupuestosLog`. */
   const registrarLogOts = (patientId: string, prevArr: SolicitudLaboratorio[], next: SolicitudLaboratorio[]) => {
@@ -1406,6 +1453,75 @@ export function PatientDataProvider({
       const nextV1 = resolveUpdater(updater, prevV1);
       syncFirestoreList(`users/${clinicUid}/pacientes/${patientId}/notasEvolucion`, prevV1, nextV1);
       return { ...prev, [patientId]: [...nextV1, ...v2Existentes] };
+    });
+  };
+
+  // ---- Escrituras dedicadas de notas v2 — cada una es un setDoc/updateDoc
+  // puntual por id, nunca el diff de array completo de arriba (ver §2/§1.6
+  // del plan de rediseño: el riesgo de borrar por diff y la incompatibilidad
+  // con serverTimestamp()). El listener ya activo sobre notasEvolucion (ver
+  // cargarDatosPaciente) refleja el resultado en notasEvolucionPorPaciente
+  // automáticamente — no hace falta actualizar el estado local aquí. ----
+
+  function notaEvolucionDocRef(patientId: string, notaId: string) {
+    return doc(db, `users/${clinicUid}/pacientes/${patientId}/notasEvolucion`, notaId);
+  }
+
+  const guardarBorradorNota = async (patientId: string, nota: NotaEvolucionV2) => {
+    if (!clinicUid) return;
+    await setDoc(notaEvolucionDocRef(patientId, nota.id), nota);
+  };
+
+  // Crear y guardar son, a nivel de Firestore, la misma operación (setDoc
+  // del documento completo) — se distinguen por nombre para que quien llama
+  // exprese la intención (primer guardado vs. autoguardado subsecuente).
+  const crearBorradorNota = guardarBorradorNota;
+
+  const marcarListaParaRevision = async (patientId: string, notaId: string) => {
+    if (!clinicUid) return;
+    await updateDoc(notaEvolucionDocRef(patientId, notaId), {
+      estado: "lista_revision",
+      listaParaRevisionEn: new Date().toISOString(),
+      actualizadoEn: new Date().toISOString(),
+    });
+  };
+
+  const firmarNota = async (patientId: string, nota: NotaEvolucionV2) => {
+    if (!clinicUid) throw new Error("Sin clínica activa.");
+    const validacion = validarNotaParaFirmar(nota);
+    if (!validacion.valido) {
+      throw new Error(validacion.errores[0] ?? "Faltan datos para poder firmar esta nota.");
+    }
+    const notaFirmada: NotaEvolucionV2 = {
+      ...nota,
+      estado: "firmada",
+      firmadoPorUid: uid,
+      firmadoEn: serverTimestamp(),
+      actualizadoEn: new Date().toISOString(),
+    };
+    await setDoc(notaEvolucionDocRef(patientId, nota.id), notaFirmada);
+  };
+
+  const agregarAclaracionNota = async (
+    patientId: string,
+    notaId: string,
+    aclaracion: { motivo: string; contenido: string }
+  ) => {
+    if (!clinicUid) return;
+    const actual = (notasEvolucionPorPaciente[patientId] ?? []).find((n) => n.id === notaId);
+    const aclaracionesPrevias = actual && esNotaV2(actual) ? actual.aclaraciones : [];
+    const nueva: AclaracionNota = {
+      id: `acl${Date.now()}${Math.random().toString(36).slice(2, 8)}`,
+      motivo: aclaracion.motivo,
+      contenido: aclaracion.contenido,
+      autorUid: uid,
+      autorNombre: userEmail,
+      fecha: new Date().toISOString(),
+    };
+    await updateDoc(notaEvolucionDocRef(patientId, notaId), {
+      aclaraciones: [...aclaracionesPrevias, nueva],
+      estado: "con_aclaracion",
+      actualizadoEn: new Date().toISOString(),
     });
   };
 
@@ -1709,6 +1825,13 @@ export function PatientDataProvider({
         miUid: uid,
         notasEvolucionPorPaciente,
         setNotasEvolucionPaciente,
+        crearBorradorNota,
+        guardarBorradorNota,
+        marcarListaParaRevision,
+        firmarNota,
+        agregarAclaracionNota,
+        diagnosticosPorPaciente,
+        setDiagnosticosPaciente,
         membershipPlanes,
         setMembershipPlanes,
         laminas,

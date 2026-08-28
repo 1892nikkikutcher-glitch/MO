@@ -11,7 +11,7 @@ import Fotografias from "./Fotografias";
 import Pagos from "./Pagos";
 import ConsentimientoInformado from "./ConsentimientoInformado";
 import Laboratorios from "./Laboratorios";
-import NotasEvolucion from "./NotasEvolucion";
+import NotasEvolucionTab from "@/components/notasEvolucion/NotasEvolucionTab";
 import MembresiaTab from "./MembresiaTab";
 import { usePatientData } from "@/context/PatientDataContext";
 import { useMoConecta } from "@/context/MoConectaContext";
@@ -647,6 +647,7 @@ export default function Expediente({
   formatDate,
   calculateAge,
   initialTab,
+  initialCitaId,
   onTabApplied,
   onBack,
 }: {
@@ -656,6 +657,7 @@ export default function Expediente({
   formatDate: (date: string) => string;
   calculateAge: (date: string) => number | null;
   initialTab?: string;
+  initialCitaId?: string;
   onTabApplied?: () => void;
   onBack: () => void;
 }) {
@@ -1000,7 +1002,9 @@ export default function Expediente({
             <ConsentimientoInformado patient={patient} />
           )}
           {activeTab === "Laboratorios" && <Laboratorios patientId={patient.id} />}
-          {activeTab === "Notas de Evolución y Seguimiento" && <NotasEvolucion patientId={patient.id} />}
+          {activeTab === "Notas de Evolución y Seguimiento" && (
+            <NotasEvolucionTab patientId={patient.id} citaId={initialCitaId} />
+          )}
           {activeTab === "Membresía" && (
             <MembresiaTab patientId={patient.id} patientName={patient.name} />
           )}

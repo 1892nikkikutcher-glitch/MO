@@ -383,6 +383,7 @@ export default function Pacientes() {
         formatDate={formatDate}
         calculateAge={calculateAge}
         initialTab={navegacionExpediente?.patientId === selected.id ? navegacionExpediente.tab : undefined}
+        initialCitaId={navegacionExpediente?.patientId === selected.id ? navegacionExpediente.citaId : undefined}
         onTabApplied={consumirNavegacionExpediente}
         onBack={() => {
           setSelected(null);

@@ -421,7 +421,7 @@ export default function AgendaCitaDialog({
             </button>
             <button
               type="button"
-              onClick={() => patientId && irAExpediente(patientId, "Notas de Evolución y Seguimiento")}
+              onClick={() => patientId && irAExpediente(patientId, "Notas de Evolución y Seguimiento", initial.id)}
               disabled={!patientId}
               title={patientId ? "Notas de evolución" : "Selecciona un paciente primero"}
               className="flex h-11 w-11 items-center justify-center rounded-full text-success transition-colors hover:bg-success/15 disabled:cursor-not-allowed disabled:opacity-30 disabled:hover:bg-transparent"
