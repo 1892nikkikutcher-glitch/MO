@@ -6,6 +6,7 @@ import { formatCurrency } from "@/lib/patientData";
 import { presupuestosPorEstadoInicial } from "@/lib/metas";
 import DashboardMetricCard from "./DashboardMetricCard";
 import LaboratoriosPendientesPanel from "./LaboratoriosPendientesPanel";
+import PresupuestosPendientesPanel from "./PresupuestosPendientesPanel";
 
 /** Fila 3 del Dashboard Principal — Ventas: qué tanto se está presupuestando,
  * qué tanto de eso se acepta, y qué trabajo de laboratorio sigue pendiente.
@@ -22,6 +23,7 @@ import LaboratoriosPendientesPanel from "./LaboratoriosPendientesPanel";
 export default function BudgetMetrics() {
   const { puedeVerFinanzas, estadisticas, laboratoriosPendientes } = usePatientData();
   const [mostrarLaboratorios, setMostrarLaboratorios] = useState(false);
+  const [mostrarPresupuestos, setMostrarPresupuestos] = useState(false);
 
   const porEstado = estadisticas.presupuestosPorEstado ?? presupuestosPorEstadoInicial;
   const cantidadHistorica = Object.values(estadisticas.presupuestosPorMes).reduce((s, n) => s + n, 0);
@@ -64,7 +66,8 @@ export default function BudgetMetrics() {
               value={formatCurrency(valorPendiente)}
               color="#3aa8ff"
               sensible
-              tooltip={`${cantidadPendiente} presupuesto(s) sin marcar como Aceptado, Rechazado o Expirado — aún sin respuesta del paciente.`}
+              onClick={() => setMostrarPresupuestos(true)}
+              tooltip={`${cantidadPendiente} presupuesto(s) sin marcar como Aceptado, Rechazado o Expirado — aún sin respuesta del paciente. Ver detalle por paciente.`}
             />
           </>
         )}
@@ -103,6 +106,7 @@ export default function BudgetMetrics() {
       </div>
 
       {mostrarLaboratorios && <LaboratoriosPendientesPanel onClose={() => setMostrarLaboratorios(false)} />}
+      {mostrarPresupuestos && <PresupuestosPendientesPanel onClose={() => setMostrarPresupuestos(false)} />}
     </>
   );
 }
