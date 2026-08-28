@@ -678,7 +678,7 @@ export default function Recetas() {
               )}
             </div>
             <div className="flex-1 text-center">
-              <p className="text-xl font-bold">{perfilDoctor.nombre || medico}</p>
+              <p className="text-xl font-bold">{medico || perfilDoctor.nombre}</p>
               {perfilDoctor.cedulaProfesional && <p className="text-sm">Ced. Prof. {perfilDoctor.cedulaProfesional}</p>}
               {perfilDoctor.especialidad && <p className="text-sm">{perfilDoctor.especialidad}</p>}
             </div>

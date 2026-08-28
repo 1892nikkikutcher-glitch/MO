@@ -45,13 +45,33 @@ export default function ConsentimientoInformado({
   patient: Patient;
   onVolver?: () => void;
 }) {
-  const { perfilDoctor } = usePatientData();
+  const { perfilDoctor, recursos, citas } = usePatientData();
+  const medicos = recursos.filter((r) => r.tipo === "medico");
   const esMenorDeEdad = (calcularEdadDetallada(patient.birthDate)?.years ?? 18) < 18;
   const fechaInicial = todayFormatted();
   const [dia, setDia] = useState(fechaInicial.dia);
   const [mes, setMes] = useState(fechaInicial.mes);
   const [anio, setAnio] = useState(fechaInicial.anio);
   const [hora, setHora] = useState(nowFormatted());
+  // El consentimiento debe llevar el nombre de quien REALMENTE va a atender
+  // al paciente, no siempre el de Administración → Perfil del Doctor (esa
+  // es la cédula/dirección de la clínica, no necesariamente quien trata a
+  // este paciente en particular). Se sugiere el médico de la cita más
+  // cercana del paciente (la próxima si tiene una agendada, si no la más
+  // reciente pasada) y siempre queda editable.
+  const [medico, setMedico] = useState(() => {
+    const hoyISO = new Date().toISOString().slice(0, 10);
+    const citasPaciente = citas.filter((c) => c.patientId === patient.id && c.estatus !== "Cancelada");
+    const proxima = citasPaciente
+      .filter((c) => c.fecha >= hoyISO)
+      .sort((a, b) => a.fecha.localeCompare(b.fecha) || a.horaInicio.localeCompare(b.horaInicio))[0];
+    const pasada = citasPaciente.filter((c) => c.fecha < hoyISO).sort((a, b) => b.fecha.localeCompare(a.fecha))[0];
+    const citaRelevante = proxima ?? pasada;
+    const medicoSugerido = citaRelevante?.medicoId
+      ? recursos.find((r) => r.id === citaRelevante.medicoId)?.nombre
+      : undefined;
+    return medicoSugerido || medicos[0]?.nombre || perfilDoctor.nombre || "";
+  });
   const [procedimiento, setProcedimiento] = useState("");
   const [nombreFirmante, setNombreFirmante] = useState(
     esMenorDeEdad ? patient.nombreTutor || "" : patient.name
@@ -92,6 +112,22 @@ export default function ConsentimientoInformado({
         <div>
           <label className="mb-1 block text-xs font-medium text-ink/60">Hora</label>
           <input type="text" value={hora} onChange={(e) => setHora(e.target.value)} className={inputClass} />
+        </div>
+
+        <div className="sm:col-span-2">
+          <label className="mb-1 block text-xs font-medium text-ink/60">Médico que atiende</label>
+          {medicos.length > 0 ? (
+            <select value={medico} onChange={(e) => setMedico(e.target.value)} className={inputClass}>
+              {!medicos.some((m) => m.nombre === medico) && medico && <option value={medico}>{medico}</option>}
+              {medicos.map((m) => (
+                <option key={m.id} value={m.nombre}>
+                  {m.nombre}
+                </option>
+              ))}
+            </select>
+          ) : (
+            <input type="text" value={medico} onChange={(e) => setMedico(e.target.value)} className={inputClass} />
+          )}
         </div>
 
         <div className="sm:col-span-2">
@@ -174,7 +210,7 @@ export default function ConsentimientoInformado({
           Carta de Consentimiento Informado General
         </h2>
         <div className="mt-3 text-center text-sm leading-snug print:mt-1.5 print:text-xs">
-          <p className="font-semibold">{perfilDoctor.nombre || "Consultorio dental"}</p>
+          <p className="font-semibold">{medico || perfilDoctor.nombre || "Consultorio dental"}</p>
           {perfilDoctor.cedulaProfesional && <p>Cédula profesional {perfilDoctor.cedulaProfesional}</p>}
           {perfilDoctor.direccionClinica && <p>{perfilDoctor.direccionClinica}</p>}
         </div>
@@ -202,13 +238,13 @@ export default function ConsentimientoInformado({
           Aceptación del paciente
         </h3>
         <p className="mt-1 whitespace-pre-line text-justify text-[13px] leading-relaxed print:text-[10.5px] print:leading-snug">
-          {parrafoAceptacion(perfilDoctor.nombre)}
+          {parrafoAceptacion(medico)}
         </p>
 
         <div className="mt-10 grid grid-cols-2 gap-x-10 gap-y-10 text-center text-[11px] print:mt-5 print:gap-x-8 print:gap-y-5 print:text-[9.5px]">
           <div>
             <div className="mb-1 h-12 border-b border-black print:h-8" />
-            <p>Firma {perfilDoctor.nombre || "del profesional"}</p>
+            <p>Firma {medico || "del profesional"}</p>
           </div>
           <div>
             <div className="mb-1 h-12 border-b border-black print:h-8" />
