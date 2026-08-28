@@ -218,6 +218,49 @@ function AvisoConfidencialidad() {
   );
 }
 
+/** Aviso de conexión — visible en toda la app (no solo en Notas de
+ * Evolución, que ya tiene su propio indicador de guardado más detallado).
+ * Firestore sigue funcionando sin internet gracias a la caché persistente
+ * activada en firebase.ts: esto solo hace visible ese hecho para que el
+ * usuario sepa que puede seguir trabajando con confianza en vez de asumir
+ * que la app "no sirve" sin señal, como pasó en el depósito dental. */
+function IndicadorSinConexion() {
+  const [online, setOnline] = useState(true);
+  const [reconectado, setReconectado] = useState(false);
+
+  useEffect(() => {
+    setOnline(navigator.onLine);
+    function marcarOnline() {
+      setOnline(true);
+      setReconectado(true);
+      setTimeout(() => setReconectado(false), 4000);
+    }
+    function marcarOffline() {
+      setOnline(false);
+    }
+    window.addEventListener("online", marcarOnline);
+    window.addEventListener("offline", marcarOffline);
+    return () => {
+      window.removeEventListener("online", marcarOnline);
+      window.removeEventListener("offline", marcarOffline);
+    };
+  }, []);
+
+  if (online && !reconectado) return null;
+
+  return (
+    <div
+      className={`fixed inset-x-0 top-0 z-[95] flex items-center justify-center gap-2 px-4 py-2 text-center text-xs font-semibold text-black print:hidden ${
+        online ? "bg-success" : "bg-warning"
+      }`}
+    >
+      {online
+        ? "Conexión restablecida — sincronizando cambios pendientes…"
+        : "Sin conexión — puedes seguir usando MO con normalidad; tus cambios se guardan en este dispositivo y se sincronizan solos al volver la señal."}
+    </div>
+  );
+}
+
 function QuickActionsBar({
   isLight,
   onNavigate,
@@ -492,6 +535,7 @@ export default function Dashboard({
   return (
     <PatientDataProvider uid={uid} userEmail={userEmail} onIrAPagina={setActivePage}>
       <MoConectaProvider uid={uid}>
+        <IndicadorSinConexion />
         <AvisoConfidencialidad />
         <InvitePrompt />
         <DashboardBody
