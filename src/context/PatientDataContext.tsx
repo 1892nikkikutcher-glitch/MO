@@ -45,6 +45,7 @@ import {
   fotosVacias,
   type FotosPaciente,
 } from "@/lib/patientData";
+import { esNotaV2, type NotaEvolucionAny } from "@/lib/notasEvolucion";
 import {
   metaConfigInicial,
   finanzasInicial,
@@ -389,6 +390,12 @@ export type NavegacionNuevaCita = { patientId: string; tratamiento: string } | n
 
 type PatientDataContextValue = {
   clinicUid: string | null;
+  /** uid real de Firebase Auth de la sesión actual — distinto de `clinicUid`
+   * cuando quien entra es un colaborador (no el dueño) de la clínica. Antes
+   * no se exponía (el provider ya lo recibía como prop `uid`, pero
+   * `PatientDataContextValue` nunca lo devolvía) — se usa para
+   * `firmadoPorUid` al firmar una nota de evolución (ver notasEvolucion.ts). */
+  miUid: string;
   userEmail: string;
   patients: Patient[];
   addPatient: (data: { name: string; phone: string; birthDate?: string }) => Patient;
@@ -405,7 +412,11 @@ type PatientDataContextValue = {
   setRecetasPaciente: (patientId: string, updater: Updater<Receta[]>) => void;
   laboratoriosPorPaciente: Record<string, SolicitudLaboratorio[]>;
   setLaboratoriosPaciente: (patientId: string, updater: Updater<SolicitudLaboratorio[]>) => void;
-  notasEvolucionPorPaciente: Record<string, NotaEvolucion[]>;
+  /** v1 (PSOAP crudo) y v2 ("Registrar atención de hoy") conviven como
+   * documentos hermanos — ver `esNotaV2` en notasEvolucion.ts para
+   * distinguirlos. `setNotasEvolucionPaciente` solo escribe v1 (ver su
+   * implementación) — v2 usa métodos dedicados que se agregan en la Fase 1. */
+  notasEvolucionPorPaciente: Record<string, NotaEvolucionAny[]>;
   setNotasEvolucionPaciente: (patientId: string, updater: Updater<NotaEvolucion[]>) => void;
   membershipPlanes: MembershipPlan[];
   setMembershipPlanes: (updater: Updater<MembershipPlan[]>) => void;
@@ -703,7 +714,7 @@ export function PatientDataProvider({
     Record<string, SolicitudLaboratorio[]>
   >({});
   const [notasEvolucionPorPaciente, setNotasEvolucionPorPacienteState] = useState<
-    Record<string, NotaEvolucion[]>
+    Record<string, NotaEvolucionAny[]>
   >({});
   const [membresiasPorPaciente, setMembresiasPorPacienteState] = useState<
     Record<string, PatientMembership[]>
@@ -813,7 +824,7 @@ export function PatientDataProvider({
     if (!subs.current[notasEvolucionKey]) {
       const path = `users/${clinicUid}/pacientes/${patientId}/notasEvolucion`;
       subs.current[notasEvolucionKey] = onSnapshot(collection(db, path), (snap) => {
-        const next = snap.docs.map((d) => ({ ...(d.data() as NotaEvolucion), id: d.id }));
+        const next = snap.docs.map((d) => ({ ...(d.data() as NotaEvolucionAny), id: d.id }));
         setNotasEvolucionPorPacienteState((prev) => ({ ...prev, [patientId]: next }));
       });
     }
@@ -1378,13 +1389,23 @@ export function PatientDataProvider({
     setLaboratoriosPorPacienteState((prev) => ({ ...prev, [patientId]: next }));
   };
 
+  // Solo escribe notas v1 (PSOAP legado) — nunca debe tocar documentos v2
+  // ("Registrar atención de hoy"), que viven en la misma subcolección. Por
+  // eso el diff de syncFirestoreList se corre SOLO contra el subconjunto v1
+  // de prev/next: si se le pasara el arreglo completo (v1+v2) filtrado a v1
+  // antes de compararlo, cualquier nota v2 quedaría "faltante" del lado
+  // `next` y syncFirestoreList la borraría de Firestore por diff. Filtrando
+  // igual en ambos lados (prev Y next) antes de diffar, los documentos v2
+  // nunca entran a la comparación — ni se escriben ni se borran.
   const setNotasEvolucionPaciente = (patientId: string, updater: Updater<NotaEvolucion[]>) => {
     if (!clinicUid) return;
     setNotasEvolucionPorPacienteState((prev) => {
-      const prevArr = prev[patientId] ?? [];
-      const next = resolveUpdater(updater, prevArr);
-      syncFirestoreList(`users/${clinicUid}/pacientes/${patientId}/notasEvolucion`, prevArr, next);
-      return { ...prev, [patientId]: next };
+      const prevAll = prev[patientId] ?? [];
+      const prevV1 = prevAll.filter((n): n is NotaEvolucion => !esNotaV2(n));
+      const v2Existentes = prevAll.filter(esNotaV2);
+      const nextV1 = resolveUpdater(updater, prevV1);
+      syncFirestoreList(`users/${clinicUid}/pacientes/${patientId}/notasEvolucion`, prevV1, nextV1);
+      return { ...prev, [patientId]: [...nextV1, ...v2Existentes] };
     });
   };
 
@@ -1685,6 +1706,7 @@ export function PatientDataProvider({
         setRecetasPaciente,
         laboratoriosPorPaciente,
         setLaboratoriosPaciente,
+        miUid: uid,
         notasEvolucionPorPaciente,
         setNotasEvolucionPaciente,
         membershipPlanes,

@@ -26,6 +26,12 @@ export type MedicamentoCatalogo = {
   dosisMaximaMg?: number;
   /** Ej. "250 mg / 5 ml" — para poder mostrar también el resultado en ml. */
   concentracion?: string;
+  /** Campos opcionales para precargar "Registrar atención de hoy" > Indicaciones
+   * (ver notasEvolucion.ts, MedicamentoNota) — aditivos, entradas viejas del
+   * catálogo y Recetas.tsx siguen funcionando igual sin ellos. */
+  principioActivo?: string;
+  presentacion?: string;
+  advertenciasOEfectosAdversos?: string;
 };
 
 function id(prefijo: string) {

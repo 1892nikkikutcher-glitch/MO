@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import { usePatientData } from "@/context/PatientDataContext";
 import type { NotaEvolucion } from "@/lib/patientData";
 import { sugerencias, type Sugerencia } from "@/lib/vocabularioNotas";
+import { esNotaV2 } from "@/lib/notasEvolucion";
 
 const psoapCampos = [
   {
@@ -149,7 +150,11 @@ export default function NotasEvolucion({ patientId }: { patientId: string }) {
     registrarPalabrasDeNota,
   } = usePatientData();
   const medicos = recursos.filter((r) => r.tipo === "medico");
-  const notas = notasEvolucionPorPaciente[patientId] ?? [];
+  // notasEvolucionPorPaciente puede traer notas v2 ("Registrar atención de
+  // hoy") mezcladas — este componente solo sabe mostrar el formato PSOAP
+  // v1, así que filtra las v2 en vez de intentar renderizarlas mal. La
+  // lista unificada (HistorialNotas.tsx) llega en una fase posterior.
+  const notas = (notasEvolucionPorPaciente[patientId] ?? []).filter((n): n is NotaEvolucion => !esNotaV2(n));
 
   const [medico, setMedico] = useState(medicos[0]?.nombre ?? "");
   const [form, setForm] = useState<Record<PsoapKey, string>>(emptyForm);
