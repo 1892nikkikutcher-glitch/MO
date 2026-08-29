@@ -259,6 +259,14 @@ export type NotaEvolucionV2 = {
   version: 2;
   estado: EstadoNotaEvolucion;
   modoCaptura: ModoCaptura;
+  /** Contador monotónico — aumenta en cada cambio lógico registrado por
+   * `registrarCambio` (useAutoguardadoNota.ts). Es la fuente de verdad para
+   * detectar conflictos entre dispositivos/sesiones (ver
+   * borradorLocalNotaPuro.ts → detectarConflictoBorrador); NUNCA se usa
+   * `actualizadoEn` (reloj de cliente) para esa decisión, solo para
+   * UX/auditoría/desempate. Ver `normalizarRevision` para notas v2 creadas
+   * antes de que este campo existiera. */
+  revision: number;
   encabezado: EncabezadoNota;
   comoLlegaHoy: ComoLlegaHoy;
   queEncontraste: QueEncontraste;
@@ -282,7 +290,7 @@ export type NotaEvolucionV2 = {
   firmadoEn?: unknown;
 };
 
-function idNota(prefijo: string): string {
+export function idNota(prefijo: string): string {
   return `${prefijo}${Date.now()}${Math.random().toString(36).slice(2, 8)}`;
 }
 
@@ -297,6 +305,7 @@ export function notaEvolucionV2Inicial(
     version: 2,
     estado: "borrador",
     modoCaptura,
+    revision: 1,
     encabezado,
     comoLlegaHoy: { chips: [] },
     queEncontraste: { organosDentales: [...encabezado.organosDentales], chips: [] },
@@ -461,4 +470,14 @@ export type NotaEvolucionAny = NotaEvolucion | NotaEvolucionV2;
 
 export function esNotaV2(nota: NotaEvolucionAny): nota is NotaEvolucionV2 {
   return (nota as NotaEvolucionV2).version === 2;
+}
+
+/** Notas v2 creadas antes de que existiera `revision` (todas las que ya
+ * están en producción al momento de esta corrección) no tienen ese campo.
+ * Nunca se trata `undefined` como `0` — eso produciría falsos conflictos
+ * (cualquier revisión remota real sería "mayor a 0") y un `NaN` en cuanto
+ * se intente incrementar. Se normaliza a `1`, consistente con el valor con
+ * el que nace toda nota nueva. */
+export function normalizarRevision(nota: NotaEvolucionV2): NotaEvolucionV2 {
+  return typeof nota.revision === "number" ? nota : { ...nota, revision: 1 };
 }

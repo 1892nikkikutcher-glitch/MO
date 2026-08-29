@@ -11,14 +11,30 @@ export function claveLocalBorrador(clinicUid: string, patientId: string, notaId:
   return `${clinicUid}:${patientId}:${notaId}`;
 }
 
+/** Contador de revisión — `revisionLocal` es la revisión actual del
+ * borrador en este dispositivo (en la práctica, siempre igual a
+ * `nota.revision`; se guarda explícita para no tener que rescatarla del
+ * objeto nota a mano); `ultimaRevisionSincronizada` es la última revisión
+ * que ESTE dispositivo confirmó como escrita con éxito en Firestore — no
+ * "la que Firestore tiene ahora", sino "la que ESTE dispositivo puso ahí
+ * la última vez". Es la única fuente de verdad para detectar conflictos
+ * (ver `detectarConflictoBorrador`); los timestamps de `MetadataLocalBorrador`
+ * son solo para UX ("última edición HH:MM"), nunca para esa decisión. */
+export type MetadataSincronizacionNota = {
+  revisionLocal: number;
+  ultimaRevisionSincronizada: number;
+};
+
 export type MetadataLocalBorrador = {
   ultimaSeccionActiva: SeccionNota;
   ultimaSeccionEditada?: SeccionNota;
   modoCaptura: ModoCaptura;
-  /** Reloj de cliente, ISO — cuándo se escribió por última vez a IndexedDB. */
+  /** Reloj de cliente, ISO — cuándo se escribió por última vez a IndexedDB.
+   * Solo para UX/auditoría, nunca para decidir si hay conflicto. */
   ultimoCambioLocalEn: string;
   ultimaSincronizacionExitosaEn?: string;
   pendienteSincronizar: boolean;
+  sincronizacion: MetadataSincronizacionNota;
 };
 
 export type RegistroBorradorLocal = {
@@ -59,20 +75,24 @@ export function calcularEstadoGuardado(params: {
 
 export type ResultadoConflicto = { hayConflicto: boolean; motivo?: string };
 
-/** Compara la versión de Firestore contra la base sobre la que el borrador
- * local fue construido (no simplemente "el más nuevo gana"). Si Firestore
- * avanzó por una sincronización que ESTE dispositivo/pestaña ya hizo, no es
- * conflicto — es el flujo normal. Si Firestore avanzó por algo que este
- * dispositivo no sincronizó (otra pestaña, otro dispositivo, otra persona),
- * es un conflicto real y no se resuelve con last-write-wins silencioso. */
+/** Determinístico y basado en revisión, NO en timestamp de reloj de
+ * cliente (relojes desincronizados y escrituras casi simultáneas hacían
+ * poco confiable comparar por `actualizadoEn`). Regla: si Firestore tiene
+ * una `revision` mayor a la última que ESTE dispositivo sincronizó con
+ * éxito, alguien escribió desde otra sesión/dispositivo sin que lo
+ * supiéramos — conflicto real, sin importar qué tan alta sea la
+ * `revisionLocal` de este dispositivo (ej. local en revisión 7 con última
+ * sincronizada en 5, remoto en 6 → SÍ es conflicto, aunque 7 > 6: existe
+ * una escritura remota que esta sesión no conoce). Si Firestore no avanzó
+ * más allá de `ultimaRevisionSincronizada`, es seguro sincronizar. */
 export function detectarConflictoBorrador(
-  local: { actualizadoEnBaseLocal: string },
-  remoto: { actualizadoEn: string }
+  local: { ultimaRevisionSincronizada: number },
+  remoto: { revision: number }
 ): ResultadoConflicto {
-  if (remoto.actualizadoEn > local.actualizadoEnBaseLocal) {
+  if (remoto.revision > local.ultimaRevisionSincronizada) {
     return {
       hayConflicto: true,
-      motivo: "Firestore tiene una versión más reciente que la que este dispositivo sincronizó por última vez.",
+      motivo: "Encontramos cambios realizados desde otra sesión que este dispositivo no sincronizó.",
     };
   }
   return { hayConflicto: false };

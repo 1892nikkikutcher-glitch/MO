@@ -1,10 +1,12 @@
 "use client";
 
 /** "Registrar atención de hoy" — contenedor de las 6 secciones guiadas que
- * sustituyen el formulario PSOAP visible (ver el plan de rediseño). Decide
- * CON QUÉ nota arrancar (recuperar un borrador existente, avisar de un
- * duplicado, o empezar una nueva) y delega el ciclo de vida de esa nota
- * concreta a `useAutoguardadoNota`. */
+ * sustituyen el formulario PSOAP visible (ver el plan de rediseño, V4).
+ * Decide CON QUÉ nota arrancar (recuperar un borrador existente, avisar de
+ * un duplicado, o empezar una nueva) — y con qué estado de sincronización
+ * (existe en Firestore / cuál es la última revisión que este dispositivo
+ * conoce) — y delega el ciclo de vida de esa nota concreta a
+ * `useAutoguardadoNota`. */
 
 import { useEffect, useMemo, useState } from "react";
 import { usePatientData } from "@/context/PatientDataContext";
@@ -12,13 +14,14 @@ import { buscarBorradorLocalPorCita, buscarBorradorLocalPorPaciente } from "@/li
 import { detectarConflictoBorrador, type RegistroBorradorLocal } from "@/lib/borradorLocalNotaPuro";
 import {
   estadoSeccion,
+  normalizarRevision,
   notaEvolucionV2Inicial,
   obtenerFaltantesNota,
   type EncabezadoNota,
   type NotaEvolucionV2,
   type SeccionNota,
 } from "@/lib/notasEvolucion";
-import { useAutoguardadoNota } from "./useAutoguardadoNota";
+import { useAutoguardadoNota, type EstadoSincronizacionInicial } from "./useAutoguardadoNota";
 import { botonPrimario, botonSecundario, EstadoGuardadoIndicador, SeccionAcordeon } from "./NotaUI";
 import SeccionComoLlega from "./SeccionComoLlega";
 import SeccionQueEncontraste from "./SeccionQueEncontraste";
@@ -44,14 +47,22 @@ function formatFechaHora(iso: string): string {
   }
 }
 
+/** Nota con la que arranca el formulario + lo que este dispositivo sabe de
+ * su relación con Firestore (si ya existe ahí, y cuál fue la última
+ * revisión que confirmamos sincronizada) — nunca se separan en dos estados
+ * independientes para que no puedan desincronizarse entre sí. */
+type ArranqueNota = { nota: NotaEvolucionV2; sincronizacion: EstadoSincronizacionInicial };
+
 export default function RegistrarAtencionHoy({
   patientId,
   citaId,
   onFirmada,
+  onGuardado,
 }: {
   patientId: string;
   citaId?: string | null;
   onFirmada: (notaId: string) => void;
+  onGuardado: () => void;
 }) {
   const { clinicUid, miUid, patients, recursos, citas, clinicInfo, notasEvolucionPorPaciente } = usePatientData();
 
@@ -59,7 +70,7 @@ export default function RegistrarAtencionHoy({
   const [registroLocal, setRegistroLocal] = useState<RegistroBorradorLocal | null>(null);
   const [notaFirestoreExistente, setNotaFirestoreExistente] = useState<NotaEvolucionV2 | null>(null);
   const [hayConflicto, setHayConflicto] = useState(false);
-  const [notaInicial, setNotaInicial] = useState<NotaEvolucionV2 | null>(null);
+  const [arranqueNota, setArranqueNota] = useState<ArranqueNota | null>(null);
   const [forzarNueva, setForzarNueva] = useState(false);
 
   const paciente = patients.find((p) => p.id === patientId);
@@ -79,6 +90,13 @@ export default function RegistrarAtencionHoy({
     [patientId, paciente?.name, citaId, cita, clinicInfo?.nombre, medico]
   );
 
+  function notaNuevaComoArranque(): ArranqueNota {
+    return {
+      nota: notaEvolucionV2Inicial(encabezado, "rapido", miUid),
+      sincronizacion: { existeEnFirestore: false, ultimaRevisionSincronizada: 0 },
+    };
+  }
+
   // Búsqueda de recuperación/duplicado — solo al montar (o si cambia de
   // paciente/cita), nunca se repite mientras se edita.
   useEffect(() => {
@@ -89,37 +107,65 @@ export default function RegistrarAtencionHoy({
         return;
       }
       setFase("buscando");
-      const local = citaId
-        ? await buscarBorradorLocalPorCita(clinicUid, citaId)
-        : await buscarBorradorLocalPorPaciente(clinicUid, patientId);
-      if (cancelado) return;
+      try {
+        // IndexedDB puede fallar (modo privado, cuota llena, navegador
+        // viejo) — si eso pasa, nunca debe dejar al usuario atorado sin
+        // poder escribir su nota; se sigue con la búsqueda solo en
+        // Firestore y, si tampoco hay nada ahí, se empieza una nueva.
+        let local = null;
+        try {
+          local = citaId
+            ? await buscarBorradorLocalPorCita(clinicUid, citaId)
+            : await buscarBorradorLocalPorPaciente(clinicUid, patientId);
+        } catch (err) {
+          console.error("No se pudo consultar el borrador local (IndexedDB) — se continúa sin él", err);
+        }
+        if (cancelado) return;
 
-      const remotaVigente = (notasEvolucionPorPaciente[patientId] ?? []).find(
-        (n): n is NotaEvolucionV2 =>
-          "version" in n &&
-          n.version === 2 &&
-          n.estado !== "firmada" &&
-          (citaId ? n.encabezado.citaId === citaId : true)
-      );
-
-      if (!local && !remotaVigente) {
-        setNotaInicial(notaEvolucionV2Inicial(encabezado, "rapido", miUid));
-        setFase("editando");
-        return;
-      }
-
-      setRegistroLocal(local);
-      setNotaFirestoreExistente(remotaVigente ?? null);
-
-      if (local && remotaVigente) {
-        const conflicto = detectarConflictoBorrador(
-          { actualizadoEnBaseLocal: local.metadataLocal.ultimaSincronizacionExitosaEn ?? local.nota.actualizadoEn },
-          { actualizadoEn: remotaVigente.actualizadoEn }
+        const remotaVigente = (notasEvolucionPorPaciente[patientId] ?? []).find(
+          (n): n is NotaEvolucionV2 =>
+            "version" in n &&
+            n.version === 2 &&
+            n.estado !== "firmada" &&
+            (citaId ? n.encabezado.citaId === citaId : true)
         );
-        setHayConflicto(conflicto.hayConflicto);
-      }
 
-      setFase(citaId && (local || remotaVigente) ? "duplicado" : "recuperar");
+        if (!local && !remotaVigente) {
+          setArranqueNota(notaNuevaComoArranque());
+          setFase("editando");
+          return;
+        }
+
+        setRegistroLocal(local);
+        setNotaFirestoreExistente(remotaVigente ? normalizarRevision(remotaVigente) : null);
+
+        // El chequeo de conflicto por revisión solo tiene sentido cuando el
+        // local y el remoto son LA MISMA nota (mismo notaId) — si son
+        // borradores distintos del mismo paciente, no es un conflicto de
+        // revisión, es simplemente que hay más de un borrador (la pantalla
+        // "duplicado" ya cubre ese caso a otro nivel).
+        if (local && remotaVigente && local.notaId === remotaVigente.id) {
+          const conflicto = detectarConflictoBorrador(
+            { ultimaRevisionSincronizada: local.metadataLocal.sincronizacion?.ultimaRevisionSincronizada ?? 0 },
+            { revision: normalizarRevision(remotaVigente).revision }
+          );
+          setHayConflicto(conflicto.hayConflicto);
+        } else {
+          setHayConflicto(false);
+        }
+
+        setFase(citaId && (local || remotaVigente) ? "duplicado" : "recuperar");
+      } catch (err) {
+        // Última red de seguridad: cualquier error inesperado en la
+        // búsqueda de recuperación jamás debe impedir registrar la
+        // atención de hoy — se empieza una nota nueva en vez de dejar la
+        // pantalla atorada en "Buscando…".
+        console.error("Error inesperado buscando borradores previos — se inicia una nota nueva", err);
+        if (!cancelado) {
+          setArranqueNota(notaNuevaComoArranque());
+          setFase("editando");
+        }
+      }
     }
     void buscar();
     return () => {
@@ -129,15 +175,41 @@ export default function RegistrarAtencionHoy({
   }, [clinicUid, patientId, citaId, forzarNueva]);
 
   function continuarBorrador(usarRemoto: boolean) {
-    const base = usarRemoto ? notaFirestoreExistente : registroLocal?.nota ?? notaFirestoreExistente;
-    if (base) setNotaInicial(base);
-    else setNotaInicial(notaEvolucionV2Inicial(encabezado, "rapido", miUid));
+    if (usarRemoto && notaFirestoreExistente) {
+      setArranqueNota({
+        nota: notaFirestoreExistente,
+        sincronizacion: { existeEnFirestore: true, ultimaRevisionSincronizada: notaFirestoreExistente.revision },
+      });
+    } else if (registroLocal) {
+      // "¿Existe ya en Firestore?" se responde buscando por el ID EXACTO de
+      // este borrador local en la copia ya sincronizada en memoria — no
+      // comparando contra `notaFirestoreExistente` (que puede ser un
+      // documento vigente DISTINTO del mismo paciente/cita). Así no
+      // depende de metadata local legada que pudiera faltar.
+      const notaRemotaDeEsteBorrador = (notasEvolucionPorPaciente[patientId] ?? []).find(
+        (n): n is NotaEvolucionV2 => "version" in n && n.version === 2 && n.id === registroLocal.notaId
+      );
+      setArranqueNota({
+        nota: normalizarRevision(registroLocal.nota),
+        sincronizacion: {
+          existeEnFirestore: !!notaRemotaDeEsteBorrador,
+          ultimaRevisionSincronizada: registroLocal.metadataLocal.sincronizacion?.ultimaRevisionSincronizada ?? 0,
+        },
+      });
+    } else if (notaFirestoreExistente) {
+      setArranqueNota({
+        nota: notaFirestoreExistente,
+        sincronizacion: { existeEnFirestore: true, ultimaRevisionSincronizada: notaFirestoreExistente.revision },
+      });
+    } else {
+      setArranqueNota(notaNuevaComoArranque());
+    }
     setFase("editando");
   }
 
   function empezarNueva() {
     setForzarNueva(true);
-    setNotaInicial(notaEvolucionV2Inicial(encabezado, "rapido", miUid));
+    setArranqueNota(notaNuevaComoArranque());
     setFase("editando");
   }
 
@@ -175,7 +247,7 @@ export default function RegistrarAtencionHoy({
         </div>
         {hayConflicto && (
           <p className="mb-3 rounded-lg border border-danger/30 bg-danger/10 p-3 text-xs text-danger">
-            Encontramos una versión más reciente de esta nota que la que quedó en este dispositivo.
+            Encontramos cambios en Firestore (otra sesión/dispositivo) que este dispositivo no sincronizó.
           </p>
         )}
         <div className="flex flex-wrap gap-2">
@@ -201,16 +273,30 @@ export default function RegistrarAtencionHoy({
     );
   }
 
-  if (!notaInicial) return null;
+  if (!arranqueNota) return null;
 
   return (
     <FormularioNota
       patientId={patientId}
       citaId={citaId}
-      notaInicial={notaInicial}
+      notaInicial={arranqueNota.nota}
+      arranqueSincronizacion={arranqueNota.sincronizacion}
       tratamientosSugeridos={cita?.tratamientos ?? []}
       onFirmada={onFirmada}
+      onGuardado={onGuardado}
     />
+  );
+}
+
+function ComparacionNota({ nota, titulo }: { nota: NotaEvolucionV2; titulo: string }) {
+  return (
+    <div className="rounded-lg border border-edge/10 bg-field p-3 text-xs text-ink/70">
+      <p className="mb-1 font-semibold text-ink/80">{titulo}</p>
+      <p>Actividad: {nota.detalleProcedimiento?.actividadRealizada || "—"}</p>
+      <p>Estado final: {nota.estadoFinal?.chips?.join(", ") || "—"}</p>
+      <p>Revisión: {nota.revision}</p>
+      <p>Última actualización: {formatFechaHora(nota.actualizadoEn)}</p>
+    </div>
   );
 }
 
@@ -218,19 +304,41 @@ function FormularioNota({
   patientId,
   citaId,
   notaInicial,
+  arranqueSincronizacion,
   tratamientosSugeridos,
   onFirmada,
+  onGuardado,
 }: {
   patientId: string;
   citaId?: string | null;
   notaInicial: NotaEvolucionV2;
+  arranqueSincronizacion: EstadoSincronizacionInicial;
   tratamientosSugeridos: string[];
   onFirmada: (notaId: string) => void;
+  onGuardado: () => void;
 }) {
-  const { nota, registrarCambio, seccionActiva, irASeccion, estadoGuardado, reintentarSincronizacion, firmar, firmando } =
-    useAutoguardadoNota(patientId, citaId, notaInicial);
+  const {
+    nota,
+    registrarCambio,
+    flushInmediato,
+    seccionActiva,
+    irASeccion,
+    estadoGuardado,
+    reintentarSincronizacion,
+    firmar,
+    firmando,
+    guardarYSalir,
+    conflictoRemoto,
+    resolverUsarRemoto,
+    resolverMantenerComoCopia,
+  } = useAutoguardadoNota(patientId, citaId, notaInicial, arranqueSincronizacion);
   const [errorFirma, setErrorFirma] = useState<string | null>(null);
   const [confirmando, setConfirmando] = useState(false);
+  const [guardando, setGuardando] = useState(false);
+  const [errorGuardado, setErrorGuardado] = useState<string | null>(null);
+  const [revisandoConflicto, setRevisandoConflicto] = useState(false);
+  const [resolviendoConflicto, setResolviendoConflicto] = useState(false);
+  const [errorConflicto, setErrorConflicto] = useState<string | null>(null);
 
   const faltantes = obtenerFaltantesNota(nota);
 
@@ -245,6 +353,30 @@ function FormularioNota({
     }
   }
 
+  async function onGuardarYSalir() {
+    setErrorGuardado(null);
+    setGuardando(true);
+    const resultado = await guardarYSalir();
+    setGuardando(false);
+    if (resultado.ok) {
+      onGuardado();
+    } else {
+      // El borrador ya quedó protegido localmente (ver guardarYSalir) — se
+      // avisa del error de sincronización y se deja decidir al usuario si
+      // sale de todas formas, en vez de ocultar el problema saliendo solo.
+      setErrorGuardado(resultado.error);
+    }
+  }
+
+  async function onMantenerComoCopia() {
+    setErrorConflicto(null);
+    setResolviendoConflicto(true);
+    const resultado = await resolverMantenerComoCopia();
+    setResolviendoConflicto(false);
+    if (!resultado.ok) setErrorConflicto(resultado.error);
+    else setRevisandoConflicto(false);
+  }
+
   return (
     <div className="space-y-4">
       <div className="flex flex-wrap items-center justify-between gap-2">
@@ -255,6 +387,34 @@ function FormularioNota({
         <EstadoGuardadoIndicador estado={estadoGuardado} onReintentar={reintentarSincronizacion} />
       </div>
 
+      {conflictoRemoto && (
+        <div className="rounded-2xl border border-danger/30 bg-danger/10 p-4">
+          <h3 className="mb-1 text-sm font-semibold text-danger">Encontramos cambios realizados desde otra sesión</h3>
+          <p className="mb-3 text-xs text-ink/60">
+            Otra sesión o dispositivo guardó cambios en esta nota que este dispositivo no conoce. Para no perder información de
+            ninguno de los dos lados, no se sobrescribe automáticamente.
+          </p>
+          {revisandoConflicto && (
+            <div className="mb-3 grid grid-cols-1 gap-2 sm:grid-cols-2">
+              <ComparacionNota nota={nota} titulo="Tu borrador (este dispositivo)" />
+              <ComparacionNota nota={conflictoRemoto} titulo="Versión remota (otra sesión)" />
+            </div>
+          )}
+          {errorConflicto && <p className="mb-2 text-xs text-danger">{errorConflicto}</p>}
+          <div className="flex flex-wrap gap-2">
+            <button onClick={() => setRevisandoConflicto((v) => !v)} className={botonSecundario}>
+              {revisandoConflicto ? "Ocultar comparación" : "Revisar cambios"}
+            </button>
+            <button onClick={resolverUsarRemoto} className={botonSecundario}>
+              Usar versión remota
+            </button>
+            <button onClick={onMantenerComoCopia} disabled={resolviendoConflicto} className={botonPrimario}>
+              {resolviendoConflicto ? "Guardando copia…" : "Mantener mi borrador como copia separada"}
+            </button>
+          </div>
+        </div>
+      )}
+
       <div className="space-y-2.5">
         <SeccionAcordeon
           id="como_llega"
@@ -263,7 +423,7 @@ function FormularioNota({
           activa={seccionActiva === "como_llega"}
           onSeleccionar={irASeccion}
         >
-          <SeccionComoLlega valor={nota.comoLlegaHoy} onChange={registrarCambio} />
+          <SeccionComoLlega valor={nota.comoLlegaHoy} onChange={registrarCambio} onBlurTexto={flushInmediato} />
         </SeccionAcordeon>
 
         <SeccionAcordeon
@@ -277,6 +437,7 @@ function FormularioNota({
             valor={nota.queEncontraste}
             tipoProcedimientoSeleccionado={nota.detalleProcedimiento?.tipo}
             onChange={registrarCambio}
+            onBlurTexto={flushInmediato}
           />
         </SeccionAcordeon>
 
@@ -309,6 +470,7 @@ function FormularioNota({
             tratamientosSugeridos={tratamientosSugeridos}
             organosPorDefecto={nota.queEncontraste.organosDentales}
             onChange={registrarCambio}
+            onBlurTexto={flushInmediato}
           />
         </SeccionAcordeon>
 
@@ -319,7 +481,7 @@ function FormularioNota({
           activa={seccionActiva === "estado_final"}
           onSeleccionar={irASeccion}
         >
-          <SeccionEstadoFinal valor={nota.estadoFinal} onChange={registrarCambio} />
+          <SeccionEstadoFinal valor={nota.estadoFinal} onChange={registrarCambio} onBlurTexto={flushInmediato} />
         </SeccionAcordeon>
 
         <SeccionAcordeon
@@ -329,7 +491,7 @@ function FormularioNota({
           activa={seccionActiva === "indicaciones"}
           onSeleccionar={irASeccion}
         >
-          <SeccionIndicaciones valor={nota.indicaciones} onChange={registrarCambio} />
+          <SeccionIndicaciones valor={nota.indicaciones} onChange={registrarCambio} onBlurTexto={flushInmediato} />
         </SeccionAcordeon>
       </div>
 
@@ -349,10 +511,30 @@ function FormularioNota({
           </div>
         )}
         {errorFirma && <p className="mb-2 text-xs text-danger">{errorFirma} Tu información sigue protegida — puedes volver a intentar.</p>}
+        {errorGuardado && (
+          <div className="mb-2 flex flex-wrap items-center gap-2 rounded-lg border border-danger/30 bg-danger/10 p-2 text-xs text-danger">
+            <span>{errorGuardado}</span>
+            <button onClick={onGuardarYSalir} disabled={guardando} className="font-semibold underline">
+              Reintentar
+            </button>
+            <button onClick={onGuardado} className="ml-auto font-semibold underline">
+              Salir de todas formas
+            </button>
+          </div>
+        )}
         {!confirmando ? (
-          <button onClick={() => setConfirmando(true)} disabled={faltantes.length > 0} className={`${botonPrimario} w-full`}>
-            Firmar y finalizar nota
-          </button>
+          <div className="flex flex-col gap-2 sm:flex-row">
+            <button onClick={onGuardarYSalir} disabled={guardando} className={`${botonSecundario} sm:w-auto`}>
+              {guardando ? "Guardando…" : "Guardar y continuar después"}
+            </button>
+            <button
+              onClick={() => setConfirmando(true)}
+              disabled={faltantes.length > 0 || !!conflictoRemoto}
+              className={`${botonPrimario} flex-1`}
+            >
+              Firmar y finalizar nota
+            </button>
+          </div>
         ) : (
           <div className="space-y-2">
             <p className="text-xs text-ink/70">

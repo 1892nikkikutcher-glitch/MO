@@ -36,13 +36,32 @@ export const auth = getAuth(app);
  * (ej. modo privado de algunos navegadores, donde IndexedDB puede no estar
  * disponible) para que la app nunca truene por esto, solo pierda el modo
  * sin conexión en ese caso puntual. */
+/** `ignoreUndefinedProperties: true` — el modelo de datos tiene muchos
+ * campos opcionales (`campo?: string`) que en JS, cuando la expresión que
+ * los llena da `undefined` (ej. `cita ? algo : undefined`), quedan como
+ * propiedad presente con valor `undefined` en vez de simplemente ausente.
+ * Firestore rechaza CUALQUIER `undefined` explícito en `setDoc`/`updateDoc`
+ * con el error "Unsupported field value: undefined" — sin este flag, toda
+ * nota de evolución registrada sin una cita asociada (o cualquier otro
+ * documento con un campo opcional así) fallaba al guardar. Es la solución
+ * oficial de Firestore para esto, en vez de perseguir a mano cada campo
+ * opcional de cada tipo. */
 function crearFirestore() {
-  if (typeof window === "undefined") return getFirestore(app);
+  if (typeof window === "undefined") return initializeFirestore(app, { ignoreUndefinedProperties: true });
   try {
     return initializeFirestore(app, {
       localCache: persistentLocalCache({ tabManager: persistentMultipleTabManager() }),
+      ignoreUndefinedProperties: true,
     });
   } catch (err) {
+    // Nunca se vuelve a llamar `initializeFirestore` aquí — si ya se
+    // registró (aunque su configuración de caché haya fallado), una segunda
+    // llamada a `initializeFirestore` para la misma app lanza "Firestore
+    // has already been initialized", un error peor que el que se intenta
+    // evitar. `getFirestore(app)` sí es seguro llamarlo de nuevo. El único
+    // costo de este camino de respaldo (IndexedDB no disponible, ej. modo
+    // privado) es perder también `ignoreUndefinedProperties` en ese caso
+    // puntual — no perder Firestore por completo.
     console.error("No se pudo activar el modo sin conexión de Firestore — la app sigue funcionando, solo sin caché local.", err);
     return getFirestore(app);
   }

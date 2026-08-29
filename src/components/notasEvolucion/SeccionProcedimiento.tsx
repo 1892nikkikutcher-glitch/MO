@@ -14,13 +14,17 @@ export default function SeccionProcedimiento({
   tratamientosSugeridos,
   organosPorDefecto,
   onChange,
+  onBlurTexto,
 }: {
   detalle: DetalleProcedimiento | undefined;
   justificacionSinProcedimiento: string | undefined;
   tratamientosSugeridos: string[];
   organosPorDefecto: number[];
-  onChange: (updater: (prev: NotaEvolucionV2) => NotaEvolucionV2) => void;
+  onChange: (updater: (prev: NotaEvolucionV2) => NotaEvolucionV2, opts?: { inmediato?: boolean }) => void;
+  onBlurTexto?: () => void;
 }) {
+  // Iniciar/quitar un procedimiento es una decisión estructural (§7.2.1) —
+  // se persiste de inmediato.
   function iniciar(nombre?: string) {
     onChange((prev) => ({
       ...prev,
@@ -31,7 +35,7 @@ export default function SeccionProcedimiento({
         actividadRealizada: nombre ?? "",
         organosDentales: organosPorDefecto,
       } satisfies DetalleGenerico,
-    }));
+    }), { inmediato: true });
   }
 
   function set<K extends keyof DetalleGenerico>(key: K, value: DetalleGenerico[K]) {
@@ -46,7 +50,7 @@ export default function SeccionProcedimiento({
   }
 
   function marcarSinProcedimiento() {
-    onChange((prev) => ({ ...prev, detalleProcedimiento: undefined, justificacionSinProcedimiento: prev.justificacionSinProcedimiento ?? "" }));
+    onChange((prev) => ({ ...prev, detalleProcedimiento: undefined, justificacionSinProcedimiento: prev.justificacionSinProcedimiento ?? "" }), { inmediato: true });
   }
 
   if (!detalle) {
@@ -119,7 +123,7 @@ export default function SeccionProcedimiento({
       </div>
       <div>
         <label className={labelClass}>Observaciones (opcional)</label>
-        <textarea className={inputClass} rows={2} value={generico.observaciones ?? ""} onChange={(e) => set("observaciones", e.target.value)} />
+        <textarea className={inputClass} rows={2} value={generico.observaciones ?? ""} onChange={(e) => set("observaciones", e.target.value)} onBlur={onBlurTexto} />
       </div>
       <div>
         <label className={labelClass}>Incidentes durante el procedimiento (opcional)</label>

@@ -20,6 +20,7 @@ export default function NotasEvolucionTab({ patientId, citaId }: { patientId: st
         patientId={patientId}
         citaId={citaId}
         onFirmada={() => setRegistrando(false)}
+        onGuardado={() => setRegistrando(false)}
       />
     );
   }

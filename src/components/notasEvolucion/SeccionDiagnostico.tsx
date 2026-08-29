@@ -21,15 +21,17 @@ export default function SeccionDiagnostico({
   notaId: string;
   valor: DiagnosticoNota;
   organosSugeridos: number[];
-  onChange: (updater: (prev: NotaEvolucionV2) => NotaEvolucionV2) => void;
+  onChange: (updater: (prev: NotaEvolucionV2) => NotaEvolucionV2, opts?: { inmediato?: boolean }) => void;
 }) {
   const { diagnosticosPorPaciente, setDiagnosticosPaciente } = usePatientData();
   const catalogo = diagnosticosPorPaciente[patientId] ?? [];
   const [nuevoTexto, setNuevoTexto] = useState("");
   const [nuevoEstado, setNuevoEstado] = useState<EstadoDiagnostico>("provisional");
 
+  // El diagnóstico es un campo crítico (§7.2.1 del plan) — toda selección
+  // se persiste de inmediato, sin esperar el debounce de texto.
   function setDiagnostico(updater: (prev: DiagnosticoNota) => DiagnosticoNota) {
-    onChange((prev) => ({ ...prev, diagnostico: updater(valor) }));
+    onChange((prev) => ({ ...prev, diagnostico: updater(valor) }), { inmediato: true });
   }
 
   function agregarId(id: string) {

@@ -32,24 +32,26 @@ export default function SeccionQueEncontraste({
   valor,
   tipoProcedimientoSeleccionado,
   onChange,
+  onBlurTexto,
 }: {
   valor: QueEncontraste;
   tipoProcedimientoSeleccionado?: string;
-  onChange: (updater: (prev: NotaEvolucionV2) => NotaEvolucionV2) => void;
+  onChange: (updater: (prev: NotaEvolucionV2) => NotaEvolucionV2, opts?: { inmediato?: boolean }) => void;
+  onBlurTexto?: () => void;
 }) {
   const [mostrarSignosVitales, setMostrarSignosVitales] = useState(!!valor.signosVitales);
 
-  function set<K extends keyof QueEncontraste>(key: K, value: QueEncontraste[K]) {
-    onChange((prev) => ({ ...prev, queEncontraste: { ...valor, [key]: value } }));
+  function set<K extends keyof QueEncontraste>(key: K, value: QueEncontraste[K], opts?: { inmediato?: boolean }) {
+    onChange((prev) => ({ ...prev, queEncontraste: { ...valor, [key]: value } }), opts);
   }
 
   function toggleChip(chip: ChipHallazgo) {
     const chips = valor.chips.includes(chip) ? valor.chips.filter((c) => c !== chip) : [...valor.chips, chip];
-    set("chips", chips);
+    set("chips", chips, { inmediato: true });
   }
 
-  function setDecisionSignosVitales(decision: DecisionSignosVitales) {
-    set("signosVitales", decision);
+  function setDecisionSignosVitales(decision: DecisionSignosVitales, opts?: { inmediato?: boolean }) {
+    set("signosVitales", decision, opts);
   }
 
   function setValorSignoVital(campo: keyof SignosVitales, v: string) {
@@ -71,7 +73,7 @@ export default function SeccionQueEncontraste({
           const organos = valor.organosDentales.includes(t)
             ? valor.organosDentales.filter((o) => o !== t)
             : [...valor.organosDentales, t];
-          set("organosDentales", organos);
+          set("organosDentales", organos, { inmediato: true });
         }} />
       </div>
 
@@ -90,6 +92,7 @@ export default function SeccionQueEncontraste({
           rows={2}
           value={valor.exploracionClinica ?? ""}
           onChange={(e) => set("exploracionClinica", e.target.value)}
+          onBlur={onBlurTexto}
         />
       </div>
 
@@ -119,7 +122,7 @@ export default function SeccionQueEncontraste({
           <div className="mb-2 flex flex-wrap gap-2">
             <button
               type="button"
-              onClick={() => setDecisionSignosVitales({ accion: "registrados_ahora", valores: valor.signosVitales?.valores ?? {} })}
+              onClick={() => setDecisionSignosVitales({ accion: "registrados_ahora", valores: valor.signosVitales?.valores ?? {} }, { inmediato: true })}
               className={`rounded-full border px-3 py-1 text-xs font-medium ${
                 valor.signosVitales?.accion === "registrados_ahora" ? "border-accent/60 bg-accent/15 text-accent" : "border-edge/15 text-ink/60"
               }`}
@@ -128,7 +131,7 @@ export default function SeccionQueEncontraste({
             </button>
             <button
               type="button"
-              onClick={() => setDecisionSignosVitales({ accion: "reutilizados_recientes" })}
+              onClick={() => setDecisionSignosVitales({ accion: "reutilizados_recientes" }, { inmediato: true })}
               className={`rounded-full border px-3 py-1 text-xs font-medium ${
                 valor.signosVitales?.accion === "reutilizados_recientes" ? "border-accent/60 bg-accent/15 text-accent" : "border-edge/15 text-ink/60"
               }`}
@@ -137,7 +140,7 @@ export default function SeccionQueEncontraste({
             </button>
             <button
               type="button"
-              onClick={() => setDecisionSignosVitales({ accion: "no_necesario" })}
+              onClick={() => setDecisionSignosVitales({ accion: "no_necesario" }, { inmediato: true })}
               className={`rounded-full border px-3 py-1 text-xs font-medium ${
                 valor.signosVitales?.accion === "no_necesario" ? "border-accent/60 bg-accent/15 text-accent" : "border-edge/15 text-ink/60"
               }`}

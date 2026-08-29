@@ -19,15 +19,21 @@ const etiquetas: Record<ChipLlegada, string> = {
 export default function SeccionComoLlega({
   valor,
   onChange,
+  onBlurTexto,
 }: {
   valor: ComoLlegaHoy;
-  onChange: (updater: (prev: NotaEvolucionV2) => NotaEvolucionV2) => void;
+  onChange: (updater: (prev: NotaEvolucionV2) => NotaEvolucionV2, opts?: { inmediato?: boolean }) => void;
+  /** Fuerza la escritura local de inmediato al salir de un campo de texto
+   * libre — ver §7.2.1 del plan (persistencia continua + flush best-effort
+   * al perder el foco, nunca dependiente de eventos de cierre de página). */
+  onBlurTexto?: () => void;
 }) {
   function toggleChip(chip: ChipLlegada) {
+    // Selección estructurada (clic, no tecleo) — persistencia inmediata.
     onChange((prev) => {
       const chips = valor.chips.includes(chip) ? valor.chips.filter((c) => c !== chip) : [...valor.chips, chip];
       return { ...prev, comoLlegaHoy: { ...valor, chips } };
-    });
+    }, { inmediato: true });
   }
 
   function set<K extends keyof ComoLlegaHoy>(key: K, value: ComoLlegaHoy[K]) {
@@ -87,6 +93,7 @@ export default function SeccionComoLlega({
           rows={2}
           value={valor.textoLibre ?? ""}
           onChange={(e) => set("textoLibre", e.target.value)}
+          onBlur={onBlurTexto}
         />
       </div>
     </div>

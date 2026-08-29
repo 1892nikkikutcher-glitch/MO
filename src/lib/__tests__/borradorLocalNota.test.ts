@@ -25,6 +25,7 @@ function registro(clinicUid: string, patientId: string, notaId: string, citaId?:
       modoCaptura: "rapido",
       ultimoCambioLocalEn: new Date().toISOString(),
       pendienteSincronizar: true,
+      sincronizacion: { revisionLocal: nota.revision, ultimaRevisionSincronizada: 0 },
     },
   };
 }

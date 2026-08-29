@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   esNotaV2,
   estadoSeccion,
+  normalizarRevision,
   notaEvolucionV2Inicial,
   obtenerFaltantesNota,
   recomendacionSignosVitales,
@@ -55,6 +56,27 @@ describe("notaEvolucionV2Inicial", () => {
     const a = notaEvolucionV2Inicial(encabezado, "rapido", "uid-1");
     const b = notaEvolucionV2Inicial(encabezado, "rapido", "uid-1");
     expect(a.id).not.toBe(b.id);
+  });
+
+  it("nace en revisión 1 — la base para la detección de conflictos", () => {
+    const nota = notaEvolucionV2Inicial(encabezado, "rapido", "uid-1");
+    expect(nota.revision).toBe(1);
+  });
+});
+
+describe("normalizarRevision", () => {
+  it("deja intacta una nota que ya tiene revision", () => {
+    const nota = { ...notaEvolucionV2Inicial(encabezado, "rapido", "uid-1"), revision: 8 };
+    expect(normalizarRevision(nota).revision).toBe(8);
+  });
+
+  it("una nota v2 creada antes de este campo (revision ausente) se normaliza a 1, nunca a 0", () => {
+    const nota = notaEvolucionV2Inicial(encabezado, "rapido", "uid-1");
+    // Simula un documento real de producción escrito antes de esta corrección.
+    const legacy = { ...nota } as NotaEvolucionV2;
+    // @ts-expect-error -- se borra a propósito para simular el documento legado.
+    delete legacy.revision;
+    expect(normalizarRevision(legacy).revision).toBe(1);
   });
 });
 

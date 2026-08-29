@@ -20,28 +20,33 @@ const etiquetas: Record<ChipEstadoFinal, string> = {
 export default function SeccionEstadoFinal({
   valor,
   onChange,
+  onBlurTexto,
 }: {
   valor: EstadoFinalNota | undefined;
-  onChange: (updater: (prev: NotaEvolucionV2) => NotaEvolucionV2) => void;
+  onChange: (updater: (prev: NotaEvolucionV2) => NotaEvolucionV2, opts?: { inmediato?: boolean }) => void;
+  onBlurTexto?: () => void;
 }) {
   const actual: EstadoFinalNota = valor ?? { chips: [] };
 
-  function setEstado(updater: (prev: EstadoFinalNota) => EstadoFinalNota) {
-    onChange((prev) => ({ ...prev, estadoFinal: updater(actual) }));
+  function setEstado(updater: (prev: EstadoFinalNota) => EstadoFinalNota, opts?: { inmediato?: boolean }) {
+    onChange((prev) => ({ ...prev, estadoFinal: updater(actual) }), opts);
   }
 
   function toggleChip(chip: ChipEstadoFinal) {
     setEstado((prev) => {
       const chips = prev.chips.includes(chip) ? prev.chips.filter((c) => c !== chip) : [...prev.chips, chip];
       return { ...prev, chips };
-    });
+    }, { inmediato: true });
   }
 
+  // El detalle de un incidente es uno de los campos críticos explícitos del
+  // plan (§7.2.1) — dado su peso clínico/legal, se persiste de inmediato en
+  // vez de esperar el debounce de texto libre.
   function setIncidente<K extends keyof NonNullable<EstadoFinalNota["incidente"]>>(campo: K, valor2: string) {
     setEstado((prev) => ({
       ...prev,
       incidente: { queOcurrio: "", comoSeAtendio: "", estadoFinalPaciente: "", seguimientoRequerido: "", ...prev.incidente, [campo]: valor2 },
-    }));
+    }), { inmediato: true });
   }
 
   return (
@@ -83,6 +88,7 @@ export default function SeccionEstadoFinal({
           rows={2}
           value={actual.textoLibre ?? ""}
           onChange={(e) => setEstado((prev) => ({ ...prev, textoLibre: e.target.value }))}
+          onBlur={onBlurTexto}
         />
       </div>
     </div>

@@ -21,30 +21,37 @@ function medicamentoVacio(): MedicamentoNota {
 export default function SeccionIndicaciones({
   valor,
   onChange,
+  onBlurTexto,
 }: {
   valor: IndicacionesSiguientePaso | undefined;
-  onChange: (updater: (prev: NotaEvolucionV2) => NotaEvolucionV2) => void;
+  onChange: (updater: (prev: NotaEvolucionV2) => NotaEvolucionV2, opts?: { inmediato?: boolean }) => void;
+  onBlurTexto?: () => void;
 }) {
   const { catalogoMedicamentos } = usePatientData();
   const actual: IndicacionesSiguientePaso = valor ?? { medicamentos: [] };
 
-  function set<K extends keyof IndicacionesSiguientePaso>(key: K, v: IndicacionesSiguientePaso[K]) {
-    onChange((prev) => ({ ...prev, indicaciones: { ...actual, [key]: v } }));
+  function set<K extends keyof IndicacionesSiguientePaso>(key: K, v: IndicacionesSiguientePaso[K], opts?: { inmediato?: boolean }) {
+    onChange((prev) => ({ ...prev, indicaciones: { ...actual, [key]: v } }), opts);
   }
 
+  // Medicamento es uno de los campos críticos explícitos del plan (§7.2.1)
+  // — se persiste de inmediato en TODOS sus subcampos, incluidos los de
+  // texto corto (dosis/vía/frecuencia): el riesgo clínico de perder un dato
+  // de medicación justifica la excepción a "texto → debounce".
   function agregarMedicamento() {
-    set("medicamentos", [...actual.medicamentos, medicamentoVacio()]);
+    set("medicamentos", [...actual.medicamentos, medicamentoVacio()], { inmediato: true });
   }
 
   function actualizarMedicamento(id: string, cambios: Partial<MedicamentoNota>) {
     set(
       "medicamentos",
-      actual.medicamentos.map((m) => (m.id === id ? { ...m, ...cambios } : m))
+      actual.medicamentos.map((m) => (m.id === id ? { ...m, ...cambios } : m)),
+      { inmediato: true }
     );
   }
 
   function quitarMedicamento(id: string) {
-    set("medicamentos", actual.medicamentos.filter((m) => m.id !== id));
+    set("medicamentos", actual.medicamentos.filter((m) => m.id !== id), { inmediato: true });
   }
 
   function elegirDelCatalogo(id: string, medicamentoCatalogoId: string) {
@@ -65,12 +72,12 @@ export default function SeccionIndicaciones({
     <div className="space-y-4">
       <div>
         <label className={labelClass}>Indicaciones posoperatorias</label>
-        <textarea className={inputClass} rows={2} value={actual.indicacionesPosoperatorias ?? ""} onChange={(e) => set("indicacionesPosoperatorias", e.target.value)} />
+        <textarea className={inputClass} rows={2} value={actual.indicacionesPosoperatorias ?? ""} onChange={(e) => set("indicacionesPosoperatorias", e.target.value)} onBlur={onBlurTexto} />
         <label className="mt-1.5 flex items-center gap-2 text-xs text-ink/60">
           <input
             type="checkbox"
             checked={!!actual.indicacionesNoNecesarias}
-            onChange={(e) => set("indicacionesNoNecesarias", e.target.checked)}
+            onChange={(e) => set("indicacionesNoNecesarias", e.target.checked, { inmediato: true })}
           />
           No fueron necesarias indicaciones adicionales
         </label>
@@ -78,7 +85,7 @@ export default function SeccionIndicaciones({
 
       <div>
         <label className={labelClass}>Signos de alarma explicados (opcional)</label>
-        <textarea className={inputClass} rows={2} value={actual.signosAlarmaExplicados ?? ""} onChange={(e) => set("signosAlarmaExplicados", e.target.value)} />
+        <textarea className={inputClass} rows={2} value={actual.signosAlarmaExplicados ?? ""} onChange={(e) => set("signosAlarmaExplicados", e.target.value)} onBlur={onBlurTexto} />
       </div>
 
       <div>
@@ -125,7 +132,7 @@ export default function SeccionIndicaciones({
             <button
               key={p.valor}
               type="button"
-              onClick={() => set("pronostico", p.valor)}
+              onClick={() => set("pronostico", p.valor, { inmediato: true })}
               className={actual.pronostico === p.valor ? botonPrimario : botonSecundario}
             >
               {p.etiqueta}
@@ -154,7 +161,7 @@ export default function SeccionIndicaciones({
       </div>
 
       <label className="flex items-center gap-2 text-sm text-ink/70">
-        <input type="checkbox" checked={!!actual.necesitaInterconsulta} onChange={(e) => set("necesitaInterconsulta", e.target.checked)} />
+        <input type="checkbox" checked={!!actual.necesitaInterconsulta} onChange={(e) => set("necesitaInterconsulta", e.target.checked, { inmediato: true })} />
         Necesita interconsulta o referencia
       </label>
       {actual.necesitaInterconsulta && (

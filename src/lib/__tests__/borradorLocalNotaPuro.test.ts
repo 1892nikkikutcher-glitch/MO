@@ -61,19 +61,30 @@ describe("calcularEstadoGuardado", () => {
 
 describe("detectarConflictoBorrador", () => {
   it("sin conflicto cuando Firestore no ha avanzado más allá de lo que el local ya sincronizó", () => {
-    const resultado = detectarConflictoBorrador(
-      { actualizadoEnBaseLocal: "2026-08-27T10:00:00.000Z" },
-      { actualizadoEn: "2026-08-27T10:00:00.000Z" }
-    );
+    const resultado = detectarConflictoBorrador({ ultimaRevisionSincronizada: 5 }, { revision: 5 });
+    expect(resultado.hayConflicto).toBe(false);
+  });
+
+  it("sin conflicto cuando el local está adelantado y Firestore sigue en la última revisión que este dispositivo sincronizó (flujo normal)", () => {
+    // Ejemplo del plan: revisionLocal=7, ultimaRevisionSincronizada=5, Firestore en 5 -> se sincroniza y pasa a 7.
+    const resultado = detectarConflictoBorrador({ ultimaRevisionSincronizada: 5 }, { revision: 5 });
     expect(resultado.hayConflicto).toBe(false);
   });
 
   it("detecta conflicto real cuando Firestore avanzó por una escritura que el local no hizo", () => {
-    const resultado = detectarConflictoBorrador(
-      { actualizadoEnBaseLocal: "2026-08-27T10:00:00.000Z" },
-      { actualizadoEn: "2026-08-27T12:00:00.000Z" }
-    );
+    const resultado = detectarConflictoBorrador({ ultimaRevisionSincronizada: 5 }, { revision: 6 });
     expect(resultado.hayConflicto).toBe(true);
     expect(resultado.motivo).toBeTruthy();
+  });
+
+  it("es conflicto incluso si la revisión local es mayor que la remota — lo que importa es lo último sincronizado, no quién tiene el número más alto", () => {
+    // Ejemplo del plan: revisionLocal=7, ultimaRevisionSincronizada=5, Firestore en 6 -> SÍ es conflicto aunque 7 > 6.
+    const resultado = detectarConflictoBorrador({ ultimaRevisionSincronizada: 5 }, { revision: 6 });
+    expect(resultado.hayConflicto).toBe(true);
+  });
+
+  it("nunca depende de timestamps — dos revisiones remotas idénticas nunca son conflicto sin importar cuándo se escribieron", () => {
+    const resultado = detectarConflictoBorrador({ ultimaRevisionSincronizada: 12 }, { revision: 12 });
+    expect(resultado.hayConflicto).toBe(false);
   });
 });
