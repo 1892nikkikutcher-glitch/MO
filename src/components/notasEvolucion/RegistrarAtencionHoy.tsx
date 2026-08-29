@@ -10,6 +10,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { usePatientData } from "@/context/PatientDataContext";
+import type { Recurso } from "@/lib/patientData";
 import { buscarBorradorLocalPorCita, buscarBorradorLocalPorPaciente } from "@/lib/borradorLocalNota";
 import { detectarConflictoBorrador, type RegistroBorradorLocal } from "@/lib/borradorLocalNotaPuro";
 import {
@@ -74,16 +75,44 @@ export default function RegistrarAtencionHoy({
   const [forzarNueva, setForzarNueva] = useState(false);
 
   const paciente = patients.find((p) => p.id === patientId);
-  const medico = recursos.find((r) => r.tipo === "medico")?.nombre ?? "";
+  const medicos = useMemo(() => recursos.filter((r) => r.tipo === "medico"), [recursos]);
   const cita = citaId ? citas.find((c) => c.id === citaId) : undefined;
+
+  // Sugerencia inicial de "quién atiende" — nunca un valor fijo de perfil:
+  // prioriza el médico de LA cita de esta nota (si viene de Agenda), luego
+  // el de la cita más cercana del paciente, y solo al final el primer
+  // médico dado de alta. Siempre editable después desde el encabezado de
+  // la nota (ver el <select> en FormularioNota) — esto es solo el punto de
+  // partida.
+  const medico = useMemo(() => {
+    if (cita?.medicoId) {
+      const nombre = recursos.find((r) => r.id === cita.medicoId)?.nombre;
+      if (nombre) return nombre;
+    }
+    const hoyISO = new Date().toISOString().slice(0, 10);
+    const citasPaciente = citas.filter((c) => c.patientId === patientId && c.estatus !== "Cancelada");
+    const proxima = citasPaciente
+      .filter((c) => c.fecha >= hoyISO)
+      .sort((a, b) => a.fecha.localeCompare(b.fecha) || a.horaInicio.localeCompare(b.horaInicio))[0];
+    const pasada = citasPaciente.filter((c) => c.fecha < hoyISO).sort((a, b) => b.fecha.localeCompare(a.fecha))[0];
+    const citaRelevante = proxima ?? pasada;
+    const nombreSugerido = citaRelevante?.medicoId ? recursos.find((r) => r.id === citaRelevante.medicoId)?.nombre : undefined;
+    return nombreSugerido || medicos[0]?.nombre || "";
+  }, [cita, citas, recursos, patientId, medicos]);
 
   const encabezado: EncabezadoNota = useMemo(
     () => ({
       patientId,
       pacienteNombreSnapshot: paciente?.name ?? "",
       citaId: citaId ?? null,
-      motivoAgendadoSnapshot: cita ? [cita.tratamientos.join(", "), cita.comentarios].filter(Boolean).join(" — ") : undefined,
-      clinicaNombreSnapshot: clinicInfo?.nombre,
+      // Nunca `undefined` explícito aquí — Firestore rechaza ese valor en
+      // setDoc ("Unsupported field value: undefined"). No depende de la
+      // opción `ignoreUndefinedProperties` del cliente de Firestore (que en
+      // la práctica puede no estar activa si ese Firestore cayó a su
+      // configuración de respaldo, ver firebase.ts) — el campo simplemente
+      // nunca toma ese valor.
+      motivoAgendadoSnapshot: cita ? [cita.tratamientos.join(", "), cita.comentarios].filter(Boolean).join(" — ") : "",
+      clinicaNombreSnapshot: clinicInfo?.nombre ?? "",
       medico,
       organosDentales: [],
     }),
@@ -282,6 +311,7 @@ export default function RegistrarAtencionHoy({
       notaInicial={arranqueNota.nota}
       arranqueSincronizacion={arranqueNota.sincronizacion}
       tratamientosSugeridos={cita?.tratamientos ?? []}
+      medicos={medicos}
       onFirmada={onFirmada}
       onGuardado={onGuardado}
     />
@@ -306,6 +336,7 @@ function FormularioNota({
   notaInicial,
   arranqueSincronizacion,
   tratamientosSugeridos,
+  medicos,
   onFirmada,
   onGuardado,
 }: {
@@ -314,6 +345,7 @@ function FormularioNota({
   notaInicial: NotaEvolucionV2;
   arranqueSincronizacion: EstadoSincronizacionInicial;
   tratamientosSugeridos: string[];
+  medicos: Recurso[];
   onFirmada: (notaId: string) => void;
   onGuardado: () => void;
 }) {
@@ -341,6 +373,14 @@ function FormularioNota({
   const [errorConflicto, setErrorConflicto] = useState<string | null>(null);
 
   const faltantes = obtenerFaltantesNota(nota);
+
+  // El médico que atiende SIEMPRE queda editable — el valor inicial es solo
+  // una sugerencia (ver el cálculo en RegistrarAtencionHoy), nunca un dato
+  // fijo. Es una selección estructurada (§7.2.1 del plan) — se persiste de
+  // inmediato.
+  function cambiarMedico(nombre: string) {
+    registrarCambio((prev) => ({ ...prev, encabezado: { ...prev.encabezado, medico: nombre } }), { inmediato: true });
+  }
 
   async function onFirmar() {
     setErrorFirma(null);
@@ -385,6 +425,34 @@ function FormularioNota({
           {nota.encabezado.motivoAgendadoSnapshot && <span> · {nota.encabezado.motivoAgendadoSnapshot}</span>}
         </div>
         <EstadoGuardadoIndicador estado={estadoGuardado} onReintentar={reintentarSincronizacion} />
+      </div>
+
+      <div className="flex items-center gap-2 text-sm">
+        <label className="text-ink/50">Atiende:</label>
+        {medicos.length > 0 ? (
+          <select
+            value={nota.encabezado.medico}
+            onChange={(e) => cambiarMedico(e.target.value)}
+            className="rounded-lg border border-edge/10 bg-field px-2 py-1 text-sm text-ink outline-none focus:border-accent/60"
+          >
+            {!medicos.some((m) => m.nombre === nota.encabezado.medico) && nota.encabezado.medico && (
+              <option value={nota.encabezado.medico}>{nota.encabezado.medico}</option>
+            )}
+            {!nota.encabezado.medico && <option value="">Sin asignar</option>}
+            {medicos.map((m) => (
+              <option key={m.id} value={m.nombre}>
+                {m.nombre}
+              </option>
+            ))}
+          </select>
+        ) : (
+          <input
+            value={nota.encabezado.medico}
+            onChange={(e) => cambiarMedico(e.target.value)}
+            placeholder="Nombre de quien atiende"
+            className="rounded-lg border border-edge/10 bg-field px-2 py-1 text-sm text-ink outline-none focus:border-accent/60"
+          />
+        )}
       </div>
 
       {conflictoRemoto && (

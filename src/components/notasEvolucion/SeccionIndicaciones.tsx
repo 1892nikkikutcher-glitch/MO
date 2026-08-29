@@ -57,14 +57,21 @@ export default function SeccionIndicaciones({
   function elegirDelCatalogo(id: string, medicamentoCatalogoId: string) {
     const cat = catalogoMedicamentos.find((c) => c.id === medicamentoCatalogoId);
     if (!cat) return actualizarMedicamento(id, { medicamentoCatalogoId: "" });
+    // Nunca `undefined` aquí — este objeto vive dentro de un ARRAY
+    // (`indicaciones.medicamentos`), y Firestore no soporta `undefined`
+    // dentro de arrays aunque `ignoreUndefinedProperties` esté activo (esa
+    // opción solo limpia propiedades undefined en objetos planos, no las de
+    // objetos anidados en un array) — un medicamento del catálogo con
+    // `presentacion`/`periodo`/etc. vacíos volvía a producir el mismo error
+    // "Unsupported field value: undefined" al guardar.
     actualizarMedicamento(id, {
       medicamentoCatalogoId,
       principioActivo: cat.principioActivo || cat.nombre,
-      presentacion: cat.presentacion,
+      presentacion: cat.presentacion ?? "",
       dosis: cat.dosisFrecuencia ?? "",
       frecuencia: cat.dosisFrecuencia ?? "",
-      duracion: cat.periodo,
-      advertenciasOEfectosAdversos: cat.advertenciasOEfectosAdversos,
+      duracion: cat.periodo ?? "",
+      advertenciasOEfectosAdversos: cat.advertenciasOEfectosAdversos ?? "",
     });
   }
 

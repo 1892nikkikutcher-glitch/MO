@@ -54,16 +54,23 @@ function crearFirestore() {
       ignoreUndefinedProperties: true,
     });
   } catch (err) {
-    // Nunca se vuelve a llamar `initializeFirestore` aquí — si ya se
-    // registró (aunque su configuración de caché haya fallado), una segunda
-    // llamada a `initializeFirestore` para la misma app lanza "Firestore
-    // has already been initialized", un error peor que el que se intenta
-    // evitar. `getFirestore(app)` sí es seguro llamarlo de nuevo. El único
-    // costo de este camino de respaldo (IndexedDB no disponible, ej. modo
-    // privado) es perder también `ignoreUndefinedProperties` en ese caso
-    // puntual — no perder Firestore por completo.
-    console.error("No se pudo activar el modo sin conexión de Firestore — la app sigue funcionando, solo sin caché local.", err);
-    return getFirestore(app);
+    console.error("No se pudo activar el modo sin conexión de Firestore — se reintenta sin caché local.", err);
+    // `ignoreUndefinedProperties` es la protección real contra "Unsupported
+    // field value: undefined" al guardar — no debe perderse solo porque la
+    // caché persistente (IndexedDB) falló. Se reintenta SIN esa caché pero
+    // CON el flag. Si el primer intento no llegó a registrar nada (el caso
+    // típico de este catch), este segundo intento es seguro.
+    try {
+      return initializeFirestore(app, { ignoreUndefinedProperties: true });
+    } catch (err2) {
+      // Si esto también falla, es casi seguro porque el primer intento SÍ
+      // alcanzó a registrarse pese al error ("Firestore has already been
+      // initialized") — en ese caso `getFirestore(app)` devuelve esa misma
+      // instancia ya registrada, que de cualquier forma se intentó crear
+      // con `ignoreUndefinedProperties: true` desde el primer intento.
+      console.error("Tampoco se pudo inicializar Firestore sin caché — se usa la instancia por defecto.", err2);
+      return getFirestore(app);
+    }
   }
 }
 
