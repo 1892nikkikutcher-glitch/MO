@@ -459,6 +459,45 @@ function OdontogramaDiagnostico({
   );
 }
 
+/** Convierte el valor separado por comas en la lista de términos ya
+ * elegidos, y agrega/quita `termino` al hacer clic en su chip — el campo
+ * sigue siendo texto libre (se puede escribir cualquier otra cosa además),
+ * esto solo agiliza capturar los hallazgos más comunes de ese campo. */
+function alternarSugerencia(valorActual: string, termino: string): string {
+  const partes = valorActual
+    .split(",")
+    .map((p) => p.trim())
+    .filter(Boolean);
+  const yaEsta = partes.some((p) => p.toLowerCase() === termino.toLowerCase());
+  const siguientes = yaEsta ? partes.filter((p) => p.toLowerCase() !== termino.toLowerCase()) : [...partes, termino];
+  return siguientes.join(", ");
+}
+
+function ChipsSugerencia({ valor, sugerencias, onChange }: { valor: string; sugerencias: string[]; onChange: (v: string) => void }) {
+  const seleccionados = valor
+    .split(",")
+    .map((p) => p.trim().toLowerCase())
+    .filter(Boolean);
+  return (
+    <div className="mt-1.5 flex flex-wrap gap-1.5">
+      {sugerencias.map((s) => (
+        <button
+          key={s}
+          type="button"
+          onClick={() => onChange(alternarSugerencia(valor, s))}
+          className={`rounded-full border px-2.5 py-0.5 text-[11px] font-medium transition-colors ${
+            seleccionados.includes(s.toLowerCase())
+              ? "border-accent bg-accent/15 text-accent"
+              : "border-edge/15 bg-field text-ink/60 hover:border-accent/40 hover:text-ink"
+          }`}
+        >
+          {s}
+        </button>
+      ))}
+    </div>
+  );
+}
+
 function PreguntaRenderer({
   pregunta,
   valor,
@@ -487,30 +526,38 @@ function PreguntaRenderer({
     );
   }
   if (pregunta.tipo === "texto") {
+    const texto = (valor as string) ?? "";
     return (
       <div>
         <label className="mb-1 block text-xs font-medium text-ink/60">{pregunta.etiqueta}</label>
         <input
           type="text"
-          value={(valor as string) ?? ""}
+          value={texto}
           placeholder={pregunta.placeholder}
           onChange={(e) => onChange(e.target.value)}
           className={inputClass}
         />
+        {pregunta.sugerencias && pregunta.sugerencias.length > 0 && (
+          <ChipsSugerencia valor={texto} sugerencias={pregunta.sugerencias} onChange={onChange} />
+        )}
       </div>
     );
   }
   if (pregunta.tipo === "textarea") {
+    const texto = (valor as string) ?? "";
     return (
       <div>
         <label className="mb-1 block text-xs font-medium text-ink/60">{pregunta.etiqueta}</label>
         <textarea
-          value={(valor as string) ?? ""}
+          value={texto}
           placeholder={pregunta.placeholder}
           onChange={(e) => onChange(e.target.value)}
           rows={3}
           className={`${inputClass} resize-none`}
         />
+        {pregunta.sugerencias && pregunta.sugerencias.length > 0 && (
+          <ChipsSugerencia valor={texto} sugerencias={pregunta.sugerencias} onChange={onChange} />
+        )}
       </div>
     );
   }

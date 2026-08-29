@@ -44,6 +44,12 @@ export type PreguntaTemplate = {
   opciones?: string[];
   /** Solo para tipo "texto": ej. "Ej. 120/80". */
   placeholder?: string;
+  /** Solo para tipo "texto"/"textarea" — hallazgos comunes de este campo,
+   * mostrados como chips debajo del campo; al hacer clic se agregan (o
+   * quitan, si ya estaban) al valor, separados por comas. Son solo una
+   * sugerencia para agilizar la captura — el campo sigue siendo texto
+   * libre, se puede escribir cualquier cosa además de estos. */
+  sugerencias?: string[];
 };
 
 export type SeccionTemplate = {
@@ -154,11 +160,36 @@ export const plantillaInicial: HistoriaClinicaTemplate = {
       id: id("sec"),
       titulo: "Examen Clínico Estomatológico — Tejidos",
       preguntas: [
-        { id: id("p"), tipo: "texto", etiqueta: "Labios" },
-        { id: id("p"), tipo: "texto", etiqueta: "Lengua" },
-        { id: id("p"), tipo: "texto", etiqueta: "Región vestibular" },
-        { id: id("p"), tipo: "texto", etiqueta: "Tejidos blandos" },
-        { id: id("p"), tipo: "texto", etiqueta: "Tejidos duros" },
+        {
+          id: id("p"),
+          tipo: "texto",
+          etiqueta: "Labios",
+          sugerencias: ["Sin alteraciones", "Hipohidróticos", "Resecos", "Fisurados", "Queilitis angular", "Herpes labial", "Con lesión"],
+        },
+        {
+          id: id("p"),
+          tipo: "texto",
+          etiqueta: "Lengua",
+          sugerencias: ["Normal", "Saburral", "Geográfica", "Fisurada", "Atrófica", "Macroglosia", "Con lesión"],
+        },
+        {
+          id: id("p"),
+          tipo: "texto",
+          etiqueta: "Región vestibular",
+          sugerencias: ["Sin alteraciones", "Frenillo corto", "Línea alba", "Hiperplasia", "Fístula", "Con lesión"],
+        },
+        {
+          id: id("p"),
+          tipo: "texto",
+          etiqueta: "Tejidos blandos",
+          sugerencias: ["Sin alteraciones", "Gingivitis", "Hiperplasia gingival", "Pulpitis", "Absceso", "Úlcera", "Fístula"],
+        },
+        {
+          id: id("p"),
+          tipo: "texto",
+          etiqueta: "Tejidos duros",
+          sugerencias: ["Sin alteraciones", "Caries", "Fractura dental", "Desgaste oclusal", "Hipoplasia del esmalte", "Movilidad dentaria"],
+        },
       ],
     },
     {
