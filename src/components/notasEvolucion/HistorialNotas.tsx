@@ -8,6 +8,8 @@
 
 import { usePatientData } from "@/context/PatientDataContext";
 import { esNotaV2, type NotaEvolucionAny, type NotaEvolucionV2 } from "@/lib/notasEvolucion";
+import { generarNarrativa } from "@/lib/notaNarrativa";
+import type { DiagnosticoPaciente } from "@/lib/notasEvolucion";
 import type { NotaEvolucion } from "@/lib/patientData";
 
 const psoapCampos = [
@@ -44,12 +46,20 @@ function TarjetaBorrador({ nota, onContinuar }: { nota: NotaEvolucionV2; onConti
   );
 }
 
-function TarjetaFirmadaV2({ nota }: { nota: NotaEvolucionV2 }) {
+function TarjetaFirmadaV2({ nota, diagnosticosCatalogo }: { nota: NotaEvolucionV2; diagnosticosCatalogo: DiagnosticoPaciente[] }) {
+  // Notas firmadas ANTES de que la generación de narrativa se activara al
+  // firmar se quedaron con `narrativa.texto` vacío — en vez de mostrar una
+  // tarjeta ilegible (solo fecha/médico/estatus), se calcula la narrativa
+  // al vuelo para mostrarla (nunca se persiste ni se reescribe la nota
+  // firmada — sería tocar un documento inmutable). Notas nuevas ya traen
+  // la narrativa guardada de fábrica.
+  const narrativaTexto = nota.narrativa.texto || generarNarrativa(nota, { diagnosticosCatalogo });
+  const organosDentales = nota.detalleProcedimiento?.organosDentales ?? nota.encabezado.organosDentales;
   return (
     <div className="rounded-2xl border border-edge/10 bg-surface p-4">
       <div className="flex flex-wrap items-center justify-between gap-2 text-xs text-ink/40">
         <span>
-          <span className="font-medium text-ink/70">{new Date(nota.creadoEn).toLocaleDateString("es-MX")}</span> · {nota.encabezado.medico}
+          <span className="font-medium text-ink/70">{new Date(nota.creadoEn).toLocaleDateString("es-MX")}</span> · {nota.encabezado.medico || "Sin médico registrado"}
         </span>
         <span className={`rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase ${estadoBadge[nota.estado].clase}`}>
           {nota.estado === "con_aclaracion" ? "Con aclaración" : "Firmada"}
@@ -58,10 +68,14 @@ function TarjetaFirmadaV2({ nota }: { nota: NotaEvolucionV2 }) {
       {nota.detalleProcedimiento?.actividadRealizada && (
         <p className="mt-2 text-sm font-medium text-ink">
           {nota.detalleProcedimiento.actividadRealizada}
-          {nota.encabezado.organosDentales.length > 0 && ` · OD ${nota.encabezado.organosDentales.join(", ")}`}
+          {organosDentales.length > 0 && ` · OD ${organosDentales.join(", ")}`}
         </p>
       )}
-      {nota.narrativa.texto && <p className="mt-1 whitespace-pre-line text-sm text-ink/70">{nota.narrativa.texto}</p>}
+      {narrativaTexto ? (
+        <p className="mt-1 whitespace-pre-line text-sm text-ink/70">{narrativaTexto}</p>
+      ) : (
+        <p className="mt-1 text-sm italic text-ink/40">Esta nota no tiene contenido adicional capturado.</p>
+      )}
       {nota.aclaraciones.length > 0 && (
         <div className="mt-3 space-y-2 border-t border-edge/10 pt-2">
           {nota.aclaraciones.map((a) => (
@@ -104,8 +118,9 @@ function TarjetaV1({ nota }: { nota: NotaEvolucion }) {
 }
 
 export default function HistorialNotas({ patientId, onContinuarBorrador }: { patientId: string; onContinuarBorrador: (notaId: string) => void }) {
-  const { notasEvolucionPorPaciente } = usePatientData();
+  const { notasEvolucionPorPaciente, diagnosticosPorPaciente } = usePatientData();
   const notas = notasEvolucionPorPaciente[patientId] ?? [];
+  const diagnosticosCatalogo = diagnosticosPorPaciente[patientId] ?? [];
 
   const borradores = notas.filter((n): n is NotaEvolucionV2 => esNotaV2(n) && (n.estado === "borrador" || n.estado === "lista_revision"));
   const firmadasV2 = notas
@@ -134,7 +149,7 @@ export default function HistorialNotas({ patientId, onContinuarBorrador }: { pat
         {borradores.length > 0 && <h3 className="mb-3 text-xs font-semibold uppercase tracking-wide text-ink/50">Historial</h3>}
         <div className="space-y-3">
           {firmadasV2.map((n) => (
-            <TarjetaFirmadaV2 key={n.id} nota={n} />
+            <TarjetaFirmadaV2 key={n.id} nota={n} diagnosticosCatalogo={diagnosticosCatalogo} />
           ))}
           {notasV1.map((n) => (
             <TarjetaV1 key={n.id} nota={n} />

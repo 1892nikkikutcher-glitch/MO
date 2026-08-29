@@ -23,6 +23,7 @@ import {
 import { calcularEstadoGuardado, claveLocalBorrador, type EstadoGuardado, type MetadataLocalBorrador } from "@/lib/borradorLocalNotaPuro";
 import { detectarConflictoBorrador } from "@/lib/borradorLocalNotaPuro";
 import { idNota, normalizarRevision, type ModoCaptura, type NotaEvolucionV2, type SeccionNota } from "@/lib/notasEvolucion";
+import { generarNarrativa } from "@/lib/notaNarrativa";
 
 const DEBOUNCE_LOCAL_MS = 250;
 const DEBOUNCE_REMOTO_MS = 1800;
@@ -41,8 +42,14 @@ export function useAutoguardadoNota(
   notaInicial: NotaEvolucionV2,
   arranqueSincronizacion: EstadoSincronizacionInicial = { existeEnFirestore: false, ultimaRevisionSincronizada: 0 }
 ) {
-  const { clinicUid, crearBorradorNota, guardarBorradorNota: guardarBorradorRemoto, firmarNota: firmarNotaRemoto, notasEvolucionPorPaciente } =
-    usePatientData();
+  const {
+    clinicUid,
+    crearBorradorNota,
+    guardarBorradorNota: guardarBorradorRemoto,
+    firmarNota: firmarNotaRemoto,
+    notasEvolucionPorPaciente,
+    diagnosticosPorPaciente,
+  } = usePatientData();
 
   const [nota, setNotaState] = useState<NotaEvolucionV2>(() => normalizarRevision(notaInicial));
   const [seccionActiva, setSeccionActiva] = useState<SeccionNota>("como_llega");
@@ -321,6 +328,19 @@ export function useAutoguardadoNota(
       if (conflictoRemotoRef.current) {
         return { ok: false, error: "Hay cambios realizados desde otra sesión sin resolver." };
       }
+      // Genera la narrativa determinística a partir de lo ya capturado — la
+      // nota firmada nunca debe quedar sin prosa legible en el historial.
+      // Nunca sobrescribe una edición manual (Fase 2 aún no la expone, pero
+      // se respeta el campo por si ya existiera).
+      if (!notaRef.current.narrativa.editadaManualmente) {
+        const textoGenerado = generarNarrativa(notaRef.current, {
+          diagnosticosCatalogo: diagnosticosPorPaciente[patientId] ?? [],
+        });
+        const notaConNarrativa = { ...notaRef.current, narrativa: { ...notaRef.current.narrativa, texto: textoGenerado } };
+        notaRef.current = notaConNarrativa;
+        setNotaState(notaConNarrativa);
+        await escribirLocal();
+      }
       const resultado = await intentarSincronizar();
       if (resultado.estado === "conflicto") {
         conflictoRemotoRef.current = resultado.remota;
@@ -339,7 +359,7 @@ export function useAutoguardadoNota(
     } finally {
       setFirmando(false);
     }
-  }, [clinicUid, patientId, escribirLocal, intentarSincronizar, firmarNotaRemoto]);
+  }, [clinicUid, patientId, escribirLocal, intentarSincronizar, firmarNotaRemoto, diagnosticosPorPaciente]);
 
   const descartar = useCallback(async () => {
     detenidoRef.current = true;
