@@ -653,7 +653,8 @@ export default function Agenda() {
                     ? setMesActual((m) => new Date(m.getFullYear(), m.getMonth() - 1, 1))
                     : setWeekStart((w) => addDays(w, -7))
             }
-            className="flex h-9 w-9 items-center justify-center rounded-lg border border-edge/10 text-base text-ink/60 hover:bg-surface"
+            className="flex h-9 w-9 items-center justify-center rounded-lg border border-success/40 text-base text-success transition-colors hover:bg-success/10"
+            style={{ boxShadow: "0 0 12px -2px rgb(var(--success-rgb) / 0.5)" }}
           >
             ‹
           </button>
@@ -667,7 +668,8 @@ export default function Agenda() {
                     ? setMesActual((m) => new Date(m.getFullYear(), m.getMonth() + 1, 1))
                     : setWeekStart((w) => addDays(w, 7))
             }
-            className="flex h-9 w-9 items-center justify-center rounded-lg border border-edge/10 text-base text-ink/60 hover:bg-surface"
+            className="flex h-9 w-9 items-center justify-center rounded-lg border border-success/40 text-base text-success transition-colors hover:bg-success/10"
+            style={{ boxShadow: "0 0 12px -2px rgb(var(--success-rgb) / 0.5)" }}
           >
             ›
           </button>
