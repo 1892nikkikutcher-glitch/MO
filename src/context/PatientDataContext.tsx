@@ -23,6 +23,7 @@ import {
   type Unsubscribe,
 } from "firebase/firestore";
 import { db } from "@/lib/firebase";
+import { confirmarHorarioPuro } from "@/lib/horarioAtencion";
 import {
   horarioInicial,
   perfilDoctorInicial,
@@ -181,25 +182,37 @@ function useFirestoreList<T extends { id: string }>(
 /** Documento único sincronizado en tiempo real en `users/{clinicUid}/config/<name>`. */
 function useFirestoreDoc<T extends object>(clinicUid: string | null, name: string, defaultValue: T) {
   const [value, setValueState] = useState<T>(defaultValue);
+  const [estado, setEstado] = useState<"cargando" | "cargado" | "error">("cargando");
   const seeded = useRef(false);
 
   useEffect(() => {
     if (!clinicUid) {
       setValueState(defaultValue);
+      setEstado("cargando");
       return;
     }
     const path = `users/${clinicUid}/config`;
     seeded.current = false;
-    const unsub = onSnapshot(doc(db, path, name), (snap) => {
-      if (!snap.exists() && !seeded.current) {
-        seeded.current = true;
-        setDoc(doc(db, path, name), defaultValue).catch((err) =>
-          console.error(`No se pudo inicializar ${path}/${name}`, err)
-        );
-        return;
+    setEstado("cargando");
+    const unsub = onSnapshot(
+      doc(db, path, name),
+      (snap) => {
+        if (!snap.exists() && !seeded.current) {
+          seeded.current = true;
+          setDoc(doc(db, path, name), defaultValue).catch((err) =>
+            console.error(`No se pudo inicializar ${path}/${name}`, err)
+          );
+          setEstado("cargado");
+          return;
+        }
+        if (snap.exists()) setValueState(snap.data() as T);
+        setEstado("cargado");
+      },
+      (error) => {
+        console.error(`Error leyendo ${path}/${name}`, error);
+        setEstado("error"); // se registra internamente, pero nunca se expone como "cargado"
       }
-      if (snap.exists()) setValueState(snap.data() as T);
-    });
+    );
     return unsub;
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [clinicUid, name]);
@@ -216,7 +229,7 @@ function useFirestoreDoc<T extends object>(clinicUid: string | null, name: strin
     });
   };
 
-  return [value, setValue] as const;
+  return [value, setValue, estado === "cargado"] as const;
 }
 
 /** Documento único `clinics/{clinicUid}` — nombre visible de la clínica. */
@@ -445,6 +458,12 @@ type PatientDataContextValue = {
    * distinguirlos. `setNotasEvolucionPaciente` solo escribe v1 (ver su
    * implementación) — v2 usa métodos dedicados que se agregan en la Fase 1. */
   notasEvolucionPorPaciente: Record<string, NotaEvolucionAny[]>;
+  /** cargando/cargado/error por paciente, ver asegurarSuscripcionNotasPaciente. */
+  estadoCargaNotasPorPaciente: Record<string, "cargando" | "cargado" | "error">;
+  /** Suscribe solo las notas de evolución de un paciente (sin las otras 9
+   * colecciones que abre cargarDatosPaciente) — usada por "Requieren
+   * Atención" en el Dashboard. */
+  cargarNotasPaciente: (patientId: string) => void;
   setNotasEvolucionPaciente: (patientId: string, updater: Updater<NotaEvolucion[]>) => void;
   /** Escrituras dedicadas de notas v2 ("Registrar atención de hoy") — NUNCA
    * usan el diff de array completo de setNotasEvolucionPaciente (ver su
@@ -550,6 +569,13 @@ type PatientDataContextValue = {
   setGastos: (updater: Updater<Gasto[]>) => void;
   horario: HorarioAtencion;
   setHorario: (updater: Updater<HorarioAtencion>) => void;
+  /** false hasta que llega la primera respuesta real de Firestore — evita
+   * que "Requiere Atención" concluya "horario sin confirmar" a partir del
+   * default inicial antes de hidratar. */
+  horarioCargado: boolean;
+  /** Confirmación explícita del horario (no basta con editar un campo, ver
+   * editarCampoHorario en horarioAtencion.ts). */
+  confirmarHorario: () => void;
   vocabularioNotas: VocabularioNotas;
   /** Aprende las palabras relevantes de una nota de evolución recién
    * guardada — alimenta el autocompletado propio de Notas de Evolución
@@ -557,6 +583,9 @@ type PatientDataContextValue = {
   registrarPalabrasDeNota: (textoNota: string) => void;
   perfilDoctor: PerfilDoctor;
   setPerfilDoctor: (updater: Updater<PerfilDoctor>) => void;
+  /** false hasta que llega la primera respuesta real de Firestore — evita
+   * el falso "no tiene firma" mientras aún hidrata. */
+  perfilDoctorCargado: boolean;
   suscripcion: SuscripcionPlan;
   setSuscripcion: (updater: Updater<SuscripcionPlan>) => void;
   metas: MetaConfig;
@@ -632,13 +661,13 @@ export function PatientDataProvider({
   const [recursos, setRecursos] = useFirestoreList<Recurso>(clinicUid, "recursos");
   const [citas, setCitas] = useFirestoreList<CitaAgenda>(clinicUid, "citas");
   const [gastos, setGastos] = useFirestoreList<Gasto>(clinicUid, "gastos");
-  const [horario, setHorario] = useFirestoreDoc<HorarioAtencion>(clinicUid, "horario", horarioInicial);
+  const [horario, setHorario, horarioCargado] = useFirestoreDoc<HorarioAtencion>(clinicUid, "horario", horarioInicial);
   const [vocabularioNotas, setVocabularioNotas] = useFirestoreDoc<VocabularioNotas>(
     clinicUid,
     "vocabularioNotas",
     vocabularioNotasInicial
   );
-  const [perfilDoctor, setPerfilDoctor] = useFirestoreDoc<PerfilDoctor>(
+  const [perfilDoctor, setPerfilDoctor, perfilDoctorCargado] = useFirestoreDoc<PerfilDoctor>(
     clinicUid,
     "perfilDoctor",
     perfilDoctorInicial
@@ -768,6 +797,12 @@ export function PatientDataProvider({
   const [notasEvolucionPorPaciente, setNotasEvolucionPorPacienteState] = useState<
     Record<string, NotaEvolucionAny[]>
   >({});
+  /** cargando/cargado/error por paciente — para que "Requieren Atención"
+   * nunca concluya "sin nota" mientras la suscripción aún no responde o
+   * falló (ver asegurarSuscripcionNotasPaciente). */
+  const [estadoCargaNotasPorPaciente, setEstadoCargaNotasPorPacienteState] = useState<
+    Record<string, "cargando" | "cargado" | "error">
+  >({});
   const [diagnosticosPorPaciente, setDiagnosticosPorPacienteState] = useState<Record<string, DiagnosticoPaciente[]>>({});
   const [comparativasPorPaciente, setComparativasPorPacienteState] = useState<
     Record<string, ComparativaRehabilitacion[]>
@@ -834,6 +869,39 @@ export function PatientDataProvider({
     };
   }, [clinicUid, rol]);
 
+  /** Única responsable de la suscripción a notas de evolución de un
+   * paciente — la llaman tanto `cargarDatosPaciente` (Expediente/Agenda,
+   * junto con las otras 9 colecciones del paciente) como `cargarNotasPaciente`
+   * (Dashboard, que solo necesita esta). Evita el falso negativo de tener
+   * dos rutas separadas con la misma guarda `subs.current[key]`: sin
+   * importar cuál de las dos se dispare primero, el estado de carga
+   * (cargando/cargado/error) siempre queda seteado, nunca se abre una
+   * segunda suscripción para el mismo paciente. */
+  const asegurarSuscripcionNotasPaciente = (patientId: string) => {
+    if (!clinicUid) return;
+    const key = `notasEvolucion:${patientId}`;
+    if (subs.current[key]) return;
+    setEstadoCargaNotasPorPacienteState((prev) => ({ ...prev, [patientId]: "cargando" }));
+    const path = `users/${clinicUid}/pacientes/${patientId}/notasEvolucion`;
+    subs.current[key] = onSnapshot(
+      collection(db, path),
+      (snap) => {
+        const next = snap.docs.map((d) => ({ ...(d.data() as NotaEvolucionAny), id: d.id }));
+        setNotasEvolucionPorPacienteState((prev) => ({ ...prev, [patientId]: next }));
+        setEstadoCargaNotasPorPacienteState((prev) => ({ ...prev, [patientId]: "cargado" }));
+      },
+      (error) => {
+        console.error(`Error cargando notas de evolución de ${patientId}`, error);
+        setEstadoCargaNotasPorPacienteState((prev) => ({ ...prev, [patientId]: "error" }));
+      }
+    );
+  };
+
+  /** Suscribe solo las notas de evolución de un paciente — usada por el
+   * Dashboard ("Requieren Atención") para no abrir las otras 9 colecciones
+   * que abre `cargarDatosPaciente` y que el Dashboard nunca usa. */
+  const cargarNotasPaciente = (patientId: string) => asegurarSuscripcionNotasPaciente(patientId);
+
   const cargarDatosPaciente = (patientId: string) => {
     if (!clinicUid) return;
     const presupuestosKey = `presupuestos:${patientId}`;
@@ -892,14 +960,7 @@ export function PatientDataProvider({
         setMembresiasPorPacienteState((prev) => ({ ...prev, [patientId]: next }));
       });
     }
-    const notasEvolucionKey = `notasEvolucion:${patientId}`;
-    if (!subs.current[notasEvolucionKey]) {
-      const path = `users/${clinicUid}/pacientes/${patientId}/notasEvolucion`;
-      subs.current[notasEvolucionKey] = onSnapshot(collection(db, path), (snap) => {
-        const next = snap.docs.map((d) => ({ ...(d.data() as NotaEvolucionAny), id: d.id }));
-        setNotasEvolucionPorPacienteState((prev) => ({ ...prev, [patientId]: next }));
-      });
-    }
+    asegurarSuscripcionNotasPaciente(patientId);
     const historiaKey = `historiaClinica:${patientId}`;
     if (!subs.current[historiaKey]) {
       const path = `users/${clinicUid}/pacientes/${patientId}/historiaClinica`;
@@ -1518,6 +1579,10 @@ export function PatientDataProvider({
   // exprese la intención (primer guardado vs. autoguardado subsecuente).
   const crearBorradorNota = guardarBorradorNota;
 
+  const confirmarHorario = () => {
+    setHorario((prev) => confirmarHorarioPuro(prev, uid, new Date().toISOString()));
+  };
+
   const marcarListaParaRevision = async (patientId: string, notaId: string) => {
     if (!clinicUid) return;
     await updateDoc(notaEvolucionDocRef(patientId, notaId), {
@@ -1931,6 +1996,8 @@ export function PatientDataProvider({
         setLaboratoriosPaciente,
         miUid: uid,
         notasEvolucionPorPaciente,
+        estadoCargaNotasPorPaciente,
+        cargarNotasPaciente,
         setNotasEvolucionPaciente,
         crearBorradorNota,
         guardarBorradorNota,
@@ -2010,11 +2077,14 @@ export function PatientDataProvider({
         setGastos,
         horario,
         setHorario,
+        horarioCargado,
+        confirmarHorario,
         vocabularioNotas,
         registrarPalabrasDeNota: (textoNota: string) =>
           setVocabularioNotas((prev) => ({ palabras: actualizarFrecuencias(prev.palabras, textoNota) })),
         perfilDoctor,
         setPerfilDoctor,
+        perfilDoctorCargado,
         suscripcion,
         setSuscripcion,
         metas,

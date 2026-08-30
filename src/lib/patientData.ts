@@ -296,6 +296,13 @@ export type HorarioAtencion = {
   comidaInicio: string;
   comidaFin: string;
   cierre: string;
+  /** Confirmación explícita del médico de que este horario es correcto —
+   * NUNCA se marca automáticamente al editar un campo (eso la invalida, ver
+   * `editarCampoHorario` en horarioAtencion.ts). Documentos ya existentes sin
+   * este campo se interpretan como pendientes de confirmar. */
+  confirmado?: boolean;
+  confirmadoEn?: string;
+  confirmadoPorUid?: string;
 };
 
 export const horarioInicial: HorarioAtencion = {

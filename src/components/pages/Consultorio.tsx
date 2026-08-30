@@ -2,13 +2,14 @@
 
 import { useEffect, useState } from "react";
 import { usePatientData } from "@/context/PatientDataContext";
+import { editarCampoHorario } from "@/lib/horarioAtencion";
 import { manejarCambioNombre } from "@/lib/textoNombre";
 
 const inputClass =
   "w-full rounded-lg border border-edge/10 bg-field px-3 py-2 text-sm text-ink outline-none focus:border-accent/60";
 
 export default function Consultorio() {
-  const { clinicInfo, setClinicInfo, horario, setHorario, miRol } = usePatientData();
+  const { clinicInfo, setClinicInfo, horario, setHorario, confirmarHorario, miRol } = usePatientData();
   const [nombre, setNombre] = useState(clinicInfo?.nombre ?? "");
   const [direccion, setDireccion] = useState(clinicInfo?.direccion ?? "");
   const [telefono, setTelefono] = useState(clinicInfo?.telefono ?? "");
@@ -192,7 +193,7 @@ export default function Consultorio() {
             <input
               type="time"
               value={horario.apertura}
-              onChange={(e) => setHorario((prev) => ({ ...prev, apertura: e.target.value }))}
+              onChange={(e) => setHorario((prev) => editarCampoHorario(prev, { apertura: e.target.value }))}
               disabled={soloLectura}
               className={inputClass}
             />
@@ -202,7 +203,7 @@ export default function Consultorio() {
             <input
               type="time"
               value={horario.comidaInicio}
-              onChange={(e) => setHorario((prev) => ({ ...prev, comidaInicio: e.target.value }))}
+              onChange={(e) => setHorario((prev) => editarCampoHorario(prev, { comidaInicio: e.target.value }))}
               disabled={soloLectura}
               className={inputClass}
             />
@@ -212,7 +213,7 @@ export default function Consultorio() {
             <input
               type="time"
               value={horario.comidaFin}
-              onChange={(e) => setHorario((prev) => ({ ...prev, comidaFin: e.target.value }))}
+              onChange={(e) => setHorario((prev) => editarCampoHorario(prev, { comidaFin: e.target.value }))}
               disabled={soloLectura}
               className={inputClass}
             />
@@ -222,11 +223,28 @@ export default function Consultorio() {
             <input
               type="time"
               value={horario.cierre}
-              onChange={(e) => setHorario((prev) => ({ ...prev, cierre: e.target.value }))}
+              onChange={(e) => setHorario((prev) => editarCampoHorario(prev, { cierre: e.target.value }))}
               disabled={soloLectura}
               className={inputClass}
             />
           </div>
+        </div>
+        <div className="mt-4 flex flex-wrap items-center gap-3">
+          <button
+            onClick={confirmarHorario}
+            disabled={soloLectura}
+            className="rounded-lg border border-accent/60 bg-accent/15 px-4 py-2 text-xs font-semibold text-accent transition-opacity hover:bg-accent/25 disabled:cursor-not-allowed disabled:opacity-40"
+          >
+            Confirmar horario
+          </button>
+          {horario.confirmado && horario.confirmadoEn ? (
+            <p className="text-xs text-success">
+              ✓ Horario confirmado el{" "}
+              {new Date(horario.confirmadoEn).toLocaleDateString("es-MX", { day: "2-digit", month: "short", year: "numeric" })}
+            </p>
+          ) : (
+            <p className="text-xs text-ink/40">Cambios pendientes de confirmar</p>
+          )}
         </div>
       </div>
     </div>

@@ -1,19 +1,44 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { usePatientData } from "@/context/PatientDataContext";
 import { formatCurrency } from "@/lib/patientData";
 import { agruparLaboratoriosPendientes, parseFechaEntrega } from "@/lib/dashboardMetrics";
+import {
+  diasDesde,
+  estadoDocumentacionDeCita,
+  prioridadPorAntiguedad,
+  textoAntiguedad,
+  VENTANA_DOCUMENTACION_DIAS,
+  type EstadoDocumentacion,
+} from "@/lib/documentacionPendiente";
 import LaboratoriosPendientesPanel from "./LaboratoriosPendientesPanel";
 
 function toIso(d: Date): string {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
 }
 
+type PrioridadAlerta = "baja" | "media" | "alta";
+type CategoriaAlerta =
+  | "documentacion"
+  | "inventario"
+  | "financiero"
+  | "laboratorio"
+  | "agenda"
+  | "asistencia"
+  | "perfil"
+  | "configuracion";
+
+const ORDEN_PRIORIDAD: Record<PrioridadAlerta, number> = { alta: 0, media: 1, baja: 2 };
+
 type Alerta = {
   key: string;
   emoji: string;
   texto: string;
+  /** Independiente del emoji — el emoji es solo presentación visual, el
+   * orden final depende exclusivamente de este campo (ver sort al final). */
+  prioridad: PrioridadAlerta;
+  categoria: CategoriaAlerta;
   onClick: () => void;
 };
 
@@ -24,8 +49,22 @@ type Alerta = {
  * atrasado) en el mensaje de resumen — no hay dato confiable para esas
  * todavía. */
 export default function AttentionAlerts() {
-  const { puedeVerFinanzas, citas, saldosPendientes, presupuestosPendientesDetalle, laboratoriosPendientes, irAPagina } =
-    usePatientData();
+  const {
+    puedeVerFinanzas,
+    citas,
+    saldosPendientes,
+    presupuestosPendientesDetalle,
+    laboratoriosPendientes,
+    irAPagina,
+    perfilDoctor,
+    perfilDoctorCargado,
+    horario,
+    horarioCargado,
+    articulosFaltantes,
+    notasEvolucionPorPaciente,
+    estadoCargaNotasPorPaciente,
+    cargarNotasPaciente,
+  } = usePatientData();
   const [mostrarLaboratorios, setMostrarLaboratorios] = useState(false);
 
   const hoy = new Date();
@@ -36,6 +75,11 @@ export default function AttentionAlerts() {
   const hace7Dias = new Date(hoy);
   hace7Dias.setDate(hace7Dias.getDate() - 7);
   const hace7DiasISO = toIso(hace7Dias);
+  // Ventana propia de documentación pendiente — NO reutiliza hace7DiasISO,
+  // que sigue siendo solo de la alerta de inasistencias.
+  const hace60Dias = new Date(hoy);
+  hace60Dias.setDate(hace60Dias.getDate() - VENTANA_DOCUMENTACION_DIAS);
+  const hace60DiasISO = toIso(hace60Dias);
 
   const gruposLab = agruparLaboratoriosPendientes(Object.values(laboratoriosPendientes.porOrden));
   const enTresDias = new Date(hoy);
@@ -57,6 +101,45 @@ export default function AttentionAlerts() {
     (c) => c.estatus === "No Asistió" && c.fecha >= hace7DiasISO && c.fecha <= hoyISO
   ).length;
 
+  const materialesFaltantes = articulosFaltantes.filter((a) => !a.surtido);
+
+  const citasAtendidasRecientes = useMemo(
+    () =>
+      citas.filter(
+        (c) => c.estatus === "Atendida" && c.patientId && c.fecha >= hace60DiasISO && c.fecha <= hoyISO
+      ),
+    [citas, hace60DiasISO, hoyISO]
+  );
+
+  const patientIdsNecesarios = useMemo(
+    () => Array.from(new Set(citasAtendidasRecientes.map((c) => c.patientId as string))),
+    [citasAtendidasRecientes]
+  );
+  const claveIdsNecesarios = patientIdsNecesarios.join(",");
+
+  useEffect(() => {
+    patientIdsNecesarios.forEach((pid) => cargarNotasPaciente(pid));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [claveIdsNecesarios]);
+
+  const clasificadas = citasAtendidasRecientes
+    .map((c) => ({
+      cita: c,
+      estado: estadoDocumentacionDeCita(
+        c.id,
+        notasEvolucionPorPaciente[c.patientId as string],
+        estadoCargaNotasPorPaciente[c.patientId as string]
+      ),
+      dias: diasDesde(c.fecha, hoy),
+    }))
+    .filter((x): x is { cita: (typeof citasAtendidasRecientes)[number]; estado: EstadoDocumentacion; dias: number } =>
+      x.estado !== null
+    );
+
+  const sinNota = clasificadas.filter((x) => x.estado === "sin_nota");
+  const borrador = clasificadas.filter((x) => x.estado === "borrador");
+  const listaRevision = clasificadas.filter((x) => x.estado === "lista_revision");
+
   const alertas: Alerta[] = [];
 
   if (puedeVerFinanzas && saldosArr.length > 0) {
@@ -64,6 +147,8 @@ export default function AttentionAlerts() {
       key: "saldo",
       emoji: "🔴",
       texto: `${saldosArr.length} paciente(s) tienen saldo pendiente — ${formatCurrency(saldoTotal)}`,
+      prioridad: "alta",
+      categoria: "financiero",
       onClick: () => irAPagina("reportes-saldos-pendientes"),
     });
   }
@@ -73,6 +158,8 @@ export default function AttentionAlerts() {
       key: "presupuestos",
       emoji: "🟠",
       texto: `${presupuestosArr.length} presupuesto(s) esperan seguimiento — ${formatCurrency(presupuestosTotal)}`,
+      prioridad: "media",
+      categoria: "financiero",
       onClick: () => irAPagina("reportes-presupuestos"),
     });
   }
@@ -82,6 +169,8 @@ export default function AttentionAlerts() {
       key: "manana",
       emoji: "🟡",
       texto: `${citasMananaSinConfirmar} paciente(s) de mañana no han confirmado`,
+      prioridad: "baja",
+      categoria: "agenda",
       onClick: () => irAPagina("agenda"),
     });
   }
@@ -91,6 +180,8 @@ export default function AttentionAlerts() {
       key: "lab-vencidos",
       emoji: "🔴",
       texto: `${gruposLab.vencidos.length} trabajo(s) de laboratorio están vencidos`,
+      prioridad: "alta",
+      categoria: "laboratorio",
       onClick: () => setMostrarLaboratorios(true),
     });
   }
@@ -100,6 +191,8 @@ export default function AttentionAlerts() {
       key: "lab-proximos",
       emoji: "🟠",
       texto: `${proximosATresDias.length + gruposLab.vencenHoy.length} trabajo(s) de laboratorio vencen hoy o en los próximos 3 días`,
+      prioridad: "media",
+      categoria: "laboratorio",
       onClick: () => setMostrarLaboratorios(true),
     });
   }
@@ -109,9 +202,80 @@ export default function AttentionAlerts() {
       key: "no-show",
       emoji: "🟡",
       texto: `${noAsistieronRecientes} paciente(s) no asistieron esta última semana`,
+      prioridad: "baja",
+      categoria: "asistencia",
       onClick: () => irAPagina("reportes-bitacora-citas"),
     });
   }
+
+  if (materialesFaltantes.length > 0) {
+    alertas.push({
+      key: "materiales",
+      emoji: "🟠",
+      texto: `${materialesFaltantes.length} material(es) pendientes de comprar`,
+      prioridad: "alta",
+      categoria: "inventario",
+      onClick: () => irAPagina("deposito-dental"),
+    });
+  }
+
+  if (sinNota.length > 0) {
+    const masAntiguaDias = Math.max(...sinNota.map((x) => x.dias));
+    alertas.push({
+      key: "notas-sin-nota",
+      emoji: "🟠",
+      texto: `${sinNota.length} atención(es) sin nota de evolución — la más antigua ${textoAntiguedad(masAntiguaDias)}`,
+      prioridad: prioridadPorAntiguedad(masAntiguaDias),
+      categoria: "documentacion",
+      onClick: () => irAPagina("agenda"),
+    });
+  }
+
+  if (borrador.length > 0) {
+    alertas.push({
+      key: "notas-borrador",
+      emoji: "🟡",
+      texto: `${borrador.length} nota(s) de evolución pendientes de terminar (borrador)`,
+      prioridad: "media",
+      categoria: "documentacion",
+      onClick: () => irAPagina("agenda"),
+    });
+  }
+
+  if (listaRevision.length > 0) {
+    alertas.push({
+      key: "notas-revision",
+      emoji: "🟡",
+      texto: `${listaRevision.length} nota(s) pendientes de revisión/firma`,
+      prioridad: "media",
+      categoria: "documentacion",
+      onClick: () => irAPagina("agenda"),
+    });
+  }
+
+  if (perfilDoctorCargado && !perfilDoctor.firmaDigitalUrl) {
+    alertas.push({
+      key: "firma",
+      emoji: "🟡",
+      texto: "Aún no subes tu firma digital para las recetas",
+      prioridad: "baja",
+      categoria: "perfil",
+      onClick: () => irAPagina("administracion-perfil"),
+    });
+  }
+
+  if (horarioCargado && !horario.confirmado) {
+    alertas.push({
+      key: "horario",
+      emoji: "🟡",
+      texto: "Confirma el horario de atención del consultorio",
+      prioridad: "baja",
+      categoria: "configuracion",
+      onClick: () => irAPagina("administracion-consultorio"),
+    });
+  }
+
+  const alertasOrdenadas = [...alertas].sort((a, b) => ORDEN_PRIORIDAD[a.prioridad] - ORDEN_PRIORIDAD[b.prioridad]);
 
   return (
     <div className="rounded-2xl border border-edge/10 bg-surface p-6">
@@ -121,11 +285,11 @@ export default function AttentionAlerts() {
         datos actual no tiene forma de calcularlos de manera confiable todavía.
       </p>
 
-      {alertas.length === 0 ? (
+      {alertasOrdenadas.length === 0 ? (
         <p className="text-sm text-ink/40">Todo al día por ahora. 🎉</p>
       ) : (
         <div className="space-y-2">
-          {alertas.map((a) => (
+          {alertasOrdenadas.map((a) => (
             <button
               key={a.key}
               onClick={a.onClick}
