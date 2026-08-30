@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { usePatientData } from "@/context/PatientDataContext";
 import {
+  calcularEdadDetallada,
   citaEstatusOptions,
   computeTratamientosPendientes,
   formatNombreConEdad,
@@ -95,6 +96,12 @@ export default function AgendaCitaDialog({
   });
   const [patientId, setPatientId] = useState(initial.patientId ?? "");
   const patientData = initial.patientId ? patients.find((p) => p.id === initial.patientId) : undefined;
+  // Reactivo al patientId actual (no solo al de la cita original) — para
+  // mostrar la edad tan pronto se selecciona un paciente nuevo.
+  const pacienteSeleccionado = patientId ? patients.find((p) => p.id === patientId) : undefined;
+  const edadPacienteSeleccionado = pacienteSeleccionado
+    ? calcularEdadDetallada(pacienteSeleccionado.birthDate)
+    : null;
   // Si la cita ya está ligada a un paciente, se usa su nombre vigente del
   // expediente en vez del texto que quedó copiado en la cita al crearla —
   // así una corrección de nombre en Pacientes se refleja aquí de inmediato.
@@ -462,34 +469,12 @@ export default function AgendaCitaDialog({
         <div className="space-y-4">
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
           <div>
-            <label className="mb-1 block text-xs font-medium text-ink/60">Médico</label>
-            <select value={medicoId} onChange={(e) => setMedicoId(e.target.value)} className={inputClass}>
-              <option value="">Sin médico asignado</option>
-              {medicos.map((r) => (
-                <option key={r.id} value={r.id}>
-                  {r.nombre}
-                </option>
-              ))}
-            </select>
-          </div>
-
-          <div>
-            <label className="mb-1 block text-xs font-medium text-ink/60">Unidad</label>
-            <select value={unidadId} onChange={(e) => setUnidadId(e.target.value)} className={inputClass}>
-              <option value="">Sin unidad asignada</option>
-              {unidades.map((r) => (
-                <option key={r.id} value={r.id}>
-                  {r.nombre}
-                </option>
-              ))}
-            </select>
-          </div>
-
-          <div>
             <label className="mb-1 block text-xs font-medium text-ink/60">Paciente</label>
             {patientId ? (
               <div className="flex items-center justify-between rounded-lg border border-success/30 bg-success/10 px-3 py-2 text-sm">
-                <span className="text-ink">{searchText}</span>
+                <span className="text-ink">
+                  {edadPacienteSeleccionado ? `(${edadPacienteSeleccionado.years}) ${searchText}` : searchText}
+                </span>
                 <button
                   onClick={cambiarPaciente}
                   className="text-xs font-semibold text-success hover:text-success"
@@ -539,6 +524,30 @@ export default function AgendaCitaDialog({
                 )}
               </>
             )}
+          </div>
+
+          <div>
+            <label className="mb-1 block text-xs font-medium text-ink/60">Médico</label>
+            <select value={medicoId} onChange={(e) => setMedicoId(e.target.value)} className={inputClass}>
+              <option value="">Sin médico asignado</option>
+              {medicos.map((r) => (
+                <option key={r.id} value={r.id}>
+                  {r.nombre}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          <div>
+            <label className="mb-1 block text-xs font-medium text-ink/60">Unidad</label>
+            <select value={unidadId} onChange={(e) => setUnidadId(e.target.value)} className={inputClass}>
+              <option value="">Sin unidad asignada</option>
+              {unidades.map((r) => (
+                <option key={r.id} value={r.id}>
+                  {r.nombre}
+                </option>
+              ))}
+            </select>
           </div>
           </div>
 
