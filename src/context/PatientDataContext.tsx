@@ -102,6 +102,7 @@ import {
   type RespuestasHistoriaClinica,
 } from "@/lib/historiaClinica";
 import { actualizarFrecuencias, vocabularioNotasInicial, type VocabularioNotas } from "@/lib/vocabularioNotas";
+import type { ComparativaRehabilitacion } from "@/lib/comparativaRehabilitacion";
 
 type Updater<T> = T | ((prev: T) => T);
 
@@ -463,6 +464,12 @@ type PatientDataContextValue = {
    * la vieja. */
   diagnosticosPorPaciente: Record<string, DiagnosticoPaciente[]>;
   setDiagnosticosPaciente: (patientId: string, updater: Updater<DiagnosticoPaciente[]>) => void;
+  /** Comparativas de rehabilitación — cada una compara 2-4 presupuestos ya
+   * guardados del mismo paciente (ver "Comparativa de Rehabilitación" en
+   * Presupuestos). Solo referencian el id de cada presupuesto, nunca
+   * copian sus datos. */
+  comparativasPorPaciente: Record<string, ComparativaRehabilitacion[]>;
+  setComparativasPaciente: (patientId: string, updater: Updater<ComparativaRehabilitacion[]>) => void;
   membershipPlanes: MembershipPlan[];
   setMembershipPlanes: (updater: Updater<MembershipPlan[]>) => void;
   laminas: Lamina[];
@@ -762,6 +769,9 @@ export function PatientDataProvider({
     Record<string, NotaEvolucionAny[]>
   >({});
   const [diagnosticosPorPaciente, setDiagnosticosPorPacienteState] = useState<Record<string, DiagnosticoPaciente[]>>({});
+  const [comparativasPorPaciente, setComparativasPorPacienteState] = useState<
+    Record<string, ComparativaRehabilitacion[]>
+  >({});
   const [membresiasPorPaciente, setMembresiasPorPacienteState] = useState<
     Record<string, PatientMembership[]>
   >({});
@@ -856,6 +866,14 @@ export function PatientDataProvider({
       subs.current[diagnosticosKey] = onSnapshot(collection(db, path), (snap) => {
         const next = snap.docs.map((d) => ({ ...(d.data() as DiagnosticoPaciente), id: d.id }));
         setDiagnosticosPorPacienteState((prev) => ({ ...prev, [patientId]: next }));
+      });
+    }
+    const comparativasKey = `comparativas:${patientId}`;
+    if (!subs.current[comparativasKey]) {
+      const path = `users/${clinicUid}/pacientes/${patientId}/comparativas`;
+      subs.current[comparativasKey] = onSnapshot(collection(db, path), (snap) => {
+        const next = snap.docs.map((d) => ({ ...(d.data() as ComparativaRehabilitacion), id: d.id }));
+        setComparativasPorPacienteState((prev) => ({ ...prev, [patientId]: next }));
       });
     }
     const laboratoriosKey = `laboratorios:${patientId}`;
@@ -1365,6 +1383,14 @@ export function PatientDataProvider({
     const next = resolveUpdater(updater, prevArr);
     syncFirestoreList(`users/${clinicUid}/pacientes/${patientId}/diagnosticos`, prevArr, next);
     setDiagnosticosPorPacienteState((prev) => ({ ...prev, [patientId]: next }));
+  };
+
+  const setComparativasPaciente = (patientId: string, updater: Updater<ComparativaRehabilitacion[]>) => {
+    if (!clinicUid) return;
+    const prevArr = comparativasPorPaciente[patientId] ?? [];
+    const next = resolveUpdater(updater, prevArr);
+    syncFirestoreList(`users/${clinicUid}/pacientes/${patientId}/comparativas`, prevArr, next);
+    setComparativasPorPacienteState((prev) => ({ ...prev, [patientId]: next }));
   };
 
   /** Agrega a `otsLog` (Reportes → OTs) cada solicitud de laboratorio nueva
@@ -1913,6 +1939,8 @@ export function PatientDataProvider({
         agregarAclaracionNota,
         diagnosticosPorPaciente,
         setDiagnosticosPaciente,
+        comparativasPorPaciente,
+        setComparativasPaciente,
         membershipPlanes,
         setMembershipPlanes,
         laminas,

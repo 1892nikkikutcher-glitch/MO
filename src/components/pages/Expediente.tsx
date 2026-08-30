@@ -4,6 +4,8 @@ import { useEffect, useState, type Dispatch, type SetStateAction } from "react";
 import NuevoPresupuesto from "./NuevoPresupuesto";
 import PresupuestoImpreso from "./PresupuestoImpreso";
 import PresupuestoTotalImpreso from "./PresupuestoTotalImpreso";
+import NuevaComparativaRehabilitacion from "./NuevaComparativaRehabilitacion";
+import ComparativaImpresa from "./ComparativaImpresa";
 import DatosPaciente from "./DatosPaciente";
 import HistoriaClinica from "./HistoriaClinica";
 import ListadoCitas from "./ListadoCitas";
@@ -42,6 +44,8 @@ import {
 } from "@/lib/historiaClinica";
 import { timeToMinutes, toISODate, getMonday, addDays } from "@/lib/agendaHelpers";
 import { estaVencido, renovarVigencia } from "@/lib/presupuestoVigencia";
+import { generarComparativaPdf } from "@/lib/generarComparativaPdf";
+import type { ComparativaRehabilitacion } from "@/lib/comparativaRehabilitacion";
 
 function fechaLargaHoy() {
   const texto = new Date().toLocaleDateString("es-MX", { weekday: "long", day: "numeric", month: "long", year: "numeric" });
@@ -195,9 +199,49 @@ function PresupuestosTab({
   prefillPresupuesto: PresupuestoPrefillItem[] | null;
   onConsumirPrefillPresupuesto: () => void;
 }) {
-  const { perfilDoctor, historiaClinicaPorPaciente, setRespuestasHistoriaClinica } = usePatientData();
-  const [view, setView] = useState<"list" | "form">("list");
+  const {
+    perfilDoctor,
+    historiaClinicaPorPaciente,
+    setRespuestasHistoriaClinica,
+    comparativasPorPaciente,
+    setComparativasPaciente,
+  } = usePatientData();
+  const [view, setView] = useState<"list" | "form" | "comparativa">("list");
   const [editingBudget, setEditingBudget] = useState<SavedBudget | null>(null);
+  const [editingComparativa, setEditingComparativa] = useState<ComparativaRehabilitacion | null>(null);
+  const [printComparativa, setPrintComparativa] = useState<ComparativaRehabilitacion | null>(null);
+  const [enviandoComparativaId, setEnviandoComparativaId] = useState<string | null>(null);
+  const [comparativaAEliminar, setComparativaAEliminar] = useState<ComparativaRehabilitacion | null>(null);
+  const comparativas = comparativasPorPaciente[patient.id] ?? [];
+
+  useEffect(() => {
+    if (printComparativa) window.print();
+  }, [printComparativa]);
+
+  const enviarComparativaGuardada = async (comparativa: ComparativaRehabilitacion) => {
+    if (enviandoComparativaId) return;
+    const ventanaWhatsApp = window.open("", "_blank");
+    const nombreArchivo = `Comparativa_${slugify(patient.name)}_${slugify(fechaLargaHoy())}.pdf`;
+    const caption = `Comparativa de rehabilitación — ${patient.name} · ${comparativa.titulo}`;
+
+    setEnviandoComparativaId(comparativa.id);
+    try {
+      const blob = await generarComparativaPdf({
+        comparativa,
+        presupuestos,
+        fechaLarga: fechaLargaHoy(),
+        pacienteNombre: patient.name,
+        perfilDoctor,
+      });
+      await enviarPdfPorWhatsapp({ blob, nombreArchivo, telefono: patient.phone, caption, ventanaPrevia: ventanaWhatsApp });
+    } catch (err) {
+      console.error("No se pudo generar el PDF de la comparativa", err);
+      ventanaWhatsApp?.close();
+      alert("No se pudo generar el PDF de la comparativa. Intenta de nuevo.");
+    } finally {
+      setEnviandoComparativaId(null);
+    }
+  };
 
   // Un prefill (viene de "Agregar a presupuesto" en Historia Clínica) abre
   // el formulario de Nuevo Presupuesto de inmediato, ya con esos renglones.
@@ -369,6 +413,28 @@ function PresupuestosTab({
     );
   }
 
+  if (view === "comparativa") {
+    return (
+      <NuevaComparativaRehabilitacion
+        patientId={patient.id}
+        presupuestos={presupuestos}
+        initial={editingComparativa ?? undefined}
+        onCancel={() => {
+          setEditingComparativa(null);
+          setView("list");
+        }}
+        onSave={(comparativa) => {
+          setComparativasPaciente(patient.id, (prev) => {
+            if (editingComparativa) return prev.map((c) => (c.id === comparativa.id ? comparativa : c));
+            return [comparativa, ...prev];
+          });
+          setEditingComparativa(null);
+          setView("list");
+        }}
+      />
+    );
+  }
+
   return (
     <div className="space-y-4">
       <div className="flex flex-wrap items-center justify-between gap-3">
@@ -400,6 +466,17 @@ function PresupuestosTab({
               </button>
             </>
           )}
+          <button
+            onClick={() => {
+              setEditingComparativa(null);
+              setView("comparativa");
+            }}
+            disabled={presupuestos.length < 2}
+            title={presupuestos.length < 2 ? "Se necesitan al menos 2 presupuestos para compararlos" : undefined}
+            className="rounded-lg border border-warning/40 bg-warning/10 px-4 py-2 text-xs font-semibold text-warning transition-colors hover:bg-warning/20 disabled:cursor-not-allowed disabled:opacity-40"
+          >
+            Comparativa de Rehabilitación
+          </button>
           <button
             onClick={() => {
               setEditingBudget(null);
@@ -545,6 +622,88 @@ function PresupuestosTab({
         </div>
       )}
 
+      {comparativas.length > 0 && (
+        <div className="space-y-3">
+          <h3 className="text-sm font-semibold uppercase tracking-wide text-ink/60">Comparativas de Rehabilitación</h3>
+          <div className="overflow-hidden rounded-2xl border border-edge/10 bg-surface print:hidden">
+            <div className="divide-y divide-edge/5">
+              {comparativas.map((c) => (
+                <div key={c.id} className="flex flex-wrap items-center justify-between gap-3 px-4 py-4">
+                  <div>
+                    <p className="text-sm font-medium text-ink">{c.titulo}</p>
+                    <p className="text-xs text-ink/40">
+                      Compara {c.opciones.length} opciones · {new Date(c.fecha).toLocaleDateString("es-MX")}
+                    </p>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <button
+                      onClick={() => {
+                        setEditingComparativa(c);
+                        setView("comparativa");
+                      }}
+                      className="rounded-lg border border-edge/15 px-3 py-1.5 text-xs font-semibold text-ink/70 transition-colors hover:bg-surface"
+                    >
+                      Ver / Editar
+                    </button>
+                    <button
+                      onClick={() => setPrintComparativa(c)}
+                      title="Imprimir"
+                      className="flex h-7 w-7 items-center justify-center rounded-full border border-edge/15 text-ink/50 transition-colors hover:border-accent/50 hover:text-accent"
+                    >
+                      <PrinterIcon />
+                    </button>
+                    <button
+                      onClick={() => enviarComparativaGuardada(c)}
+                      disabled={enviandoComparativaId === c.id}
+                      title="Enviar por WhatsApp"
+                      className="flex h-7 w-7 items-center justify-center rounded-full border border-success/30 text-success/70 transition-colors hover:border-success hover:text-success disabled:opacity-40"
+                    >
+                      <WhatsAppIcon />
+                    </button>
+                    <button
+                      onClick={() => setComparativaAEliminar(c)}
+                      title="Eliminar"
+                      className="flex h-7 w-7 items-center justify-center rounded-full border border-danger/20 text-danger/50 transition-colors hover:border-danger/60 hover:text-danger"
+                    >
+                      <TrashIcon />
+                    </button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {comparativaAEliminar && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4">
+          <div className="w-full max-w-sm rounded-2xl border border-edge/10 bg-modal p-6">
+            <h3 className="text-base font-semibold text-ink">Eliminar comparativa</h3>
+            <p className="mt-2 text-sm text-ink/70">
+              Vas a eliminar la comparativa <span className="font-semibold text-ink">&quot;{comparativaAEliminar.titulo}&quot;</span>.
+              Los presupuestos que compara no se ven afectados. Esta acción no se puede deshacer.
+            </p>
+            <div className="mt-6 flex gap-3">
+              <button
+                onClick={() => setComparativaAEliminar(null)}
+                className="flex-1 rounded-lg border border-edge/15 py-2.5 text-sm font-semibold text-ink/80 transition-colors hover:bg-surface"
+              >
+                Cancelar
+              </button>
+              <button
+                onClick={() => {
+                  setComparativasPaciente(patient.id, (prev) => prev.filter((c) => c.id !== comparativaAEliminar.id));
+                  setComparativaAEliminar(null);
+                }}
+                className="flex-1 rounded-lg bg-danger py-2.5 text-sm font-semibold text-black transition-opacity hover:opacity-90"
+              >
+                Eliminar
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {presupuestoAEliminar && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4">
           <div className="w-full max-w-sm rounded-2xl border border-edge/10 bg-modal p-6">
@@ -596,6 +755,15 @@ function PresupuestosTab({
           pacienteNombre={patient.name}
           pacienteCorreo={patient.email ?? ""}
           pacienteTelefono={patient.phone}
+        />
+      )}
+
+      {printComparativa && (
+        <ComparativaImpresa
+          comparativa={printComparativa}
+          presupuestos={presupuestos}
+          pacienteNombre={patient.name}
+          fechaLarga={fechaLargaHoy()}
         />
       )}
     </div>
