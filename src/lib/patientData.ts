@@ -54,6 +54,15 @@ export type Patient = {
   /** Calificación de comportamiento/cooperación (1-5 estrellas) para
    * pacientes adultos. 0 o ausente = sin calificar. */
   comportamientoEstrellas?: 0 | 1 | 2 | 3 | 4 | 5;
+
+  /** Presente solo si este expediente se fusionó dentro de otro (ver
+   * "Fusionar Expedientes" en Pacientes) — id del expediente sobreviviente.
+   * El documento NUNCA se borra (misma filosofía que el resto de la app:
+   * la información clínica no se elimina), solo se oculta de las listas y
+   * buscadores mientras este campo esté presente. */
+  fusionadoEnId?: string;
+  /** ISO datetime — cuándo se fusionó. */
+  fusionadoEn?: string;
 };
 
 /** Convierte la fecha ISO ("YYYY-MM-DD") de una cita a formato día/mes/año

@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import Expediente from "./Expediente";
+import FusionarExpedientesDialog from "./FusionarExpedientesDialog";
 import { usePatientData } from "@/context/PatientDataContext";
 import { coincidePaciente, formatEdad, type Patient } from "@/lib/patientData";
 import { exportarCsv } from "@/lib/exportCsv";
@@ -311,6 +312,16 @@ export default function Pacientes() {
   const [showImportar, setShowImportar] = useState(false);
   const [busqueda, setBusqueda] = useState("");
   const [orden, setOrden] = useState<"reciente" | "alfabetico" | "edad">("reciente");
+  const [seleccionadosParaFusionar, setSeleccionadosParaFusionar] = useState<Set<string>>(new Set());
+  const [mostrarFusionar, setMostrarFusionar] = useState(false);
+  const toggleSeleccionParaFusionar = (id: string) => {
+    setSeleccionadosParaFusionar((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else if (next.size < 2) next.add(id);
+      return next;
+    });
+  };
 
   const busquedaTrim = busqueda.trim();
   const pacientesFiltrados = !busquedaTrim
@@ -418,6 +429,15 @@ export default function Pacientes() {
             <option value="alfabetico">Alfabético (A-Z)</option>
             <option value="edad">Edad (menor a mayor)</option>
           </select>
+          {seleccionadosParaFusionar.size === 2 && (
+            <button
+              onClick={() => setMostrarFusionar(true)}
+              title="Une los dos expedientes marcados en uno solo — para cuando el mismo paciente quedó duplicado por error"
+              className="rounded-lg border border-warning/40 bg-warning/10 px-4 py-2.5 text-sm font-semibold text-warning transition-colors hover:bg-warning/20"
+            >
+              Fusionar Expedientes
+            </button>
+          )}
           <button
             onClick={exportarPacientes}
             title="Descarga tus pacientes en un .csv que abre en Excel — tus datos siempre disponibles fuera de MO"
@@ -453,6 +473,7 @@ export default function Pacientes() {
       <table className="w-full text-left text-sm">
         <thead>
           <tr className="border-b border-edge/10 text-xs uppercase tracking-wide text-ink/40">
+            <th className="w-10 px-3 py-4" />
             <th className="px-6 py-4 font-medium">Foto</th>
             <th className="px-6 py-4 font-medium">Nombre completo</th>
             <th className="px-6 py-4 font-medium">Celular</th>
@@ -464,6 +485,15 @@ export default function Pacientes() {
         <tbody>
           {pacientesOrdenados.map((p) => (
             <tr key={p.id} className="border-b border-edge/5 last:border-0 hover:bg-surface">
+              <td className="px-3 py-4">
+                <input
+                  type="checkbox"
+                  checked={seleccionadosParaFusionar.has(p.id)}
+                  onChange={() => toggleSeleccionParaFusionar(p.id)}
+                  title="Marcar para fusionar con otro expediente"
+                  className="accent-[color:var(--accent)]"
+                />
+              </td>
               <td className="px-6 py-4">
                 <div
                   className="flex h-10 w-10 items-center justify-center rounded-full text-xs font-bold text-black"
@@ -514,6 +544,17 @@ export default function Pacientes() {
         <ImportarPacientesDialog
           onClose={() => setShowImportar(false)}
           onImportar={(registros, onProgreso) => importarPacientes(registros, onProgreso)}
+        />
+      )}
+
+      {mostrarFusionar && seleccionadosParaFusionar.size === 2 && (
+        <FusionarExpedientesDialog
+          pacientes={patients.filter((p) => seleccionadosParaFusionar.has(p.id)) as [Patient, Patient]}
+          onClose={() => setMostrarFusionar(false)}
+          onFusionado={() => {
+            setMostrarFusionar(false);
+            setSeleccionadosParaFusionar(new Set());
+          }}
         />
       )}
     </div>

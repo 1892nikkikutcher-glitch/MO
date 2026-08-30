@@ -416,6 +416,21 @@ type PatientDataContextValue = {
     nuevos: Omit<Patient, "id">[],
     onProgreso?: (hechos: number, total: number) => void
   ) => Promise<void>;
+  /** Fusiona dos expedientes duplicados en uno solo — ver "Fusionar
+   * Expedientes" en Pacientes. `camposPacienteResueltos`/
+   * `historiaClinicaResuelta`/`fotosResueltas` ya vienen con los conflictos
+   * decididos por quien llama (ver src/lib/fusionExpedientes.ts); esta
+   * función solo aplica esos valores y une el resto de las colecciones.
+   * Nunca borra el expediente perdedor — lo marca `fusionadoEnId` y lo
+   * oculta de `patients` (ver el filtro en el valor expuesto por el
+   * provider), pero su información original queda intacta. */
+  fusionarPacientes: (params: {
+    sobrevivienteId: string;
+    perdedorId: string;
+    camposPacienteResueltos: Partial<Patient>;
+    historiaClinicaResuelta: RespuestasHistoriaClinica;
+    fotosResueltas: FotosPaciente;
+  }) => void;
   presupuestosPorPaciente: Record<string, SavedBudget[]>;
   setPresupuestosPaciente: (patientId: string, updater: Updater<SavedBudget[]>) => void;
   pagosPorPaciente: Record<string, Pago[]>;
@@ -1666,6 +1681,67 @@ export function PatientDataProvider({
     );
   };
 
+  /** Fusiona dos expedientes duplicados — ver "Fusionar Expedientes" en
+   * Pacientes y src/lib/fusionExpedientes.ts para la lógica de resolución
+   * de conflictos (ya resuelta por quien llama, esta función solo aplica
+   * los resultados). Reutiliza los setters existentes de cada colección en
+   * vez de escribir a Firestore directo — así cada colección conserva
+   * exactamente su propio comportamiento (ej. las notas v2 se guardan con
+   * su escritura puntual por id, no con el diff de arreglo de las v1).
+   * Nunca limpia ni borra los datos del perdedor — solo los copia hacia el
+   * sobreviviente y marca al perdedor como fusionado, para poder recuperar
+   * todo si algo saliera mal a medio proceso. */
+  const fusionarPacientes = ({
+    sobrevivienteId,
+    perdedorId,
+    camposPacienteResueltos,
+    historiaClinicaResuelta,
+    fotosResueltas,
+  }: {
+    sobrevivienteId: string;
+    perdedorId: string;
+    camposPacienteResueltos: Partial<Patient>;
+    historiaClinicaResuelta: RespuestasHistoriaClinica;
+    fotosResueltas: FotosPaciente;
+  }) => {
+    setPresupuestosPaciente(sobrevivienteId, (prev) => [...prev, ...(presupuestosPorPaciente[perdedorId] ?? [])]);
+    setPagosPaciente(sobrevivienteId, (prev) => [...prev, ...(pagosPorPaciente[perdedorId] ?? [])]);
+    setRecetasPaciente(sobrevivienteId, (prev) => [...prev, ...(recetasPorPaciente[perdedorId] ?? [])]);
+    setLaboratoriosPaciente(sobrevivienteId, (prev) => [...prev, ...(laboratoriosPorPaciente[perdedorId] ?? [])]);
+    setDiagnosticosPaciente(sobrevivienteId, (prev) => [...prev, ...(diagnosticosPorPaciente[perdedorId] ?? [])]);
+    setMembresiasPaciente(sobrevivienteId, (prev) => [...prev, ...(membresiasPorPaciente[perdedorId] ?? [])]);
+
+    // Notas de evolución: v1 y v2 conviven en el mismo arreglo pero se
+    // escriben distinto — v1 vía el diff de setNotasEvolucionPaciente, v2
+    // con su escritura puntual por id (guardarBorradorNota), igual que en
+    // cualquier otro guardado normal de una nota v2.
+    const notasPerdedor = notasEvolucionPorPaciente[perdedorId] ?? [];
+    const notasV1Perdedor = notasPerdedor.filter((n): n is NotaEvolucion => !esNotaV2(n));
+    const notasV2Perdedor = notasPerdedor.filter(esNotaV2);
+    setNotasEvolucionPaciente(sobrevivienteId, (prev) => [...prev, ...notasV1Perdedor]);
+    notasV2Perdedor.forEach((nota) => void guardarBorradorNota(sobrevivienteId, nota));
+
+    setRespuestasHistoriaClinica(sobrevivienteId, historiaClinicaResuelta);
+    setFotosPaciente(sobrevivienteId, fotosResueltas);
+
+    setCitas((prev) => prev.map((c) => (c.patientId === perdedorId ? { ...c, patientId: sobrevivienteId } : c)));
+    setPagosEliminados((prev) => prev.map((p) => (p.patientId === perdedorId ? { ...p, patientId: sobrevivienteId } : p)));
+    setDomiciliaciones((prev) =>
+      prev.map((d) => (d.patientId === perdedorId ? { ...d, patientId: sobrevivienteId } : d))
+    );
+    setEncuestas((prev) => prev.map((e) => (e.patientId === perdedorId ? { ...e, patientId: sobrevivienteId } : e)));
+
+    setPatients((prev) =>
+      prev.map((p) => {
+        if (p.id === sobrevivienteId) return { ...p, ...camposPacienteResueltos };
+        if (p.id === perdedorId) {
+          return { ...p, fusionadoEnId: sobrevivienteId, fusionadoEn: new Date().toISOString() };
+        }
+        return p;
+      })
+    );
+  };
+
   const marcarAsistencia = (
     personalId: string,
     fecha: string,
@@ -1810,10 +1886,15 @@ export function PatientDataProvider({
       value={{
         clinicUid,
         userEmail,
-        patients,
+        // Un paciente fusionado dentro de otro (ver fusionarPacientes) nunca
+        // se borra, pero tampoco debe volver a aparecer en ningún buscador o
+        // listado — filtrarlo aquí, en el único punto de exposición, evita
+        // tener que tocar cada componente que use `patients` uno por uno.
+        patients: patients.filter((p) => !p.fusionadoEnId),
         addPatient,
         updatePatient,
         importarPacientes,
+        fusionarPacientes,
         presupuestosPorPaciente,
         setPresupuestosPaciente,
         pagosPorPaciente,
