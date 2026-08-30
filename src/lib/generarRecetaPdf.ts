@@ -134,6 +134,20 @@ export async function generarRecetaPdf(datos: DatosRecetaPdf): Promise<Blob> {
   }
 
   const yFooter = Math.max(y + 25, pageHeight - 50);
+
+  // Si queda un hueco en blanco entre el último medicamento y el pie de
+  // firma, se anula con una X — evita que alguien anexe a mano un
+  // medicamento no recetado en ese espacio.
+  const yVacioInicio = y + 5;
+  const yVacioFin = yFooter - 14;
+  if (yVacioFin - yVacioInicio > 12) {
+    doc.setDrawColor(180, 180, 180);
+    doc.setLineWidth(0.25);
+    doc.line(marginX, yVacioInicio, pageWidth - marginX, yVacioFin);
+    doc.line(marginX, yVacioFin, pageWidth - marginX, yVacioInicio);
+    doc.setDrawColor(0, 0, 0);
+  }
+
   doc.setFont("helvetica", "normal");
   if (datos.perfilDoctor.textoValidezReceta) {
     doc.setFontSize(10);

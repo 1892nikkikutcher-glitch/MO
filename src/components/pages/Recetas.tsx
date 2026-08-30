@@ -666,7 +666,7 @@ export default function Recetas() {
 
       {/* Receta imprimible — formato tipo COPRISEM */}
       {patient && medicamentosRecetados.length > 0 && (
-        <div className="hidden border-4 border-black bg-white p-8 text-black print:block">
+        <div className="hidden flex-col border-4 border-black bg-white p-8 text-black print:flex print:min-h-[240mm]">
           <div className="flex items-start justify-between">
             <div className="w-24 shrink-0 text-center">
               {perfilDoctor.logoEscuelaUrl && (
@@ -717,7 +717,17 @@ export default function Recetas() {
           </div>
           {notas && <p className="mt-4 whitespace-pre-line text-sm">{notas}</p>}
 
-          <div className="mt-16 flex items-end justify-between">
+          {/* Anula el espacio en blanco que quede antes del pie de firma —
+              evita que alguien anexe a mano un medicamento no recetado ahí. */}
+          <div
+            className="my-4 min-h-[10mm] flex-1"
+            style={{
+              backgroundImage:
+                "linear-gradient(to bottom right, transparent calc(50% - 0.5px), #bbb calc(50%), transparent calc(50% + 0.5px)), linear-gradient(to top right, transparent calc(50% - 0.5px), #bbb calc(50%), transparent calc(50% + 0.5px))",
+            }}
+          />
+
+          <div className="flex items-end justify-between">
             {perfilDoctor.textoValidezReceta && (
               <p className="text-sm underline">{perfilDoctor.textoValidezReceta}</p>
             )}
