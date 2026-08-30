@@ -516,19 +516,8 @@ export default function Agenda() {
                 setMesActual(new Date(d.getFullYear(), d.getMonth(), 1));
               }}
               title="Ir a fecha"
-              className="rounded-lg border border-edge/10 bg-field px-2.5 py-1.5 text-xs text-ink outline-none focus:border-accent/60"
+              className="rounded-lg border border-edge/10 bg-field px-3 py-2 text-sm text-ink outline-none focus:border-accent/60"
             />
-            <button
-              onClick={() => {
-                const hoy = new Date();
-                setWeekStart(getMonday(hoy));
-                setDiaSeleccionado(hoy);
-                setMesActual(new Date(hoy.getFullYear(), hoy.getMonth(), 1));
-              }}
-              className="rounded-lg border border-accent/40 px-3 py-1.5 text-xs font-semibold text-accent transition-colors hover:bg-accent/10"
-            >
-              Hoy
-            </button>
           </div>
         </div>
 
@@ -597,9 +586,9 @@ export default function Agenda() {
           })()}
         </div>
 
-        {/* 4. Tira de vistas de calendario, médicos/unidades, flechas y exportar. */}
-        <div className="flex flex-wrap items-center gap-2">
-          <div className="flex items-center gap-1.5 rounded-lg border border-edge/10 p-0.5">
+        {/* 4. Tira de vistas de calendario, médicos/unidades, flechas, hoy y exportar. */}
+        <div className="flex flex-wrap items-center gap-2.5">
+          <div className="flex items-center gap-1.5 rounded-lg border border-edge/10 p-1">
             <span className="pl-1.5 text-[10px] font-semibold uppercase tracking-wide text-ink/40">Ver por</span>
             {(
               [
@@ -611,7 +600,7 @@ export default function Agenda() {
               <button
                 key={op.id}
                 onClick={() => setVistaRecurso(op.id)}
-                className={`rounded-md px-2.5 py-1 text-xs font-semibold transition-colors ${
+                className={`rounded-md px-3 py-1.5 text-sm font-semibold transition-colors ${
                   vistaRecurso === op.id ? "bg-accent/15 text-accent" : "text-ink/50"
                 }`}
               >
@@ -620,10 +609,10 @@ export default function Agenda() {
             ))}
           </div>
 
-          <div className="flex rounded-lg border border-edge/10 p-0.5">
+          <div className="flex rounded-lg border border-edge/10 p-1">
             <button
               onClick={() => setVista("semana")}
-              className={`rounded-md px-3 py-1 text-xs font-semibold transition-colors ${
+              className={`rounded-md px-3.5 py-1.5 text-sm font-semibold transition-colors ${
                 vista === "semana" ? "bg-accent/15 text-accent" : "text-ink/50"
               }`}
             >
@@ -631,7 +620,7 @@ export default function Agenda() {
             </button>
             <button
               onClick={() => setVista("3dias")}
-              className={`rounded-md px-3 py-1 text-xs font-semibold transition-colors ${
+              className={`rounded-md px-3.5 py-1.5 text-sm font-semibold transition-colors ${
                 vista === "3dias" ? "bg-accent/15 text-accent" : "text-ink/50"
               }`}
             >
@@ -639,7 +628,7 @@ export default function Agenda() {
             </button>
             <button
               onClick={() => setVista("dia")}
-              className={`rounded-md px-3 py-1 text-xs font-semibold transition-colors ${
+              className={`rounded-md px-3.5 py-1.5 text-sm font-semibold transition-colors ${
                 vista === "dia" ? "bg-accent/15 text-accent" : "text-ink/50"
               }`}
             >
@@ -647,7 +636,7 @@ export default function Agenda() {
             </button>
             <button
               onClick={() => setVista("mes")}
-              className={`rounded-md px-3 py-1 text-xs font-semibold transition-colors ${
+              className={`rounded-md px-3.5 py-1.5 text-sm font-semibold transition-colors ${
                 vista === "mes" ? "bg-accent/15 text-accent" : "text-ink/50"
               }`}
             >
@@ -664,7 +653,7 @@ export default function Agenda() {
                     ? setMesActual((m) => new Date(m.getFullYear(), m.getMonth() - 1, 1))
                     : setWeekStart((w) => addDays(w, -7))
             }
-            className="flex h-7 w-7 items-center justify-center rounded-lg border border-edge/10 text-ink/60 hover:bg-surface"
+            className="flex h-9 w-9 items-center justify-center rounded-lg border border-edge/10 text-base text-ink/60 hover:bg-surface"
           >
             ‹
           </button>
@@ -678,9 +667,20 @@ export default function Agenda() {
                     ? setMesActual((m) => new Date(m.getFullYear(), m.getMonth() + 1, 1))
                     : setWeekStart((w) => addDays(w, 7))
             }
-            className="flex h-7 w-7 items-center justify-center rounded-lg border border-edge/10 text-ink/60 hover:bg-surface"
+            className="flex h-9 w-9 items-center justify-center rounded-lg border border-edge/10 text-base text-ink/60 hover:bg-surface"
           >
             ›
+          </button>
+          <button
+            onClick={() => {
+              const hoy = new Date();
+              setWeekStart(getMonday(hoy));
+              setDiaSeleccionado(hoy);
+              setMesActual(new Date(hoy.getFullYear(), hoy.getMonth(), 1));
+            }}
+            className="rounded-lg border border-accent/40 px-3.5 py-2 text-sm font-semibold text-accent transition-colors hover:bg-accent/10"
+          >
+            Hoy
           </button>
           <button
             onClick={exportarAGoogleCalendar}
@@ -689,9 +689,9 @@ export default function Agenda() {
                 ? "Descarga la agenda diaria (.ics) para importar en Google Calendar u otro calendario — uso interno de la clínica"
                 : "Descarga la agenda general de la clínica (.ics) para importar en Google Calendar u otro calendario — uso interno"
             }
-            className="flex items-center gap-1.5 rounded-lg border border-edge/10 px-3 py-1.5 text-xs font-semibold text-ink/70 transition-colors hover:bg-surface hover:text-ink"
+            className="flex items-center gap-2 rounded-lg border border-edge/10 px-4 py-2 text-sm font-semibold text-ink/70 transition-colors hover:bg-surface hover:text-ink"
           >
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" className="shrink-0">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" className="shrink-0">
               <path
                 d="M12 15V3m0 12-4-4m4 4 4-4M4 17v2a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-2"
                 stroke="currentColor"
