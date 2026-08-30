@@ -11,6 +11,7 @@ import { useMemo, useState } from "react";
 import RadarComparativa, { type OpcionRadar } from "@/components/RadarComparativa";
 import {
   calcularEconomiaRelativa,
+  etiquetaTratamiento,
   idComparativa,
   type ComparativaRehabilitacion,
   type NivelComparativa,
@@ -135,7 +136,7 @@ export default function NuevaComparativaRehabilitacion({
     return {
       id: p.id,
       color: COLORES[i % COLORES.length],
-      etiqueta: `Folio #${p.folio}`,
+      etiqueta: etiquetaTratamiento(p),
       valores: [economias[i] ?? 3, cal.funcion, cal.estetica, cal.conservacionBiologica],
     };
   });
@@ -241,7 +242,7 @@ export default function NuevaComparativaRehabilitacion({
             >
               <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
                 <h3 className="text-sm font-semibold text-ink">
-                  Folio #{p.folio} — {formatCurrency(p.total)}
+                  {etiquetaTratamiento(p)} — {formatCurrency(p.total)}
                 </h3>
                 <span className="text-xs text-ink/40">Economía: {economias[i]}/5 (según el costo, automático)</span>
               </div>

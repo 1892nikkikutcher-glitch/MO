@@ -9,7 +9,7 @@ import RadarComparativa, { type OpcionRadar } from "@/components/RadarComparativ
 import { usePatientData } from "@/context/PatientDataContext";
 import { EJES_COMPARATIVA } from "./NuevaComparativaRehabilitacion";
 import { formatCurrency, type SavedBudget } from "@/lib/patientData";
-import type { ComparativaRehabilitacion } from "@/lib/comparativaRehabilitacion";
+import { etiquetaTratamiento, type ComparativaRehabilitacion } from "@/lib/comparativaRehabilitacion";
 
 const COLORES = ["#4f8a75", "#bd8a3d", "#7a4b8c", "#3f6fa8"];
 
@@ -37,7 +37,7 @@ export default function ComparativaImpresa({
   const opcionesRadar: OpcionRadar[] = filas.map(({ op, presupuesto, color }) => ({
     id: presupuesto.id,
     color,
-    etiqueta: `Folio #${presupuesto.folio}`,
+    etiqueta: etiquetaTratamiento(presupuesto),
     valores: [3, op.funcion, op.estetica, op.conservacionBiologica],
   }));
 
@@ -75,9 +75,7 @@ export default function ComparativaImpresa({
         {filas.map(({ op, presupuesto, color }) => (
           <div key={presupuesto.id} className="border-t-2 pt-3" style={{ borderColor: color }}>
             <div className="flex items-baseline justify-between">
-              <p className="font-bold">
-                Folio #{presupuesto.folio} — {presupuesto.items[0]?.procedure ?? "Sin procedimientos"}
-              </p>
+              <p className="font-bold">{etiquetaTratamiento(presupuesto)}</p>
               <p className="font-bold">{formatCurrency(presupuesto.total)}</p>
             </div>
             <div className="mt-1 grid grid-cols-2 gap-4 text-xs">

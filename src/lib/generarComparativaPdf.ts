@@ -1,6 +1,6 @@
 import jsPDF from "jspdf";
 import { cargarImagen, type ImagenCargada } from "./imagenesPdf";
-import type { ComparativaRehabilitacion } from "./comparativaRehabilitacion";
+import { etiquetaTratamiento, type ComparativaRehabilitacion } from "./comparativaRehabilitacion";
 import type { PerfilDoctor, SavedBudget } from "./patientData";
 
 export type DatosComparativaPdf = {
@@ -107,7 +107,7 @@ export async function generarComparativaPdf(datos: DatosComparativaPdf): Promise
     doc.setFontSize(11);
     doc.setFillColor(color[0], color[1], color[2]);
     doc.rect(xIzq, y - 3.5, 3, 4.5, "F");
-    doc.text(`Folio #${presupuesto.folio} — ${presupuesto.items[0]?.procedure ?? "Sin procedimientos"}`, xIzq + 6, y);
+    doc.text(etiquetaTratamiento(presupuesto), xIzq + 6, y);
     doc.text(formatCurrency(presupuesto.total), xDer, y, { align: "right" });
     y += 6;
 

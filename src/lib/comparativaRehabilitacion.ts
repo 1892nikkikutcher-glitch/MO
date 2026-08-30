@@ -10,6 +10,8 @@
  * siempre busca el presupuesto real por ese id. Economía nunca se captura a
  * mano, se deriva de los totales reales (`calcularEconomiaRelativa`). */
 
+import type { SavedBudget } from "./patientData";
+
 export type NivelComparativa = 1 | 2 | 3 | 4 | 5;
 
 export type OpcionComparativa = {
@@ -34,6 +36,17 @@ export type ComparativaRehabilitacion = {
 
 export function idComparativa(): string {
   return `cmp${Date.now()}${Math.random().toString(36).slice(2, 8)}`;
+}
+
+/** Al presentar la comparativa (en pantalla, impresa o por WhatsApp) se
+ * identifica cada presupuesto por el nombre del tratamiento, no por su
+ * folio — es lo que se explica al paciente, el folio es solo un dato
+ * administrativo interno (sigue usándose tal cual en el paso de "elegir
+ * presupuestos" de NuevaComparativaRehabilitacion, donde folio SÍ es el
+ * identificador relevante). */
+export function etiquetaTratamiento(presupuesto: SavedBudget): string {
+  const nombre = presupuesto.items[0]?.procedure ?? "Sin procedimientos";
+  return presupuesto.items.length > 1 ? `${nombre} +${presupuesto.items.length - 1}` : nombre;
 }
 
 /** Economía siempre se deriva de los totales reales de cada presupuesto
