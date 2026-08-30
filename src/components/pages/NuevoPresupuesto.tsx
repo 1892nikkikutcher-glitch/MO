@@ -13,7 +13,11 @@ import {
 import { generarPresupuestoPdf } from "@/lib/generarPresupuestoPdf";
 import { enviarPdfPorWhatsapp } from "@/lib/enviarPdfWhatsapp";
 import { slugify } from "@/lib/textoNombre";
+import { calcularFechaVigencia } from "@/lib/presupuestoVigencia";
+import type { PresupuestoPrefillItem } from "@/lib/historiaClinica";
 import type { BudgetData, LineItem, Patient } from "@/lib/patientData";
+
+const VIGENCIA_DIAS_DEFECTO = 30;
 
 export type { BudgetData };
 
@@ -44,12 +48,18 @@ export default function NuevoPresupuesto({
   patient,
   initialBudget,
   planTratamientoSugerido,
+  prefillItems,
   onCancel,
   onSave,
 }: {
   patient: Patient;
   initialBudget?: BudgetData;
   planTratamientoSugerido?: string;
+  /** Renglones ya prellenados desde un diagnóstico del odontograma (ver
+   * Historia Clínica → "Agregar a presupuesto") — nacen a precio $0, listos
+   * para completarles el precio antes de guardar. Ignorado si se está
+   * editando un presupuesto existente. */
+  prefillItems?: Pick<PresupuestoPrefillItem, "procedure" | "teeth" | "note">[];
   onCancel: () => void;
   onSave: (budget: BudgetData) => void;
 }) {
@@ -69,6 +79,7 @@ export default function NuevoPresupuesto({
     initialBudget?.especialidad ?? especialidadesPredefinidas[0]
   );
   const diagnostico = initialBudget?.diagnostico ?? "";
+  const [vigenciaDias, setVigenciaDias] = useState(initialBudget?.vigenciaDias ?? VIGENCIA_DIAS_DEFECTO);
   const [notaProcedimiento, setNotaProcedimiento] = useState("");
   /** Se pueden marcar varios procedimientos a la vez (ej. acceso e
    * instrumentación + instrumentación y obturación + corona, todo en el
@@ -85,7 +96,17 @@ export default function NuevoPresupuesto({
   const [mostrarPersonalizado, setMostrarPersonalizado] = useState(false);
   const [selectedTeeth, setSelectedTeeth] = useState<number[]>([]);
   const [descuentoPct, setDescuentoPct] = useState("");
-  const [items, setItems] = useState<LineItem[]>(initialBudget?.items ?? []);
+  const [items, setItems] = useState<LineItem[]>(
+    () =>
+      initialBudget?.items ??
+      (prefillItems ?? []).map((p) => ({
+        id: `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+        procedure: p.procedure,
+        price: 0,
+        teeth: p.teeth,
+        note: p.note,
+      }))
+  );
   /** Id del renglón que se está editando (null = capturando uno nuevo). La
    * edición reutiliza el mismo formulario de "procedimiento no catalogado"
    * (nombre + precio libres) sin importar si el renglón se agregó
@@ -231,10 +252,22 @@ export default function NuevoPresupuesto({
   };
 
   const total = items.reduce((sum, item) => sum + item.price, 0);
+  const hayRenglonesSinPrecio = items.some((item) => item.price === 0);
 
   const handleGuardar = () => {
-    if (items.length === 0) return;
-    onSave({ folio, fecha, medico, tipoDePrecio, especialidad, diagnostico, items, total });
+    if (items.length === 0 || hayRenglonesSinPrecio) return;
+    onSave({
+      folio,
+      fecha,
+      medico,
+      tipoDePrecio,
+      especialidad,
+      diagnostico,
+      items,
+      total,
+      vigenciaDias,
+      fechaVigenciaHasta: calcularFechaVigencia(fecha, vigenciaDias),
+    });
   };
 
   const handleImprimir = () => {
@@ -319,7 +352,7 @@ export default function NuevoPresupuesto({
             </select>
           </div>
 
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-3 gap-4">
             <div>
               <label className="mb-1 block text-xs font-medium text-ink/60">
                 Tipos de precios
@@ -352,6 +385,19 @@ export default function NuevoPresupuesto({
                   </option>
                 ))}
               </select>
+            </div>
+
+            <div>
+              <label className="mb-1 block text-xs font-medium text-ink/60" title="Después de esta fecha, se avisa que conviene verificar que los precios sigan vigentes.">
+                Vigencia (días)
+              </label>
+              <input
+                type="number"
+                min={1}
+                value={vigenciaDias}
+                onChange={(e) => setVigenciaDias(Math.max(1, Number(e.target.value) || VIGENCIA_DIAS_DEFECTO))}
+                className="w-full rounded-lg border border-edge/10 bg-field px-3 py-2 text-sm text-ink outline-none focus:border-accent/60"
+              />
             </div>
           </div>
 
@@ -615,7 +661,17 @@ export default function NuevoPresupuesto({
                     )}
                   </div>
                   <div className="flex items-center gap-3">
-                    <span className="font-medium text-ink">{formatCurrency(item.price)}</span>
+                    {item.price === 0 ? (
+                      <button
+                        onClick={() => iniciarEdicionItem(item)}
+                        className="rounded-full bg-danger/15 px-2 py-0.5 text-xs font-semibold text-danger print:hidden"
+                        title="Este renglón vino de un diagnóstico del odontograma — complétale el precio antes de guardar"
+                      >
+                        Falta precio
+                      </button>
+                    ) : (
+                      <span className="font-medium text-ink">{formatCurrency(item.price)}</span>
+                    )}
                     <button
                       onClick={() => iniciarEdicionItem(item)}
                       className="text-ink/30 hover:text-accent print:hidden"
@@ -644,7 +700,8 @@ export default function NuevoPresupuesto({
         <div className="mt-6 flex flex-wrap gap-3 print:hidden">
           <button
             onClick={handleGuardar}
-            disabled={items.length === 0}
+            disabled={items.length === 0 || hayRenglonesSinPrecio}
+            title={hayRenglonesSinPrecio ? "Completa el precio de todos los renglones antes de guardar" : undefined}
             className="flex-1 rounded-lg border border-accent/60 bg-accent/15 py-2.5 text-sm font-semibold text-accent transition-opacity hover:bg-accent/25 disabled:cursor-not-allowed disabled:opacity-40"
           >
             {isEditing ? "Guardar Cambios" : "Guardar Presupuesto"}

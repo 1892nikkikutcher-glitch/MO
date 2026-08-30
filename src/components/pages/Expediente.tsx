@@ -32,8 +32,16 @@ import {
   type SavedBudget,
   type Pago,
 } from "@/lib/patientData";
-import { condicionesSistemicasPositivas, esNegacionAlergia } from "@/lib/historiaClinica";
+import {
+  condicionesSistemicasPositivas,
+  esNegacionAlergia,
+  respuestasVacias,
+  valorOdontogramaComoDiagnosticos,
+  type PresupuestoPrefillItem,
+  type RespuestaValor,
+} from "@/lib/historiaClinica";
 import { timeToMinutes, toISODate, getMonday, addDays } from "@/lib/agendaHelpers";
+import { estaVencido, renovarVigencia } from "@/lib/presupuestoVigencia";
 
 function fechaLargaHoy() {
   const texto = new Date().toLocaleDateString("es-MX", { weekday: "long", day: "numeric", month: "long", year: "numeric" });
@@ -177,15 +185,29 @@ function PresupuestosTab({
   presupuestos,
   setPresupuestos,
   planTratamientoSugerido,
+  prefillPresupuesto,
+  onConsumirPrefillPresupuesto,
 }: {
   patient: Patient;
   presupuestos: SavedBudget[];
   setPresupuestos: Dispatch<SetStateAction<SavedBudget[]>>;
   planTratamientoSugerido: string;
+  prefillPresupuesto: PresupuestoPrefillItem[] | null;
+  onConsumirPrefillPresupuesto: () => void;
 }) {
-  const { perfilDoctor } = usePatientData();
+  const { perfilDoctor, historiaClinicaPorPaciente, setRespuestasHistoriaClinica } = usePatientData();
   const [view, setView] = useState<"list" | "form">("list");
   const [editingBudget, setEditingBudget] = useState<SavedBudget | null>(null);
+
+  // Un prefill (viene de "Agregar a presupuesto" en Historia Clínica) abre
+  // el formulario de Nuevo Presupuesto de inmediato, ya con esos renglones.
+  useEffect(() => {
+    if (prefillPresupuesto && prefillPresupuesto.length > 0) {
+      setEditingBudget(null);
+      setView("form");
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [prefillPresupuesto]);
   const [printTarget, setPrintTarget] = useState<SavedBudget | null>(null);
   const [printAll, setPrintAll] = useState(false);
   const [enviandoWhatsAppId, setEnviandoWhatsAppId] = useState<string | null>(null);
@@ -289,13 +311,45 @@ function PresupuestosTab({
   };
 
   if (view === "form") {
+    // Marca en Historia Clínica los diagnósticos de origen con el folio del
+    // presupuesto recién creado — "Ya en presupuesto #XXXX" en vez de la
+    // casilla de selección la próxima vez que se abra esa pestaña. Nunca
+    // reescribe el diagnóstico/tratamiento en sí, solo el vínculo.
+    const estamparDiagnosticosLigados = (nuevoId: string) => {
+      if (!prefillPresupuesto || prefillPresupuesto.length === 0) return;
+      const actuales = historiaClinicaPorPaciente[patient.id] ?? respuestasVacias;
+      const porPreguntaActualizado = { ...actuales.porPregunta };
+      const hoyISO = new Date().toISOString().slice(0, 10);
+      const idsPorPregunta = new Map<string, Set<string>>();
+      for (const item of prefillPresupuesto) {
+        if (!idsPorPregunta.has(item.preguntaId)) idsPorPregunta.set(item.preguntaId, new Set());
+        idsPorPregunta.get(item.preguntaId)!.add(item.diagnosticoId);
+      }
+      for (const [preguntaId, diagnosticoIds] of idsPorPregunta) {
+        const entradas = valorOdontogramaComoDiagnosticos(porPreguntaActualizado[preguntaId]);
+        porPreguntaActualizado[preguntaId] = entradas.map((e) =>
+          diagnosticoIds.has(e.id) ? { ...e, presupuestoId: nuevoId, fechaPresupuesto: hoyISO } : e
+        ) as unknown as RespuestaValor;
+      }
+      setRespuestasHistoriaClinica(patient.id, {
+        ...actuales,
+        porPregunta: porPreguntaActualizado,
+        actualizadoEn: new Date().toISOString(),
+      });
+    };
+
     return (
       <NuevoPresupuesto
         patient={patient}
         initialBudget={editingBudget ?? undefined}
         planTratamientoSugerido={planTratamientoSugerido}
-        onCancel={() => setView("list")}
+        prefillItems={editingBudget ? undefined : prefillPresupuesto ?? undefined}
+        onCancel={() => {
+          onConsumirPrefillPresupuesto();
+          setView("list");
+        }}
         onSave={(budget) => {
+          const nuevoId = editingBudget ? editingBudget.id : `${Date.now()}`;
           setPresupuestos((prev) => {
             if (editingBudget) {
               return prev.map((p) =>
@@ -304,11 +358,10 @@ function PresupuestosTab({
                   : p
               );
             }
-            return [
-              { ...budget, id: `${Date.now()}`, estado: "pendiente", editadoManualmente: true },
-              ...prev,
-            ];
+            return [{ ...budget, id: nuevoId, estado: "pendiente", editadoManualmente: true }, ...prev];
           });
+          if (!editingBudget) estamparDiagnosticosLigados(nuevoId);
+          onConsumirPrefillPresupuesto();
           setEditingBudget(null);
           setView("list");
         }}
@@ -430,6 +483,25 @@ function PresupuestosTab({
                         </option>
                       ))}
                     </select>
+                    {estaVencido(p.fechaVigenciaHasta, p.estado) && (
+                      <span className="flex items-center gap-1.5 rounded-full bg-warning/15 px-2 py-0.5 text-[10px] font-semibold text-warning">
+                        Vencido — verifica que los precios sigan vigentes
+                        <button
+                          onClick={() =>
+                            setPresupuestos((prev) =>
+                              prev.map((b) =>
+                                b.id === p.id
+                                  ? { ...b, fechaVigenciaHasta: renovarVigencia(b.vigenciaDias ?? 30) }
+                                  : b
+                              )
+                            )
+                          }
+                          className="underline decoration-warning/50 underline-offset-2 hover:decoration-warning"
+                        >
+                          Renovar vigencia
+                        </button>
+                      </span>
+                    )}
                     <button
                       onClick={() => setPrintTarget(p)}
                       title="Imprimir"
@@ -662,6 +734,11 @@ export default function Expediente({
   onBack: () => void;
 }) {
   const [activeTab, setActiveTab] = useState<ExpedienteTab>(expedienteTabs[0]);
+  // Puente entre Historia Clínica y Presupuestos: al elegir diagnósticos del
+  // odontograma y darle "Agregar a presupuesto", esto se llena y se cambia
+  // de pestaña — PresupuestosTab lo consume para abrir Nuevo Presupuesto ya
+  // prellenado, y lo limpia (onConsumirPrefillPresupuesto) al guardar.
+  const [prefillPresupuesto, setPrefillPresupuesto] = useState<PresupuestoPrefillItem[] | null>(null);
   const {
     presupuestosPorPaciente,
     setPresupuestosPaciente,
@@ -981,12 +1058,23 @@ export default function Expediente({
               presupuestos={presupuestos}
               setPresupuestos={setPresupuestos}
               planTratamientoSugerido={planTratamientoSugerido}
+              prefillPresupuesto={prefillPresupuesto}
+              onConsumirPrefillPresupuesto={() => setPrefillPresupuesto(null)}
             />
           )}
           {activeTab === "Datos del Paciente" && (
             <DatosPaciente patient={patient} formatDate={formatDate} />
           )}
-          {activeTab === "Historia Clínica" && <HistoriaClinica patientId={patient.id} />}
+          {activeTab === "Historia Clínica" && (
+            <HistoriaClinica
+              patientId={patient.id}
+              onAgregarAPresupuesto={(items) => {
+                setPrefillPresupuesto(items);
+                setActiveTab("Presupuestos");
+              }}
+              onVerPresupuestos={() => setActiveTab("Presupuestos")}
+            />
+          )}
           {activeTab === "Listado de Citas" && <ListadoCitas citas={citasPaciente} recursos={recursos} />}
           {activeTab === "Fotografías" && <Fotografias patientId={patient.id} />}
           {activeTab === "Pagos" && (

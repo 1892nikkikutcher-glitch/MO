@@ -15,9 +15,11 @@ import {
   valorOdontogramaComoDiagnosticos,
   type DiagnosticoOdontograma,
   type PreguntaTemplate,
+  type PresupuestoPrefillItem,
   type RespuestaValor,
   type RespuestasHistoriaClinica,
 } from "@/lib/historiaClinica";
+import type { SavedBudget } from "@/lib/patientData";
 
 type SiNo = "" | "si" | "no";
 
@@ -267,9 +269,15 @@ function formatFechaCorta(iso: string) {
 function OdontogramaDiagnostico({
   entries,
   onChange,
+  presupuestos,
+  onAgregarAPresupuesto,
+  onVerPresupuestos,
 }: {
   entries: DiagnosticoOdontograma[];
   onChange: (entries: DiagnosticoOdontograma[]) => void;
+  presupuestos: SavedBudget[];
+  onAgregarAPresupuesto: (entradas: DiagnosticoOdontograma[]) => void;
+  onVerPresupuestos: () => void;
 }) {
   const { procedimientos } = usePatientData();
   const [selectedTeeth, setSelectedTeeth] = useState<number[]>([]);
@@ -277,6 +285,16 @@ function OdontogramaDiagnostico({
   const [tratamientoSugerido, setTratamientoSugerido] = useState("");
   const [editandoId, setEditandoId] = useState<string | null>(null);
   const [entradaAEliminar, setEntradaAEliminar] = useState<DiagnosticoOdontograma | null>(null);
+  const [seleccionadosParaPresupuesto, setSeleccionadosParaPresupuesto] = useState<Set<string>>(new Set());
+
+  const toggleSeleccionParaPresupuesto = (id: string) => {
+    setSeleccionadosParaPresupuesto((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  };
 
   const toggleTooth = (t: number) =>
     setSelectedTeeth((prev) => (prev.includes(t) ? prev.filter((x) => x !== t) : [...prev, t]));
@@ -393,51 +411,94 @@ function OdontogramaDiagnostico({
 
       {entries.length > 0 && (
         <div className="space-y-2">
-          {entries.map((entry) => (
-            <div
-              key={entry.id}
-              className="flex items-start justify-between gap-3 rounded-lg border border-edge/10 bg-inset px-3 py-2 text-sm"
-            >
-              <div>
-                <p className="text-xs font-semibold text-accent">
-                  OD {[...entry.dientes].sort((a, b) => a - b).join(", ")}
-                </p>
-                <p className="text-ink">
-                  {entry.diagnostico || (
-                    <span className="italic text-ink/40">Sin diagnóstico anotado — edítalo para agregarlo</span>
-                  )}
-                </p>
-                {entry.tratamientoSugerido && (
-                  <p className="text-xs text-ink/50">Tratamiento sugerido: {entry.tratamientoSugerido}</p>
-                )}
-                {(entry.fecha || entry.fechaPresupuesto) && (
-                  <p className="text-xs text-ink/30">
-                    {entry.fecha && `Diagnosticado ${formatFechaCorta(entry.fecha)}`}
-                    {entry.fecha && entry.fechaPresupuesto && " · "}
-                    {entry.fechaPresupuesto && `Presupuestado ${formatFechaCorta(entry.fechaPresupuesto)}`}
-                  </p>
-                )}
-              </div>
-              <div className="flex shrink-0 items-center gap-2">
-                <button
-                  type="button"
-                  onClick={() => iniciarEdicion(entry)}
-                  title="Editar"
-                  className="text-ink/30 transition-colors hover:text-accent"
-                >
-                  ✎
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setEntradaAEliminar(entry)}
-                  title="Quitar"
-                  className="text-ink/30 transition-colors hover:text-danger"
-                >
-                  ✕
-                </button>
-              </div>
+          {seleccionadosParaPresupuesto.size > 0 && (
+            <div className="flex items-center justify-between rounded-lg border border-accent/30 bg-accent/10 px-3 py-2">
+              <span className="text-xs font-medium text-accent">
+                {seleccionadosParaPresupuesto.size} diagnóstico(s) seleccionado(s)
+              </span>
+              <button
+                type="button"
+                onClick={() => {
+                  onAgregarAPresupuesto(entries.filter((e) => seleccionadosParaPresupuesto.has(e.id)));
+                  setSeleccionadosParaPresupuesto(new Set());
+                }}
+                className="rounded-lg border border-accent/50 bg-accent/15 px-3 py-1.5 text-xs font-semibold text-accent transition-colors hover:bg-accent/25"
+              >
+                + Agregar {seleccionadosParaPresupuesto.size} a presupuesto
+              </button>
             </div>
-          ))}
+          )}
+          {entries.map((entry) => {
+            const folioLigado = entry.presupuestoId
+              ? presupuestos.find((p) => p.id === entry.presupuestoId)?.folio
+              : undefined;
+            const elegibleParaPresupuesto = Boolean(entry.tratamientoSugerido?.trim()) && !entry.presupuestoId;
+            return (
+              <div
+                key={entry.id}
+                className="flex items-start justify-between gap-3 rounded-lg border border-edge/10 bg-inset px-3 py-2 text-sm"
+              >
+                <div className="flex items-start gap-2">
+                  {elegibleParaPresupuesto && (
+                    <input
+                      type="checkbox"
+                      checked={seleccionadosParaPresupuesto.has(entry.id)}
+                      onChange={() => toggleSeleccionParaPresupuesto(entry.id)}
+                      title="Seleccionar para agregar a presupuesto"
+                      className="mt-1 accent-[color:var(--accent)]"
+                    />
+                  )}
+                  <div>
+                    <p className="text-xs font-semibold text-accent">
+                      OD {[...entry.dientes].sort((a, b) => a - b).join(", ")}
+                    </p>
+                    <p className="text-ink">
+                      {entry.diagnostico || (
+                        <span className="italic text-ink/40">Sin diagnóstico anotado — edítalo para agregarlo</span>
+                      )}
+                    </p>
+                    {entry.tratamientoSugerido && (
+                      <p className="text-xs text-ink/50">Tratamiento sugerido: {entry.tratamientoSugerido}</p>
+                    )}
+                    {(entry.fecha || entry.fechaPresupuesto) && (
+                      <p className="text-xs text-ink/30">
+                        {entry.fecha && `Diagnosticado ${formatFechaCorta(entry.fecha)}`}
+                        {entry.fecha && entry.fechaPresupuesto && " · "}
+                        {entry.fechaPresupuesto && `Presupuestado ${formatFechaCorta(entry.fechaPresupuesto)}`}
+                      </p>
+                    )}
+                    {entry.presupuestoId && (
+                      <button
+                        type="button"
+                        onClick={onVerPresupuestos}
+                        className="text-xs font-semibold text-accent hover:underline"
+                      >
+                        Ya en presupuesto{folioLigado ? ` #${folioLigado}` : ""} — ver
+                      </button>
+                    )}
+                  </div>
+                </div>
+                <div className="flex shrink-0 items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => iniciarEdicion(entry)}
+                    title="Editar"
+                    className="text-ink/30 transition-colors hover:text-accent"
+                  >
+                    ✎
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setEntradaAEliminar(entry)}
+                    title="Quitar"
+                    className="text-ink/30 transition-colors hover:text-danger"
+                  >
+                    ✕
+                  </button>
+                </div>
+              </div>
+            );
+          })}
         </div>
       )}
 
@@ -505,6 +566,9 @@ function PreguntaRenderer({
   detalle,
   onChangeDetalle,
   mostrarDetalle,
+  presupuestos,
+  onAgregarAPresupuesto,
+  onVerPresupuestos,
 }: {
   pregunta: PreguntaTemplate;
   valor: RespuestaValor | undefined;
@@ -512,6 +576,9 @@ function PreguntaRenderer({
   detalle?: string;
   onChangeDetalle?: (v: string) => void;
   mostrarDetalle?: boolean;
+  presupuestos: SavedBudget[];
+  onAgregarAPresupuesto: (preguntaId: string, entradas: DiagnosticoOdontograma[]) => void;
+  onVerPresupuestos: () => void;
 }) {
   if (pregunta.tipo === "sino") {
     return (
@@ -582,6 +649,9 @@ function PreguntaRenderer({
       <OdontogramaDiagnostico
         entries={entries}
         onChange={(next) => onChange(next as unknown as RespuestaValor)}
+        presupuestos={presupuestos}
+        onAgregarAPresupuesto={(entradas) => onAgregarAPresupuesto(pregunta.id, entradas)}
+        onVerPresupuestos={onVerPresupuestos}
       />
     );
   }
@@ -604,7 +674,21 @@ function formatFechaHora(iso: string) {
   });
 }
 
-export default function HistoriaClinica({ patientId }: { patientId: string }) {
+export default function HistoriaClinica({
+  patientId,
+  onAgregarAPresupuesto,
+  onVerPresupuestos,
+}: {
+  patientId: string;
+  /** Se llama al elegir uno o varios diagnósticos del odontograma y darle
+   * "Agregar a presupuesto" — quien monta este componente (Expediente.tsx)
+   * decide qué hacer (abrir Nuevo Presupuesto prellenado, cambiar de
+   * pestaña). Este componente ya se aseguró de guardar el historial antes
+   * de llamarlo, para que el diagnóstico no quede solo en el borrador. */
+  onAgregarAPresupuesto: (items: PresupuestoPrefillItem[]) => void;
+  /** Cambia a la pestaña Presupuestos — para el link "Ya en presupuesto…". */
+  onVerPresupuestos: () => void;
+}) {
   const {
     historiaClinicaTemplate,
     historiaClinicaPorPaciente,
@@ -612,8 +696,10 @@ export default function HistoriaClinica({ patientId }: { patientId: string }) {
     irAPagina,
     setCambiosSinGuardar,
     patients,
+    presupuestosPorPaciente,
   } = usePatientData();
   const guardadas = historiaClinicaPorPaciente[patientId] ?? respuestasVacias;
+  const presupuestos = presupuestosPorPaciente[patientId] ?? [];
   const esMasculino = patients.find((p) => p.id === patientId)?.sexo === "Masculino";
 
   const [borrador, setBorrador] = useState<RespuestasHistoriaClinica>(guardadas);
@@ -693,6 +779,23 @@ export default function HistoriaClinica({ patientId }: { patientId: string }) {
     setGuardando(false);
   };
 
+  // Guarda el historial primero (el diagnóstico recién anotado en el
+  // odontograma podría existir solo en el borrador local todavía) y hasta
+  // entonces avisa hacia arriba — así el presupuesto nunca referencia un
+  // diagnóstico que en realidad no llegó a persistirse.
+  const manejarAgregarAPresupuesto = (preguntaId: string, entradas: DiagnosticoOdontograma[]) => {
+    guardar();
+    onAgregarAPresupuesto(
+      entradas.map((e) => ({
+        preguntaId,
+        diagnosticoId: e.id,
+        procedure: e.tratamientoSugerido ?? "",
+        teeth: e.dientes,
+        note: e.diagnostico,
+      }))
+    );
+  };
+
   return (
     <div className="space-y-6">
       {(() => {
@@ -770,6 +873,9 @@ export default function HistoriaClinica({ patientId }: { patientId: string }) {
                 mostrarDetalle={esSeccionAntecedentesPatologicos(seccion.titulo)}
                 detalle={borrador.porPregunta[claveDetalleSiNo(pregunta.id)] as string | undefined}
                 onChangeDetalle={(v) => actualizarPregunta(claveDetalleSiNo(pregunta.id), v)}
+                presupuestos={presupuestos}
+                onAgregarAPresupuesto={manejarAgregarAPresupuesto}
+                onVerPresupuestos={onVerPresupuestos}
               />
             ))
           )}

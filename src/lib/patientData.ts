@@ -160,6 +160,14 @@ export type BudgetData = {
   diagnostico: string;
   items: LineItem[];
   total: number;
+  /** Días de vigencia desde `fecha` — editable por presupuesto, nace en 30.
+   * Ausente en presupuestos guardados antes de este campo. */
+  vigenciaDias?: number;
+  /** ISO (YYYY-MM-DD) — fecha límite de validez, calculada desde `fecha` +
+   * `vigenciaDias` (ver src/lib/presupuestoVigencia.ts). Ausente en
+   * presupuestos guardados antes de este campo — nunca se les inventa una
+   * fecha retroactiva. */
+  fechaVigenciaHasta?: string;
 };
 
 export const presupuestoEstadoOptions = ["pendiente", "aceptado", "rechazado", "expirado"] as const;

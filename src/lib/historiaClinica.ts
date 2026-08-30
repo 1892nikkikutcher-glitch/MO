@@ -266,6 +266,22 @@ export type DiagnosticoOdontograma = {
    * prellenar un renglón de presupuesto (ver NuevoPresupuesto), como
    * registro de que ya se presupuestó y cuándo. */
   fechaPresupuesto?: string;
+  /** Id del SavedBudget al que se ligó este diagnóstico — permite mostrar
+   * "Ya en presupuesto #XXXX" con link al folio real, en vez de solo una
+   * fecha suelta sin poder navegar a él. */
+  presupuestoId?: string;
+};
+
+/** Un diagnóstico del odontograma, ya listo para convertirse en un renglón
+ * de presupuesto (ver NuevoPresupuesto.tsx) — `preguntaId` identifica de
+ * qué pregunta "odontograma" vino, para poder marcarlo con `presupuestoId`
+ * después sin tener que buscarlo. */
+export type PresupuestoPrefillItem = {
+  preguntaId: string;
+  diagnosticoId: string;
+  procedure: string;
+  teeth: number[];
+  note: string;
 };
 
 /** Antes de este cambio, la respuesta de una pregunta "odontograma" era
