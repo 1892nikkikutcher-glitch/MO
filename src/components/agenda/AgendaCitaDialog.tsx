@@ -113,6 +113,20 @@ export default function AgendaCitaDialog({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [initial.patientId]);
 
+  // Con el diálogo abierto en un celular, hacer scroll dentro de él (al
+  // llegar al principio/final del contenido) sin esto "encadenaba" el
+  // scroll hacia la página de Agenda de atrás, hoy fija pero visible detrás
+  // del overlay — se sentía como que "la parte de atrás se mueve". Bloquea
+  // el scroll del body mientras el diálogo está montado y lo restaura al
+  // cerrarlo.
+  useEffect(() => {
+    const overflowPrevio = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    return () => {
+      document.body.style.overflow = overflowPrevio;
+    };
+  }, []);
+
   const [telefono, setTelefono] = useState(patientData?.phone ?? "");
   const [correo, setCorreo] = useState(patientData?.email ?? "");
   const [tratamientos, setTratamientos] = useState<string[]>(initial.tratamientos ?? []);
@@ -352,7 +366,7 @@ export default function AgendaCitaDialog({
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4">
-      <div className="max-h-[90vh] w-full max-w-5xl overflow-y-auto rounded-2xl border border-edge/10 bg-modal-solid p-6">
+      <div className="max-h-[90vh] w-full max-w-5xl overflow-y-auto overscroll-contain rounded-2xl border border-edge/10 bg-modal-solid p-4 sm:p-6">
         <div className="mb-4 flex flex-col gap-3 sm:relative sm:flex-row sm:items-center sm:justify-between">
           <div>
             <h2 className="text-lg font-semibold text-ink">
@@ -679,7 +693,7 @@ export default function AgendaCitaDialog({
           </div>
           </div>
 
-          <div className="grid grid-cols-3 gap-3">
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-3 sm:gap-3">
             <div>
               <label className="mb-1 block text-xs font-medium text-ink/60">Fecha</label>
               <input
@@ -726,7 +740,7 @@ export default function AgendaCitaDialog({
                 Programar seguimiento recurrente
               </label>
               {recurrente && (
-                <div className="mt-3 grid grid-cols-2 gap-3">
+                <div className="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-2">
                   <div>
                     <label className="mb-1 block text-xs font-medium text-ink/60">Frecuencia</label>
                     <select
@@ -768,11 +782,11 @@ export default function AgendaCitaDialog({
           </div>
         )}
 
-        <div className="mt-6 flex gap-3">
+        <div className="mt-6 flex flex-col gap-3 sm:flex-row">
           {isEditing && onDelete && (
             <button
               onClick={() => setConfirmandoEliminarCita(true)}
-              className="rounded-lg border border-danger/30 px-4 py-2.5 text-sm font-semibold text-danger transition-colors hover:bg-danger/10"
+              className="order-last rounded-lg border border-danger/30 px-4 py-2.5 text-sm font-semibold text-danger transition-colors hover:bg-danger/10 sm:order-none"
             >
               Eliminar
             </button>
