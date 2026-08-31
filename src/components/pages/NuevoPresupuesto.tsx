@@ -12,6 +12,7 @@ import {
 } from "@/lib/procedimientos";
 import { generarPresupuestoPdf } from "@/lib/generarPresupuestoPdf";
 import { enviarPdfPorWhatsapp } from "@/lib/enviarPdfWhatsapp";
+import AbrirWhatsAppPrompt from "@/components/AbrirWhatsAppPrompt";
 import { normalizarTexto } from "@/lib/reportes";
 import { slugify } from "@/lib/textoNombre";
 import { calcularFechaVigencia } from "@/lib/presupuestoVigencia";
@@ -70,6 +71,7 @@ export default function NuevoPresupuesto({
   const procedimientosActivos = procedimientos.filter(esProcedimientoActivo);
   const gruposProcedimientos = agruparPorEspecialidad(procedimientosActivos);
   const [enviandoWhatsApp, setEnviandoWhatsApp] = useState(false);
+  const [waUrlPendiente, setWaUrlPendiente] = useState<string | null>(null);
 
   const isEditing = Boolean(initialBudget);
   const [folio] = useState(() => initialBudget?.folio ?? generateFolio());
@@ -314,13 +316,14 @@ export default function NuevoPresupuesto({
         total,
         perfilDoctor,
       });
-      await enviarPdfPorWhatsapp({
+      const resultado = await enviarPdfPorWhatsapp({
         blob,
         nombreArchivo,
         telefono: patient.phone,
         caption,
         ventanaPrevia: ventanaWhatsApp,
       });
+      if (resultado.requiereAbrirManualmente) setWaUrlPendiente(resultado.waUrl);
     } catch (err) {
       console.error("No se pudo generar el PDF del presupuesto", err);
       ventanaWhatsApp?.close();
@@ -757,6 +760,10 @@ export default function NuevoPresupuesto({
         items={items}
         total={total}
       />
+
+      {waUrlPendiente && (
+        <AbrirWhatsAppPrompt waUrl={waUrlPendiente} onCerrar={() => setWaUrlPendiente(null)} />
+      )}
     </div>
   );
 }

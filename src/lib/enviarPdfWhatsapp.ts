@@ -12,15 +12,30 @@ function esMovilConWhatsappEnShareSheet(): boolean {
   return /Android|iPhone|iPod/i.test(navigator.userAgent);
 }
 
+/** Resultado de `enviarPdfPorWhatsapp`. En móvil, el share sheet nativo ya
+ * mandó el archivo — no queda nada más que hacer. En escritorio, redirigir
+ * automáticamente una pestaña pre-abierta a wa.me resultó NO ser confiable
+ * en Safari/Mac (el archivo se descarga bien, pero la navegación
+ * automática de la pestaña se pierde silenciosamente) — así que en vez de
+ * intentarlo, se devuelve el link para que la UI lo muestre como un botón
+ * "Abrir WhatsApp" que el propio doctor hace clic (un clic fresco y directo
+ * nunca lo bloquea un popup blocker, a diferencia de una redirección
+ * programática después de esperar la generación del PDF). */
+export type ResultadoEnvioWhatsapp =
+  | { requiereAbrirManualmente: false }
+  | { requiereAbrirManualmente: true; waUrl: string };
+
 /** Envía un PDF ya generado por WhatsApp: en móvil usa el share sheet nativo
  * (adjunta el archivo directamente); en escritorio no existe forma de
  * adjuntar un archivo a un chat de WhatsApp mediante un link, así que se
- * descarga el PDF y se abre WhatsApp con el texto para adjuntarlo a mano.
+ * descarga el PDF y se devuelve el link de WhatsApp para que la UI lo
+ * ofrezca como botón (ver `ResultadoEnvioWhatsapp`).
  *
  * `ventanaPrevia` debe venir de un `window.open("", "_blank")` disparado de
- * forma síncrona en el clic que originó el envío — abrirla después de
- * esperar la generación del PDF pierde el gesto de usuario y el navegador
- * la bloquea como pop-up. */
+ * forma síncrona en el clic que originó el envío — sigue sirviendo para el
+ * share sheet nativo (se cierra sin usarse) y como respaldo si en algún
+ * momento se retoma la navegación automática, pero ya no es el mecanismo
+ * principal para abrir WhatsApp en escritorio. */
 export async function enviarPdfPorWhatsapp({
   blob,
   nombreArchivo,
@@ -33,19 +48,27 @@ export async function enviarPdfPorWhatsapp({
   telefono?: string;
   caption: string;
   ventanaPrevia: Window | null;
-}): Promise<void> {
+}): Promise<ResultadoEnvioWhatsapp> {
   const archivo = new File([blob], nombreArchivo, { type: "application/pdf" });
 
-  if (navigator.canShare?.({ files: [archivo] })) {
+  if (esMovilConWhatsappEnShareSheet() && navigator.canShare?.({ files: [archivo] })) {
     ventanaPrevia?.close(); // no se usa la pestaña — el share sheet nativo adjunta el PDF directamente
     try {
-      await navigator.share({ files: [archivo], title: nombreArchivo, text: caption });
+      // Deliberadamente SIN `text`/`title`: al compartir archivo + texto
+      // juntos, la extensión de compartir de WhatsApp en iOS puede quedarse
+      // solo con el texto y descartar el PDF en silencio (confirmado — el
+      // mensaje llega, el archivo no). Compartiendo solo el archivo se
+      // garantiza que WhatsApp reciba el documento; el doctor escribe el
+      // mensaje a mano una vez ahí.
+      await navigator.share({ files: [archivo] });
     } catch (err) {
-      if (err instanceof Error && err.name === "AbortError") return; // el usuario canceló el share sheet
+      if (err instanceof Error && err.name === "AbortError") return { requiereAbrirManualmente: false }; // el usuario canceló el share sheet
       throw err;
     }
-    return;
+    return { requiereAbrirManualmente: false };
   }
+
+  ventanaPrevia?.close();
 
   const url = URL.createObjectURL(blob);
   const enlace = document.createElement("a");
@@ -57,6 +80,5 @@ export async function enviarPdfPorWhatsapp({
   const telefonoLimpio = telefono?.replace(/\D/g, "");
   const destino = telefonoLimpio ? `/${telefonoLimpio}` : "/";
   const waUrl = `https://wa.me${destino}?text=${encodeURIComponent(`${caption}\n\n(Adjunta el PDF que se acaba de descargar)`)}`;
-  if (ventanaPrevia) ventanaPrevia.location.href = waUrl;
-  else window.open(waUrl, "_blank");
+  return { requiereAbrirManualmente: true, waUrl };
 }

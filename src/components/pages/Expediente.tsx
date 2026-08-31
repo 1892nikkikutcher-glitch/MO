@@ -20,6 +20,7 @@ import { useMoConecta } from "@/context/MoConectaContext";
 import { generarPresupuestoPdf } from "@/lib/generarPresupuestoPdf";
 import { generarPresupuestoTotalPdf } from "@/lib/generarPresupuestoTotalPdf";
 import { enviarPdfPorWhatsapp } from "@/lib/enviarPdfWhatsapp";
+import AbrirWhatsAppPrompt from "@/components/AbrirWhatsAppPrompt";
 import { slugify } from "@/lib/textoNombre";
 import {
   computeTratamientosPendientes,
@@ -212,6 +213,10 @@ function PresupuestosTab({
   const [printComparativa, setPrintComparativa] = useState<ComparativaRehabilitacion | null>(null);
   const [enviandoComparativaId, setEnviandoComparativaId] = useState<string | null>(null);
   const [comparativaAEliminar, setComparativaAEliminar] = useState<ComparativaRehabilitacion | null>(null);
+  /** Cuando enviar por WhatsApp (presupuesto, presupuesto completo o
+   * comparativa) descarga el PDF pero no puede abrir WhatsApp solo — ver
+   * ResultadoEnvioWhatsapp en enviarPdfWhatsapp.ts. */
+  const [waUrlPendiente, setWaUrlPendiente] = useState<string | null>(null);
   const comparativas = comparativasPorPaciente[patient.id] ?? [];
 
   useEffect(() => {
@@ -233,7 +238,8 @@ function PresupuestosTab({
         pacienteNombre: patient.name,
         perfilDoctor,
       });
-      await enviarPdfPorWhatsapp({ blob, nombreArchivo, telefono: patient.phone, caption, ventanaPrevia: ventanaWhatsApp });
+      const resultado = await enviarPdfPorWhatsapp({ blob, nombreArchivo, telefono: patient.phone, caption, ventanaPrevia: ventanaWhatsApp });
+      if (resultado.requiereAbrirManualmente) setWaUrlPendiente(resultado.waUrl);
     } catch (err) {
       console.error("No se pudo generar el PDF de la comparativa", err);
       ventanaWhatsApp?.close();
@@ -306,13 +312,14 @@ function PresupuestosTab({
         total: budget.total,
         perfilDoctor,
       });
-      await enviarPdfPorWhatsapp({
+      const resultado = await enviarPdfPorWhatsapp({
         blob,
         nombreArchivo,
         telefono: patient.phone,
         caption,
         ventanaPrevia: ventanaWhatsApp,
       });
+      if (resultado.requiereAbrirManualmente) setWaUrlPendiente(resultado.waUrl);
     } catch (err) {
       console.error("No se pudo generar el PDF del presupuesto", err);
       ventanaWhatsApp?.close();
@@ -339,13 +346,14 @@ function PresupuestosTab({
         pacienteTelefono: patient.phone,
         perfilDoctor,
       });
-      await enviarPdfPorWhatsapp({
+      const resultado = await enviarPdfPorWhatsapp({
         blob,
         nombreArchivo,
         telefono: patient.phone,
         caption,
         ventanaPrevia: ventanaWhatsApp,
       });
+      if (resultado.requiereAbrirManualmente) setWaUrlPendiente(resultado.waUrl);
     } catch (err) {
       console.error("No se pudo generar el PDF del presupuesto completo", err);
       ventanaWhatsApp?.close();
@@ -823,6 +831,10 @@ function PresupuestosTab({
           pacienteNombre={patient.name}
           fechaLarga={fechaLargaHoy()}
         />
+      )}
+
+      {waUrlPendiente && (
+        <AbrirWhatsAppPrompt waUrl={waUrlPendiente} onCerrar={() => setWaUrlPendiente(null)} />
       )}
     </div>
   );

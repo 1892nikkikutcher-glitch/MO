@@ -5,6 +5,8 @@ import { usePatientData } from "@/context/PatientDataContext";
 import { formatNombreConEdad, type MedicamentoRecetado, type Receta } from "@/lib/patientData";
 import { calcularDosisPediatrica, type MedicamentoCatalogo } from "@/lib/medicamentos";
 import { generarRecetaPdf } from "@/lib/generarRecetaPdf";
+import { enviarPdfPorWhatsapp } from "@/lib/enviarPdfWhatsapp";
+import AbrirWhatsAppPrompt from "@/components/AbrirWhatsAppPrompt";
 import { slugify } from "@/lib/textoNombre";
 import { coincideAlergia, condicionesSistemicasPositivas, esNegacionAlergia } from "@/lib/historiaClinica";
 
@@ -112,6 +114,7 @@ export default function Recetas() {
   const [folioActual, setFolioActual] = useState<string | null>(null);
   const [horaActual, setHoraActual] = useState<string | null>(null);
   const [enviandoWhatsApp, setEnviandoWhatsApp] = useState(false);
+  const [waUrlPendiente, setWaUrlPendiente] = useState<string | null>(null);
   const [busquedaBitacora, setBusquedaBitacora] = useState("");
 
   const patient = patients.find((p) => p.id === patientId) ?? null;
@@ -267,7 +270,6 @@ export default function Recetas() {
     const hora = horaActual ?? horaActualFormateada();
     const nombreArchivo = `Receta_${slugify(patient.name)}_${slugify(todayFormatted())}.pdf`;
     const caption = `Receta médica — ${patient.name} · Folio ${folio} · ${todayFormatted()} ${hora}`;
-    const telefono = patient.phone.replace(/\D/g, "");
 
     setEnviandoWhatsApp(true);
     try {
@@ -289,31 +291,14 @@ export default function Recetas() {
         notas,
         perfilDoctor,
       });
-      const archivo = new File([blob], nombreArchivo, { type: "application/pdf" });
-
-      if (navigator.canShare?.({ files: [archivo] })) {
-        ventanaWhatsApp?.close(); // no se usa la pestaña — el share sheet nativo adjunta el PDF directamente
-        try {
-          await navigator.share({ files: [archivo], title: nombreArchivo, text: caption });
-        } catch (err) {
-          if (err instanceof Error && err.name === "AbortError") return; // el usuario canceló el share sheet
-          throw err;
-        }
-        return;
-      }
-
-      // En escritorio no existe forma de adjuntar un archivo a un chat de WhatsApp
-      // mediante un link — se descarga el PDF y se abre WhatsApp con el texto para
-      // que el usuario lo adjunte manualmente.
-      const url = URL.createObjectURL(blob);
-      const enlace = document.createElement("a");
-      enlace.href = url;
-      enlace.download = nombreArchivo;
-      enlace.click();
-      URL.revokeObjectURL(url);
-      const waUrl = `https://wa.me/${telefono}?text=${encodeURIComponent(`${caption}\n\n(Adjunta el PDF que se acaba de descargar)`)}`;
-      if (ventanaWhatsApp) ventanaWhatsApp.location.href = waUrl;
-      else window.open(waUrl, "_blank");
+      const resultado = await enviarPdfPorWhatsapp({
+        blob,
+        nombreArchivo,
+        telefono: patient.phone,
+        caption,
+        ventanaPrevia: ventanaWhatsApp,
+      });
+      if (resultado.requiereAbrirManualmente) setWaUrlPendiente(resultado.waUrl);
     } catch (err) {
       console.error("No se pudo generar el PDF de la receta", err);
       ventanaWhatsApp?.close();
@@ -793,6 +778,10 @@ export default function Recetas() {
             </div>
           </div>
         </div>
+      )}
+
+      {waUrlPendiente && (
+        <AbrirWhatsAppPrompt waUrl={waUrlPendiente} onCerrar={() => setWaUrlPendiente(null)} />
       )}
     </div>
   );
