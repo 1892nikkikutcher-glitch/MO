@@ -3,9 +3,9 @@
 /** Versión imprimible de una Comparativa de Rehabilitación — mismo patrón
  * que PresupuestoImpreso.tsx: oculta en pantalla, visible solo al imprimir
  * (`hidden ... print:block`), siempre fondo blanco/texto negro sin importar
- * el tema activo de la app. Reutiliza RadarComparativa en modoImpresion. */
+ * el tema activo de la app. Reutiliza BarrasComparativa en modoImpresion. */
 
-import RadarComparativa, { type OpcionRadar } from "@/components/RadarComparativa";
+import BarrasComparativa, { type OpcionGrafica } from "@/components/BarrasComparativa";
 import { usePatientData } from "@/context/PatientDataContext";
 import { EJES_COMPARATIVA } from "./NuevaComparativaRehabilitacion";
 import { formatCurrency, type SavedBudget } from "@/lib/patientData";
@@ -34,7 +34,7 @@ export default function ComparativaImpresa({
     })
     .filter((f): f is { op: ComparativaRehabilitacion["opciones"][number]; presupuesto: SavedBudget; color: string } => Boolean(f));
 
-  const opcionesRadar: OpcionRadar[] = filas.map(({ op, presupuesto, color }) => ({
+  const opcionesGrafica: OpcionGrafica[] = filas.map(({ op, presupuesto, color }) => ({
     id: presupuesto.id,
     color,
     etiqueta: etiquetaTratamiento(presupuesto),
@@ -68,7 +68,7 @@ export default function ComparativaImpresa({
       </div>
 
       <div className="mt-6 flex justify-center">
-        <RadarComparativa ejes={EJES_COMPARATIVA} opciones={opcionesRadar} modoImpresion />
+        <BarrasComparativa ejes={EJES_COMPARATIVA} opciones={opcionesGrafica} modoImpresion />
       </div>
 
       <div className="mt-6 space-y-4">

@@ -4,11 +4,11 @@
  * elegir 2-4 presupuestos ya guardados del paciente, y calificar cada uno
  * en función/estética/conservación biológica (economía se calcula sola,
  * desde los totales reales — ver calcularEconomiaRelativa). Vista previa en
- * vivo con la misma gráfica de radar que se usa en pantalla, impresión y
- * (con barras en vez de radar) en el PDF de WhatsApp. */
+ * vivo con las mismas barras de escala 0-5 que se usan en pantalla,
+ * impresión y en el PDF de WhatsApp. */
 
 import { useMemo, useState } from "react";
-import RadarComparativa, { type OpcionRadar } from "@/components/RadarComparativa";
+import BarrasComparativa, { type OpcionGrafica } from "@/components/BarrasComparativa";
 import {
   calcularEconomiaRelativa,
   etiquetaTratamiento,
@@ -131,7 +131,7 @@ export default function NuevaComparativaRehabilitacion({
     [presupuestosElegidos]
   );
 
-  const opcionesRadar: OpcionRadar[] = presupuestosElegidos.map((p, i) => {
+  const opcionesGrafica: OpcionGrafica[] = presupuestosElegidos.map((p, i) => {
     const cal = calificaciones[p.id] ?? calificacionVacia();
     return {
       id: p.id,
@@ -226,7 +226,7 @@ export default function NuevaComparativaRehabilitacion({
       </div>
 
       <div className="rounded-2xl border border-edge/10 bg-surface p-6">
-        <RadarComparativa ejes={EJES_COMPARATIVA} opciones={opcionesRadar} />
+        <BarrasComparativa ejes={EJES_COMPARATIVA} opciones={opcionesGrafica} />
       </div>
 
       <div className="space-y-4">
