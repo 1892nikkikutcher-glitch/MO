@@ -56,6 +56,7 @@ import GlobalNuevoPaciente from "./GlobalNuevoPaciente";
 import PanelAdministrador from "./pages/PanelAdministrador";
 import AsistenteFlotante from "./AsistenteFlotante";
 import { PatientDataProvider, usePatientData } from "@/context/PatientDataContext";
+import { PrivacidadProvider } from "@/context/PrivacidadContext";
 import { MoConectaProvider } from "@/context/MoConectaContext";
 import MoConecta from "./pages/MoConecta";
 
@@ -404,6 +405,7 @@ function DashboardBody({
   }
 
   return (
+    <PrivacidadProvider>
     <div data-theme={theme} className="flex min-h-screen bg-app text-ink">
       <Sidebar
         active={activePage}
@@ -513,6 +515,7 @@ function DashboardBody({
 
       <AsistenteFlotante activePage={activePage} activeLabel={activeLabel} />
     </div>
+    </PrivacidadProvider>
   );
 }
 

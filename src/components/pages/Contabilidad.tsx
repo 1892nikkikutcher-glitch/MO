@@ -2,6 +2,8 @@
 
 import { useState } from "react";
 import { usePatientData } from "@/context/PatientDataContext";
+import { usePrivacidad } from "@/context/PrivacidadContext";
+import CandadoPrivacidad from "@/components/CandadoPrivacidad";
 import type { Contador } from "@/lib/catalogosVarios";
 import { formatCurrency } from "@/lib/patientData";
 import { inicioMes, sumarRango } from "@/lib/metas";
@@ -141,6 +143,7 @@ function tituloContador(c: Contador): string {
 
 export default function Contabilidad() {
   const { contadores, setContadores, puedeVerFinanzas, finanzas, gastos } = usePatientData();
+  const { oculto } = usePrivacidad();
   const [editando, setEditando] = useState<Contador | "nuevo" | null>(null);
   const [contadorAEliminar, setContadorAEliminar] = useState<Contador | null>(null);
 
@@ -233,9 +236,12 @@ export default function Contabilidad() {
 
       {puedeVerFinanzas && (
         <div>
-          <h3 className="text-sm font-semibold uppercase tracking-wide text-ink/60">
-            Resumen para contabilidad
-          </h3>
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <h3 className="text-sm font-semibold uppercase tracking-wide text-ink/60">
+              Resumen para contabilidad
+            </h3>
+            <CandadoPrivacidad />
+          </div>
           <p className="mt-1 text-xs text-ink/40">
             Ingresos y gastos de este mes, para compartir con tu contador. Más adelante este módulo
             podrá separar automáticamente qué ingresos requieren factura, una vez que capturemos la
@@ -243,13 +249,17 @@ export default function Contabilidad() {
           </p>
           <div className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-2">
             <div className="rounded-2xl border border-edge/10 bg-surface p-5">
-              <div className="text-xl font-bold text-ink">{formatCurrency(ingresosMes)}</div>
+              <div className={`text-xl font-bold text-ink ${oculto ? "blur-[6px] select-none" : ""}`}>
+                {oculto ? "••••••" : formatCurrency(ingresosMes)}
+              </div>
               <div className="mt-1 text-[11px] uppercase tracking-wide text-ink/40">
                 Ingresos de Este Mes
               </div>
             </div>
             <div className="rounded-2xl border border-edge/10 bg-surface p-5">
-              <div className="text-xl font-bold text-ink">{formatCurrency(gastosMes)}</div>
+              <div className={`text-xl font-bold text-ink ${oculto ? "blur-[6px] select-none" : ""}`}>
+                {oculto ? "••••••" : formatCurrency(gastosMes)}
+              </div>
               <div className="mt-1 text-[11px] uppercase tracking-wide text-ink/40">
                 Gastos de Este Mes
               </div>
