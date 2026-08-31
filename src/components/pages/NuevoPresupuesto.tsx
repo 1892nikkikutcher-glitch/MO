@@ -12,6 +12,7 @@ import {
 } from "@/lib/procedimientos";
 import { generarPresupuestoPdf } from "@/lib/generarPresupuestoPdf";
 import { enviarPdfPorWhatsapp } from "@/lib/enviarPdfWhatsapp";
+import { normalizarTexto } from "@/lib/reportes";
 import { slugify } from "@/lib/textoNombre";
 import { calcularFechaVigencia } from "@/lib/presupuestoVigencia";
 import type { PresupuestoPrefillItem } from "@/lib/historiaClinica";
@@ -91,6 +92,18 @@ export default function NuevoPresupuesto({
       prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]
     );
   };
+  const [busquedaProcedimiento, setBusquedaProcedimiento] = useState("");
+  const terminoBusquedaProcedimiento = normalizarTexto(busquedaProcedimiento);
+  const gruposProcedimientosFiltrados = terminoBusquedaProcedimiento
+    ? gruposProcedimientos
+        .map((grupo) => ({
+          ...grupo,
+          procedimientos: grupo.procedimientos.filter((p) =>
+            normalizarTexto(p.nombre).includes(terminoBusquedaProcedimiento)
+          ),
+        }))
+        .filter((grupo) => grupo.procedimientos.length > 0)
+    : gruposProcedimientos;
   const [personalizadoNombre, setPersonalizadoNombre] = useState("");
   const [personalizadoPrecio, setPersonalizadoPrecio] = useState("");
   const [mostrarPersonalizado, setMostrarPersonalizado] = useState(false);
@@ -450,8 +463,18 @@ export default function NuevoPresupuesto({
                 Marca uno o varios — por ejemplo, acceso e instrumentación + instrumentación y
                 obturación + corona, todo en el mismo diente.
               </p>
+              <input
+                type="text"
+                value={busquedaProcedimiento}
+                onChange={(e) => setBusquedaProcedimiento(e.target.value)}
+                placeholder="Buscar procedimiento..."
+                className="mb-2 w-full rounded-lg border border-edge/10 bg-field px-3 py-2 text-sm text-ink placeholder-ink/30 outline-none focus:border-accent/60"
+              />
               <div className="max-h-56 space-y-3 overflow-y-auto rounded-lg border border-edge/10 bg-field p-2">
-                {gruposProcedimientos.map((grupo) => (
+                {gruposProcedimientosFiltrados.length === 0 && (
+                  <p className="px-1 py-2 text-sm text-ink/40">Sin resultados para &quot;{busquedaProcedimiento}&quot;.</p>
+                )}
+                {gruposProcedimientosFiltrados.map((grupo) => (
                   <div key={grupo.especialidad}>
                     <p className="px-1 pb-1 text-[10px] font-semibold uppercase tracking-wide text-ink/40">
                       {grupo.especialidad}

@@ -13,7 +13,7 @@ export function enRangoFecha(fecha: string, desde: string, hasta: string): boole
   return true;
 }
 
-function normalizarTexto(s: string): string {
+export function normalizarTexto(s: string): string {
   return Array.from(s.normalize("NFD"))
     .filter((c) => {
       const code = c.codePointAt(0) ?? 0;
