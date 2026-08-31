@@ -45,23 +45,30 @@ export default function BarrasComparativa({
             {ejes.map((eje, i) => {
               const nivel = op.valores[i] ?? 0;
               return (
-                <div key={eje} className="flex items-center gap-2 text-xs">
-                  <span className={`w-36 shrink-0 ${claseTextoSuave}`}>{eje}</span>
-                  <div className={`relative h-2.5 flex-1 overflow-hidden rounded-sm ${claseFondoBarra}`}>
-                    <div
-                      className="absolute inset-y-0 left-0 rounded-sm"
-                      style={{ width: `${(nivel / 5) * 100}%`, background: op.color }}
-                    />
-                    {[1, 2, 3, 4].map((marca) => (
-                      <span
-                        key={marca}
-                        className={`absolute inset-y-0 w-px ${claseDivisor}`}
-                        style={{ left: `${(marca / 5) * 100}%` }}
-                        aria-hidden="true"
+                // En celular (pantalla angosta) la etiqueta va arriba y la
+                // barra ocupa todo el ancho disponible — con la etiqueta al
+                // costado (como en tablet/escritorio) la barra quedaba
+                // apretada en menos de 150px. modoImpresion siempre usa el
+                // layout horizontal: una hoja impresa nunca es tan angosta.
+                <div key={eje} className="flex flex-col gap-1 text-xs sm:flex-row sm:items-center sm:gap-2">
+                  <span className={`sm:w-36 sm:shrink-0 ${claseTextoSuave}`}>{eje}</span>
+                  <div className="flex items-center gap-2">
+                    <div className={`relative h-2.5 flex-1 overflow-hidden rounded-sm ${claseFondoBarra}`}>
+                      <div
+                        className="absolute inset-y-0 left-0 rounded-sm"
+                        style={{ width: `${(nivel / 5) * 100}%`, background: op.color }}
                       />
-                    ))}
+                      {[1, 2, 3, 4].map((marca) => (
+                        <span
+                          key={marca}
+                          className={`absolute inset-y-0 w-px ${claseDivisor}`}
+                          style={{ left: `${(marca / 5) * 100}%` }}
+                          aria-hidden="true"
+                        />
+                      ))}
+                    </div>
+                    <span className={`w-8 shrink-0 text-right font-semibold ${claseTexto}`}>{nivel}/5</span>
                   </div>
-                  <span className={`w-8 shrink-0 text-right font-semibold ${claseTexto}`}>{nivel}/5</span>
                 </div>
               );
             })}

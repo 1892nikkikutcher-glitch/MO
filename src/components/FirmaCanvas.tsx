@@ -18,9 +18,18 @@ export default function FirmaCanvas({
   const drawingRef = useRef(false);
   const [hasSignature, setHasSignature] = useState(false);
 
+  // El lienzo dibuja en un búfer interno fijo de 440x160 (los atributos
+  // width/height de abajo), pero `w-full` lo hace RENDERIZAR más angosto en
+  // cualquier celular (el contenedor casi nunca llega a 440px de ancho real).
+  // Sin escalar, el trazo queda desplazado de donde realmente tocas — entre
+  // más angosta la pantalla, peor el desfase. Se convierte la posición del
+  // toque (en píxeles CSS renderizados) a píxeles del búfer interno.
   const getPos = (e: React.PointerEvent<HTMLCanvasElement>) => {
-    const rect = canvasRef.current!.getBoundingClientRect();
-    return { x: e.clientX - rect.left, y: e.clientY - rect.top };
+    const canvas = canvasRef.current!;
+    const rect = canvas.getBoundingClientRect();
+    const escalaX = canvas.width / rect.width;
+    const escalaY = canvas.height / rect.height;
+    return { x: (e.clientX - rect.left) * escalaX, y: (e.clientY - rect.top) * escalaY };
   };
 
   const handlePointerDown = (e: React.PointerEvent<HTMLCanvasElement>) => {
