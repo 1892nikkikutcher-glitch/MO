@@ -5,6 +5,7 @@ import { usePatientData } from "@/context/PatientDataContext";
 import { manejarCambioNombre } from "@/lib/textoNombre";
 import { escuelasOdontologiaComunes } from "@/lib/escuelasOdontologia";
 import { archivoAImagenComprimida } from "@/lib/imagenLogo";
+import FirmaCanvas from "@/components/FirmaCanvas";
 
 const inputClass =
   "w-full rounded-lg border border-edge/10 bg-field px-3 py-2 text-sm text-ink placeholder-ink/30 outline-none focus:border-accent/60";
@@ -77,6 +78,102 @@ function LogoField({
         </div>
       </Field>
       <p className="mt-1 text-xs text-ink/40">{ayuda}</p>
+    </div>
+  );
+}
+
+function FirmaField({
+  valor,
+  onCambiar,
+}: {
+  valor: string;
+  onCambiar: (dataUri: string) => void;
+}) {
+  const [subiendo, setSubiendo] = useState(false);
+  const [error, setError] = useState("");
+  const [dibujando, setDibujando] = useState(false);
+
+  const handleArchivo = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    e.target.value = "";
+    if (!file) return;
+    setSubiendo(true);
+    setError("");
+    try {
+      const dataUri = await archivoAImagenComprimida(file);
+      onCambiar(dataUri);
+    } catch {
+      setError("No se pudo cargar la imagen. Intenta con otro archivo.");
+    } finally {
+      setSubiendo(false);
+    }
+  };
+
+  return (
+    <div>
+      <Field label="Firma digital (opcional)">
+        <div className="flex items-center gap-3">
+          {valor && (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img
+              src={valor}
+              alt="Vista previa de la firma"
+              className="h-14 w-28 shrink-0 rounded-lg border border-edge/10 bg-white object-contain p-1"
+            />
+          )}
+          <div className="flex-1 space-y-1.5">
+            <div className="flex flex-wrap items-center gap-2">
+              <button
+                type="button"
+                onClick={() => setDibujando(true)}
+                className="rounded-lg border border-accent/50 bg-accent/10 px-3 py-1.5 text-xs font-semibold text-accent transition-colors hover:bg-accent/20"
+              >
+                Dibujar firma
+              </button>
+              <label className="cursor-pointer rounded-lg border border-edge/15 px-3 py-1.5 text-xs font-semibold text-ink/70 transition-colors hover:bg-surface">
+                Subir foto
+                <input type="file" accept="image/*" onChange={handleArchivo} className="hidden" />
+              </label>
+              {valor && !subiendo && (
+                <button
+                  type="button"
+                  onClick={() => onCambiar("")}
+                  className="text-xs font-semibold text-danger hover:text-danger"
+                >
+                  Quitar firma
+                </button>
+              )}
+            </div>
+            {subiendo && <p className="text-xs text-ink/40">Cargando imagen…</p>}
+            {error && <p className="text-xs text-danger">{error}</p>}
+          </div>
+        </div>
+      </Field>
+      <p className="mt-1 text-xs text-ink/40">
+        Dibuja tu firma con el dedo o el mouse, o sube una foto/escaneo. Se agrega sobre la línea de
+        &quot;Firma médico&quot; en las recetas que envíes por WhatsApp o imprimas en PDF.
+      </p>
+      {!valor && (
+        <p className="mt-2 rounded-lg border border-accent/30 bg-accent/10 px-3 py-2 text-xs text-accent">
+          La primera vez que agregues tu firma, hazlo desde tu celular — dibujar con el dedo en la
+          pantalla táctil da un resultado más natural que con el mouse en computadora.
+        </p>
+      )}
+
+      {dibujando && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4">
+          <div className="w-full max-w-md rounded-2xl border border-edge/10 bg-modal-solid p-6">
+            <FirmaCanvas
+              etiqueta="Tu firma"
+              onCancel={() => setDibujando(false)}
+              onSave={(dataUrl) => {
+                onCambiar(dataUrl);
+                setDibujando(false);
+              }}
+            />
+          </div>
+        </div>
+      )}
     </div>
   );
 }
@@ -207,9 +304,7 @@ export default function PerfilDoctor() {
           }}
         />
 
-        <LogoField
-          label="Firma digital (opcional)"
-          ayuda="Sube una foto o escaneo de tu firma. Se agrega sobre la línea de 'Firma médico' en las recetas que envíes por WhatsApp o imprimas en PDF."
+        <FirmaField
           valor={form.firmaDigitalUrl}
           onCambiar={(dataUri) => {
             setForm((prev) => ({ ...prev, firmaDigitalUrl: dataUri }));
