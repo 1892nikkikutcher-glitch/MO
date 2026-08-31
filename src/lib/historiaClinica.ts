@@ -152,7 +152,7 @@ export const plantillaInicial: HistoriaClinicaTemplate = {
       id: id("sec"),
       titulo: "Examen Clínico Estomatológico — Ganglios",
       preguntas: [
-        { id: id("p"), tipo: "chips", etiqueta: "Ganglios (grupo 1)", opciones: ["Palpables", "Único", "Adherido", "Múltiple", "Móvil", "Sin datos patológicos aparentes"] },
+        { id: id("p"), tipo: "chips", etiqueta: "Ganglios (grupo 1)", opciones: ["Palpables", "No palpables", "Único", "Adherido", "Múltiple", "Móvil", "Sin datos patológicos aparentes"] },
         { id: id("p"), tipo: "chips", etiqueta: "Ganglios (grupo 2)", opciones: ["Supuración", "Unilateral", "Duro", "Bilateral", "Blando"] },
       ],
     },
