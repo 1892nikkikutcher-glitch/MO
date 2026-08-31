@@ -1,6 +1,6 @@
 import jsPDF from "jspdf";
 import { cargarImagen, type ImagenCargada } from "./imagenesPdf";
-import { etiquetaTratamiento, type ComparativaRehabilitacion } from "./comparativaRehabilitacion";
+import { calcularEconomiaRelativa, etiquetaTratamiento, type ComparativaRehabilitacion } from "./comparativaRehabilitacion";
 import type { PerfilDoctor, SavedBudget } from "./patientData";
 
 export type DatosComparativaPdf = {
@@ -77,7 +77,14 @@ export async function generarComparativaPdf(datos: DatosComparativaPdf): Promise
     })
     .filter((x): x is { op: (typeof datos.comparativa.opciones)[number]; presupuesto: SavedBudget } => Boolean(x));
 
-  const anchoBarra = xDer - xIzq - 40;
+  // Mismo cálculo que en pantalla/impresión (NuevaComparativaRehabilitacion,
+  // ComparativaImpresa) — nunca se captura a mano, se deriva de los totales
+  // reales de los presupuestos que se están comparando.
+  const economias = calcularEconomiaRelativa(opcionesConPresupuesto.map(({ presupuesto }) => presupuesto.total));
+
+  const xBarra = xIzq + 38;
+  const anchoEtiquetaNivel = 10;
+  const anchoBarra = xDer - xBarra - anchoEtiquetaNivel;
   const alturaBarra = 3.2;
 
   const dibujarBarra = (etiqueta: string, nivel: number, color: [number, number, number]) => {
@@ -85,9 +92,22 @@ export async function generarComparativaPdf(datos: DatosComparativaPdf): Promise
     doc.setTextColor(60, 60, 60);
     doc.text(etiqueta, xIzq, y + 2.4);
     doc.setFillColor(230, 230, 230);
-    doc.rect(xIzq + 38, y, anchoBarra, alturaBarra, "F");
+    doc.rect(xBarra, y, anchoBarra, alturaBarra, "F");
     doc.setFillColor(color[0], color[1], color[2]);
-    doc.rect(xIzq + 38, y, (anchoBarra * nivel) / 5, alturaBarra, "F");
+    doc.rect(xBarra, y, (anchoBarra * nivel) / 5, alturaBarra, "F");
+    // Marcas de escala en 1, 2, 3, 4 (0 y 5 son los extremos de la barra) —
+    // para que se lea como una gráfica de 0 a 5, no solo una barra de
+    // progreso sin referencia.
+    doc.setDrawColor(255, 255, 255);
+    doc.setLineWidth(0.25);
+    for (let marca = 1; marca <= 4; marca++) {
+      const xMarca = xBarra + (anchoBarra * marca) / 5;
+      doc.line(xMarca, y, xMarca, y + alturaBarra);
+    }
+    doc.setDrawColor(0, 0, 0);
+    doc.setFontSize(8);
+    doc.setTextColor(90, 90, 90);
+    doc.text(`${nivel}/5`, xDer, y + 2.4, { align: "right" });
     doc.setTextColor(0, 0, 0);
     y += alturaBarra + 3;
   };
@@ -112,7 +132,7 @@ export async function generarComparativaPdf(datos: DatosComparativaPdf): Promise
     y += 6;
 
     doc.setFont("helvetica", "normal");
-    dibujarBarra("Economía", 3, color);
+    dibujarBarra(EJES[0], economias[i] ?? 3, color);
     dibujarBarra(EJES[1], op.funcion, color);
     dibujarBarra(EJES[2], op.estetica, color);
     dibujarBarra(EJES[3], op.conservacionBiologica, color);
