@@ -1,3 +1,17 @@
+/** `navigator.canShare` no basta para decidir "usar el share sheet nativo":
+ * Safari de escritorio (macOS) también lo soporta, pero su share sheet solo
+ * ofrece AirDrop/Mensajes/Notas/Freeform — WhatsApp no aparece ahí, así que
+ * usar `navigator.share` en Mac deja al doctor sin forma de completar el
+ * envío. Solo en iOS/Android el share sheet nativo SÍ incluye WhatsApp como
+ * destino. Se detecta con userAgent (no con `canShare`) — un iPad en modo
+ * escritorio se reporta a sí mismo como "Macintosh" y por lo tanto cae
+ * (correctamente, de forma conservadora) en el flujo de descarga + wa.me,
+ * que sigue funcionando ahí, solo sin el atajo de un toque. */
+function esMovilConWhatsappEnShareSheet(): boolean {
+  if (typeof navigator === "undefined") return false;
+  return /Android|iPhone|iPod/i.test(navigator.userAgent);
+}
+
 /** Envía un PDF ya generado por WhatsApp: en móvil usa el share sheet nativo
  * (adjunta el archivo directamente); en escritorio no existe forma de
  * adjuntar un archivo a un chat de WhatsApp mediante un link, así que se

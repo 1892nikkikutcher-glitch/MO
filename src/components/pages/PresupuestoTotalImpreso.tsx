@@ -13,18 +13,25 @@ export default function PresupuestoTotalImpreso({
   pacienteNombre,
   pacienteCorreo,
   pacienteTelefono,
+  modoVistaPrevia = false,
 }: {
   presupuestos: SavedBudget[];
   fechaLarga: string;
   pacienteNombre: string;
   pacienteCorreo: string;
   pacienteTelefono: string;
+  /** Para mostrarlo en pantalla dentro de un modal de vista previa (revisar
+   * antes de enviar) — en vez del patrón `hidden ... print:block` (oculto
+   * salvo al imprimir), queda siempre visible. */
+  modoVistaPrevia?: boolean;
 }) {
   const { perfilDoctor } = usePatientData();
   const granTotal = presupuestos.reduce((sum, p) => sum + p.total, 0);
 
   return (
-    <div className="hidden border-4 border-black bg-white p-8 text-black print:block">
+    <div
+      className={`border-4 border-black bg-white p-8 text-black ${modoVistaPrevia ? "block" : "hidden print:block"}`}
+    >
       <div className="flex items-start justify-between">
         <div className="w-16 shrink-0">
           {perfilDoctor.logoEscuelaUrl && (

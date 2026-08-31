@@ -254,6 +254,7 @@ function PresupuestosTab({
   }, [prefillPresupuesto]);
   const [printTarget, setPrintTarget] = useState<SavedBudget | null>(null);
   const [printAll, setPrintAll] = useState(false);
+  const [vistaPreviaCompleto, setVistaPreviaCompleto] = useState(false);
   const [enviandoWhatsAppId, setEnviandoWhatsAppId] = useState<string | null>(null);
   const [enviandoCompleto, setEnviandoCompleto] = useState(false);
   const [presupuestoAEliminar, setPresupuestoAEliminar] = useState<SavedBudget | null>(null);
@@ -450,6 +451,13 @@ function PresupuestosTab({
                   : "Marca folios abajo para elegir cuáles incluir (si no, va todo)"}
               </span>
               <button
+                onClick={() => setVistaPreviaCompleto(true)}
+                title="Ver el presupuesto completo antes de imprimirlo o enviarlo, por si necesita alguna corrección"
+                className="rounded-lg border border-edge/15 px-4 py-2 text-xs font-semibold text-ink/70 transition-colors hover:bg-surface"
+              >
+                Vista previa
+              </button>
+              <button
                 onClick={() => setPrintAll(true)}
                 title="Imprime los folios marcados (o todos, si no marcaste ninguno) juntos, con el total general"
                 className="rounded-lg border border-edge/15 px-4 py-2 text-xs font-semibold text-ink/70 transition-colors hover:bg-surface"
@@ -625,7 +633,10 @@ function PresupuestosTab({
       {comparativas.length > 0 && (
         <div className="space-y-3">
           <h3 className="text-sm font-semibold uppercase tracking-wide text-ink/60">Comparativas de Rehabilitación</h3>
-          <div className="overflow-hidden rounded-2xl border border-edge/10 bg-surface print:hidden">
+          <div
+            className="overflow-hidden rounded-2xl border border-warning/40 bg-surface print:hidden"
+            style={{ boxShadow: "0 0 16px -2px rgb(var(--warning-rgb) / 0.5)" }}
+          >
             <div className="divide-y divide-edge/5">
               {comparativas.map((c) => (
                 <div key={c.id} className="flex flex-wrap items-center justify-between gap-3 px-4 py-4">
@@ -756,6 +767,53 @@ function PresupuestosTab({
           pacienteCorreo={patient.email ?? ""}
           pacienteTelefono={patient.phone}
         />
+      )}
+
+      {vistaPreviaCompleto && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4">
+          <div className="flex max-h-[90vh] w-full max-w-3xl flex-col rounded-2xl border border-edge/10 bg-modal-solid">
+            <div className="flex items-center justify-between gap-3 border-b border-edge/10 p-4">
+              <h3 className="text-sm font-semibold text-ink">Vista previa — presupuesto completo</h3>
+              <button
+                onClick={() => setVistaPreviaCompleto(false)}
+                className="rounded-lg border border-edge/15 px-3 py-1.5 text-xs font-semibold text-ink/70 hover:bg-surface"
+              >
+                Cerrar
+              </button>
+            </div>
+            <div className="overflow-y-auto p-4">
+              <PresupuestoTotalImpreso
+                presupuestos={presupuestosParaCompleto}
+                fechaLarga={fechaLargaHoy()}
+                pacienteNombre={patient.name}
+                pacienteCorreo={patient.email ?? ""}
+                pacienteTelefono={patient.phone}
+                modoVistaPrevia
+              />
+            </div>
+            <div className="flex flex-wrap items-center justify-end gap-2 border-t border-edge/10 p-4">
+              <button
+                onClick={() => {
+                  setVistaPreviaCompleto(false);
+                  setPrintAll(true);
+                }}
+                className="rounded-lg border border-edge/15 px-4 py-2 text-xs font-semibold text-ink/70 transition-colors hover:bg-surface"
+              >
+                Imprimir
+              </button>
+              <button
+                onClick={() => {
+                  setVistaPreviaCompleto(false);
+                  enviarPresupuestoCompleto();
+                }}
+                disabled={enviandoCompleto}
+                className="rounded-lg border border-success/40 px-4 py-2 text-xs font-semibold text-success transition-colors hover:bg-success/10 disabled:cursor-not-allowed disabled:opacity-40"
+              >
+                Enviar por WhatsApp
+              </button>
+            </div>
+          </div>
+        </div>
       )}
 
       {printComparativa && (
