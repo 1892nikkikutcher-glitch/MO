@@ -221,8 +221,15 @@ function useFirestoreDoc<T extends object>(clinicUid: string | null, name: strin
     if (!clinicUid) return;
     const path = `users/${clinicUid}/config`;
     setValueState((prev) => {
+      // `prev` puede ser `defaultValue` si esto se llama antes de que
+      // termine de cargar la primera respuesta real de Firestore (mismo
+      // riesgo que setRespuestasHistoriaClinica) — este hook respalda 14
+      // documentos de config distintos (perfilDoctor, horario, metas,
+      // finanzas, formatosWhatsapp...), así que `merge: true` aquí protege
+      // a todos ellos a la vez contra un guardado que reemplace el
+      // documento completo con datos incompletos.
       const next = resolveUpdater(updater, prev);
-      setDoc(doc(db, path, name), next).catch((err) =>
+      setDoc(doc(db, path, name), next, { merge: true }).catch((err) =>
         console.error(`No se pudo guardar ${path}/${name}`, err)
       );
       return next;
@@ -251,7 +258,10 @@ function useClinicInfo(clinicUid: string | null) {
     if (!clinicUid || !value) return;
     const next = resolveUpdater(updater, value);
     setValueState(next);
-    setDoc(doc(db, "clinics", clinicUid), next).catch((err) =>
+    // merge: true por consistencia con el resto de los documentos de
+    // config — este ya tenía el guard `!value` que evita el caso más común
+    // (guardar antes de cargar), pero mismo defensivo por si acaso.
+    setDoc(doc(db, "clinics", clinicUid), next, { merge: true }).catch((err) =>
       console.error(`No se pudo guardar clinics/${clinicUid}`, err)
     );
   };
@@ -1653,9 +1663,12 @@ export function PatientDataProvider({
 
   const setFotosPaciente = (patientId: string, updater: Updater<FotosPaciente>) => {
     if (!clinicUid) return;
+    // Mismo riesgo que setRespuestasHistoriaClinica (ver su comentario) —
+    // merge: true evita reemplazar todo el documento si `prev` viene de
+    // fotosVacias por una suscripción aún no resuelta.
     const prev = fotosPorPaciente[patientId] ?? fotosVacias;
     const next = resolveUpdater(updater, prev);
-    setDoc(doc(db, `users/${clinicUid}/pacientes/${patientId}/fotos`, "datos"), next).catch((err) =>
+    setDoc(doc(db, `users/${clinicUid}/pacientes/${patientId}/fotos`, "datos"), next, { merge: true }).catch((err) =>
       console.error(`No se pudo guardar fotos de ${patientId}`, err)
     );
     setFotosPorPacienteState((p) => ({ ...p, [patientId]: next }));
