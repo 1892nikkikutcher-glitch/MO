@@ -14,6 +14,7 @@ import {
 } from "@/lib/patientData";
 import { usePatientData } from "@/context/PatientDataContext";
 import FirmaCanvas from "@/components/FirmaCanvas";
+import AvisoNoCabeEnHoja from "@/components/AvisoNoCabeEnHoja";
 import { renderPlantilla, formatosWhatsAppInicial, buildProximaCitaTexto } from "@/lib/formatosWhatsapp";
 
 const medicos = ["Dr. Nicolás Medina González", "Dra. Ana Paola Ríos Cervantes"];
@@ -327,7 +328,7 @@ function ReciboActions({
   pago: Pago;
   onDone: () => void;
 }) {
-  const { citas, clinicInfo, formatosWhatsapp } = usePatientData();
+  const { citas, patients, clinicInfo, formatosWhatsapp } = usePatientData();
 
   const handleImprimir = () => {
     window.print();
@@ -349,9 +350,14 @@ function ReciboActions({
       formaPago: pago.formaPago,
       conceptos: pago.lineas.map((l) => `- ${l.label}: ${formatCurrency(l.monto)}`).join("\n"),
       total: formatCurrency(pago.total),
-      proximaCita: buildProximaCitaTexto(citas, patientId),
+      proximaCita: buildProximaCitaTexto(citas, patientId, pago.fecha),
     });
-    window.open(`https://wa.me/?text=${encodeURIComponent(texto)}`, "_blank");
+    // Mismo patrón que Recordatorios.tsx/enviarPdfWhatsapp.ts: sin el
+    // teléfono en la URL, WhatsApp abre sin contacto seleccionado y hay que
+    // buscar al paciente a mano — con el teléfono, abre directo en su chat.
+    const telefono = patients.find((p) => p.id === patientId)?.phone?.replace(/\D/g, "");
+    const destino = telefono ? `/${telefono}` : "/";
+    window.open(`https://wa.me${destino}?text=${encodeURIComponent(texto)}`, "_blank");
   };
 
   return (
@@ -376,6 +382,11 @@ function ReciboActions({
           </div>
         )}
       </div>
+
+      <AvisoNoCabeEnHoja mostrar={pago.lineas.length > 8}>
+        Este recibo tiene {pago.lineas.length} conceptos — revisa la vista previa de impresión de
+        tu navegador antes de entregarlo, por si no cabe en una sola hoja.
+      </AvisoNoCabeEnHoja>
 
       <div>
         <p className="mb-2 text-xs font-medium text-ink/60">Enviar recibo</p>
@@ -786,7 +797,7 @@ export default function Pagos({
   pagos: Pago[];
   setPagos: Dispatch<SetStateAction<Pago[]>>;
 }) {
-  const { userEmail, setPagosEliminados, citas, clinicInfo, formatosWhatsapp } = usePatientData();
+  const { userEmail, setPagosEliminados, citas, patients, clinicInfo, formatosWhatsapp } = usePatientData();
   const [showDialog, setShowDialog] = useState(false);
   const [printTarget, setPrintTarget] = useState<Pago | null>(null);
   const [pagoAEliminar, setPagoAEliminar] = useState<Pago | null>(null);
@@ -939,9 +950,14 @@ export default function Pagos({
                               .map((l) => `- ${l.label}: ${formatCurrency(l.monto)}`)
                               .join("\n"),
                             total: formatCurrency(pago.total),
-                            proximaCita: buildProximaCitaTexto(citas, patientId),
+                            proximaCita: buildProximaCitaTexto(citas, patientId, pago.fecha),
                           });
-                          window.open(`https://wa.me/?text=${encodeURIComponent(texto)}`, "_blank");
+                          // Mismo bug que ya se corrigió en ReciboActions: sin el
+                          // teléfono en la URL, WhatsApp abre sin contacto
+                          // seleccionado y hay que buscarlo a mano.
+                          const telefono = patients.find((p) => p.id === patientId)?.phone?.replace(/\D/g, "");
+                          const destino = telefono ? `/${telefono}` : "/";
+                          window.open(`https://wa.me${destino}?text=${encodeURIComponent(texto)}`, "_blank");
                         }}
                         title="Enviar comprobante por WhatsApp"
                         className="flex h-7 w-7 items-center justify-center rounded-full border border-success/30 text-success/70 transition-colors hover:border-success hover:text-success"

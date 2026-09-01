@@ -24,7 +24,7 @@ Por favor responda con una de estas opciones:
 
 Si necesita reagendar o cancelar, agradecemos su aviso oportuno antes de las 04:00 pm del día anterior, para poder ofrecer el espacio a otro paciente y administrar mejor nuestros tiempos.
 
-*Tolerancia máxima de 15 min. Anticipe sus tiempos para trámites en administración.*
+*Tolerancia máxima de 10 min. Anticipe sus tiempos para trámites en administración.*
 
 ¡Agradecemos su cooperación para atenderle como se merece, que tenga un lindo día!
 
@@ -82,11 +82,21 @@ export function formatHora12(hora24: string): string {
   return `${String(h).padStart(2, "0")}:${m} ${sufijo}`;
 }
 
+/** Suma meses a una fecha "YYYY-MM-DD" armándola por componentes en hora
+ * local — `new Date("YYYY-MM-DD")` la interpreta como medianoche UTC, lo
+ * que corre un día hacia atrás en timezones detrás de UTC (México). */
+function sumarMeses(fechaISO: string, meses: number): string {
+  const [y, m, d] = fechaISO.split("-").map(Number);
+  const fecha = new Date(y, m - 1 + meses, d);
+  return `${fecha.getFullYear()}-${String(fecha.getMonth() + 1).padStart(2, "0")}-${String(fecha.getDate()).padStart(2, "0")}`;
+}
+
 /** Texto listo para insertar en {{proximaCita}} del recibo de pago: la
- * siguiente cita agendada de este paciente (fecha de hoy en adelante, sin
- * contar canceladas), o cadena vacía si no tiene ninguna — para que la
- * plantilla no muestre una línea coja cuando no aplica. */
-export function buildProximaCitaTexto(citas: CitaAgenda[], patientId: string): string {
+ * siguiente cita agendada de ESTE paciente (fecha de hoy en adelante, sin
+ * contar canceladas). Si no tiene ninguna, en vez de dejar la línea vacía
+ * sugiere una fecha tentativa de control a 6 meses de la fecha del pago —
+ * es solo texto informativo, nunca agenda una cita real. */
+export function buildProximaCitaTexto(citas: CitaAgenda[], patientId: string, fechaPago: string): string {
   const hoy = new Date();
   const hoyISO = `${hoy.getFullYear()}-${String(hoy.getMonth() + 1).padStart(2, "0")}-${String(hoy.getDate()).padStart(2, "0")}`;
 
@@ -94,6 +104,12 @@ export function buildProximaCitaTexto(citas: CitaAgenda[], patientId: string): s
     .filter((c) => c.patientId === patientId && c.estatus !== "Cancelada" && c.fecha >= hoyISO)
     .sort((a, b) => (a.fecha + a.horaInicio).localeCompare(b.fecha + b.horaInicio))[0];
 
-  if (!proxima) return "";
-  return `\n\nSu próxima cita es el ${formatFechaLarga(proxima.fecha)} a las ${formatHora12(proxima.horaInicio)}.`;
+  if (proxima) {
+    return `\n\nSu próxima cita es el ${formatFechaLarga(proxima.fecha)} a las ${formatHora12(proxima.horaInicio)}.`;
+  }
+
+  const tentativa = sumarMeses(fechaPago, 6);
+  return `\n\nAún no tiene una próxima cita agendada — le sugerimos un control aproximadamente el ${formatFechaLarga(
+    tentativa
+  )} (6 meses después de esta visita). Contáctenos para agendarla.`;
 }
