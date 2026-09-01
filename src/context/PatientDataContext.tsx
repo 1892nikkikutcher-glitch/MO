@@ -9,6 +9,7 @@ import {
   type ReactNode,
 } from "react";
 import {
+  arrayUnion,
   collection,
   deleteDoc,
   doc,
@@ -102,6 +103,7 @@ import {
   type HistoriaClinicaTemplate,
   type RespuestasHistoriaClinica,
 } from "@/lib/historiaClinica";
+import type { PlanTratamientoItem, PresupuestoVinculado } from "@/lib/planTratamiento";
 import { actualizarFrecuencias, vocabularioNotasInicial, type VocabularioNotas } from "@/lib/vocabularioNotas";
 import type { ComparativaRehabilitacion } from "@/lib/comparativaRehabilitacion";
 
@@ -493,6 +495,20 @@ type PatientDataContextValue = {
    * la vieja. */
   diagnosticosPorPaciente: Record<string, DiagnosticoPaciente[]>;
   setDiagnosticosPaciente: (patientId: string, updater: Updater<DiagnosticoPaciente[]>) => void;
+  /** Plan de Tratamiento por diagnóstico del odontograma (ver
+   * planTratamiento.ts) — la decisión clínica intercalada entre un
+   * DiagnosticoOdontograma y un renglón de presupuesto. */
+  planTratamientoPorPaciente: Record<string, PlanTratamientoItem[]>;
+  setPlanTratamientoPaciente: (patientId: string, updater: Updater<PlanTratamientoItem[]>) => void;
+  /** Agrega UNA cotización más a un plan ya existente sin arriesgar pisar
+   * una agregada por otra pestaña/usuario mientras tanto — usa
+   * arrayUnion() de Firestore (resuelto en el servidor) en vez del patrón
+   * general de sincronizar la lista completa desde el estado de React. */
+  vincularPresupuestoAPlan: (
+    patientId: string,
+    planTratamientoItemId: string,
+    vinculo: PresupuestoVinculado
+  ) => Promise<void>;
   /** Comparativas de rehabilitación — cada una compara 2-4 presupuestos ya
    * guardados del mismo paciente (ver "Comparativa de Rehabilitación" en
    * Presupuestos). Solo referencian el id de cada presupuesto, nunca
@@ -814,6 +830,7 @@ export function PatientDataProvider({
     Record<string, "cargando" | "cargado" | "error">
   >({});
   const [diagnosticosPorPaciente, setDiagnosticosPorPacienteState] = useState<Record<string, DiagnosticoPaciente[]>>({});
+  const [planTratamientoPorPaciente, setPlanTratamientoPorPacienteState] = useState<Record<string, PlanTratamientoItem[]>>({});
   const [comparativasPorPaciente, setComparativasPorPacienteState] = useState<
     Record<string, ComparativaRehabilitacion[]>
   >({});
@@ -944,6 +961,14 @@ export function PatientDataProvider({
       subs.current[diagnosticosKey] = onSnapshot(collection(db, path), (snap) => {
         const next = snap.docs.map((d) => ({ ...(d.data() as DiagnosticoPaciente), id: d.id }));
         setDiagnosticosPorPacienteState((prev) => ({ ...prev, [patientId]: next }));
+      });
+    }
+    const planTratamientoKey = `planTratamiento:${patientId}`;
+    if (!subs.current[planTratamientoKey]) {
+      const path = `users/${clinicUid}/pacientes/${patientId}/planTratamiento`;
+      subs.current[planTratamientoKey] = onSnapshot(collection(db, path), (snap) => {
+        const next = snap.docs.map((d) => ({ ...(d.data() as PlanTratamientoItem), id: d.id }));
+        setPlanTratamientoPorPacienteState((prev) => ({ ...prev, [patientId]: next }));
       });
     }
     const comparativasKey = `comparativas:${patientId}`;
@@ -1456,6 +1481,30 @@ export function PatientDataProvider({
     setDiagnosticosPorPacienteState((prev) => ({ ...prev, [patientId]: next }));
   };
 
+  const setPlanTratamientoPaciente = (patientId: string, updater: Updater<PlanTratamientoItem[]>) => {
+    if (!clinicUid) return;
+    const prevArr = planTratamientoPorPaciente[patientId] ?? [];
+    const next = resolveUpdater(updater, prevArr);
+    syncFirestoreList(`users/${clinicUid}/pacientes/${patientId}/planTratamiento`, prevArr, next);
+    setPlanTratamientoPorPacienteState((prev) => ({ ...prev, [patientId]: next }));
+  };
+
+  /** Agrega una cotización a un plan ya existente vía arrayUnion() —
+   * resuelto en el servidor, así que dos cotizaciones casi simultáneas del
+   * mismo plan (dos pestañas) nunca se pisan entre sí, a diferencia del
+   * patrón general de arriba (que sobrescribe la lista completa desde un
+   * array de React y sí podría perder una adición concurrente). No pasa
+   * por el estado local — el onSnapshot ya suscrito lo recoge solo. */
+  const vincularPresupuestoAPlan = async (
+    patientId: string,
+    planTratamientoItemId: string,
+    vinculo: PresupuestoVinculado
+  ) => {
+    if (!clinicUid) return;
+    const ref = doc(db, `users/${clinicUid}/pacientes/${patientId}/planTratamiento/${planTratamientoItemId}`);
+    await updateDoc(ref, { presupuestosVinculados: arrayUnion(vinculo) });
+  };
+
   const setComparativasPaciente = (patientId: string, updater: Updater<ComparativaRehabilitacion[]>) => {
     if (!clinicUid) return;
     const prevArr = comparativasPorPaciente[patientId] ?? [];
@@ -1820,6 +1869,7 @@ export function PatientDataProvider({
     setRecetasPaciente(sobrevivienteId, (prev) => [...prev, ...(recetasPorPaciente[perdedorId] ?? [])]);
     setLaboratoriosPaciente(sobrevivienteId, (prev) => [...prev, ...(laboratoriosPorPaciente[perdedorId] ?? [])]);
     setDiagnosticosPaciente(sobrevivienteId, (prev) => [...prev, ...(diagnosticosPorPaciente[perdedorId] ?? [])]);
+    setPlanTratamientoPaciente(sobrevivienteId, (prev) => [...prev, ...(planTratamientoPorPaciente[perdedorId] ?? [])]);
     setMembresiasPaciente(sobrevivienteId, (prev) => [...prev, ...(membresiasPorPaciente[perdedorId] ?? [])]);
 
     // Notas de evolución: v1 y v2 conviven en el mismo arreglo pero se
@@ -2026,6 +2076,9 @@ export function PatientDataProvider({
         agregarAclaracionNota,
         diagnosticosPorPaciente,
         setDiagnosticosPaciente,
+        planTratamientoPorPaciente,
+        setPlanTratamientoPaciente,
+        vincularPresupuestoAPlan,
         comparativasPorPaciente,
         setComparativasPaciente,
         membershipPlanes,

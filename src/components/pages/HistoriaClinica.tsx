@@ -10,15 +10,31 @@ import {
   esSeccionAntecedentesPatologicos,
   esSeccionDiagnosticoSistemico,
   esSeccionGinecoObstetrica,
+  estadoDiagnosticoOdontogramaLabel,
+  estadoDiagnosticoOdontogramaOptions,
+  estadoParaMostrar,
   respuestasVacias,
   resumenAntecedentesPatologicos,
   valorOdontogramaComoDiagnosticos,
   type DiagnosticoOdontograma,
+  type EstadoDiagnosticoOdontograma,
   type PreguntaTemplate,
   type PresupuestoPrefillItem,
   type RespuestaValor,
   type RespuestasHistoriaClinica,
 } from "@/lib/historiaClinica";
+import {
+  buscarProcedimientoPorNombre,
+  construirPlanTratamientoItem,
+  destinoPlanTratamientoLabel,
+  destinoPlanTratamientoOptions,
+  prioridadTratamientoLabel,
+  prioridadTratamientoOptions,
+  validarCreacionPlanTratamiento,
+  type DestinoPlanTratamiento,
+  type PlanTratamientoItem,
+  type PrioridadTratamiento,
+} from "@/lib/planTratamiento";
 import type { SavedBudget } from "@/lib/patientData";
 
 type SiNo = "" | "si" | "no";
@@ -260,23 +276,408 @@ function formatFechaCorta(iso: string) {
   return `${d}/${m}/${y}`;
 }
 
+/** Selector del estado clínico de un diagnóstico — siempre visible y
+ * editable en cualquier momento, independiente de crear un plan. Un
+ * diagnóstico legado sin `estado` se muestra como "Sin clasificar", NUNCA
+ * se le asume "confirmado" (ver estadoParaMostrar en historiaClinica.ts). */
+function EstadoDiagnosticoSelector({
+  estado,
+  onChange,
+}: {
+  estado: EstadoDiagnosticoOdontograma | undefined;
+  onChange: (nuevo: EstadoDiagnosticoOdontograma) => void;
+}) {
+  const mostrado = estadoParaMostrar({ estado });
+  return (
+    <div className="mt-1.5 flex flex-wrap items-center gap-1">
+      <span className="text-xs text-ink/40">Estado:</span>
+      {estadoDiagnosticoOdontogramaOptions.map((opt) => (
+        <button
+          key={opt}
+          type="button"
+          onClick={() => onChange(opt)}
+          className={`rounded-full border px-2 py-0.5 text-[11px] font-semibold transition-colors ${
+            mostrado === opt
+              ? "border-accent/60 bg-accent/15 text-accent"
+              : "border-edge/15 text-ink/50 hover:bg-surface"
+          }`}
+        >
+          {estadoDiagnosticoOdontogramaLabel[opt]}
+        </button>
+      ))}
+      {mostrado === "sin_clasificar" && (
+        <span className="text-[11px] italic text-ink/30">Sin clasificar</span>
+      )}
+    </div>
+  );
+}
+
+/** Clasifica `tratamiento` contra el catálogo real y exige confirmación
+ * explícita del profesional antes de fijar cualquier precio — nunca elige
+ * sola entre 2+ candidatos, y hasta un match único requiere un clic. */
+function ResolverCatalogoYCotizar({
+  tratamiento,
+  onConfirmar,
+  onCancelar,
+}: {
+  tratamiento: string;
+  /** precioConfirmado ausente = "Precio pendiente", el renglón nace en $0
+   * en NuevoPresupuesto (mismo comportamiento que hoy). */
+  onConfirmar: (procedimientoId: string | undefined, precioConfirmado: number | undefined) => void;
+  onCancelar: () => void;
+}) {
+  const { procedimientos } = usePatientData();
+  const resultado = buscarProcedimientoPorNombre(tratamiento, procedimientos);
+
+  if (resultado.tipo === "sin_match") {
+    return (
+      <div className="space-y-2 rounded-lg border border-warning/30 bg-warning/10 p-3 text-xs">
+        <p className="text-warning">
+          &quot;{tratamiento}&quot; no está en el catálogo — el renglón nacerá con &quot;Precio pendiente&quot;.
+        </p>
+        <div className="flex gap-2">
+          <button
+            type="button"
+            onClick={() => onConfirmar(undefined, undefined)}
+            className="rounded-lg border border-accent/50 bg-accent/15 px-3 py-1.5 font-semibold text-accent hover:bg-accent/25"
+          >
+            Continuar con precio pendiente
+          </button>
+          <button type="button" onClick={onCancelar} className="rounded-lg border border-edge/15 px-3 py-1.5 text-ink/60 hover:bg-surface">
+            Cancelar
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  if (resultado.tipo === "match_unico") {
+    const p = resultado.procedimiento;
+    return (
+      <div className="space-y-2 rounded-lg border border-accent/30 bg-accent/10 p-3 text-xs">
+        <p className="text-ink">
+          Procedimiento encontrado en catálogo: <span className="font-semibold">{p.nombre}</span> — ${p.costoPaciente.toLocaleString("es-MX")}
+        </p>
+        <div className="flex flex-wrap gap-2">
+          <button
+            type="button"
+            onClick={() => onConfirmar(p.id, p.costoPaciente)}
+            className="rounded-lg border border-accent/50 bg-accent/15 px-3 py-1.5 font-semibold text-accent hover:bg-accent/25"
+          >
+            Confirmar este precio
+          </button>
+          <button
+            type="button"
+            onClick={() => onConfirmar(undefined, undefined)}
+            className="rounded-lg border border-edge/15 px-3 py-1.5 text-ink/60 hover:bg-surface"
+          >
+            Precio pendiente en su lugar
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-2 rounded-lg border border-warning/30 bg-warning/10 p-3 text-xs">
+      <p className="text-warning">Hay varias coincidencias — elige la correcta (nunca se elige sola):</p>
+      <div className="flex flex-col gap-1.5">
+        {resultado.candidatos.map((p) => (
+          <button
+            key={p.id}
+            type="button"
+            onClick={() => onConfirmar(p.id, p.costoPaciente)}
+            className="rounded-lg border border-edge/15 bg-surface px-3 py-1.5 text-left hover:border-accent/40"
+          >
+            {p.nombre} — ${p.costoPaciente.toLocaleString("es-MX")}
+          </button>
+        ))}
+        <button
+          type="button"
+          onClick={() => onConfirmar(undefined, undefined)}
+          className="rounded-lg border border-edge/15 px-3 py-1.5 text-left text-ink/60 hover:bg-surface"
+        >
+          Ninguno de estos — precio pendiente
+        </button>
+      </div>
+    </div>
+  );
+}
+
+/** Panel corto para crear UN PlanTratamientoItem a partir de un diagnóstico
+ * ya anotado — "¿qué haremos con este diagnóstico?" → tratamiento/prioridad
+ * si aplica → "Incluir en presupuesto" resuelve el catálogo con
+ * confirmación explícita. El plan se persiste SIEMPRE al guardar, sin
+ * importar si se decide cotizar ahora o después (ver PlanTratamientoItem en
+ * planTratamiento.ts, ronda 3 punto 3). */
+function CrearPlanTratamientoPanel({
+  entry,
+  patientId,
+  preguntaId,
+  miUid,
+  onConfirmarEstado,
+  onGuardarPlan,
+  onCancelar,
+}: {
+  entry: DiagnosticoOdontograma;
+  patientId: string;
+  preguntaId: string;
+  miUid: string;
+  onConfirmarEstado: (nuevo: EstadoDiagnosticoOdontograma) => void;
+  onGuardarPlan: (plan: PlanTratamientoItem, prefill: PresupuestoPrefillItem | null) => void;
+  onCancelar: () => void;
+}) {
+  const [destino, setDestino] = useState<DestinoPlanTratamiento | null>(null);
+  const [tratamiento, setTratamiento] = useState(entry.tratamientoSugerido ?? "");
+  const [prioridad, setPrioridad] = useState<PrioridadTratamiento>("media");
+  const [incluirEnPresupuesto, setIncluirEnPresupuesto] = useState(true);
+  const [resolviendoCatalogo, setResolviendoCatalogo] = useState(false);
+
+  const validacion = destino ? validarCreacionPlanTratamiento(entry.estado, destino) : null;
+  const bloqueadoPorProvisional = destino === "tratamiento_clinica" && entry.estado === "provisional";
+  const motivoBloqueo = validacion && !validacion.permitido ? validacion.motivo : null;
+
+  const construirYGuardar = (procedimientoId: string | undefined, precioConfirmado: number | undefined) => {
+    if (!destino || !entry.estado) return;
+    const id = `plan${Date.now()}`;
+    const plan = construirPlanTratamientoItem({
+      id,
+      patientId,
+      diagnosticoId: entry.id,
+      preguntaId,
+      diagnosticoTexto: entry.diagnostico,
+      estadoDiagnosticoSnapshot: entry.estado,
+      dientes: entry.dientes,
+      tratamiento: destino === "tratamiento_clinica" ? tratamiento.trim() : "",
+      procedimientoId,
+      prioridad,
+      destino,
+      creadoEn: new Date().toISOString(),
+      creadoPorUid: miUid,
+    });
+    const prefill: PresupuestoPrefillItem | null =
+      destino === "tratamiento_clinica" && incluirEnPresupuesto
+        ? {
+            preguntaId,
+            diagnosticoId: entry.id,
+            planTratamientoItemId: id,
+            procedure: tratamiento.trim(),
+            teeth: entry.dientes,
+            note: entry.diagnostico,
+            precioConfirmado,
+            prioridad,
+          }
+        : null;
+    onGuardarPlan(plan, prefill);
+  };
+
+  const handleGuardarClick = () => {
+    if (!validacion?.permitido) return;
+    if (destino === "tratamiento_clinica" && incluirEnPresupuesto && tratamiento.trim()) {
+      setResolviendoCatalogo(true);
+      return;
+    }
+    construirYGuardar(undefined, undefined);
+  };
+
+  if (resolviendoCatalogo) {
+    return (
+      <div className="mt-2 space-y-2">
+        <ResolverCatalogoYCotizar
+          tratamiento={tratamiento.trim()}
+          onConfirmar={(procedimientoId, precioConfirmado) => construirYGuardar(procedimientoId, precioConfirmado)}
+          onCancelar={() => setResolviendoCatalogo(false)}
+        />
+      </div>
+    );
+  }
+
+  return (
+    <div className="mt-2 space-y-3 rounded-lg border border-accent/20 bg-accent/5 p-3">
+      <div>
+        <p className="mb-1 text-xs font-medium text-ink/60">¿Qué haremos con este diagnóstico?</p>
+        <div className="flex flex-wrap gap-1.5">
+          {destinoPlanTratamientoOptions.map((opt) => (
+            <button
+              key={opt}
+              type="button"
+              onClick={() => setDestino(opt)}
+              className={`rounded-full border px-2.5 py-1 text-xs font-semibold transition-colors ${
+                destino === opt ? "border-accent/60 bg-accent/15 text-accent" : "border-edge/15 text-ink/60 hover:bg-surface"
+              }`}
+            >
+              {destinoPlanTratamientoLabel[opt]}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {destino && motivoBloqueo && !bloqueadoPorProvisional && (
+        <p className="text-xs text-danger">{motivoBloqueo}</p>
+      )}
+
+      {bloqueadoPorProvisional && (
+        <div className="rounded-lg border border-warning/30 bg-warning/10 p-2.5 text-xs">
+          <p className="text-warning">{motivoBloqueo}</p>
+          <button
+            type="button"
+            onClick={() => onConfirmarEstado("confirmado")}
+            className="mt-1.5 rounded-lg border border-accent/50 bg-accent/15 px-3 py-1 font-semibold text-accent hover:bg-accent/25"
+          >
+            Confirmar diagnóstico
+          </button>
+        </div>
+      )}
+
+      {destino === "tratamiento_clinica" && validacion?.permitido && (
+        <div className="space-y-2">
+          <div>
+            <label className="mb-1 block text-xs font-medium text-ink/60">Tratamiento</label>
+            <input
+              type="text"
+              value={tratamiento}
+              onChange={(e) => setTratamiento(e.target.value)}
+              placeholder="Ej. Resina clase I"
+              className={inputClass}
+            />
+          </div>
+          <div>
+            <label className="mb-1 block text-xs font-medium text-ink/60">Prioridad</label>
+            <div className="flex flex-wrap gap-1.5">
+              {prioridadTratamientoOptions.map((opt) => (
+                <button
+                  key={opt}
+                  type="button"
+                  onClick={() => setPrioridad(opt)}
+                  className={`rounded-full border px-2.5 py-1 text-xs font-semibold transition-colors ${
+                    prioridad === opt ? "border-accent/60 bg-accent/15 text-accent" : "border-edge/15 text-ink/60 hover:bg-surface"
+                  }`}
+                >
+                  {prioridadTratamientoLabel[opt]}
+                </button>
+              ))}
+            </div>
+          </div>
+          <label className="flex items-center gap-2 text-xs font-medium text-ink/70">
+            <input
+              type="checkbox"
+              checked={incluirEnPresupuesto}
+              onChange={(e) => setIncluirEnPresupuesto(e.target.checked)}
+              className="h-4 w-4 accent-accent"
+            />
+            Incluir en presupuesto
+          </label>
+        </div>
+      )}
+
+      {destino && (
+        <div className="flex gap-2">
+          <button
+            type="button"
+            onClick={handleGuardarClick}
+            disabled={!validacion?.permitido || (destino === "tratamiento_clinica" && !tratamiento.trim())}
+            className="rounded-lg border border-accent/50 bg-accent/15 px-3 py-1.5 text-xs font-semibold text-accent transition-colors hover:bg-accent/25 disabled:cursor-not-allowed disabled:opacity-40"
+          >
+            Guardar plan
+          </button>
+          <button type="button" onClick={onCancelar} className="rounded-lg border border-edge/15 px-3 py-1.5 text-xs font-semibold text-ink/60 hover:bg-surface">
+            Cancelar
+          </button>
+        </div>
+      )}
+    </div>
+  );
+}
+
+/** Fila de un plan de tratamiento ya guardado — "Crear nueva cotización"
+ * siempre disponible sin importar cuántas veces ya se haya cotizado (nunca
+ * se bloquea por presupuestosVinculados existentes, ver ronda 3 punto 3). */
+function PlanTratamientoRow({
+  plan,
+  patientId,
+  onCotizar,
+}: {
+  plan: PlanTratamientoItem;
+  patientId: string;
+  onCotizar: (plan: PlanTratamientoItem, prefill: PresupuestoPrefillItem) => void;
+}) {
+  const [cotizando, setCotizando] = useState(false);
+  const vinculos = plan.presupuestosVinculados ?? [];
+
+  return (
+    <div className="rounded-lg border border-edge/10 bg-inset px-2.5 py-2 text-xs">
+      <div className="flex flex-wrap items-center gap-1.5">
+        <span className="rounded-full bg-accent/10 px-2 py-0.5 font-semibold text-accent">{destinoPlanTratamientoLabel[plan.destino]}</span>
+        {plan.destino === "tratamiento_clinica" && (
+          <>
+            <span className="text-ink">{plan.tratamiento}</span>
+            <span className="rounded-full border border-edge/15 px-2 py-0.5 text-ink/50">{prioridadTratamientoLabel[plan.prioridad]}</span>
+          </>
+        )}
+        <span className="text-ink/30">· estado del diagnóstico al crear el plan: {estadoDiagnosticoOdontogramaLabel[plan.estadoDiagnosticoSnapshot]}</span>
+      </div>
+      {vinculos.length > 0 && (
+        <p className="mt-1 text-ink/40">Cotizado {vinculos.length} {vinculos.length === 1 ? "vez" : "veces"}</p>
+      )}
+      {plan.destino === "tratamiento_clinica" && plan.estadoClinico !== "cancelado" && (
+        <div className="mt-1.5">
+          {!cotizando ? (
+            <button type="button" onClick={() => setCotizando(true)} className="font-semibold text-accent hover:underline">
+              {vinculos.length > 0 ? "Crear nueva cotización" : "Crear cotización"}
+            </button>
+          ) : (
+            <ResolverCatalogoYCotizar
+              tratamiento={plan.tratamiento}
+              onConfirmar={(procedimientoId, precioConfirmado) => {
+                onCotizar(plan, {
+                  preguntaId: plan.preguntaId,
+                  diagnosticoId: plan.diagnosticoId,
+                  planTratamientoItemId: plan.id,
+                  procedure: plan.tratamiento,
+                  teeth: plan.dientes,
+                  note: plan.diagnosticoTexto,
+                  precioConfirmado,
+                  prioridad: plan.prioridad,
+                });
+                setCotizando(false);
+              }}
+              onCancelar={() => setCotizando(false)}
+            />
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
 /** Odontograma para anotar diagnósticos por diente (uno o varios a la
  * vez) — marcar dientes arriba deja una selección "en borrador" que se
  * convierte en un renglón guardado al capturar el diagnóstico, igual que
  * el flujo de agregar procedimientos en Nuevo Presupuesto. El tratamiento
  * sugerido es criterio del médico (no un cálculo), y sirve después para
- * prellenar un renglón de presupuesto para este mismo diagnóstico. */
+ * prellenar el tratamiento de un PlanTratamientoItem para este mismo
+ * diagnóstico (ver "Crear plan de tratamiento" en cada renglón). */
 function OdontogramaDiagnostico({
   entries,
   onChange,
   presupuestos,
-  onAgregarAPresupuesto,
+  planesTratamiento,
+  patientId,
+  preguntaId,
+  miUid,
+  onGuardarPlan,
+  onCrearCotizacion,
   onVerPresupuestos,
 }: {
   entries: DiagnosticoOdontograma[];
   onChange: (entries: DiagnosticoOdontograma[]) => void;
   presupuestos: SavedBudget[];
-  onAgregarAPresupuesto: (entradas: DiagnosticoOdontograma[]) => void;
+  planesTratamiento: PlanTratamientoItem[];
+  patientId: string;
+  preguntaId: string;
+  miUid: string;
+  onGuardarPlan: (plan: PlanTratamientoItem) => void;
+  onCrearCotizacion: (prefill: PresupuestoPrefillItem) => void;
   onVerPresupuestos: () => void;
 }) {
   const { procedimientos } = usePatientData();
@@ -285,16 +686,7 @@ function OdontogramaDiagnostico({
   const [tratamientoSugerido, setTratamientoSugerido] = useState("");
   const [editandoId, setEditandoId] = useState<string | null>(null);
   const [entradaAEliminar, setEntradaAEliminar] = useState<DiagnosticoOdontograma | null>(null);
-  const [seleccionadosParaPresupuesto, setSeleccionadosParaPresupuesto] = useState<Set<string>>(new Set());
-
-  const toggleSeleccionParaPresupuesto = (id: string) => {
-    setSeleccionadosParaPresupuesto((prev) => {
-      const next = new Set(prev);
-      if (next.has(id)) next.delete(id);
-      else next.add(id);
-      return next;
-    });
-  };
+  const [planEnCreacionParaId, setPlanEnCreacionParaId] = useState<string | null>(null);
 
   const toggleTooth = (t: number) =>
     setSelectedTeeth((prev) => (prev.includes(t) ? prev.filter((x) => x !== t) : [...prev, t]));
@@ -317,19 +709,39 @@ function OdontogramaDiagnostico({
     const diagnostico = diagnosticoTexto.trim();
     if (selectedTeeth.length === 0 || !diagnostico) return;
     if (editandoId) {
-      onChange(
-        entries.map((e) =>
-          e.id === editandoId
-            ? {
-                ...e,
-                dientes: selectedTeeth,
-                diagnostico,
-                tratamientoSugerido: tratamientoSugerido.trim() || undefined,
-                fecha: e.fecha || todayISO(),
-              }
-            : e
-        )
-      );
+      const original = entries.find((e) => e.id === editandoId);
+      const tieneDescendientes = planesTratamiento.some((p) => p.diagnosticoId === editandoId);
+      // Protección mínima: un diagnóstico CONFIRMADO que ya originó al
+      // menos un PlanTratamientoItem nunca se sobrescribe destructivamente
+      // — se crea una entrada derivada en vez de mutar la original, que
+      // permanece intacta y visible (ver derivadoDeDiagnosticoId,
+      // historiaClinica.ts). Diagnósticos sin descendientes o no
+      // confirmados se siguen editando en el mismo id, como antes.
+      if (original?.estado === "confirmado" && tieneDescendientes) {
+        const derivado: DiagnosticoOdontograma = {
+          id: `diag${Date.now()}`,
+          dientes: selectedTeeth,
+          diagnostico,
+          tratamientoSugerido: tratamientoSugerido.trim() || undefined,
+          fecha: todayISO(),
+          derivadoDeDiagnosticoId: original.id,
+        };
+        onChange([derivado, ...entries]);
+      } else {
+        onChange(
+          entries.map((e) =>
+            e.id === editandoId
+              ? {
+                  ...e,
+                  dientes: selectedTeeth,
+                  diagnostico,
+                  tratamientoSugerido: tratamientoSugerido.trim() || undefined,
+                  fecha: e.fecha || todayISO(),
+                }
+              : e
+          )
+        );
+      }
     } else {
       const nuevo: DiagnosticoOdontograma = {
         id: `diag${Date.now()}`,
@@ -344,6 +756,10 @@ function OdontogramaDiagnostico({
   };
 
   const quitarEntrada = (id: string) => onChange(entries.filter((e) => e.id !== id));
+
+  const cambiarEstado = (entryId: string, nuevoEstado: EstadoDiagnosticoOdontograma) => {
+    onChange(entries.map((e) => (e.id === entryId ? { ...e, estado: nuevoEstado } : e)));
+  };
 
   return (
     <div className="space-y-4">
@@ -411,72 +827,78 @@ function OdontogramaDiagnostico({
 
       {entries.length > 0 && (
         <div className="space-y-2">
-          {seleccionadosParaPresupuesto.size > 0 && (
-            <div className="flex items-center justify-between rounded-lg border border-accent/30 bg-accent/10 px-3 py-2">
-              <span className="text-xs font-medium text-accent">
-                {seleccionadosParaPresupuesto.size} diagnóstico(s) seleccionado(s)
-              </span>
-              <button
-                type="button"
-                onClick={() => {
-                  onAgregarAPresupuesto(entries.filter((e) => seleccionadosParaPresupuesto.has(e.id)));
-                  setSeleccionadosParaPresupuesto(new Set());
-                }}
-                className="rounded-lg border border-accent/50 bg-accent/15 px-3 py-1.5 text-xs font-semibold text-accent transition-colors hover:bg-accent/25"
-              >
-                + Agregar {seleccionadosParaPresupuesto.size} a presupuesto
-              </button>
-            </div>
-          )}
           {entries.map((entry) => {
             const folioLigado = entry.presupuestoId
               ? presupuestos.find((p) => p.id === entry.presupuestoId)?.folio
               : undefined;
-            const elegibleParaPresupuesto = Boolean(entry.tratamientoSugerido?.trim()) && !entry.presupuestoId;
+            const planesDeEsteDiagnostico = planesTratamiento.filter((p) => p.diagnosticoId === entry.id);
             return (
               <div
                 key={entry.id}
                 className="flex items-start justify-between gap-3 rounded-lg border border-edge/10 bg-inset px-3 py-2 text-sm"
               >
-                <div className="flex items-start gap-2">
-                  {elegibleParaPresupuesto && (
-                    <input
-                      type="checkbox"
-                      checked={seleccionadosParaPresupuesto.has(entry.id)}
-                      onChange={() => toggleSeleccionParaPresupuesto(entry.id)}
-                      title="Seleccionar para agregar a presupuesto"
-                      className="mt-1 accent-[color:var(--accent)]"
-                    />
+                <div className="min-w-0 flex-1">
+                  <p className="text-xs font-semibold text-accent">
+                    OD {[...entry.dientes].sort((a, b) => a - b).join(", ")}
+                  </p>
+                  <p className="text-ink">
+                    {entry.diagnostico || (
+                      <span className="italic text-ink/40">Sin diagnóstico anotado — edítalo para agregarlo</span>
+                    )}
+                  </p>
+                  {entry.tratamientoSugerido && (
+                    <p className="text-xs text-ink/50">Tratamiento sugerido: {entry.tratamientoSugerido}</p>
                   )}
-                  <div>
-                    <p className="text-xs font-semibold text-accent">
-                      OD {[...entry.dientes].sort((a, b) => a - b).join(", ")}
+                  {(entry.fecha || entry.fechaPresupuesto) && (
+                    <p className="text-xs text-ink/30">
+                      {entry.fecha && `Diagnosticado ${formatFechaCorta(entry.fecha)}`}
+                      {entry.fecha && entry.fechaPresupuesto && " · "}
+                      {entry.fechaPresupuesto && `Presupuestado ${formatFechaCorta(entry.fechaPresupuesto)}`}
                     </p>
-                    <p className="text-ink">
-                      {entry.diagnostico || (
-                        <span className="italic text-ink/40">Sin diagnóstico anotado — edítalo para agregarlo</span>
-                      )}
-                    </p>
-                    {entry.tratamientoSugerido && (
-                      <p className="text-xs text-ink/50">Tratamiento sugerido: {entry.tratamientoSugerido}</p>
-                    )}
-                    {(entry.fecha || entry.fechaPresupuesto) && (
-                      <p className="text-xs text-ink/30">
-                        {entry.fecha && `Diagnosticado ${formatFechaCorta(entry.fecha)}`}
-                        {entry.fecha && entry.fechaPresupuesto && " · "}
-                        {entry.fechaPresupuesto && `Presupuestado ${formatFechaCorta(entry.fechaPresupuesto)}`}
-                      </p>
-                    )}
-                    {entry.presupuestoId && (
-                      <button
-                        type="button"
-                        onClick={onVerPresupuestos}
-                        className="text-xs font-semibold text-accent hover:underline"
-                      >
-                        Ya en presupuesto{folioLigado ? ` #${folioLigado}` : ""} — ver
-                      </button>
-                    )}
-                  </div>
+                  )}
+                  {entry.presupuestoId && (
+                    <button
+                      type="button"
+                      onClick={onVerPresupuestos}
+                      className="text-xs font-semibold text-accent hover:underline"
+                    >
+                      Ya en presupuesto{folioLigado ? ` #${folioLigado}` : ""} — ver
+                    </button>
+                  )}
+
+                  <EstadoDiagnosticoSelector estado={entry.estado} onChange={(nuevo) => cambiarEstado(entry.id, nuevo)} />
+
+                  {planesDeEsteDiagnostico.length > 0 && (
+                    <div className="mt-2 space-y-1.5">
+                      {planesDeEsteDiagnostico.map((plan) => (
+                        <PlanTratamientoRow key={plan.id} plan={plan} patientId={patientId} onCotizar={(_, prefill) => onCrearCotizacion(prefill)} />
+                      ))}
+                    </div>
+                  )}
+
+                  {planEnCreacionParaId === entry.id ? (
+                    <CrearPlanTratamientoPanel
+                      entry={entry}
+                      patientId={patientId}
+                      preguntaId={preguntaId}
+                      miUid={miUid}
+                      onConfirmarEstado={(nuevo) => cambiarEstado(entry.id, nuevo)}
+                      onGuardarPlan={(plan, prefill) => {
+                        onGuardarPlan(plan);
+                        if (prefill) onCrearCotizacion(prefill);
+                        setPlanEnCreacionParaId(null);
+                      }}
+                      onCancelar={() => setPlanEnCreacionParaId(null)}
+                    />
+                  ) : (
+                    <button
+                      type="button"
+                      onClick={() => setPlanEnCreacionParaId(entry.id)}
+                      className="mt-2 rounded-lg border border-accent/40 px-2.5 py-1 text-xs font-semibold text-accent transition-colors hover:bg-accent/10"
+                    >
+                      Crear plan de tratamiento
+                    </button>
+                  )}
                 </div>
                 <div className="flex shrink-0 items-center gap-2">
                   <button
@@ -567,7 +989,11 @@ function PreguntaRenderer({
   onChangeDetalle,
   mostrarDetalle,
   presupuestos,
-  onAgregarAPresupuesto,
+  planesTratamiento,
+  patientId,
+  miUid,
+  onGuardarPlan,
+  onCrearCotizacion,
   onVerPresupuestos,
 }: {
   pregunta: PreguntaTemplate;
@@ -577,7 +1003,11 @@ function PreguntaRenderer({
   onChangeDetalle?: (v: string) => void;
   mostrarDetalle?: boolean;
   presupuestos: SavedBudget[];
-  onAgregarAPresupuesto: (preguntaId: string, entradas: DiagnosticoOdontograma[]) => void;
+  planesTratamiento: PlanTratamientoItem[];
+  patientId: string;
+  miUid: string;
+  onGuardarPlan: (plan: PlanTratamientoItem) => void;
+  onCrearCotizacion: (prefill: PresupuestoPrefillItem) => void;
   onVerPresupuestos: () => void;
 }) {
   if (pregunta.tipo === "sino") {
@@ -650,7 +1080,12 @@ function PreguntaRenderer({
         entries={entries}
         onChange={(next) => onChange(next as unknown as RespuestaValor)}
         presupuestos={presupuestos}
-        onAgregarAPresupuesto={(entradas) => onAgregarAPresupuesto(pregunta.id, entradas)}
+        planesTratamiento={planesTratamiento}
+        patientId={patientId}
+        preguntaId={pregunta.id}
+        miUid={miUid}
+        onGuardarPlan={onGuardarPlan}
+        onCrearCotizacion={onCrearCotizacion}
         onVerPresupuestos={onVerPresupuestos}
       />
     );
@@ -697,9 +1132,13 @@ export default function HistoriaClinica({
     setCambiosSinGuardar,
     patients,
     presupuestosPorPaciente,
+    planTratamientoPorPaciente,
+    setPlanTratamientoPaciente,
+    miUid,
   } = usePatientData();
   const guardadas = historiaClinicaPorPaciente[patientId] ?? respuestasVacias;
   const presupuestos = presupuestosPorPaciente[patientId] ?? [];
+  const planesTratamiento = planTratamientoPorPaciente[patientId] ?? [];
   const esMasculino = patients.find((p) => p.id === patientId)?.sexo === "Masculino";
 
   const [borrador, setBorrador] = useState<RespuestasHistoriaClinica>(guardadas);
@@ -796,21 +1235,20 @@ export default function HistoriaClinica({
     return () => clearInterval(intervalo);
   }, []);
 
-  // Guarda el historial primero (el diagnóstico recién anotado en el
-  // odontograma podría existir solo en el borrador local todavía) y hasta
-  // entonces avisa hacia arriba — así el presupuesto nunca referencia un
-  // diagnóstico que en realidad no llegó a persistirse.
-  const manejarAgregarAPresupuesto = (preguntaId: string, entradas: DiagnosticoOdontograma[]) => {
+  // Guarda el historial primero (el diagnóstico recién anotado, o su
+  // estado recién confirmado, podrían existir solo en el borrador local
+  // todavía) y hasta entonces persiste el plan — así un PlanTratamientoItem
+  // nunca referencia un diagnóstico que en realidad no llegó a persistirse.
+  // Crear el plan y cotizarlo son dos pasos independientes (ver
+  // planTratamiento.ts): el plan se guarda SIEMPRE aquí; si además se pidió
+  // cotizar, manejarCrearCotizacion se llama aparte y solo abre Presupuestos.
+  const manejarGuardarPlan = (plan: PlanTratamientoItem) => {
     guardar();
-    onAgregarAPresupuesto(
-      entradas.map((e) => ({
-        preguntaId,
-        diagnosticoId: e.id,
-        procedure: e.tratamientoSugerido ?? "",
-        teeth: e.dientes,
-        note: e.diagnostico,
-      }))
-    );
+    setPlanTratamientoPaciente(patientId, (prev) => [plan, ...prev]);
+  };
+
+  const manejarCrearCotizacion = (prefill: PresupuestoPrefillItem) => {
+    onAgregarAPresupuesto([prefill]);
   };
 
   return (
@@ -896,7 +1334,11 @@ export default function HistoriaClinica({
                 detalle={borrador.porPregunta[claveDetalleSiNo(pregunta.id)] as string | undefined}
                 onChangeDetalle={(v) => actualizarPregunta(claveDetalleSiNo(pregunta.id), v)}
                 presupuestos={presupuestos}
-                onAgregarAPresupuesto={manejarAgregarAPresupuesto}
+                planesTratamiento={planesTratamiento}
+                patientId={patientId}
+                miUid={miUid}
+                onGuardarPlan={manejarGuardarPlan}
+                onCrearCotizacion={manejarCrearCotizacion}
                 onVerPresupuestos={onVerPresupuestos}
               />
             ))

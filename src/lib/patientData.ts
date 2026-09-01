@@ -1,4 +1,5 @@
 import { capitalizarNombre } from "./textoNombre";
+import type { PrioridadTratamiento } from "./planTratamiento";
 
 export type Patient = {
   id: string;
@@ -158,6 +159,13 @@ export type LineItem = {
   precioUnitario?: number;
   cantidad?: number;
   descuentoPct?: number;
+  /** Presente solo si este renglón nació de un PlanTratamientoItem
+   * confirmado (ver planTratamiento.ts) — cierra la trazabilidad de vuelta
+   * al diagnóstico/plan que lo originó. `prioridad` es un snapshot: un
+   * presupuesto histórico conserva la prioridad tal como era cuando se
+   * generó, aunque el plan cambie después. Ausente en renglones capturados
+   * a mano o directo del catálogo. */
+  origenClinico?: { diagnosticoId: string; planTratamientoItemId: string; prioridad: PrioridadTratamiento };
 };
 
 export type BudgetData = {

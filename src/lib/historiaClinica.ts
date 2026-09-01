@@ -3,6 +3,8 @@
  * Administración > Historial Clínico, y ese mismo cambio se refleja de
  * inmediato en la pestaña "Historia Clínica" de cada paciente. */
 
+import type { PrioridadTratamiento } from "./planTratamiento";
+
 export type TipoPregunta = "sino" | "texto" | "textarea" | "chips" | "odontograma" | "listaPrioridad";
 
 export const tipoPreguntaLabel: Record<TipoPregunta, string> = {
@@ -247,6 +249,29 @@ export const plantillaInicial: HistoriaClinicaTemplate = {
 
 export type RespuestaValor = string | string[] | number[];
 
+export const estadoDiagnosticoOdontogramaOptions = ["sospecha", "provisional", "confirmado", "descartado"] as const;
+export type EstadoDiagnosticoOdontograma = (typeof estadoDiagnosticoOdontogramaOptions)[number];
+
+export const estadoDiagnosticoOdontogramaLabel: Record<EstadoDiagnosticoOdontograma, string> = {
+  sospecha: "Sospecha",
+  provisional: "Provisional",
+  confirmado: "Confirmado",
+  descartado: "Descartado",
+};
+
+export const tipoEvidenciaDiagnosticaOptions = [
+  "clinica", "fotografia", "radiografia_periapical", "bitewing",
+  "panoramica", "cbct", "laboratorio", "modelo", "otro",
+] as const;
+export type TipoEvidenciaDiagnostica = (typeof tipoEvidenciaDiagnosticaOptions)[number];
+
+/** Referencia a la evidencia que sustenta un diagnóstico — nunca duplica el
+ * archivo, solo guarda su id (ej. FotoPaciente.id) o una descripción libre
+ * cuando todavía no hay infraestructura de archivo para ese tipo de estudio
+ * (radiografías/CBCT/laboratorio reales — ver Fase 2). La evidencia nunca
+ * genera un diagnóstico sola: siempre requiere interpretación profesional. */
+export type EvidenciaDiagnostica = { tipo: TipoEvidenciaDiagnostica; referenciaId?: string; descripcion?: string };
+
 /** Un diagnóstico anotado sobre uno o varios dientes del odontograma (ej.
  * "Caries de segundo grado clase I" marcado en 3 piezas a la vez). Se
  * guarda en la respuesta de la pregunta tipo "odontograma" como
@@ -262,26 +287,49 @@ export type DiagnosticoOdontograma = {
   tratamientoSugerido?: string;
   /** ISO date — cuándo se anotó el diagnóstico. */
   fecha: string;
-  /** ISO date — se llena solo cuando este diagnóstico se usa para
-   * prellenar un renglón de presupuesto (ver NuevoPresupuesto), como
-   * registro de que ya se presupuestó y cuándo. */
+  /** Ausente = "sin clasificar" en la UI — NUNCA se asume "confirmado"
+   * retrospectivamente para un diagnóstico legado sin este campo. */
+  estado?: EstadoDiagnosticoOdontograma;
+  /** Presente solo si este diagnóstico nació de reeditar uno confirmado
+   * que ya tenía un PlanTratamientoItem — el original permanece intacto y
+   * visible, nunca se sobrescribe (ver protección en HistoriaClinica.tsx). */
+  derivadoDeDiagnosticoId?: string;
+  evidencias?: EvidenciaDiagnostica[];
+  /** @deprecated Se conserva solo por compatibilidad visual con el badge
+   * "Ya en presupuesto #XXXX" de presupuestos vinculados ANTES de que
+   * existiera PlanTratamientoItem — ya NO es la fuente de verdad para
+   * cotizaciones nuevas (ver PlanTratamientoItem.presupuestosVinculados en
+   * planTratamiento.ts). Nunca se sigue escribiendo distinto a como ya
+   * funcionaba. */
   fechaPresupuesto?: string;
-  /** Id del SavedBudget al que se ligó este diagnóstico — permite mostrar
-   * "Ya en presupuesto #XXXX" con link al folio real, en vez de solo una
-   * fecha suelta sin poder navegar a él. */
+  /** @deprecated ver fechaPresupuesto arriba. */
   presupuestoId?: string;
 };
 
+/** `entry.estado` para mostrar en UI — nunca inventa "confirmado" para un
+ * diagnóstico legado sin clasificar; usar SOLO para etiqueta visual, nunca
+ * para decidir automatismos (crear un plan exige `entry.estado` real, ver
+ * validarCreacionPlanTratamiento en planTratamiento.ts). */
+export function estadoParaMostrar(entry: Pick<DiagnosticoOdontograma, "estado">): EstadoDiagnosticoOdontograma | "sin_clasificar" {
+  return entry.estado ?? "sin_clasificar";
+}
+
 /** Un diagnóstico del odontograma, ya listo para convertirse en un renglón
- * de presupuesto (ver NuevoPresupuesto.tsx) — `preguntaId` identifica de
- * qué pregunta "odontograma" vino, para poder marcarlo con `presupuestoId`
- * después sin tener que buscarlo. */
+ * de presupuesto (ver NuevoPresupuesto.tsx) — `preguntaId`/`diagnosticoId`
+ * identifican de dónde vino, `planTratamientoItemId` es el plan clínico que
+ * autorizó este renglón. `precioConfirmado` solo viene presente si el
+ * profesional confirmó explícitamente un precio del catálogo (ver
+ * buscarProcedimientoPorNombre) — su ausencia dispara "Falta precio" en
+ * NuevoPresupuesto.tsx, igual que hoy. */
 export type PresupuestoPrefillItem = {
   preguntaId: string;
   diagnosticoId: string;
+  planTratamientoItemId: string;
   procedure: string;
   teeth: number[];
   note: string;
+  precioConfirmado?: number;
+  prioridad: PrioridadTratamiento;
 };
 
 /** Antes de este cambio, la respuesta de una pregunta "odontograma" era

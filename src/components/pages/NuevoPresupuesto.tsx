@@ -17,6 +17,7 @@ import AvisoNoCabeEnHoja from "@/components/AvisoNoCabeEnHoja";
 import { normalizarTexto } from "@/lib/reportes";
 import { slugify } from "@/lib/textoNombre";
 import { calcularFechaVigencia } from "@/lib/presupuestoVigencia";
+import { prioridadTratamientoLabel } from "@/lib/planTratamiento";
 import type { PresupuestoPrefillItem } from "@/lib/historiaClinica";
 import type { BudgetData, LineItem, Patient } from "@/lib/patientData";
 
@@ -58,11 +59,12 @@ export default function NuevoPresupuesto({
   patient: Patient;
   initialBudget?: BudgetData;
   planTratamientoSugerido?: string;
-  /** Renglones ya prellenados desde un diagnóstico del odontograma (ver
-   * Historia Clínica → "Agregar a presupuesto") — nacen a precio $0, listos
-   * para completarles el precio antes de guardar. Ignorado si se está
-   * editando un presupuesto existente. */
-  prefillItems?: Pick<PresupuestoPrefillItem, "procedure" | "teeth" | "note">[];
+  /** Renglones ya prellenados desde un PlanTratamientoItem confirmado (ver
+   * Historia Clínica → "Crear plan de tratamiento" → "Incluir en
+   * presupuesto"/"Crear cotización") — nacen con el precio ya confirmado
+   * del catálogo si hubo match, o en $0 ("Falta precio") si no. Ignorado si
+   * se está editando un presupuesto existente. */
+  prefillItems?: PresupuestoPrefillItem[];
   onCancel: () => void;
   onSave: (budget: BudgetData) => void;
 }) {
@@ -118,9 +120,10 @@ export default function NuevoPresupuesto({
       (prefillItems ?? []).map((p) => ({
         id: `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
         procedure: p.procedure,
-        price: 0,
+        price: p.precioConfirmado ?? 0,
         teeth: p.teeth,
         note: p.note,
+        origenClinico: { diagnosticoId: p.diagnosticoId, planTratamientoItemId: p.planTratamientoItemId, prioridad: p.prioridad },
       }))
   );
   /** Id del renglón que se está editando (null = capturando uno nuevo). La
@@ -665,7 +668,17 @@ export default function NuevoPresupuesto({
                   className="flex items-center justify-between rounded-lg border border-edge/10 bg-inset px-3 py-2 text-sm"
                 >
                   <div>
-                    <div className="text-ink">{item.procedure}</div>
+                    <div className="flex items-center gap-1.5">
+                      <span className="text-ink">{item.procedure}</span>
+                      {item.origenClinico && (
+                        <span
+                          className="rounded-full border border-edge/15 px-1.5 py-0.5 text-[10px] font-semibold text-ink/50"
+                          title="Prioridad clínica al momento de generar este renglón — no afecta el precio ni el total"
+                        >
+                          {prioridadTratamientoLabel[item.origenClinico.prioridad]}
+                        </span>
+                      )}
+                    </div>
                     {(item.cantidad ?? 1) > 1 && (
                       <div className="text-xs text-ink/40">
                         {formatCurrency(item.precioUnitario ?? item.price)} × {item.cantidad}

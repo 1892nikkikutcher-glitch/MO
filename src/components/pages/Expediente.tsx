@@ -35,6 +35,7 @@ import {
   type Patient,
   type SavedBudget,
   type Pago,
+  type LineItem,
 } from "@/lib/patientData";
 import {
   condicionesSistemicasPositivas,
@@ -207,6 +208,7 @@ function PresupuestosTab({
     setRespuestasHistoriaClinica,
     comparativasPorPaciente,
     setComparativasPaciente,
+    vincularPresupuestoAPlan,
   } = usePatientData();
   const [view, setView] = useState<"list" | "form" | "comparativa">("list");
   const [editingBudget, setEditingBudget] = useState<SavedBudget | null>(null);
@@ -366,16 +368,22 @@ function PresupuestosTab({
 
   if (view === "form") {
     // Marca en Historia Clínica los diagnósticos de origen con el folio del
-    // presupuesto recién creado — "Ya en presupuesto #XXXX" en vez de la
-    // casilla de selección la próxima vez que se abra esa pestaña. Nunca
-    // reescribe el diagnóstico/tratamiento en sí, solo el vínculo.
-    const estamparDiagnosticosLigados = (nuevoId: string) => {
-      if (!prefillPresupuesto || prefillPresupuesto.length === 0) return;
+    // presupuesto recién creado — "Ya en presupuesto #XXXX" (compatibilidad
+    // visual del badge existente). Nunca reescribe el diagnóstico/
+    // tratamiento en sí, solo el vínculo. La fuente de verdad para
+    // cotizaciones NUEVAS ya no es este campo — es
+    // PlanTratamientoItem.presupuestosVinculados, agregado abajo vía
+    // vincularPresupuestoAPlan (arrayUnion, nunca sobrescribe cotizaciones
+    // previas del mismo plan).
+    const estamparDiagnosticosLigados = (nuevoId: string, budgetItems: LineItem[]) => {
+      const itemsConOrigen = budgetItems.filter((it) => it.origenClinico);
+      if (itemsConOrigen.length === 0) return;
+      const hoyISO = new Date().toISOString().slice(0, 10);
+
       const actuales = historiaClinicaPorPaciente[patient.id] ?? respuestasVacias;
       const porPreguntaActualizado = { ...actuales.porPregunta };
-      const hoyISO = new Date().toISOString().slice(0, 10);
       const idsPorPregunta = new Map<string, Set<string>>();
-      for (const item of prefillPresupuesto) {
+      for (const item of prefillPresupuesto ?? []) {
         if (!idsPorPregunta.has(item.preguntaId)) idsPorPregunta.set(item.preguntaId, new Set());
         idsPorPregunta.get(item.preguntaId)!.add(item.diagnosticoId);
       }
@@ -390,6 +398,19 @@ function PresupuestosTab({
         porPregunta: porPreguntaActualizado,
         actualizadoEn: new Date().toISOString(),
       });
+
+      // Solo los renglones REALMENTE incluidos en el presupuesto final
+      // (budgetItems, no el prefill original) generan un vínculo — si el
+      // usuario borró un renglón antes de guardar, ese plan simplemente no
+      // se cotiza esta vez.
+      for (const item of itemsConOrigen) {
+        vincularPresupuestoAPlan(patient.id, item.origenClinico!.planTratamientoItemId, {
+          presupuestoId: nuevoId,
+          budgetItemId: item.id,
+          fecha: hoyISO,
+          prioridad: item.origenClinico!.prioridad,
+        });
+      }
     };
 
     return (
@@ -414,7 +435,7 @@ function PresupuestosTab({
             }
             return [{ ...budget, id: nuevoId, estado: "pendiente", editadoManualmente: true }, ...prev];
           });
-          if (!editingBudget) estamparDiagnosticosLigados(nuevoId);
+          if (!editingBudget) estamparDiagnosticosLigados(nuevoId, budget.items);
           onConsumirPrefillPresupuesto();
           setEditingBudget(null);
           setView("list");

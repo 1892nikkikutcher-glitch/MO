@@ -183,6 +183,9 @@ service cloud.firestore {
     match /users/{ownerId}/pacientes/{patientId}/diagnosticos/{diagnosticoId} {
       allow read, write: if isActiveMember(ownerId);
     }
+    match /users/{ownerId}/pacientes/{patientId}/planTratamiento/{planTratamientoItemId} {
+      allow read, write: if isActiveMember(ownerId);
+    }
     match /users/{ownerId}/pacientes/{patientId}/comparativas/{comparativaId} {
       allow read, write: if isActiveMember(ownerId);
     }
