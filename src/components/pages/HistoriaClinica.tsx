@@ -779,6 +779,23 @@ export default function HistoriaClinica({
     setGuardando(false);
   };
 
+  // Auto-guardado: cada 8s, si quedaron ediciones sin guardar, se guardan
+  // solas — para no depender de que el doctor se acuerde de dar clic en
+  // "Guardar" (información clínica delicada no debe depender de eso). Usa
+  // refs en vez de depender de [borrador] directamente para que el
+  // intervalo no se reinicie con cada tecleo — así se garantiza que corre
+  // cada 8s de verdad, incluso si el doctor escribe sin pausar.
+  const guardarRef = useRef(guardar);
+  guardarRef.current = guardar;
+  const hayCambiosSinGuardarRef = useRef(hayCambiosSinGuardar);
+  hayCambiosSinGuardarRef.current = hayCambiosSinGuardar;
+  useEffect(() => {
+    const intervalo = setInterval(() => {
+      if (hayCambiosSinGuardarRef.current) guardarRef.current();
+    }, 8000);
+    return () => clearInterval(intervalo);
+  }, []);
+
   // Guarda el historial primero (el diagnóstico recién anotado en el
   // odontograma podría existir solo en el borrador local todavía) y hasta
   // entonces avisa hacia arriba — así el presupuesto nunca referencia un
@@ -798,6 +815,11 @@ export default function HistoriaClinica({
 
   return (
     <div className="space-y-6">
+      <p className="text-xs text-ink/30">
+        💡 Este historial se guarda automáticamente mientras escribes. Aun así, para información
+        delicada (diagnósticos, alergias), te recomendamos tomar una captura de pantalla como
+        respaldo adicional por si acaso.
+      </p>
       {(() => {
         const texto = borrador.alergias ?? "";
         const negado = esNegacionExplicita(texto);
@@ -901,7 +923,10 @@ export default function HistoriaClinica({
             ? `Última actualización: ${formatFechaHora(guardadas.actualizadoEn)}`
             : "Este historial todavía no se ha guardado."}
           {hayCambiosSinGuardar && (
-            <span className="ml-2 font-semibold text-accent">Tienes cambios sin guardar.</span>
+            <span className="ml-2 font-semibold text-accent">
+              Tienes cambios sin guardar — se guardan solos en unos segundos, o dale clic a
+              &quot;Guardar&quot; para no esperar.
+            </span>
           )}
         </p>
         <button
