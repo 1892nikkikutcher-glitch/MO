@@ -274,8 +274,34 @@ export function assignLanes(citasDelDia: CitaAgenda[]) {
   return withLane;
 }
 
+/** Suma meses recortando al último día válido del mes destino —
+ * `date.setMonth()` sin recortar desborda (31 ago + 6 meses pasaría de
+ * frente marzo en vez de quedar en 28/29 feb), y ese desborde también
+ * afectaba a la recurrencia por lote existente. */
 export function addMonths(d: Date, n: number) {
-  const date = new Date(d);
-  date.setMonth(date.getMonth() + n);
-  return date;
+  const diaOriginal = d.getDate();
+  const fecha = new Date(d.getFullYear(), d.getMonth() + n, 1);
+  const ultimoDiaDelMesDestino = new Date(fecha.getFullYear(), fecha.getMonth() + 1, 0).getDate();
+  fecha.setDate(Math.min(diaOriginal, ultimoDiaDelMesDestino));
+  return fecha;
+}
+
+/** Valida que una franja horaria (horaInicio-horaFin) quede dentro del
+ * horario de atención del consultorio — solo apertura/cierre, sin cruzar
+ * la comida. Nunca valida día de la semana porque HorarioAtencion no tiene
+ * ese concepto todavía (mismo horario para todos los días). */
+export function estaDentroDeHorario(
+  horario: { apertura: string; comidaInicio: string; comidaFin: string; cierre: string },
+  horaInicio: string,
+  horaFin: string
+): boolean {
+  const inicio = timeToMinutes(horaInicio);
+  const fin = timeToMinutes(horaFin);
+  const apertura = timeToMinutes(horario.apertura);
+  const cierre = timeToMinutes(horario.cierre);
+  const comidaInicio = timeToMinutes(horario.comidaInicio);
+  const comidaFin = timeToMinutes(horario.comidaFin);
+  if (inicio < apertura || fin > cierre) return false;
+  const cruzaComida = inicio < comidaFin && comidaInicio < fin;
+  return !cruzaComida;
 }

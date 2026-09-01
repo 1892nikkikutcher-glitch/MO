@@ -10,11 +10,20 @@ import {
   type CitaAgenda,
   type CitaEstatus,
   type FrecuenciaRecurrencia,
+  type IntervaloSeguimiento,
   type Recurso,
   type LineItem,
   type SavedBudget,
+  type UnidadSeguimiento,
 } from "@/lib/patientData";
 import { renderPlantilla, formatFechaLarga, formatHora12 } from "@/lib/formatosWhatsapp";
+import {
+  PRESETS_INTERVALO,
+  calcularFechaSeguimiento,
+  crearSiguienteCitaSeguimiento,
+  detectarPresetIntervalo,
+  intervaloValido,
+} from "@/lib/seguimientoAutomatico";
 import { manejarCambioNombre } from "@/lib/textoNombre";
 import { formatDuracion } from "@/lib/procedimientos";
 import GlobalAgregarPago from "@/components/GlobalAgregarPago";
@@ -44,6 +53,22 @@ const frecuenciaLabel: Record<FrecuenciaRecurrencia, string> = {
   trimestral: "Cada 3 meses",
   semestral: "Cada 6 meses",
 };
+
+const unidadSeguimientoLabel: Record<UnidadSeguimiento, string> = {
+  dias: "Días",
+  semanas: "Semanas",
+  meses: "Meses",
+};
+
+const limitesUnidadSeguimiento: Record<UnidadSeguimiento, number> = { dias: 365, semanas: 52, meses: 24 };
+
+const motivosSeguimientoSugeridos = [
+  "Revisión de evolución",
+  "Control postoperatorio",
+  "Control de ortopedia",
+  "Mantenimiento",
+  "Revisión preventiva",
+];
 
 export default function AgendaCitaDialog({
   recursos,
@@ -76,6 +101,7 @@ export default function AgendaCitaDialog({
     setPresupuestosPaciente,
     pagosPorPaciente,
     citas,
+    horario,
   } = usePatientData();
   const medicos = recursos.filter((r) => r.tipo === "medico");
   const unidades = recursos.filter((r) => r.tipo === "unidad");
@@ -156,6 +182,40 @@ export default function AgendaCitaDialog({
   const [frecuencia, setFrecuencia] = useState<FrecuenciaRecurrencia>("mensual");
   const [repeticiones, setRepeticiones] = useState(3);
   const folioRef = useState(() => initial.folio ?? `F-${Date.now().toString().slice(-6)}`)[0];
+
+  // "Programar próximo seguimiento automáticamente" — mecanismo independiente
+  // de la recurrencia por lote de arriba, mutuamente excluyente en la UI.
+  const [seguimientoAutomatico, setSeguimientoAutomatico] = useState(initial.seguimientoAutomatico ?? false);
+  const [seguimientoIntervalo, setSeguimientoIntervalo] = useState<IntervaloSeguimiento | undefined>(
+    initial.seguimientoIntervalo
+  );
+  const [intervaloPreset, setIntervaloPreset] = useState(() => detectarPresetIntervalo(initial.seguimientoIntervalo));
+  // String vacío real, SIN default silencioso — si queda vacío al guardar
+  // con el seguimiento activo, el guardado se bloquea, nunca se rellena solo.
+  const [seguimientoMotivo, setSeguimientoMotivo] = useState(initial.seguimientoMotivo ?? "");
+  const [motivoEsOtro, setMotivoEsOtro] = useState(
+    () => !!initial.seguimientoMotivo && !motivosSeguimientoSugeridos.includes(initial.seguimientoMotivo)
+  );
+
+  const activarSeguimientoAutomatico = (activo: boolean) => {
+    setSeguimientoAutomatico(activo);
+    if (activo) setRecurrente(false);
+  };
+  const activarRecurrente = (activo: boolean) => {
+    setRecurrente(activo);
+    if (activo) setSeguimientoAutomatico(false);
+  };
+
+  const seleccionarPresetIntervalo = (label: string) => {
+    setIntervaloPreset(label);
+    const preset = PRESETS_INTERVALO.find((p) => p.label === label);
+    if (preset) setSeguimientoIntervalo(preset.valor); // "Personalizado" no tiene preset -> conserva el valor actual
+  };
+
+  const previaFechaSeguimiento =
+    seguimientoAutomatico && fecha && intervaloValido(seguimientoIntervalo)
+      ? calcularFechaSeguimiento(fecha, seguimientoIntervalo)
+      : null;
 
   // Flechas del encabezado: al editar una cita, permiten saltar directo al
   // expediente del paciente anterior/siguiente en el orden cronológico de
@@ -271,6 +331,20 @@ export default function AgendaCitaDialog({
 
   const handleGuardar = () => {
     if (!puedeGuardar) return;
+
+    // Datos clínicos incompletos nunca deben impedir en silencio la
+    // atención — se detiene ANTES de tocar Firestore, no después.
+    if (seguimientoAutomatico) {
+      if (!intervaloValido(seguimientoIntervalo)) {
+        alert("Selecciona cuándo quieres volver a ver al paciente.");
+        return;
+      }
+      if (!seguimientoMotivo.trim()) {
+        alert("Indica el motivo del próximo seguimiento.");
+        return;
+      }
+    }
+
     const nombrePaciente = patientId
       ? patients.find((p) => p.id === patientId)?.name ?? searchText
       : searchText.trim();
@@ -299,6 +373,13 @@ export default function AgendaCitaDialog({
       estatus,
       recurrenciaId: initial.recurrenciaId ?? (recurrente ? `rec${Date.now()}` : null),
       horaLlegada: horaLlegada || null,
+      seguimientoAutomatico,
+      seguimientoCadenaId: initial.seguimientoCadenaId,
+      seguimientoOrigenCitaId: initial.seguimientoOrigenCitaId,
+      seguimientoIntervalo: seguimientoAutomatico ? seguimientoIntervalo : undefined,
+      seguimientoSecuencia: initial.seguimientoSecuencia,
+      seguimientoMotivo: seguimientoAutomatico ? seguimientoMotivo.trim() : undefined,
+      origenCita: initial.origenCita ?? "manual",
     };
 
     // Si la cita queda ligada a un paciente y trae un costo estimado, se
@@ -361,6 +442,48 @@ export default function AgendaCitaDialog({
       }
     }
 
+    // El disparador NO depende de "acaba de transicionar a Atendida" (eso
+    // rompería la cadena para siempre ante un conflicto puntual) — cada
+    // guardado de una cita Atendida con seguimiento activo intenta asegurar
+    // que su siguiente exista; crearSiguienteCitaSeguimiento es idempotente,
+    // así que reintentar (ej. tras resolver un conflicto) autosana la
+    // cadena sin necesitar un botón dedicado.
+    if (estatus === "Atendida" && base.seguimientoAutomatico) {
+      const resultado = crearSiguienteCitaSeguimiento({
+        citaAtendida: base,
+        citasExistentes: [...citas, ...citasAGuardar],
+        recursos,
+        horario,
+        ahora: Date.now(),
+      });
+      if (resultado.creada) {
+        citasAGuardar.push(resultado.cita);
+      } else if (resultado.motivo === "conflicto" || resultado.motivo === "fuera_de_horario") {
+        alert(
+          `Esta cita quedó registrada como Atendida, pero no fue posible crear el seguimiento automático porque ${
+            resultado.motivo === "conflicto"
+              ? "esa fecha/hora ya tiene otra cita"
+              : "cae fuera del horario del consultorio"
+          }. Resuelve el conflicto y vuelve a guardar esta cita para reintentar — la cadena no se pierde.`
+        );
+      } else if (
+        resultado.motivo === "ya_existe" &&
+        JSON.stringify(initial.seguimientoIntervalo) !== JSON.stringify(seguimientoIntervalo)
+      ) {
+        // Cambiar el intervalo de una cita que ya generó su siguiente NO la
+        // mueve — se avisa solo cuando de verdad se intentó cambiar el
+        // intervalo, para no ser repetitivo en guardados normales.
+        alert("Esta atención ya generó su próxima cita de seguimiento. Si quieres cambiar su fecha, edítala directamente.");
+      }
+    }
+    if (
+      initial.estatus === "Atendida" &&
+      estatus !== "Atendida" &&
+      citas.some((c) => c.seguimientoOrigenCitaId === initial.id)
+    ) {
+      alert("Esta atención ya generó una cita de seguimiento. Cambiar su estatus no eliminará automáticamente esa cita.");
+    }
+
     onSave(citasAGuardar);
   };
 
@@ -372,7 +495,14 @@ export default function AgendaCitaDialog({
             <h2 className="text-lg font-semibold text-ink">
               {isEditing ? "Editar Cita" : "Nueva Cita"}
             </h2>
-            <p className="text-xs text-ink/40">Folio: {initial.folio ?? folioRef}</p>
+            <p className="text-xs text-ink/40">
+              Folio: {initial.folio ?? folioRef}
+              {initial.origenCita === "seguimiento_automatico" && (
+                <span className="ml-2 rounded-full bg-accent/10 px-2 py-0.5 text-[11px] font-semibold text-accent">
+                  Seguimiento automático
+                </span>
+              )}
+            </p>
             <div className="mt-2 flex flex-wrap gap-1.5">
               {citaEstatusOptions.map((opt) => {
                 const hex = CITA_ESTATUS_HEX[opt] ?? CITA_BORDE_NEUTRO;
@@ -729,12 +859,13 @@ export default function AgendaCitaDialog({
           </div>
 
           {!isEditing && (
-            <div className="rounded-lg border border-edge/10 p-3">
+            <div className={`rounded-lg border border-edge/10 p-3 ${seguimientoAutomatico ? "opacity-40" : ""}`}>
               <label className="flex items-center gap-2 text-sm font-medium text-ink/80">
                 <input
                   type="checkbox"
                   checked={recurrente}
-                  onChange={(e) => setRecurrente(e.target.checked)}
+                  disabled={seguimientoAutomatico}
+                  onChange={(e) => activarRecurrente(e.target.checked)}
                   className="h-4 w-4 accent-accent"
                 />
                 Programar seguimiento recurrente
@@ -772,6 +903,127 @@ export default function AgendaCitaDialog({
               )}
             </div>
           )}
+
+          <div className={`rounded-lg border border-edge/10 p-3 ${recurrente ? "opacity-40" : ""}`}>
+            <label className="flex items-center gap-2 text-sm font-medium text-ink/80">
+              <input
+                type="checkbox"
+                checked={seguimientoAutomatico}
+                disabled={recurrente}
+                onChange={(e) => activarSeguimientoAutomatico(e.target.checked)}
+                className="h-4 w-4 accent-accent"
+              />
+              Programar próximo seguimiento automáticamente
+            </label>
+            <p className="mt-1 text-xs text-ink/40">
+              Cuando esta cita se marque como Atendida, MO programará la siguiente según el intervalo que elijas.
+            </p>
+            {seguimientoAutomatico && (
+              <div className="mt-3 space-y-3">
+                <div>
+                  <label className="mb-1 block text-xs font-medium text-ink/60">
+                    ¿Cuándo quieres volver a verlo?
+                  </label>
+                  <div className="flex flex-wrap gap-1.5">
+                    {[...PRESETS_INTERVALO.map((p) => p.label), "Personalizado"].map((label) => (
+                      <button
+                        key={label}
+                        type="button"
+                        onClick={() => seleccionarPresetIntervalo(label)}
+                        className={`rounded-full border px-2.5 py-1 text-xs font-semibold transition-colors ${
+                          intervaloPreset === label
+                            ? "border-accent/60 bg-accent/15 text-accent"
+                            : "border-edge/15 text-ink/60 hover:bg-surface"
+                        }`}
+                      >
+                        {label}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                {intervaloPreset === "Personalizado" && (
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <label className="mb-1 block text-xs font-medium text-ink/60">Cantidad</label>
+                      <input
+                        type="number"
+                        min={1}
+                        max={limitesUnidadSeguimiento[seguimientoIntervalo?.unidad ?? "dias"]}
+                        value={seguimientoIntervalo?.cantidad ?? ""}
+                        onChange={(e) =>
+                          setSeguimientoIntervalo((prev) => ({
+                            cantidad: Number(e.target.value),
+                            unidad: prev?.unidad ?? "dias",
+                          }))
+                        }
+                        className={inputClass}
+                      />
+                    </div>
+                    <div>
+                      <label className="mb-1 block text-xs font-medium text-ink/60">Unidad</label>
+                      <select
+                        value={seguimientoIntervalo?.unidad ?? "dias"}
+                        onChange={(e) =>
+                          setSeguimientoIntervalo((prev) => ({
+                            cantidad: prev?.cantidad ?? 1,
+                            unidad: e.target.value as UnidadSeguimiento,
+                          }))
+                        }
+                        className={inputClass}
+                      >
+                        {(Object.keys(unidadSeguimientoLabel) as UnidadSeguimiento[]).map((u) => (
+                          <option key={u} value={u}>
+                            {unidadSeguimientoLabel[u]}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                  </div>
+                )}
+
+                {previaFechaSeguimiento && (
+                  <p className="text-xs text-accent">
+                    Próximo seguimiento sugerido: {formatFechaLarga(previaFechaSeguimiento)}
+                  </p>
+                )}
+
+                <div>
+                  <label className="mb-1 block text-xs font-medium text-ink/60">Motivo del seguimiento</label>
+                  <select
+                    value={motivoEsOtro ? "__otra__" : seguimientoMotivo}
+                    onChange={(e) => {
+                      if (e.target.value === "__otra__") {
+                        setMotivoEsOtro(true);
+                        setSeguimientoMotivo("");
+                      } else {
+                        setMotivoEsOtro(false);
+                        setSeguimientoMotivo(e.target.value);
+                      }
+                    }}
+                    className={inputClass}
+                  >
+                    <option value="">Selecciona un motivo...</option>
+                    {motivosSeguimientoSugeridos.map((m) => (
+                      <option key={m} value={m}>
+                        {m}
+                      </option>
+                    ))}
+                    <option value="__otra__">Otro...</option>
+                  </select>
+                  {motivoEsOtro && (
+                    <input
+                      type="text"
+                      value={seguimientoMotivo}
+                      onChange={(e) => setSeguimientoMotivo(e.target.value)}
+                      placeholder="Ej. Control de placa dental"
+                      className={`${inputClass} mt-2`}
+                    />
+                  )}
+                </div>
+              </div>
+            )}
+          </div>
         </div>
 
         {conflictos.length > 0 && (

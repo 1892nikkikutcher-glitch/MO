@@ -564,6 +564,9 @@ export type CitaEstatus = (typeof citaEstatusOptions)[number];
 
 export type FrecuenciaRecurrencia = "mensual" | "trimestral" | "semestral";
 
+export type UnidadSeguimiento = "dias" | "semanas" | "meses";
+export type IntervaloSeguimiento = { cantidad: number; unidad: UnidadSeguimiento };
+
 export type CitaAgenda = {
   id: string;
   folio: string;
@@ -590,6 +593,32 @@ export type CitaAgenda = {
   /** Hora real (HH:MM) en que el paciente se presentó — asistencia de
    * pacientes. Se estampa automáticamente al marcar la cita "En espera". */
   horaLlegada?: string | null;
+
+  /** Si está activo, al marcar esta cita "Atendida" se genera automáticamente
+   * la siguiente cita de seguimiento (ver src/lib/seguimientoAutomatico.ts).
+   * Mecanismo independiente de recurrenciaId (recurrencia por lote) —
+   * mutuamente excluyentes en la UI, nunca conviven en la misma cita. */
+  seguimientoAutomatico?: boolean;
+  /** Comparten esta id todas las citas de una misma cadena de seguimiento,
+   * sin importar cuántas veces cambie el intervalo entre una y otra —
+   * determinística: "seg-<id de la cita que inició la cadena>". */
+  seguimientoCadenaId?: string;
+  /** Id de la cita "Atendida" que generó ESTA cita — clave de idempotencia:
+   * si ya existe una cita con este seguimientoOrigenCitaId, no se genera
+   * otra aunque se vuelva a guardar la cita de origen. */
+  seguimientoOrigenCitaId?: string;
+  /** Cuánto falta desde ESTA cita hasta la siguiente de su cadena —
+   * decisión clínica del doctor en cada atención, nunca un valor fijo. */
+  seguimientoIntervalo?: IntervaloSeguimiento;
+  /** 0 implícito en la cita que inició la cadena; 1, 2, 3... en cada cita
+   * generada a partir de la anterior. */
+  seguimientoSecuencia?: number;
+  /** Motivo de la cita de seguimiento futura, confirmado por el doctor —
+   * nunca se copian los tratamientos de la cita de hoy ni se inventa un
+   * motivo por default. */
+  seguimientoMotivo?: string;
+  /** Ausente = cita creada a mano (compatibilidad con citas existentes). */
+  origenCita?: "manual" | "seguimiento_automatico";
 };
 
 export const laboratorioTipoOptions = ["Dental", "Químico", "Radiografía"] as const;
