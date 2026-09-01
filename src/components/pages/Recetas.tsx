@@ -7,6 +7,7 @@ import { calcularDosisPediatrica, type MedicamentoCatalogo } from "@/lib/medicam
 import { generarRecetaPdf } from "@/lib/generarRecetaPdf";
 import { enviarPdfPorWhatsapp } from "@/lib/enviarPdfWhatsapp";
 import AbrirWhatsAppPrompt from "@/components/AbrirWhatsAppPrompt";
+import AvisoNoCabeEnHoja from "@/components/AvisoNoCabeEnHoja";
 import { slugify } from "@/lib/textoNombre";
 import { coincideAlergia, condicionesSistemicasPositivas, esNegacionAlergia } from "@/lib/historiaClinica";
 
@@ -522,6 +523,12 @@ export default function Recetas() {
           </div>
         </div>
 
+        <AvisoNoCabeEnHoja mostrar={medicamentosRecetados.length > 5}>
+          Tienes {medicamentosRecetados.length} medicamentos recetados — con instrucciones largas,
+          la receta podría no caber en una sola hoja. Usa Imprimir y revisa la vista previa de tu
+          navegador antes de entregarla.
+        </AvisoNoCabeEnHoja>
+
         <div className="flex flex-wrap items-center gap-3">
           {!guardado && (
             <button
@@ -651,7 +658,7 @@ export default function Recetas() {
 
       {/* Receta imprimible — formato tipo COPRISEM */}
       {patient && medicamentosRecetados.length > 0 && (
-        <div className="hidden flex-col border-4 border-black bg-white p-8 text-black print:flex print:min-h-[240mm]">
+        <div className="hidden flex-col border-4 border-black bg-white p-8 text-black print:flex">
           <div className="flex items-start justify-between">
             <div className="w-24 shrink-0 text-center">
               {perfilDoctor.logoEscuelaUrl && (

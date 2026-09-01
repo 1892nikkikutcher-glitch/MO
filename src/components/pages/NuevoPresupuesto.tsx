@@ -13,6 +13,7 @@ import {
 import { generarPresupuestoPdf } from "@/lib/generarPresupuestoPdf";
 import { enviarPdfPorWhatsapp } from "@/lib/enviarPdfWhatsapp";
 import AbrirWhatsAppPrompt from "@/components/AbrirWhatsAppPrompt";
+import AvisoNoCabeEnHoja from "@/components/AvisoNoCabeEnHoja";
 import { normalizarTexto } from "@/lib/reportes";
 import { slugify } from "@/lib/textoNombre";
 import { calcularFechaVigencia } from "@/lib/presupuestoVigencia";
@@ -722,6 +723,11 @@ export default function NuevoPresupuesto({
             </div>
           )}
         </div>
+
+        <AvisoNoCabeEnHoja mostrar={items.length > 8}>
+          Este presupuesto tiene {items.length} tratamientos — revisa la vista previa de impresión
+          de tu navegador antes de entregarlo, por si no cabe en una sola hoja.
+        </AvisoNoCabeEnHoja>
 
         <div className="mt-6 flex flex-wrap gap-3 print:hidden">
           <button

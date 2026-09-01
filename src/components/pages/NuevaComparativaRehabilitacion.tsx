@@ -9,6 +9,7 @@
 
 import { useMemo, useState } from "react";
 import BarrasComparativa, { type OpcionGrafica } from "@/components/BarrasComparativa";
+import AvisoNoCabeEnHoja from "@/components/AvisoNoCabeEnHoja";
 import {
   calcularEconomiaRelativa,
   etiquetaTratamiento,
@@ -279,6 +280,14 @@ export default function NuevaComparativaRehabilitacion({
           );
         })}
       </div>
+
+      <AvisoNoCabeEnHoja
+        mostrar={Object.values(calificaciones).reduce((sum, c) => sum + c.ventajas.length + c.desventajas.length, 0) > 600}
+      >
+        Los textos de ventajas/desventajas son largos — con varias opciones comparadas, la
+        comparativa impresa o en PDF podría no caber en una sola hoja. Revisa el resultado antes de
+        imprimirla o enviarla.
+      </AvisoNoCabeEnHoja>
 
       <div className="flex justify-end gap-3">
         <button onClick={onCancel} className={botonSecundario}>

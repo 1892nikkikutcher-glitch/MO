@@ -21,6 +21,7 @@ import { generarPresupuestoPdf } from "@/lib/generarPresupuestoPdf";
 import { generarPresupuestoTotalPdf } from "@/lib/generarPresupuestoTotalPdf";
 import { enviarPdfPorWhatsapp } from "@/lib/enviarPdfWhatsapp";
 import AbrirWhatsAppPrompt from "@/components/AbrirWhatsAppPrompt";
+import AvisoNoCabeEnHoja from "@/components/AvisoNoCabeEnHoja";
 import { slugify } from "@/lib/textoNombre";
 import {
   computeTratamientosPendientes,
@@ -790,6 +791,16 @@ function PresupuestosTab({
               </button>
             </div>
             <div className="overflow-y-auto p-4">
+              <AvisoNoCabeEnHoja
+                mostrar={
+                  presupuestosParaCompleto.length > 3 ||
+                  presupuestosParaCompleto.reduce((sum, p) => sum + p.items.length, 0) > 15
+                }
+              >
+                Estás juntando {presupuestosParaCompleto.length} folio(s) — con varios presupuestos
+                es más fácil que el documento no quepa en una sola hoja. Revisa la vista previa de
+                abajo con cuidado antes de imprimir o enviar.
+              </AvisoNoCabeEnHoja>
               <PresupuestoTotalImpreso
                 presupuestos={presupuestosParaCompleto}
                 fechaLarga={fechaLargaHoy()}
