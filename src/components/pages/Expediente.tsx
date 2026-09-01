@@ -1343,6 +1343,7 @@ export default function Expediente({
                 setActiveTab("Presupuestos");
               }}
               onVerPresupuestos={() => setActiveTab("Presupuestos")}
+              onVerFotografias={() => setActiveTab("Fotografías")}
             />
           )}
           {activeTab === "Listado de Citas" && <ListadoCitas citas={citasPaciente} recursos={recursos} />}

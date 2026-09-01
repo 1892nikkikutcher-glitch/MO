@@ -453,6 +453,16 @@ export function esSeccionGinecoObstetrica(titulo: string): boolean {
   return titulo.toLowerCase().includes("gineco");
 }
 
+/** Detecta por título (plantilla editable, mismo criterio que el resto de
+ * detectores de esta sección) la sección de exploración de tejidos del
+ * examen clínico estomatológico — ahí se ofrece un acceso directo a
+ * Fotografías, para poder respaldar visualmente lo que se está anotando en
+ * caso de que el texto se pierda. */
+export function esSeccionExamenTejidos(titulo: string): boolean {
+  const t = titulo.toLowerCase();
+  return t.includes("estomatol") && t.includes("tejido");
+}
+
 export type CondicionSistemica = { etiqueta: string; detalle: string };
 
 /** Antecedentes patológicos marcados "Sí" y el texto del Diagnóstico

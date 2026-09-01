@@ -9,6 +9,7 @@ import {
   esNegacionExplicita,
   esSeccionAntecedentesPatologicos,
   esSeccionDiagnosticoSistemico,
+  esSeccionExamenTejidos,
   esSeccionGinecoObstetrica,
   estadoDiagnosticoOdontogramaLabel,
   estadoDiagnosticoOdontogramaOptions,
@@ -1113,6 +1114,7 @@ export default function HistoriaClinica({
   patientId,
   onAgregarAPresupuesto,
   onVerPresupuestos,
+  onVerFotografias,
 }: {
   patientId: string;
   /** Se llama al elegir uno o varios diagnósticos del odontograma y darle
@@ -1123,6 +1125,9 @@ export default function HistoriaClinica({
   onAgregarAPresupuesto: (items: PresupuestoPrefillItem[]) => void;
   /** Cambia a la pestaña Presupuestos — para el link "Ya en presupuesto…". */
   onVerPresupuestos: () => void;
+  /** Cambia a la pestaña Fotografías — acceso directo desde el examen
+   * clínico estomatológico, para respaldar visualmente el diagnóstico. */
+  onVerFotografias: () => void;
 }) {
   const {
     historiaClinicaTemplate,
@@ -1319,6 +1324,15 @@ export default function HistoriaClinica({
 
       {historiaClinicaTemplate.secciones.map((seccion, i) => (
         <Section key={seccion.id} number={i + 1} title={seccion.titulo}>
+          {esSeccionExamenTejidos(seccion.titulo) && (
+            <button
+              type="button"
+              onClick={onVerFotografias}
+              className="flex items-center gap-1.5 rounded-lg border border-accent/40 px-3 py-1.5 text-xs font-semibold text-accent transition-colors hover:bg-accent/10"
+            >
+              📷 Anexar fotografías del examen
+            </button>
+          )}
           {esMasculino && esSeccionGinecoObstetrica(seccion.titulo) ? (
             <p className="text-sm italic text-ink/40">
               No aplicable — paciente de sexo masculino.
