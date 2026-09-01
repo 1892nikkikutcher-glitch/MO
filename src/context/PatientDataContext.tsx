@@ -1636,11 +1636,18 @@ export function PatientDataProvider({
     updater: Updater<RespuestasHistoriaClinica>
   ) => {
     if (!clinicUid) return;
+    // `prev` puede venir de `respuestasVacias` si la suscripción de este
+    // paciente todavía no había resuelto cuando se llama esto (ej. el
+    // doctor entró a Historia Clínica y guardó antes de que llegara la
+    // primera respuesta real de Firestore) — un `setDoc` normal (sin
+    // merge) en ese caso REEMPLAZA TODO el documento y borra cualquier
+    // respuesta previa que no estuviera en `prev`. `merge: true` evita
+    // esto: solo escribe las claves presentes en `next`, preserva el resto.
     const prev = historiaClinicaPorPaciente[patientId] ?? respuestasVacias;
     const next = resolveUpdater(updater, prev);
-    setDoc(doc(db, `users/${clinicUid}/pacientes/${patientId}/historiaClinica`, "respuestas"), next).catch(
-      (err) => console.error(`No se pudo guardar historiaClinica de ${patientId}`, err)
-    );
+    setDoc(doc(db, `users/${clinicUid}/pacientes/${patientId}/historiaClinica`, "respuestas"), next, {
+      merge: true,
+    }).catch((err) => console.error(`No se pudo guardar historiaClinica de ${patientId}`, err));
     setHistoriaClinicaPorPacienteState((p) => ({ ...p, [patientId]: next }));
   };
 
