@@ -2,6 +2,8 @@
 
 import { useEffect, useState } from "react";
 import { auth } from "@/lib/firebase";
+import { usePrivacidad } from "@/context/PrivacidadContext";
+import CandadoPrivacidad from "@/components/CandadoPrivacidad";
 import { planesDisponibles, type PlanId, type CategoriaSugerencia, type EstadoSugerencia } from "@/lib/patientData";
 import { adminOtorgarFundadoraApi, adminVerificarPerfilApi, verEvidenciaVerificacionApi } from "@/lib/conectaApi";
 import type { EstadoVerificacion } from "@/lib/moConecta";
@@ -122,10 +124,26 @@ async function llamarApi(path: string, options: RequestInit = {}) {
   return data;
 }
 
-function MetricCard({ label, value, sub }: { label: string; value: string; sub?: string }) {
+function MetricCard({
+  label,
+  value,
+  sub,
+  sensible,
+  oculto,
+}: {
+  label: string;
+  value: string;
+  sub?: string;
+  /** true si el valor es una cifra financiera que debe ocultarse tras el candado de privacidad. */
+  sensible?: boolean;
+  oculto?: boolean;
+}) {
+  const ocultarEsteValor = sensible && oculto;
   return (
     <div className="rounded-2xl border border-edge/10 bg-surface p-4">
-      <p className="text-2xl font-semibold text-ink">{value}</p>
+      <p className={`text-2xl font-semibold text-ink ${ocultarEsteValor ? "blur-[6px] select-none" : ""}`}>
+        {ocultarEsteValor ? "••••••" : value}
+      </p>
       <p className="mt-1 text-xs uppercase tracking-wide text-ink/50">{label}</p>
       {sub && <p className="mt-1 text-xs text-ink/40">{sub}</p>}
     </div>
@@ -486,6 +504,7 @@ function MoConectaSeccion({ resumen, onCambio }: { resumen: MoConectaResumen; on
 }
 
 export default function PanelAdministrador() {
+  const { oculto } = usePrivacidad();
   const [resumen, setResumen] = useState<Resumen | null>(null);
   const [error, setError] = useState("");
   const [clinicaEditar, setClinicaEditar] = useState<ClinicaResumen | null>(null);
@@ -536,12 +555,17 @@ export default function PanelAdministrador() {
 
   return (
     <div className="space-y-6">
+      <div className="flex items-center justify-between gap-3">
+        <h2 className="text-sm font-semibold uppercase tracking-wide text-ink/60">Panel de administrador</h2>
+        <CandadoPrivacidad />
+      </div>
+
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
         <MetricCard label="Consultorios registrados" value={String(resumen.consultoriosRegistrados)} />
         <MetricCard label="Usuarios totales" value={String(resumen.usuariosTotales)} />
         <MetricCard label="Suscripciones pagando" value={String(resumen.suscripcionesPagando)} />
-        <MetricCard label="Ingreso mensual recurrente" value={formatMoneda(resumen.mrr)} />
-        <MetricCard label="ARPU" value={formatMoneda(Math.round(resumen.arpu))} />
+        <MetricCard label="Ingreso mensual recurrente" value={formatMoneda(resumen.mrr)} sensible oculto={oculto} />
+        <MetricCard label="ARPU" value={formatMoneda(Math.round(resumen.arpu))} sensible oculto={oculto} />
         <MetricCard label="Nuevas clínicas (mes)" value={String(resumen.nuevasDelMes)} />
         <MetricCard label="Pruebas activas" value={String(resumen.pruebasActivas)} />
         <MetricCard label="Cancelaciones" value={String(resumen.cancelaciones)} />
@@ -602,7 +626,9 @@ export default function PanelAdministrador() {
                     {estadoSuscripcionLabel[c.estadoSuscripcion].texto}
                   </span>
                 </td>
-                <td className="px-4 py-3 text-ink/60">{formatMoneda(c.mrr)}</td>
+                <td className={`px-4 py-3 text-ink/60 ${oculto ? "blur-[6px] select-none" : ""}`}>
+                  {oculto ? "••••••" : formatMoneda(c.mrr)}
+                </td>
                 <td className="px-4 py-3 text-ink/60">{formatFecha(c.creadoEl)}</td>
                 <td className="px-4 py-3 text-ink/60">{formatFecha(c.ultimaActividad)}</td>
                 <td className="px-4 py-3">
