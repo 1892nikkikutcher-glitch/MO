@@ -192,6 +192,12 @@ service cloud.firestore {
     match /users/{ownerId}/pacientes/{patientId}/pagos/{pagoId} {
       allow read, write: if isClinicAdmin(ownerId);
     }
+    match /users/{ownerId}/pacientes/{patientId}/devoluciones/{devolucionId} {
+      allow read, write: if isClinicAdmin(ownerId);
+    }
+    match /users/{ownerId}/pacientes/{patientId}/devolucionesResumen/{pagoId} {
+      allow read, write: if isClinicAdmin(ownerId);
+    }
     match /users/{ownerId}/recursos/{recursoId} {
       allow read, write: if isActiveMember(ownerId);
     }
@@ -288,6 +294,9 @@ service cloud.firestore {
       allow read, write: if isClinicAdmin(ownerId);
     }
     match /users/{ownerId}/gastos/{id} {
+      allow read, write: if isClinicAdmin(ownerId);
+    }
+    match /users/{ownerId}/devolucionesLog/{id} {
       allow read, write: if isClinicAdmin(ownerId);
     }
 

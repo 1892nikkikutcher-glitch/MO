@@ -1,20 +1,24 @@
 "use client";
 
-import { useEffect, useState, type Dispatch, type SetStateAction } from "react";
+import { Fragment, useEffect, useState, type Dispatch, type SetStateAction } from "react";
 import {
   formatCurrency,
   buildReciboTexto,
   computeTratamientosPendientes,
   tratamientosDeDisponibles,
+  motivoDevolucionLabel,
   type SavedBudget,
   type Tratamiento,
   type TratamientoPendiente,
   type LineaPago,
   type Pago,
+  type DevolucionPago,
 } from "@/lib/patientData";
 import { usePatientData } from "@/context/PatientDataContext";
 import FirmaCanvas from "@/components/FirmaCanvas";
 import AvisoNoCabeEnHoja from "@/components/AvisoNoCabeEnHoja";
+import RegistrarDevolucionDialog from "@/components/RegistrarDevolucionDialog";
+import { calcularDisponibleDevolucion, resumenDesdeDevoluciones } from "@/lib/devolucionesPago";
 import { renderPlantilla, formatosWhatsAppInicial, buildProximaCitaTexto } from "@/lib/formatosWhatsapp";
 
 const medicos = ["Dr. Nicolás Medina González", "Dra. Ana Paola Ríos Cervantes"];
@@ -789,12 +793,14 @@ export default function Pagos({
   patientName,
   presupuestos,
   pagos,
+  devoluciones,
   setPagos,
 }: {
   patientId: string;
   patientName: string;
   presupuestos: SavedBudget[];
   pagos: Pago[];
+  devoluciones: DevolucionPago[];
   setPagos: Dispatch<SetStateAction<Pago[]>>;
 }) {
   const { userEmail, setPagosEliminados, citas, patients, clinicInfo, formatosWhatsapp } = usePatientData();
@@ -802,6 +808,32 @@ export default function Pagos({
   const [printTarget, setPrintTarget] = useState<Pago | null>(null);
   const [pagoAEliminar, setPagoAEliminar] = useState<Pago | null>(null);
   const [pagoAEditar, setPagoAEditar] = useState<Pago | null>(null);
+  const [pagoParaDevolver, setPagoParaDevolver] = useState<Pago | "sin-preseleccion" | null>(null);
+
+  /** Un pago que ya tiene devoluciones completadas nunca debe poder
+   * eliminarse ni bajarse de monto — rompería la invariante "nunca
+   * devolver más de lo cobrado" (la próxima devolución calcularía mal el
+   * disponible, y la ya completada quedaría apuntando a un pago
+   * inconsistente). Único punto de modificación a estos dos flujos ya
+   * existentes, estrictamente necesario para proteger esa invariante. */
+  const tieneDevolucionesCompletadas = (pago: Pago) =>
+    calcularDisponibleDevolucion(pago, resumenDesdeDevoluciones(pago.id, devoluciones)).totalDevuelto > 0;
+
+  const intentarEditar = (pago: Pago) => {
+    if (tieneDevolucionesCompletadas(pago)) {
+      alert("Este pago ya tiene una devolución registrada — no se puede editar su monto ni sus conceptos. Si hay un error, corrígelo desde el registro de la devolución.");
+      return;
+    }
+    setPagoAEditar(pago);
+  };
+
+  const intentarEliminar = (pago: Pago) => {
+    if (tieneDevolucionesCompletadas(pago)) {
+      alert("Este pago ya tiene una devolución registrada — no se puede eliminar. Si hay un error, corrígelo desde el registro de la devolución.");
+      return;
+    }
+    setPagoAEliminar(pago);
+  };
 
   const eliminarPagoConMotivo = (pago: Pago, motivo: string) => {
     const registro = {
@@ -826,7 +858,8 @@ export default function Pagos({
 
   const tratamientosPendientes: TratamientoPendiente[] = computeTratamientosPendientes(
     presupuestos,
-    pagos
+    pagos,
+    devoluciones
   );
 
   const totalPresupuestado = presupuestos.reduce((sum, p) => sum + p.total, 0);
@@ -851,15 +884,24 @@ export default function Pagos({
 
   return (
     <div className="space-y-4">
-      <div className="flex items-center justify-between">
+      <div className="flex flex-wrap items-center justify-between gap-2">
         <h3 className="text-sm font-semibold uppercase tracking-wide text-ink/60">Pagos</h3>
-        <button
-          onClick={() => setShowDialog(true)}
-          className="rounded-lg border border-accent/50 bg-accent/10 px-4 py-2 text-xs font-semibold text-accent transition-colors hover:bg-accent/20"
-          style={{ boxShadow: "0 0 12px -2px rgb(var(--accent-rgb) / 0.5)" }}
-        >
-          + Agregar Pago
-        </button>
+        <div className="flex items-center gap-2">
+          <button
+            onClick={() => setPagoParaDevolver("sin-preseleccion")}
+            disabled={pagos.length === 0}
+            className="rounded-lg border border-danger/40 bg-danger/5 px-4 py-2 text-xs font-semibold text-danger transition-colors hover:bg-danger/10 disabled:cursor-not-allowed disabled:opacity-40"
+          >
+            ↩ Registrar devolución
+          </button>
+          <button
+            onClick={() => setShowDialog(true)}
+            className="rounded-lg border border-accent/50 bg-accent/10 px-4 py-2 text-xs font-semibold text-accent transition-colors hover:bg-accent/20"
+            style={{ boxShadow: "0 0 12px -2px rgb(var(--accent-rgb) / 0.5)" }}
+          >
+            + Agregar Pago
+          </button>
+        </div>
       </div>
 
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
@@ -898,8 +940,14 @@ export default function Pagos({
               </tr>
             </thead>
             <tbody>
-              {pagos.map((pago) => (
-                <tr key={pago.id} className="border-b border-edge/5 last:border-0">
+              {pagos.map((pago) => {
+                const devolucionesDelPago = devoluciones
+                  .filter((d) => d.pagoOrigenId === pago.id && d.estado !== "cancelada")
+                  .sort((a, b) => (a.completadoEn ?? a.creadoEn).localeCompare(b.completadoEn ?? b.creadoEn));
+                const disponiblePago = calcularDisponibleDevolucion(pago, resumenDesdeDevoluciones(pago.id, devoluciones));
+                return (
+                <Fragment key={pago.id}>
+                <tr className="border-b border-edge/5 last:border-0">
                   <td className="px-6 py-3 whitespace-nowrap text-ink/70">{pago.fecha}</td>
                   <td className="px-6 py-3 text-ink/70">
                     {pago.lineas.length > 0 ? pago.lineas.map((l) => l.label).join(", ") : "—"}
@@ -971,15 +1019,24 @@ export default function Pagos({
                   </td>
                   <td className="px-6 py-3 text-right">
                     <div className="ml-auto flex w-fit items-center gap-1.5">
+                      {disponiblePago.disponible > 0 && (
+                        <button
+                          onClick={() => setPagoParaDevolver(pago)}
+                          title="Registrar devolución"
+                          className="flex h-7 w-7 items-center justify-center rounded-full border border-danger/20 text-danger/50 transition-colors hover:border-danger/60 hover:text-danger"
+                        >
+                          ↩
+                        </button>
+                      )}
                       <button
-                        onClick={() => setPagoAEditar(pago)}
+                        onClick={() => intentarEditar(pago)}
                         title="Editar pago (monto o tratamiento)"
                         className="flex h-7 w-7 items-center justify-center rounded-full border border-edge/15 text-ink/50 transition-colors hover:border-accent/50 hover:text-accent"
                       >
                         ✎
                       </button>
                       <button
-                        onClick={() => setPagoAEliminar(pago)}
+                        onClick={() => intentarEliminar(pago)}
                         title="Eliminar pago"
                         className="flex h-7 w-7 items-center justify-center rounded-full border border-danger/20 text-danger/50 transition-colors hover:border-danger/60 hover:text-danger"
                       >
@@ -988,7 +1045,26 @@ export default function Pagos({
                     </div>
                   </td>
                 </tr>
-              ))}
+                {devolucionesDelPago.map((dev) => (
+                  <tr key={dev.id} className="border-b border-edge/5 bg-danger/5 last:border-0">
+                    <td className="px-6 py-2 pl-10 text-xs text-ink/50 whitespace-nowrap">
+                      {new Date(dev.completadoEn ?? dev.creadoEn).toLocaleDateString("es-MX")}
+                    </td>
+                    <td colSpan={6} className="px-6 py-2 text-xs text-danger/80">
+                      ↳ {dev.tipo === "total" ? "Devolución total" : "Devolución parcial"} · {motivoDevolucionLabel[dev.motivo]}
+                      {dev.correccion && (
+                        <span className="ml-1.5 rounded-full bg-warning/10 px-1.5 py-0.5 text-[10px] font-semibold text-warning">
+                          Con corrección posterior
+                        </span>
+                      )}
+                    </td>
+                    <td className="px-6 py-2 text-right text-xs font-semibold text-danger">−{formatCurrency(dev.monto)}</td>
+                    <td />
+                  </tr>
+                ))}
+                </Fragment>
+                );
+              })}
             </tbody>
           </table>
         </div>
@@ -1048,6 +1124,16 @@ export default function Pagos({
             upsertPago(pago);
             setPagoAEditar(null);
           }}
+        />
+      )}
+
+      {pagoParaDevolver && (
+        <RegistrarDevolucionDialog
+          patientId={patientId}
+          patientName={patientName}
+          pagos={pagos}
+          pagoPreseleccionado={pagoParaDevolver === "sin-preseleccion" ? undefined : pagoParaDevolver}
+          onClose={() => setPagoParaDevolver(null)}
         />
       )}
     </div>

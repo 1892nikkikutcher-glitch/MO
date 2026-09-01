@@ -40,6 +40,7 @@ import {
   type EstadoPresupuesto,
   type LineItem,
   type Pago,
+  type DevolucionPago,
   type Receta,
   type NotaEvolucion,
   type Recurso,
@@ -79,7 +80,14 @@ import type { Deposito, ArticuloFaltante, ArticuloCaducidad } from "@/lib/deposi
 import type { CentroRadiodiagnostico } from "@/lib/centroRadiodiagnostico";
 import type { LaboratorioDental } from "@/lib/laboratorioDental";
 import type { PagoEliminado } from "@/lib/pagosEliminados";
-import { saldosPendientesInicial, type SaldosPendientesConfig } from "@/lib/saldosPendientes";
+import { saldosPendientesInicial, calcularSaldoPendiente, type SaldosPendientesConfig } from "@/lib/saldosPendientes";
+import {
+  completarDevolucion,
+  cancelarDevolucionBorrador,
+  registrarCorreccionDevolucion,
+  type DevolucionInput,
+} from "@/lib/devolucionesPago";
+import type { EventoDevolucionLog } from "@/lib/devolucionesLog";
 import { laboratoriosPendientesInicial, type LaboratoriosPendientesConfig } from "@/lib/laboratoriosPendientes";
 import {
   presupuestosPendientesDetalleInicial,
@@ -509,6 +517,46 @@ type PatientDataContextValue = {
     planTratamientoItemId: string,
     vinculo: PresupuestoVinculado
   ) => Promise<void>;
+  /** Devoluciones de pago por paciente — ver devolucionesPago.ts. Un pago
+   * nunca se edita/borra; una devolución es un movimiento nuevo vinculado. */
+  devolucionesPorPaciente: Record<string, DevolucionPago[]>;
+  /** Bitácora plana de auditoría (mismo patrón que pagosEliminados) —
+   * nunca anidada, para poder leerla en Reportes sin recorrer expedientes. */
+  devolucionesLog: EventoDevolucionLog[];
+  /** Completa una devolución de forma atómica (transacción única: la
+   * devolución, su resumen, el delta de corte de caja y el evento de
+   * auditoría) y luego intenta reconciliar `saldosPendientes` aparte — ese
+   * segundo paso puede fallar sin que la devolución deje de estar
+   * completada (nunca se le pide al usuario repetir el movimiento de
+   * dinero por eso). */
+  registrarDevolucion: (
+    devolucionId: string,
+    input: DevolucionInput,
+    patientName: string
+  ) => Promise<{ devolucion: DevolucionPago; saldoSincronizado: boolean }>;
+  /** Solo válido antes de completar — un borrador nunca movió dinero real. */
+  cancelarDevolucion: (patientId: string, devolucionId: string) => Promise<void>;
+  /** Anota un ajuste posterior a una devolución YA completada — nunca la
+   * revierte ni cambia su estado (ver DevolucionPago.correccion). */
+  corregirDevolucion: (
+    patientId: string,
+    devolucionId: string,
+    correccion: { motivo: string; montoRegresado?: number }
+  ) => Promise<void>;
+  /** Vuelve a calcular saldosPendientes de un paciente desde cero (recompute
+   * puro e idempotente, seguro de reintentar cualquier número de veces) —
+   * expuesto para el botón "Reintentar sincronización" cuando
+   * registrarDevolucion devuelve saldoSincronizado: false. */
+  reconciliarSaldoPendiente: (patientId: string) => void;
+  /** Adjunta la firma de recepción (ya subida a Storage) a una devolución
+   * completada — no transaccional, nunca sugiere que la devolución falló. */
+  agregarFirmaRecepcionDevolucion: (
+    patientId: string,
+    devolucionId: string,
+    pagoOrigenId: string,
+    path: string,
+    url: string
+  ) => Promise<void>;
   /** Comparativas de rehabilitación — cada una compara 2-4 presupuestos ya
    * guardados del mismo paciente (ver "Comparativa de Rehabilitación" en
    * Presupuestos). Solo referencian el id de cada presupuesto, nunca
@@ -831,6 +879,11 @@ export function PatientDataProvider({
   >({});
   const [diagnosticosPorPaciente, setDiagnosticosPorPacienteState] = useState<Record<string, DiagnosticoPaciente[]>>({});
   const [planTratamientoPorPaciente, setPlanTratamientoPorPacienteState] = useState<Record<string, PlanTratamientoItem[]>>({});
+  const [devolucionesPorPaciente, setDevolucionesPorPacienteState] = useState<Record<string, DevolucionPago[]>>({});
+  // Escrita únicamente dentro de la transacción de completarDevolucion — no
+  // necesita un setter propio del contexto, el onSnapshot ya la mantiene
+  // sincronizada.
+  const [devolucionesLog] = useFirestoreList<EventoDevolucionLog>(clinicUid, "devolucionesLog");
   const [comparativasPorPaciente, setComparativasPorPacienteState] = useState<
     Record<string, ComparativaRehabilitacion[]>
   >({});
@@ -969,6 +1022,14 @@ export function PatientDataProvider({
       subs.current[planTratamientoKey] = onSnapshot(collection(db, path), (snap) => {
         const next = snap.docs.map((d) => ({ ...(d.data() as PlanTratamientoItem), id: d.id }));
         setPlanTratamientoPorPacienteState((prev) => ({ ...prev, [patientId]: next }));
+      });
+    }
+    const devolucionesKey = `devoluciones:${patientId}`;
+    if (!subs.current[devolucionesKey]) {
+      const path = `users/${clinicUid}/pacientes/${patientId}/devoluciones`;
+      subs.current[devolucionesKey] = onSnapshot(collection(db, path), (snap) => {
+        const next = snap.docs.map((d) => ({ ...(d.data() as DevolucionPago), id: d.id }));
+        setDevolucionesPorPacienteState((prev) => ({ ...prev, [patientId]: next }));
       });
     }
     const comparativasKey = `comparativas:${patientId}`;
@@ -1203,15 +1264,13 @@ export function PatientDataProvider({
    * Reportes → Saldos Pendientes sin tener que cargar los 1006 expedientes.
    * Se quita del mapa al paciente que ya no debe nada, para que el reporte
    * solo muestre saldos reales. */
-  const registrarSaldoPendiente = (patientId: string, presupuestos: SavedBudget[], pagos: Pago[]) => {
-    const totalPresupuestado = presupuestos.reduce((s, p) => s + p.total, 0);
-    // Solo cuenta pagos ligados a un tratamiento del presupuesto — pagos
-    // sueltos como membresías no deben "pagar" un tratamiento que no cubren.
-    const totalPagado = pagos.reduce(
-      (s, p) => s + p.lineas.reduce((ls, l) => ls + (l.tratamientoId ? l.monto : 0), 0),
-      0
-    );
-    const saldo = totalPresupuestado - totalPagado;
+  const registrarSaldoPendiente = (
+    patientId: string,
+    presupuestos: SavedBudget[],
+    pagos: Pago[],
+    devoluciones: DevolucionPago[] = []
+  ) => {
+    const { totalPresupuestado, totalPagado, saldo } = calcularSaldoPendiente(presupuestos, pagos, devoluciones);
     const patientName = patients.find((p) => p.id === patientId)?.name ?? "";
     setSaldosPendientes((prev) => {
       const porPaciente = { ...prev.porPaciente };
@@ -1307,7 +1366,7 @@ export function PatientDataProvider({
     syncFirestoreList(`users/${clinicUid}/pacientes/${patientId}/presupuestos`, prevArr, next);
     registrarDeltaPresupuestos(prevArr, next);
     registrarPresupuestosPendientesDetalle(patientId, prevArr, next);
-    registrarSaldoPendiente(patientId, next, pagosPorPaciente[patientId] ?? []);
+    registrarSaldoPendiente(patientId, next, pagosPorPaciente[patientId] ?? [], devolucionesPorPaciente[patientId] ?? []);
     registrarLogPresupuestos(patientId, prevArr, next);
     setPresupuestosPorPacienteState((prev) => ({ ...prev, [patientId]: next }));
     sincronizarEtiquetasPagos(patientId, prevArr, next);
@@ -1440,7 +1499,7 @@ export function PatientDataProvider({
       ...presupuestosAgregados,
       ...(presupuestosPorPaciente[patientId] ?? []),
     ];
-    registrarSaldoPendiente(patientId, presupuestosActuales, next);
+    registrarSaldoPendiente(patientId, presupuestosActuales, next, devolucionesPorPaciente[patientId] ?? []);
     setPagosPorPacienteState((prev) => ({ ...prev, [patientId]: next }));
   };
 
@@ -1503,6 +1562,107 @@ export function PatientDataProvider({
     if (!clinicUid) return;
     const ref = doc(db, `users/${clinicUid}/pacientes/${patientId}/planTratamiento/${planTratamientoItemId}`);
     await updateDoc(ref, { presupuestosVinculados: arrayUnion(vinculo) });
+  };
+
+  /** Recompute completo (no delta) de saldosPendientes de un paciente —
+   * puro e idempotente, seguro de reintentar cualquier número de veces sin
+   * corromper nada. Usado tanto tras registrar una devolución como por el
+   * botón manual "Reintentar sincronización" si el primer intento falló. */
+  const reconciliarSaldoPendiente = (patientId: string) => {
+    registrarSaldoPendiente(
+      patientId,
+      presupuestosPorPaciente[patientId] ?? [],
+      pagosPorPaciente[patientId] ?? [],
+      devolucionesPorPaciente[patientId] ?? []
+    );
+  };
+
+  const registrarDevolucion = async (devolucionId: string, input: DevolucionInput, patientName: string) => {
+    if (!clinicUid) throw new Error("Sin clínica activa.");
+    // Atómico y garantizado: si esto no lanza, el dinero ya quedó
+    // registrado como devuelto — punto final. Nunca se le pide al usuario
+    // repetir esta llamada por un fallo posterior de sincronización.
+    const { devolucion } = await completarDevolucion(db, clinicUid, devolucionId, input, uid, patientName);
+    let saldoSincronizado = true;
+    try {
+      // Recompute completo con la devolución ya incluida — devolucionesPorPaciente
+      // todavía puede no traerla si el onSnapshot no ha llegado, así que se
+      // agrega explícitamente a la lista usada para este cálculo puntual.
+      const devolucionesConEsta = [
+        ...(devolucionesPorPaciente[input.patientId] ?? []).filter((d) => d.id !== devolucion.id),
+        devolucion,
+      ];
+      registrarSaldoPendiente(
+        input.patientId,
+        presupuestosPorPaciente[input.patientId] ?? [],
+        pagosPorPaciente[input.patientId] ?? [],
+        devolucionesConEsta
+      );
+    } catch (err) {
+      console.error("No se pudo sincronizar saldosPendientes tras la devolución", err);
+      saldoSincronizado = false;
+    }
+    return { devolucion, saldoSincronizado };
+  };
+
+  const cancelarDevolucion = async (patientId: string, devolucionId: string) => {
+    if (!clinicUid) return;
+    await cancelarDevolucionBorrador(db, clinicUid, patientId, devolucionId, uid);
+    await setDoc(doc(db, `users/${clinicUid}/devolucionesLog/${devolucionId}-cancelada`), {
+      id: `${devolucionId}-cancelada`,
+      tipo: "devolucion_cancelada",
+      patientId,
+      patientName: patients.find((p) => p.id === patientId)?.name ?? "",
+      devolucionId,
+      pagoOrigenId: "",
+      uid,
+      creadoEn: new Date().toISOString(),
+    } satisfies EventoDevolucionLog);
+  };
+
+  const corregirDevolucion = async (
+    patientId: string,
+    devolucionId: string,
+    correccion: { motivo: string; montoRegresado?: number }
+  ) => {
+    if (!clinicUid) return;
+    await registrarCorreccionDevolucion(db, clinicUid, patientId, devolucionId, correccion, uid);
+    await setDoc(doc(db, `users/${clinicUid}/devolucionesLog/${devolucionId}-correccion`), {
+      id: `${devolucionId}-correccion`,
+      tipo: "devolucion_corregida",
+      patientId,
+      patientName: patients.find((p) => p.id === patientId)?.name ?? "",
+      devolucionId,
+      pagoOrigenId: "",
+      motivo: correccion.motivo,
+      uid,
+      creadoEn: new Date().toISOString(),
+    } satisfies EventoDevolucionLog);
+  };
+
+  /** Adjunta la firma de recepción ya subida a Storage a una devolución YA
+   * completada — nunca transaccional, un fallo aquí no debe sugerir que la
+   * devolución falló (ver ronda 2 punto 9 del plan). */
+  const agregarFirmaRecepcionDevolucion = async (
+    patientId: string,
+    devolucionId: string,
+    pagoOrigenId: string,
+    path: string,
+    url: string
+  ) => {
+    if (!clinicUid) return;
+    const ref = doc(db, `users/${clinicUid}/pacientes/${patientId}/devoluciones/${devolucionId}`);
+    await updateDoc(ref, { firmaRecepcionStoragePath: path, firmaRecepcionUrl: url });
+    await setDoc(doc(db, `users/${clinicUid}/devolucionesLog/${devolucionId}-firma`), {
+      id: `${devolucionId}-firma`,
+      tipo: "firma_recepcion_agregada",
+      patientId,
+      patientName: patients.find((p) => p.id === patientId)?.name ?? "",
+      devolucionId,
+      pagoOrigenId,
+      uid,
+      creadoEn: new Date().toISOString(),
+    } satisfies EventoDevolucionLog);
   };
 
   const setComparativasPaciente = (patientId: string, updater: Updater<ComparativaRehabilitacion[]>) => {
@@ -2079,6 +2239,13 @@ export function PatientDataProvider({
         planTratamientoPorPaciente,
         setPlanTratamientoPaciente,
         vincularPresupuestoAPlan,
+        devolucionesPorPaciente,
+        devolucionesLog,
+        registrarDevolucion,
+        cancelarDevolucion,
+        corregirDevolucion,
+        reconciliarSaldoPendiente,
+        agregarFirmaRecepcionDevolucion,
         comparativasPorPaciente,
         setComparativasPaciente,
         membershipPlanes,

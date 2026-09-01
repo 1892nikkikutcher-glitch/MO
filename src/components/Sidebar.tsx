@@ -238,6 +238,7 @@ export const navItems = [
     ),
     children: [
       { id: "reportes-pagos", label: "Pagos" },
+      { id: "reportes-devoluciones", label: "Devoluciones" },
       { id: "reportes-corte-caja", label: "Corte caja" },
       { id: "reportes-presupuestos", label: "Presupuestos" },
       { id: "reportes-saldos-pendientes", label: "Saldos pendientes" },

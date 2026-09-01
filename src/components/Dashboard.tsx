@@ -29,6 +29,7 @@ import LaboratorioDental from "./pages/LaboratorioDental";
 import ProximamenteStub from "./pages/ProximamenteStub";
 import Contrasena from "./pages/Contrasena";
 import ReportePagos from "./pages/ReportePagos";
+import ReporteDevoluciones from "./pages/ReporteDevoluciones";
 import BitacoraCitas from "./pages/BitacoraCitas";
 import ReporteProcedimientos from "./pages/ReporteProcedimientos";
 import MedicosPacientes from "./pages/MedicosPacientes";
@@ -100,6 +101,7 @@ const paginasConstruidas = new Set([
   "reportes-aseguradoras",
   "reportes-seguimiento-asistencia",
   "reportes-pagos",
+  "reportes-devoluciones",
   "reportes-corte-diario",
   "reportes-corte-caja",
   "reportes-graficas",
@@ -492,6 +494,7 @@ function DashboardBody({
           {activePage === "reportes-aseguradoras" && <Aseguradoras />}
           {activePage === "reportes-seguimiento-asistencia" && <SeguimientoAsistencia />}
           {activePage === "reportes-pagos" && <ReportePagos />}
+          {activePage === "reportes-devoluciones" && <ReporteDevoluciones />}
           {activePage === "reportes-corte-diario" && <ReporteCorteDiario />}
           {activePage === "reportes-corte-caja" && <ReporteCorteCaja />}
           {activePage === "reportes-graficas" && <ReporteGraficas />}

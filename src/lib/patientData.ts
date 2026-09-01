@@ -730,11 +730,46 @@ export const motivoDevolucionOptions = [
 ] as const;
 export type MotivoDevolucion = (typeof motivoDevolucionOptions)[number];
 
+export const motivoDevolucionLabel: Record<MotivoDevolucion, string> = {
+  procedimiento_no_realizado: "Procedimiento no realizado",
+  suspension_clinica: "Suspensión clínica",
+  referencia_especialista: "Referencia a especialista",
+  cambio_plan_tratamiento: "Cambio de plan de tratamiento",
+  paciente_decide_no_continuar: "El paciente decide no continuar",
+  pago_duplicado: "Pago duplicado",
+  error_cobro: "Error de cobro",
+  cortesia_bonificacion: "Cortesía / bonificación",
+  otro: "Otro",
+};
+
 export const efectoTratamientoOptions = ["continua", "cancelado", "referido", "pendiente", "solo_financiero"] as const;
 export type EfectoTratamiento = (typeof efectoTratamientoOptions)[number];
 
+export const efectoTratamientoLabel: Record<EfectoTratamiento, string> = {
+  continua: "Continúa en la clínica",
+  cancelado: "Cancelado",
+  referido: "Referido a especialista / atención externa",
+  pendiente: "Pendiente de decisión",
+  solo_financiero: "Solo ajuste financiero, sin cambio clínico",
+};
+
 export const metodoDevolucionOptions = ["efectivo", "transferencia", "reverso_tarjeta", "otro"] as const;
 export type MetodoDevolucion = (typeof metodoDevolucionOptions)[number];
+
+export const metodoDevolucionLabel: Record<MetodoDevolucion, string> = {
+  efectivo: "Efectivo",
+  transferencia: "Transferencia",
+  reverso_tarjeta: "Reverso de tarjeta",
+  otro: "Otro",
+};
+
+export const relacionReceptorDevolucionLabel: Record<RelacionReceptorDevolucion, string> = {
+  paciente: "Paciente",
+  madre: "Madre",
+  padre: "Padre",
+  tutor: "Tutor",
+  representante: "Representante",
+};
 
 /** "anulada" NO existe a propósito — un movimiento de efectivo que ya
  * ocurrió (una devolución "completada") nunca puede "no haber pasado".

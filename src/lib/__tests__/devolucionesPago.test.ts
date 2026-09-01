@@ -4,9 +4,10 @@ import {
   calcularDisponibleDevolucion,
   construirDevolucion,
   devolucionValida,
+  resumenDesdeDevoluciones,
   type DevolucionInput,
 } from "../devolucionesPago";
-import type { DevolucionResumen, Pago } from "../patientData";
+import type { DevolucionPago, DevolucionResumen, Pago } from "../patientData";
 
 function pagoFixture(overrides: Partial<Pago> = {}): Pago {
   return {
@@ -354,6 +355,51 @@ describe("aplicarDevolucionAResumen", () => {
     const previoCopia = JSON.parse(JSON.stringify(previo));
     aplicarDevolucionAResumen(previo, "pago-1", inputFixture({ monto: 100 }), "2026-07-01");
     expect(previo).toEqual(previoCopia);
+  });
+});
+
+describe("resumenDesdeDevoluciones", () => {
+  function devolucion(overrides: Partial<DevolucionPago> = {}): DevolucionPago {
+    return {
+      id: "dev-1",
+      patientId: "pac-1",
+      pagoOrigenId: "pago-1",
+      tipo: "parcial",
+      monto: 500,
+      moneda: "MXN",
+      metodo: "efectivo",
+      motivo: "procedimiento_no_realizado",
+      itemsAfectados: [{ lineaPagoId: "linea-A", tratamientoId: "trat-A", folio: "F-1", label: "A", montoDevuelto: 500, efectoTratamiento: "referido" }],
+      registradoPorUid: "uid-1",
+      estado: "completada",
+      creadoEn: "2026-06-15T10:00:00.000Z",
+      completadoEn: "2026-06-15T10:00:00.000Z",
+      ...overrides,
+    };
+  }
+
+  it("null cuando no hay devoluciones completadas de ese pago", () => {
+    expect(resumenDesdeDevoluciones("pago-1", [])).toBeNull();
+    expect(resumenDesdeDevoluciones("pago-1", [devolucion({ estado: "borrador" })])).toBeNull();
+    expect(resumenDesdeDevoluciones("pago-2", [devolucion()])).toBeNull();
+  });
+
+  it("suma solo devoluciones completadas de ESE pago, ignora canceladas y de otros pagos", () => {
+    const resumen = resumenDesdeDevoluciones("pago-1", [
+      devolucion({ id: "d1", monto: 500 }),
+      devolucion({ id: "d2", monto: 300, pagoOrigenId: "pago-2" }),
+      devolucion({ id: "d3", monto: 100, estado: "cancelada" }),
+    ]);
+    expect(resumen?.totalDevuelto).toBe(500);
+  });
+
+  it("acumula devueltoPorLinea de varias devoluciones", () => {
+    const resumen = resumenDesdeDevoluciones("pago-1", [
+      devolucion({ id: "d1", monto: 200, itemsAfectados: [{ lineaPagoId: "linea-A", tratamientoId: "trat-A", folio: "F-1", label: "A", montoDevuelto: 200, efectoTratamiento: "referido" }] }),
+      devolucion({ id: "d2", monto: 100, itemsAfectados: [{ lineaPagoId: "linea-A", tratamientoId: "trat-A", folio: "F-1", label: "A", montoDevuelto: 100, efectoTratamiento: "referido" }] }),
+    ]);
+    expect(resumen?.devueltoPorLinea["linea-A"]).toBe(300);
+    expect(resumen?.totalDevuelto).toBe(300);
   });
 });
 

@@ -1014,6 +1014,7 @@ export default function Expediente({
     setPresupuestosPaciente,
     pagosPorPaciente,
     setPagosPaciente,
+    devolucionesPorPaciente,
     cargarDatosPaciente,
     citas,
     recursos,
@@ -1074,6 +1075,7 @@ export default function Expediente({
   const pagos = pagosPorPaciente[patient.id] ?? [];
   const setPagos: Dispatch<SetStateAction<Pago[]>> = (updater) =>
     setPagosPaciente(patient.id, updater);
+  const devoluciones = devolucionesPorPaciente[patient.id] ?? [];
   const patientAlergias = historiaClinicaPorPaciente[patient.id]?.alergias?.trim() || "";
   const condicionesSistemicas = condicionesSistemicasPositivas(
     historiaClinicaTemplate,
@@ -1354,6 +1356,7 @@ export default function Expediente({
               patientName={patient.name}
               presupuestos={presupuestos}
               pagos={pagos}
+              devoluciones={devoluciones}
               setPagos={setPagos}
             />
           )}

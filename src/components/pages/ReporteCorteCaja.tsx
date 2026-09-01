@@ -16,9 +16,13 @@ export default function ReporteCorteCaja() {
   const { finanzas } = usePatientData();
   const [fecha, setFecha] = useState(hoyIso());
 
-  const total = finanzas.porFecha[fecha] ?? 0;
+  const cobrosBrutos = finanzas.porFecha[fecha] ?? 0;
+  const devolucionesMonto = finanzas.devolucionesPorFecha?.[fecha] ?? 0;
+  const neto = cobrosBrutos - devolucionesMonto;
   const porForma = finanzas.porFechaYFormaPago?.[fecha] ?? {};
   const formas = Object.entries(porForma).sort((a, b) => b[1] - a[1]);
+  const porMetodoDevolucion = finanzas.devolucionesPorFechaYMetodo?.[fecha] ?? {};
+  const metodosDevolucion = Object.entries(porMetodoDevolucion).sort((a, b) => b[1] - a[1]);
 
   const ultimosDias = Object.entries(finanzas.porFecha)
     .filter(([, monto]) => monto !== 0)
@@ -37,16 +41,36 @@ export default function ReporteCorteCaja() {
             className={`${inputClass} max-w-xs`}
           />
 
-          <div className="mt-4 rounded-xl border border-edge/10 bg-inset p-5">
-            <div className="text-3xl font-bold text-success">{formatCurrency(total)}</div>
-            <div className="mt-1 text-xs uppercase tracking-wide text-ink/40">
-              Total cobrado el {fecha}
+          <div className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-3">
+            <div className="rounded-xl border border-edge/10 bg-inset p-5">
+              <div className="text-2xl font-bold text-success">{formatCurrency(cobrosBrutos)}</div>
+              <div className="mt-1 text-xs uppercase tracking-wide text-ink/40">Cobros brutos</div>
+            </div>
+            <div className="rounded-xl border border-edge/10 bg-inset p-5">
+              <div className="text-2xl font-bold text-danger">−{formatCurrency(devolucionesMonto)}</div>
+              <div className="mt-1 text-xs uppercase tracking-wide text-ink/40">Devoluciones</div>
+            </div>
+            <div className="rounded-xl border border-accent/30 bg-accent/10 p-5">
+              <div className="text-2xl font-bold text-accent">{formatCurrency(neto)}</div>
+              <div className="mt-1 text-xs uppercase tracking-wide text-ink/40">Ingreso neto</div>
             </div>
           </div>
 
+          {metodosDevolucion.length > 0 && (
+            <div className="mt-4 space-y-2">
+              <h4 className="text-xs font-semibold uppercase tracking-wide text-ink/40">Devoluciones por método</h4>
+              {metodosDevolucion.map(([metodo, monto]) => (
+                <div key={metodo} className="flex items-center justify-between rounded-lg border border-danger/15 bg-danger/5 px-4 py-2.5 text-sm">
+                  <span className="text-ink/80">{metodo}</span>
+                  <span className="font-semibold text-danger">−{formatCurrency(monto)}</span>
+                </div>
+              ))}
+            </div>
+          )}
+
           {formas.length === 0 ? (
             <p className="mt-4 text-sm text-ink/40">
-              {total > 0
+              {cobrosBrutos > 0
                 ? "Este total incluye pagos registrados antes de activarse el desglose por forma de pago — los pagos nuevos sí aparecerán desglosados aquí."
                 : "No hay pagos registrados en esta fecha."}
             </p>
