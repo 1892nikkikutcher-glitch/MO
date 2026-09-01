@@ -2,6 +2,8 @@
  * semanal/quincenal/mensual siempre coincidan entre sí, y el cálculo real
  * de ingresos por periodo a partir del acumulado diario de pagos. */
 
+import { redondearDinero } from "./dinero";
+
 export type MetaConfig = {
   metaMensual: number;
 };
@@ -14,9 +16,36 @@ export const metaConfigInicial: MetaConfig = { metaMensual: 0 };
 export type FinanzasConfig = {
   porFecha: Record<string, number>;
   porFechaYFormaPago: Record<string, Record<string, number>>;
+  /** Devoluciones completadas — indexado por la fecha REAL en que se
+   * completó la devolución (completadoEn), NUNCA por la fecha del pago
+   * original, para que el corte histórico del día del pago nunca se
+   * altere. Opcional para retrocompatibilidad con documentos ya
+   * existentes, igual que el resto de campos aditivos de esta config. */
+  devolucionesPorFecha?: Record<string, number>;
+  devolucionesPorFechaYMetodo?: Record<string, Record<string, number>>;
 };
 
 export const finanzasInicial: FinanzasConfig = { porFecha: {}, porFechaYFormaPago: {} };
+
+/** Delta puro sobre el rollup de devoluciones — misma estrategia de
+ * `redondearDinero` que el resto del dominio financiero nuevo. Como una
+ * devolución completada nunca se revierte (ver "cancelada" vs "correccion"
+ * en DevolucionPago), el delta siempre es positivo en Fase 2 — no hace
+ * falta un caso simétrico de resta. */
+export function aplicarDeltaDevolucion(
+  finanzas: FinanzasConfig,
+  fechaIso: string,
+  metodo: string,
+  deltaMonto: number
+): FinanzasConfig {
+  const devolucionesPorFecha = { ...(finanzas.devolucionesPorFecha ?? {}) };
+  devolucionesPorFecha[fechaIso] = redondearDinero((devolucionesPorFecha[fechaIso] ?? 0) + deltaMonto);
+  const devolucionesPorFechaYMetodo = { ...(finanzas.devolucionesPorFechaYMetodo ?? {}) };
+  const porMetodo = { ...(devolucionesPorFechaYMetodo[fechaIso] ?? {}) };
+  porMetodo[metodo] = redondearDinero((porMetodo[metodo] ?? 0) + deltaMonto);
+  devolucionesPorFechaYMetodo[fechaIso] = porMetodo;
+  return { ...finanzas, devolucionesPorFecha, devolucionesPorFechaYMetodo };
+}
 
 /** Cantidad y valor ($) histórico de presupuestos por estado — presupuestos
  * guardados antes de que existiera el campo `estado` cuentan como

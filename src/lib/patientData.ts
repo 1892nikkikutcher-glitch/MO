@@ -1,5 +1,6 @@
 import { capitalizarNombre } from "./textoNombre";
 import type { PrioridadTratamiento } from "./planTratamiento";
+import { montoMayorQue, redondearDinero } from "./dinero";
 
 export type Patient = {
   id: string;
@@ -681,7 +682,8 @@ export function tratamientosDeDisponibles(presupuestos: SavedBudget[]): Tratamie
 
 export function computeTratamientosPendientes(
   presupuestos: SavedBudget[],
-  pagos: Pago[]
+  pagos: Pago[],
+  devoluciones: DevolucionPago[] = []
 ): TratamientoPendiente[] {
   const pagadoPorTratamiento: Record<string, number> = {};
   pagos.forEach((pago) => {
@@ -692,11 +694,137 @@ export function computeTratamientosPendientes(
       }
     });
   });
+  // La fuente de verdad es efectoTratamiento POR RENGLÓN de la devolución —
+  // solo "continua" reabre saldo; el resto (cancelado/referido/pendiente/
+  // solo_financiero) nunca genera una cuenta por cobrar automática solo
+  // porque hubo dinero devuelto.
+  devoluciones
+    .filter((d) => d.estado === "completada")
+    .forEach((d) => {
+      (d.itemsAfectados ?? [])
+        .filter((item) => item.efectoTratamiento === "continua")
+        .forEach((item) => {
+          if (item.tratamientoId) {
+            pagadoPorTratamiento[item.tratamientoId] = (pagadoPorTratamiento[item.tratamientoId] ?? 0) - item.montoDevuelto;
+          }
+        });
+    });
 
   return tratamientosDeDisponibles(presupuestos)
     .map((t) => ({
       ...t,
-      pendiente: t.price - (pagadoPorTratamiento[t.id] ?? 0),
+      pendiente: redondearDinero(t.price - (pagadoPorTratamiento[t.id] ?? 0)),
     }))
-    .filter((t) => t.pendiente > 0.009);
+    .filter((t) => montoMayorQue(t.pendiente, 0));
 }
+
+export const motivoDevolucionOptions = [
+  "procedimiento_no_realizado", "suspension_clinica", "referencia_especialista",
+  "cambio_plan_tratamiento", "paciente_decide_no_continuar", "pago_duplicado",
+  "error_cobro", "cortesia_bonificacion", "otro",
+] as const;
+export type MotivoDevolucion = (typeof motivoDevolucionOptions)[number];
+
+export const efectoTratamientoOptions = ["continua", "cancelado", "referido", "pendiente", "solo_financiero"] as const;
+export type EfectoTratamiento = (typeof efectoTratamientoOptions)[number];
+
+export const metodoDevolucionOptions = ["efectivo", "transferencia", "reverso_tarjeta", "otro"] as const;
+export type MetodoDevolucion = (typeof metodoDevolucionOptions)[number];
+
+/** "anulada" NO existe a propósito — un movimiento de efectivo que ya
+ * ocurrió (una devolución "completada") nunca puede "no haber pasado".
+ * "cancelada" solo es válida ANTES de completar (un borrador nunca movió
+ * dinero real); un error posterior a "completada" se documenta con el
+ * campo `correccion`, sin cambiar este estado. */
+export const estadoDevolucionOptions = ["borrador", "pendiente_autorizacion", "completada", "cancelada"] as const;
+export type EstadoDevolucion = (typeof estadoDevolucionOptions)[number];
+
+/** Mismo vocabulario que TipoFirmante (notasEvolucion.ts) — se repite aquí
+ * en vez de importarlo, para no crear un ciclo de imports. */
+export type RelacionReceptorDevolucion = "paciente" | "madre" | "padre" | "tutor" | "representante";
+
+/** Snapshot de qué renglón del PAGO originó la devolución — ancla en
+ * LineaPago.id (no en LineItem.id directo) porque lo que se devuelve es
+ * dinero de una línea de un pago concreto. folio/label se copian al
+ * momento de la devolución para poder mostrar "qué se devolvió" aunque el
+ * presupuesto cambie o el renglón se borre después. efectoTratamiento vive
+ * AQUÍ (no a nivel de toda la devolución) porque una sola devolución puede
+ * tocar varios tratamientos con destinos clínicos distintos (uno referido,
+ * otro que continúa) — este campo es la única fuente de verdad para los
+ * cálculos de saldo pendiente. */
+export type ItemDevolucion = {
+  lineaPagoId: string;
+  tratamientoId: string | null;
+  folio: string | null;
+  label: string;
+  montoDevuelto: number;
+  efectoTratamiento: EfectoTratamiento;
+};
+
+export type DevolucionPago = {
+  id: string;
+  patientId: string;
+  pagoOrigenId: string;
+  presupuestoId?: string;
+  tipo: "total" | "parcial";
+  monto: number;
+  moneda: "MXN";
+  metodo: MetodoDevolucion;
+  motivo: MotivoDevolucion;
+  detalleMotivo?: string;
+  /** OPCIONAL — representa el efecto SOLO de montoNoAsignadoTratamientos,
+   * nunca un "efecto general" de toda la devolución. Ausente cuando no hay
+   * monto sin asignar (nunca se rellena con un valor inventado). Cuando
+   * itemsAfectados existe, el efecto real para saldo es SIEMPRE
+   * item.efectoTratamiento — este campo nunca se usa en ese caso. */
+  efectoTratamiento?: EfectoTratamiento;
+  itemsAfectados?: ItemDevolucion[];
+  /** Monto de la devolución no asignado a ningún tratamiento específico.
+   * suma(itemsAfectados.montoDevuelto) + montoNoAsignadoTratamientos debe
+   * igualar `monto`, dentro de una tolerancia de centavos — nunca una
+   * diferencia silenciosa (ver devolucionesPago.ts). */
+  montoNoAsignadoTratamientos?: number;
+  notaEvolucionId?: string;
+  /** Opcional — id de una interconsulta de MO Conecta, si existe. No se
+   * valida contra ese dominio (aislado a propósito) — es solo referencia. */
+  interconsultaId?: string;
+  recibidoPor?: { nombre: string; relacion?: RelacionReceptorDevolucion };
+  referenciaTransferencia?: string;
+  firmaRecepcionStoragePath?: string;
+  firmaRecepcionUrl?: string;
+  registradoPorUid: string;
+  autorizadoPorUid?: string;
+  entregadoPorUid?: string;
+  estado: EstadoDevolucion;
+  /** ISO datetime — a diferencia de Pago.fecha ("DD/MM/YYYY"), para poder
+   * derivar la llave del corte de caja con un simple .slice(0,10). */
+  creadoEn: string;
+  completadoEn?: string;
+  canceladoEn?: string;
+  canceladoPorUid?: string;
+  /** Anotación de que existió un ajuste posterior a una devolución YA
+   * completada (ej. el dinero regresó a la clínica por otra vía). NUNCA
+   * cambia `estado`, NUNCA resta de devolucionesResumen.totalDevuelto ni de
+   * finanzas.devolucionesPorFecha — la salida de efectivo original sigue
+   * siendo un hecho histórico. Un movimiento compensatorio real queda fuera
+   * de alcance de Fase 1; aquí solo se deja trazabilidad de que se revisó. */
+  correccion?: { motivo: string; montoRegresado?: number; registradaEn: string; registradaPorUid: string };
+  fiscal?: {
+    cfdiOrigenId?: string;
+    requiereRevisionFiscal: boolean;
+    cfdiEgresoId?: string;
+    estado: "no_aplica" | "pendiente" | "procesado";
+  };
+};
+
+/** Rollup por pago — en Fase 2 vivirá en
+ * users/{clinicUid}/pacientes/{patientId}/devolucionesResumen/{pagoId}
+ * (id = pagoId, para leerlo/escribirlo por referencia directa dentro de
+ * una transacción, sin queries). devueltoPorLinea protege el límite POR
+ * RENGLÓN, no solo el límite global del pago. */
+export type DevolucionResumen = {
+  pagoId: string;
+  totalDevuelto: number;
+  devueltoPorLinea: Record<string, number>;
+  actualizadoEn: string;
+};
