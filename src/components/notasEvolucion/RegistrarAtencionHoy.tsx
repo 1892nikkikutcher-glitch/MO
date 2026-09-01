@@ -503,6 +503,7 @@ function FormularioNota({
         >
           <SeccionQueEncontraste
             valor={nota.queEncontraste}
+            patientId={nota.encabezado.patientId}
             tipoProcedimientoSeleccionado={nota.detalleProcedimiento?.tipo}
             onChange={registrarCambio}
             onBlurTexto={flushInmediato}

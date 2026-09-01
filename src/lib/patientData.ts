@@ -296,6 +296,11 @@ export type FotosPaciente = {
   intraorales: FotoPaciente[];
   ineFrente?: FotoPaciente | null;
   ineReverso?: FotoPaciente | null;
+  /** Fotos anexadas desde una Nota de Evolución (ver SeccionQueEncontraste
+   * y QueEncontraste.fotosVinculadasIds en notasEvolucion.ts) — a criterio
+   * del médico, para dejar evidencia visual del hallazgo del día. Ausente
+   * en documentos guardados antes de este campo. */
+  notasEvolucion?: FotoPaciente[];
 };
 
 export const fotosVacias: FotosPaciente = { extraorales: [], intraorales: [] };

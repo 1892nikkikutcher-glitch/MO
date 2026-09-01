@@ -2,6 +2,9 @@
 
 import { useState } from "react";
 import Odontograma from "@/components/pages/Odontograma";
+import { usePatientData } from "@/context/PatientDataContext";
+import { subirFotoPaciente } from "@/lib/fotosPaciente";
+import type { FotoPaciente } from "@/lib/patientData";
 import { Chip, botonSecundario, inputClass, labelClass } from "./NotaUI";
 import {
   chipsHallazgos,
@@ -30,20 +33,54 @@ const etiquetas: Record<ChipHallazgo, string> = {
 
 export default function SeccionQueEncontraste({
   valor,
+  patientId,
   tipoProcedimientoSeleccionado,
   onChange,
   onBlurTexto,
 }: {
   valor: QueEncontraste;
+  patientId: string;
   tipoProcedimientoSeleccionado?: string;
   onChange: (updater: (prev: NotaEvolucionV2) => NotaEvolucionV2, opts?: { inmediato?: boolean }) => void;
   onBlurTexto?: () => void;
 }) {
   const [mostrarSignosVitales, setMostrarSignosVitales] = useState(!!valor.signosVitales);
+  const { clinicUid, fotosPorPaciente, setFotosPaciente } = usePatientData();
+  const [subiendoFoto, setSubiendoFoto] = useState(false);
+  const [errorFoto, setErrorFoto] = useState("");
 
   function set<K extends keyof QueEncontraste>(key: K, value: QueEncontraste[K], opts?: { inmediato?: boolean }) {
     onChange((prev) => ({ ...prev, queEncontraste: { ...valor, [key]: value } }), opts);
   }
+
+  // Las fotos en sí viven en fotosPorPaciente (mismo documento que
+  // Fotografías, carpeta "notasEvolucion") — la nota solo guarda IDs
+  // (fotosVinculadasIds), nunca duplica el archivo ni su registro.
+  const fotosDelPaciente = fotosPorPaciente[patientId]?.notasEvolucion ?? [];
+  const fotosAdjuntas = (valor.fotosVinculadasIds ?? [])
+    .map((id) => fotosDelPaciente.find((f) => f.id === id))
+    .filter((f): f is FotoPaciente => !!f);
+
+  const agregarFoto = async (file: File) => {
+    if (!clinicUid) return;
+    setSubiendoFoto(true);
+    setErrorFoto("");
+    try {
+      const foto = await subirFotoPaciente(clinicUid, patientId, "notasEvolucion", file);
+      setFotosPaciente(patientId, (prev) => ({ ...prev, notasEvolucion: [...(prev.notasEvolucion ?? []), foto] }));
+      set("fotosVinculadasIds", [...(valor.fotosVinculadasIds ?? []), foto.id], { inmediato: true });
+    } catch (err) {
+      setErrorFoto(err instanceof Error ? err.message : "No se pudo subir la foto.");
+    } finally {
+      setSubiendoFoto(false);
+    }
+  };
+
+  // Solo desvincula de esta nota — nunca borra el archivo ni el registro en
+  // fotosPorPaciente, para no perder información clínica por accidente.
+  const quitarFotoDeLaNota = (fotoId: string) => {
+    set("fotosVinculadasIds", (valor.fotosVinculadasIds ?? []).filter((id) => id !== fotoId), { inmediato: true });
+  };
 
   function toggleChip(chip: ChipHallazgo) {
     const chips = valor.chips.includes(chip) ? valor.chips.filter((c) => c !== chip) : [...valor.chips, chip];
@@ -103,6 +140,47 @@ export default function SeccionQueEncontraste({
           value={valor.estudiosRevisados ?? ""}
           onChange={(e) => set("estudiosRevisados", e.target.value)}
         />
+      </div>
+
+      <div>
+        <label className={labelClass}>Fotografías del hallazgo (opcional, a tu criterio)</label>
+        <p className="mb-2 text-xs text-ink/40">
+          Útil para dejar evidencia visual del caso — por ejemplo, si el diagnóstico se pierde o para aclarar dudas después.
+        </p>
+        {fotosAdjuntas.length > 0 && (
+          <div className="mb-2 flex flex-wrap gap-2">
+            {fotosAdjuntas.map((foto) => (
+              <div key={foto.id} className="relative">
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img src={foto.url} alt={foto.name} className="h-20 w-20 rounded-lg border border-edge/15 object-cover" />
+                <button
+                  type="button"
+                  onClick={() => quitarFotoDeLaNota(foto.id)}
+                  title="Quitar de esta nota"
+                  className="absolute -right-1.5 -top-1.5 flex h-5 w-5 items-center justify-center rounded-full bg-danger text-xs text-white"
+                >
+                  ✕
+                </button>
+              </div>
+            ))}
+          </div>
+        )}
+        <label className={`${botonSecundario} inline-flex cursor-pointer items-center gap-1.5 ${subiendoFoto ? "pointer-events-none opacity-60" : ""}`}>
+          📷 {subiendoFoto ? "Subiendo…" : "Agregar foto"}
+          <input
+            type="file"
+            accept="image/*"
+            capture="environment"
+            className="hidden"
+            disabled={subiendoFoto}
+            onChange={(e) => {
+              const file = e.target.files?.[0];
+              e.target.value = "";
+              if (file) agregarFoto(file);
+            }}
+          />
+        </label>
+        {errorFoto && <p className="mt-1 text-xs text-danger">{errorFoto}</p>}
       </div>
 
       {recomendado && !valor.signosVitales && (
