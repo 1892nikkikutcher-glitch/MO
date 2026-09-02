@@ -247,12 +247,15 @@ export default function Inicio() {
     });
   };
   // Reaccionan a este periodo: Finanzas, Operación (Pacientes), Agenda, el
-  // valor presupuestado de Ventas, y los donuts de esta pantalla. Se quedan
-  // fijos (histórico/estado-actual/ventana propia, no un periodo de
-  // reporte): Aceptados/Pendientes/Conversión/Laboratorios de Ventas, Saldo
-  // Pendiente, Pacientes Activos, Próximas Citas, Requieren Atención,
-  // Pendientes del Consultorio, Metas, y las gráficas de tendencia — cada
-  // una documentada en su propio archivo con la razón.
+  // valor presupuestado de Ventas, los donuts de esta pantalla, y las
+  // alertas de Requieren Atención basadas en citas (inasistencias, notas de
+  // evolución). Se quedan fijos (histórico/estado-actual/ventana propia, no
+  // un periodo de reporte): Aceptados/Pendientes/Conversión/Laboratorios de
+  // Ventas, Saldo Pendiente, Pacientes Activos, Próximas Citas, el resto de
+  // Requieren Atención (saldo/presupuestos/materiales/laboratorios/firma/
+  // horario — estado de hoy, sin historial guardado), Pendientes del
+  // Consultorio, Metas, y las gráficas de tendencia — cada una documentada
+  // en su propio archivo con la razón.
   const rango = useMemo(
     () => calcularRangoPeriodo(periodoId, anclaFecha, personalizado, hoy),
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -346,7 +349,7 @@ export default function Inicio() {
       {/* Alertas y pendientes: listas accionables, no indicadores por
           categoría — se muestran antes de agrupar el resto por Finanzas y
           Pacientes. */}
-      <AttentionAlerts />
+      <AttentionAlerts rango={rango} />
       <PendientesConsultorio />
 
       <SeccionDashboard titulo="Finanzas">

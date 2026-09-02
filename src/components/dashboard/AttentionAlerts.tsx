@@ -3,13 +3,12 @@
 import { useEffect, useMemo, useState } from "react";
 import { usePatientData } from "@/context/PatientDataContext";
 import { formatCurrency } from "@/lib/patientData";
-import { agruparLaboratoriosPendientes, parseFechaEntrega } from "@/lib/dashboardMetrics";
+import { agruparLaboratoriosPendientes, parseFechaEntrega, type RangoPeriodo } from "@/lib/dashboardMetrics";
 import {
   diasDesde,
   estadoDocumentacionDeCita,
   prioridadPorAntiguedad,
   textoAntiguedad,
-  VENTANA_DOCUMENTACION_DIAS,
   type EstadoDocumentacion,
 } from "@/lib/documentacionPendiente";
 import LaboratoriosPendientesPanel from "./LaboratoriosPendientesPanel";
@@ -47,8 +46,17 @@ type Alerta = {
  * incluye alertas que se pueden calcular con datos reales; ver el resto de
  * la lista pedida (tratamientos sin próxima cita, control de ortodoncia
  * atrasado) en el mensaje de resumen — no hay dato confiable para esas
- * todavía. */
-export default function AttentionAlerts() {
+ * todavía.
+ *
+ * Las alertas basadas en citas con fecha (inasistencias, notas de
+ * evolución pendientes) SÍ reaccionan a `rango` — se recalculan sobre el
+ * periodo elegido arriba en vez de una ventana fija. Las que son un estado
+ * ACTUAL sin historial (saldo pendiente, presupuestos por seguimiento,
+ * materiales, laboratorios, firma, horario) se quedan fijas a hoy sin
+ * importar `rango`: no hay forma de saber "cómo estaban en agosto" sin
+ * guardar un historial que hoy no existe — recortarlas por periodo
+ * mostraría un dato incompleto o inventado, no uno real. */
+export default function AttentionAlerts({ rango }: { rango: RangoPeriodo }) {
   const {
     puedeVerFinanzas,
     citas,
@@ -68,18 +76,9 @@ export default function AttentionAlerts() {
   const [mostrarLaboratorios, setMostrarLaboratorios] = useState(false);
 
   const hoy = new Date();
-  const hoyISO = toIso(hoy);
   const manana = new Date(hoy);
   manana.setDate(manana.getDate() + 1);
   const mananaISO = toIso(manana);
-  const hace7Dias = new Date(hoy);
-  hace7Dias.setDate(hace7Dias.getDate() - 7);
-  const hace7DiasISO = toIso(hace7Dias);
-  // Ventana propia de documentación pendiente — NO reutiliza hace7DiasISO,
-  // que sigue siendo solo de la alerta de inasistencias.
-  const hace60Dias = new Date(hoy);
-  hace60Dias.setDate(hace60Dias.getDate() - VENTANA_DOCUMENTACION_DIAS);
-  const hace60DiasISO = toIso(hace60Dias);
 
   const gruposLab = agruparLaboratoriosPendientes(Object.values(laboratoriosPendientes.porOrden));
   const enTresDias = new Date(hoy);
@@ -98,7 +97,7 @@ export default function AttentionAlerts() {
   const citasMananaSinConfirmar = citas.filter((c) => c.fecha === mananaISO && c.estatus === "Agendada").length;
 
   const noAsistieronRecientes = citas.filter(
-    (c) => c.estatus === "No Asistió" && c.fecha >= hace7DiasISO && c.fecha <= hoyISO
+    (c) => c.estatus === "No Asistió" && c.fecha >= rango.desdeISO && c.fecha <= rango.hastaISO
   ).length;
 
   const materialesFaltantes = articulosFaltantes.filter((a) => !a.surtido);
@@ -106,9 +105,9 @@ export default function AttentionAlerts() {
   const citasAtendidasRecientes = useMemo(
     () =>
       citas.filter(
-        (c) => c.estatus === "Atendida" && c.patientId && c.fecha >= hace60DiasISO && c.fecha <= hoyISO
+        (c) => c.estatus === "Atendida" && c.patientId && c.fecha >= rango.desdeISO && c.fecha <= rango.hastaISO
       ),
-    [citas, hace60DiasISO, hoyISO]
+    [citas, rango.desdeISO, rango.hastaISO]
   );
 
   const patientIdsNecesarios = useMemo(
@@ -201,7 +200,7 @@ export default function AttentionAlerts() {
     alertas.push({
       key: "no-show",
       emoji: "🟡",
-      texto: `${noAsistieronRecientes} paciente(s) no asistieron esta última semana`,
+      texto: `${noAsistieronRecientes} paciente(s) no asistieron (${rango.label})`,
       prioridad: "baja",
       categoria: "asistencia",
       onClick: () => irAPagina("reportes-bitacora-citas"),
@@ -224,7 +223,7 @@ export default function AttentionAlerts() {
     alertas.push({
       key: "notas-sin-nota",
       emoji: "🟠",
-      texto: `${sinNota.length} atención(es) sin nota de evolución — la más antigua ${textoAntiguedad(masAntiguaDias)}`,
+      texto: `${sinNota.length} atención(es) sin nota de evolución (${rango.label}) — la más antigua ${textoAntiguedad(masAntiguaDias)}`,
       prioridad: prioridadPorAntiguedad(masAntiguaDias),
       categoria: "documentacion",
       onClick: () => irAPagina("agenda"),
@@ -235,7 +234,7 @@ export default function AttentionAlerts() {
     alertas.push({
       key: "notas-borrador",
       emoji: "🟡",
-      texto: `${borrador.length} nota(s) de evolución pendientes de terminar (borrador)`,
+      texto: `${borrador.length} nota(s) de evolución pendientes de terminar — borrador (${rango.label})`,
       prioridad: "media",
       categoria: "documentacion",
       onClick: () => irAPagina("agenda"),
@@ -246,7 +245,7 @@ export default function AttentionAlerts() {
     alertas.push({
       key: "notas-revision",
       emoji: "🟡",
-      texto: `${listaRevision.length} nota(s) pendientes de revisión/firma`,
+      texto: `${listaRevision.length} nota(s) pendientes de revisión/firma (${rango.label})`,
       prioridad: "media",
       categoria: "documentacion",
       onClick: () => irAPagina("agenda"),
@@ -282,7 +281,10 @@ export default function AttentionAlerts() {
       <h2 className="mb-1 text-sm font-semibold uppercase tracking-wide text-ink/60">Requieren Atención</h2>
       <p className="mb-4 text-xs text-ink/40">
         Tratamientos sin próxima cita y control de ortodoncia atrasado no están aquí — el modelo de
-        datos actual no tiene forma de calcularlos de manera confiable todavía.
+        datos actual no tiene forma de calcularlos de manera confiable todavía. Saldo pendiente,
+        presupuestos por seguimiento, materiales, laboratorios, firma y horario reflejan el estado
+        de hoy sin importar el periodo elegido arriba (no hay historial guardado de cómo estaban
+        en el pasado); inasistencias y notas de evolución sí cambian con ese periodo.
       </p>
 
       {alertasOrdenadas.length === 0 ? (
