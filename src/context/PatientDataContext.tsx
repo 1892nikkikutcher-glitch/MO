@@ -90,6 +90,10 @@ import {
 import type { EventoDevolucionLog } from "@/lib/devolucionesLog";
 import { laboratoriosPendientesInicial, type LaboratoriosPendientesConfig } from "@/lib/laboratoriosPendientes";
 import {
+  presupuestosCreadosDetalleInicial,
+  type PresupuestosCreadosDetalleConfig,
+} from "@/lib/presupuestosCreadosDetalle";
+import {
   presupuestosPendientesDetalleInicial,
   type PresupuestosPendientesDetalleConfig,
 } from "@/lib/presupuestosPendientesDetalle";
@@ -582,6 +586,7 @@ type PatientDataContextValue = {
   saldosPendientes: SaldosPendientesConfig;
   laboratoriosPendientes: LaboratoriosPendientesConfig;
   presupuestosPendientesDetalle: PresupuestosPendientesDetalleConfig;
+  presupuestosCreadosDetalle: PresupuestosCreadosDetalleConfig;
   presupuestosLog: PresupuestoLogEntry[];
   setPresupuestosLog: (updater: Updater<PresupuestoLogEntry[]>) => void;
   otsLog: OtLogEntry[];
@@ -777,6 +782,12 @@ export function PatientDataProvider({
       clinicUid,
       "presupuestosPendientesDetalle",
       presupuestosPendientesDetalleInicial
+    );
+  const [presupuestosCreadosDetalle, setPresupuestosCreadosDetalle] =
+    useFirestoreDoc<PresupuestosCreadosDetalleConfig>(
+      clinicUid,
+      "presupuestosCreadosDetalle",
+      presupuestosCreadosDetalleInicial
     );
   const [regulacionSanitaria, setRegulacionSanitaria] = useFirestoreDoc<EstadoRegulacionSanitaria>(
     clinicUid,
@@ -1282,6 +1293,44 @@ export function PatientDataProvider({
     });
   };
 
+  /** Refleja en `config/presupuestosCreadosDetalle` todo presupuesto creado
+   * o editado, con su paciente y folio — mismo patrón incremental que
+   * `registrarPresupuestosPendientesDetalle`, pero sin lógica de `estado`:
+   * la entrada trackea "fue creado", no "está pendiente", así que nunca se
+   * quita por un cambio de estado, solo si el presupuesto se elimina.
+   * Habilita el detalle clicable de "Presupuestado (periodo)" / "Valor
+   * Presupuestado (histórico)" en el Dashboard. */
+  const registrarPresupuestosCreadosDetalle = (
+    patientId: string,
+    prevArr: SavedBudget[],
+    next: SavedBudget[]
+  ) => {
+    const patientName = patients.find((p) => p.id === patientId)?.name ?? "";
+    const prevIds = new Set(prevArr.map((p) => p.id));
+    const nextIds = new Set(next.map((p) => p.id));
+    const cambiaron = next.filter((p) => {
+      const antes = prevArr.find((a) => a.id === p.id);
+      return !antes || JSON.stringify(antes) !== JSON.stringify(p);
+    });
+    const eliminados = [...prevIds].filter((id) => !nextIds.has(id));
+    if (cambiaron.length === 0 && eliminados.length === 0) return;
+    setPresupuestosCreadosDetalle((prev) => {
+      const porPresupuesto = { ...prev.porPresupuesto };
+      cambiaron.forEach((p) => {
+        porPresupuesto[p.id] = {
+          id: p.id,
+          patientId,
+          patientName,
+          folio: p.folio,
+          total: p.total,
+          fecha: fechaPagoAIso(p.fecha) ?? p.fecha,
+        };
+      });
+      eliminados.forEach((id) => delete porPresupuesto[id]);
+      return { porPresupuesto };
+    });
+  };
+
   /** Refleja en `config/saldosPendientes` cuánto debe cada paciente (mismo
    * patrón incremental que el resto de los rollups) para poder listarlos en
    * Reportes → Saldos Pendientes sin tener que cargar los 1006 expedientes.
@@ -1389,6 +1438,7 @@ export function PatientDataProvider({
     syncFirestoreList(`users/${clinicUid}/pacientes/${patientId}/presupuestos`, prevArr, next);
     registrarDeltaPresupuestos(prevArr, next);
     registrarPresupuestosPendientesDetalle(patientId, prevArr, next);
+    registrarPresupuestosCreadosDetalle(patientId, prevArr, next);
     registrarSaldoPendiente(patientId, next, pagosPorPaciente[patientId] ?? [], devolucionesPorPaciente[patientId] ?? []);
     registrarLogPresupuestos(patientId, prevArr, next);
     setPresupuestosPorPacienteState((prev) => ({ ...prev, [patientId]: next }));
@@ -2299,6 +2349,7 @@ export function PatientDataProvider({
         saldosPendientes,
         laboratoriosPendientes,
         presupuestosPendientesDetalle,
+        presupuestosCreadosDetalle,
         presupuestosLog,
         setPresupuestosLog,
         otsLog,

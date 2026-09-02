@@ -174,13 +174,28 @@ export function variacionPct(actual: number, anterior: number): number | null {
 
 /** Pacientes distintos con al menos una cita Atendida en [desdeISO, hastaISO]. */
 export function pacientesAtendidosEnRango(citas: CitaAgenda[], desdeISO: string, hastaISO: string): number {
-  const ids = new Set<string>();
+  return pacientesEnRangoDetalle(citas, desdeISO, hastaISO).length;
+}
+
+export type PacienteEnRangoEntry = { patientId: string; patientName: string };
+
+/** Mismo criterio que `pacientesAtendidosEnRango`, pero devuelve la
+ * identidad de cada paciente (para el detalle clicable) en vez de solo el
+ * conteo — un paciente por cita Atendida más reciente que tenga en el
+ * rango, sin necesidad de cruzar con `patients` porque `CitaAgenda.paciente`
+ * ya trae el nombre denormalizado. */
+export function pacientesEnRangoDetalle(
+  citas: CitaAgenda[],
+  desdeISO: string,
+  hastaISO: string
+): PacienteEnRangoEntry[] {
+  const porPaciente = new Map<string, string>();
   citas.forEach((c) => {
     if (c.estatus === "Atendida" && c.patientId && c.fecha >= desdeISO && c.fecha <= hastaISO) {
-      ids.add(c.patientId);
+      porPaciente.set(c.patientId, c.paciente);
     }
   });
-  return ids.size;
+  return [...porPaciente.entries()].map(([patientId, patientName]) => ({ patientId, patientName }));
 }
 
 /** Pacientes "activos": con al menos una cita Atendida en los últimos 12
@@ -269,6 +284,12 @@ export function valorPerdidoEstimado(citas: CitaAgenda[], desdeISO: string, hast
 /** Citas de los próximos `dias` días (incluyendo hoy) que todavía no se
  * resolvieron (no atendidas, canceladas, reagendadas ni no-show). */
 export function proximasCitas(citas: CitaAgenda[], hoyISO: string, dias: number): number {
+  return citasProximas(citas, hoyISO, dias).length;
+}
+
+/** Mismo criterio que `proximasCitas`, pero devuelve las citas en vez de
+ * solo el conteo — para el detalle clicable de "Próximas Citas". */
+export function citasProximas(citas: CitaAgenda[], hoyISO: string, dias: number): CitaAgenda[] {
   const hoy = new Date(`${hoyISO}T00:00:00`);
   const limite = new Date(hoy);
   limite.setDate(limite.getDate() + dias);
@@ -280,7 +301,7 @@ export function proximasCitas(citas: CitaAgenda[], hoyISO: string, dias: number)
       c.fecha >= hoyISO &&
       c.fecha <= limiteISO &&
       (c.estatus === "Agendada" || c.estatus === "Confirmada" || c.estatus === "En espera")
-  ).length;
+  );
 }
 
 const MESES_ABR = [

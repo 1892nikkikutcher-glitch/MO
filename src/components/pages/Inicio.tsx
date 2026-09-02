@@ -15,6 +15,7 @@ import BudgetMetrics from "@/components/dashboard/BudgetMetrics";
 import AppointmentMetrics from "@/components/dashboard/AppointmentMetrics";
 import AttentionAlerts from "@/components/dashboard/AttentionAlerts";
 import DashboardCharts from "@/components/dashboard/DashboardCharts";
+import DashboardDetallePanel, { type DashboardDetalleItem } from "@/components/dashboard/DashboardDetallePanel";
 
 /** Franja de acento + resplandor neón muy sutil para las tarjetas KPI del
  * dashboard — mismo mecanismo que el borde inset de antes, solo con un
@@ -39,9 +40,11 @@ const estatusColor: Record<string, string> = {
 function DonutChart({
   data,
   center,
+  onSelectSegment,
 }: {
   data: { label: string; value: number; color: string }[];
   center?: React.ReactNode;
+  onSelectSegment?: (label: string) => void;
 }) {
   const total = data.reduce((sum, d) => sum + d.value, 0);
   const radius = 70;
@@ -86,20 +89,29 @@ function DonutChart({
         {total === 0 ? (
           <p className="text-sm text-ink/40">Aún no hay datos suficientes.</p>
         ) : (
-          segments.map((s) => (
-            <div key={s.label} className="flex items-center gap-3">
-              <span
-                className="h-3 w-3 shrink-0 rounded-full"
-                style={{ backgroundColor: s.color, boxShadow: `0 0 8px ${s.color}` }}
-              />
-              <div>
-                <div className="text-sm font-medium text-ink">{s.label}</div>
-                <div className="text-xs text-ink/40">
-                  {s.value} · {Math.round(s.fraction * 100)}%
+          segments.map((s) => {
+            const Wrapper = onSelectSegment && s.value > 0 ? "button" : "div";
+            return (
+              <Wrapper
+                key={s.label}
+                onClick={onSelectSegment && s.value > 0 ? () => onSelectSegment(s.label) : undefined}
+                className={`flex w-full items-center gap-3 text-left ${
+                  onSelectSegment && s.value > 0 ? "rounded-lg transition-colors hover:bg-surface2" : ""
+                }`}
+              >
+                <span
+                  className="h-3 w-3 shrink-0 rounded-full"
+                  style={{ backgroundColor: s.color, boxShadow: `0 0 8px ${s.color}` }}
+                />
+                <div>
+                  <div className="text-sm font-medium text-ink">{s.label}</div>
+                  <div className="text-xs text-ink/40">
+                    {s.value} · {Math.round(s.fraction * 100)}%
+                  </div>
                 </div>
-              </div>
-            </div>
-          ))
+              </Wrapper>
+            );
+          })
         )}
       </div>
     </div>
@@ -179,7 +191,8 @@ function MetasCard({
 }
 
 export default function Inicio() {
-  const { puedeVerFinanzas, patients, citas, finanzas, metas, estadisticas, irAPagina } = usePatientData();
+  const { puedeVerFinanzas, patients, citas, finanzas, metas, estadisticas, irAPagina, irAExpediente } =
+    usePatientData();
 
   const hoy = new Date();
   const hoyISO = `${hoy.getFullYear()}-${String(hoy.getMonth() + 1).padStart(2, "0")}-${String(
@@ -191,6 +204,7 @@ export default function Inicio() {
     desdeISO: `${hoyISO.slice(0, 7)}-01`,
     hastaISO: hoyISO,
   }));
+  const [detalle, setDetalle] = useState<{ title: string; items: DashboardDetalleItem[] } | null>(null);
   // Reaccionan a este periodo: Finanzas, Operación (Pacientes), Agenda, el
   // valor presupuestado de Ventas, y los donuts de esta pantalla. Se quedan
   // fijos (histórico/estado-actual/ventana propia, no un periodo de
@@ -229,17 +243,27 @@ export default function Inicio() {
   const pacientesConCitaEnPeriodo = new Set(
     citasDelPeriodo.filter((c): c is typeof c & { patientId: string } => !!c.patientId).map((c) => c.patientId)
   );
-  let nuevosEnPeriodo = 0;
-  let recurrentesEnPeriodo = 0;
+  const patientsPorId = new Map(patients.map((p) => [p.id, p]));
+  const nuevosEnPeriodoIds: string[] = [];
+  const recurrentesEnPeriodoIds: string[] = [];
   pacientesConCitaEnPeriodo.forEach((patientId) => {
     const primeraCita = primeraCitaPorPaciente.get(patientId);
-    if (primeraCita && primeraCita >= rango.desdeISO) nuevosEnPeriodo++;
-    else recurrentesEnPeriodo++;
+    if (primeraCita && primeraCita >= rango.desdeISO) nuevosEnPeriodoIds.push(patientId);
+    else recurrentesEnPeriodoIds.push(patientId);
   });
   const patientTypeData = [
-    { label: "Nuevos", value: nuevosEnPeriodo, color: "#3b82f6" },
-    { label: "Recurrentes", value: recurrentesEnPeriodo, color: "#f59e0b" },
+    { label: "Nuevos", value: nuevosEnPeriodoIds.length, color: "#3b82f6" },
+    { label: "Recurrentes", value: recurrentesEnPeriodoIds.length, color: "#f59e0b" },
   ];
+  const patientIdsAItems = (ids: string[]): DashboardDetalleItem[] =>
+    ids.map((id) => ({
+      id,
+      primary: patientsPorId.get(id)?.name || "Paciente",
+      onSelect: () => {
+        setDetalle(null);
+        irAExpediente(id);
+      },
+    }));
 
   const citasPorEstatusData = [
     "Agendada",
@@ -303,15 +327,29 @@ export default function Inicio() {
             <div className="text-xl font-bold text-ink">{patients.length}</div>
             <div className="mt-1 text-[11px] uppercase tracking-wide text-ink/40">Total de Expedientes</div>
           </div>
-          <div
-            className="rounded-xl border border-edge/10 bg-surface p-4"
+          <button
+            className="rounded-xl border border-edge/10 bg-surface p-4 text-left transition-transform hover:-translate-y-0.5"
             style={{ boxShadow: neonShadow("#ff3d9a") }}
+            onClick={() =>
+              setDetalle({
+                title: "Cumpleaños Este Mes",
+                items: cumpleanerosDelMes.map(({ patient, nacimiento }) => ({
+                  id: patient.id,
+                  primary: patient.name || "Paciente",
+                  secondary: `${nacimiento.getDate()}/${nacimiento.getMonth() + 1}`,
+                  onSelect: () => {
+                    setDetalle(null);
+                    irAExpediente(patient.id);
+                  },
+                })),
+              })
+            }
           >
             <div className="text-xl font-bold text-ink">{cumpleanerosDelMes.length}</div>
             <div className="mt-1 text-[11px] uppercase tracking-wide text-ink/40">
               Cumpleaños Este Mes
             </div>
-          </div>
+          </button>
           <div
             className="rounded-xl border border-edge/10 bg-surface p-4"
             style={{ boxShadow: neonShadow("#b84dff") }}
@@ -323,12 +361,38 @@ export default function Inicio() {
 
         <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
           <CardShell title={`Tipos de Paciente (${rango.label})`}>
-            <DonutChart data={patientTypeData} />
+            <DonutChart
+              data={patientTypeData}
+              onSelectSegment={(label) =>
+                setDetalle({
+                  title: `${label} (${rango.label})`,
+                  items: patientIdsAItems(label === "Nuevos" ? nuevosEnPeriodoIds : recurrentesEnPeriodoIds),
+                })
+              }
+            />
           </CardShell>
 
           <CardShell title={`Citas por Estatus (${rango.label})`}>
             <DonutChart
               data={citasPorEstatusData}
+              onSelectSegment={(label) =>
+                setDetalle({
+                  title: `${label} (${rango.label})`,
+                  items: citasDelPeriodo
+                    .filter((c) => c.estatus === label)
+                    .map((c) => ({
+                      id: c.id,
+                      primary: c.paciente || "Paciente",
+                      secondary: `${c.fecha} · ${c.horaInicio}-${c.horaFin}`,
+                      onSelect: c.patientId
+                        ? () => {
+                            setDetalle(null);
+                            irAExpediente(c.patientId as string, "Agenda");
+                          }
+                        : undefined,
+                    })),
+                })
+              }
               center={
                 <>
                   <span className="text-4xl font-bold text-ink">{citasDelPeriodo.length}</span>
@@ -341,6 +405,15 @@ export default function Inicio() {
           </CardShell>
         </div>
       </SeccionDashboard>
+
+      {detalle && (
+        <DashboardDetallePanel
+          title={detalle.title}
+          items={detalle.items}
+          emptyMessage="No hay elementos para mostrar."
+          onClose={() => setDetalle(null)}
+        />
+      )}
     </div>
   );
 }

@@ -8,6 +8,7 @@ import { sumarPresupuestosEnRango, type RangoPeriodo } from "@/lib/dashboardMetr
 import DashboardMetricCard from "./DashboardMetricCard";
 import LaboratoriosPendientesPanel from "./LaboratoriosPendientesPanel";
 import PresupuestosPendientesPanel from "./PresupuestosPendientesPanel";
+import DashboardDetallePanel, { type DashboardDetalleItem } from "./DashboardDetallePanel";
 
 /** Fila 3 del Dashboard Principal — Ventas: qué tanto se está presupuestando,
  * qué tanto de eso se acepta, y qué trabajo de laboratorio sigue pendiente.
@@ -27,10 +28,30 @@ import PresupuestosPendientesPanel from "./PresupuestosPendientesPanel";
  * porque el total histórico (`totalPresupuestado`/`presupuestosPorMes`) ya
  * existía antes y sí es completo. */
 export default function BudgetMetrics({ rango }: { rango: RangoPeriodo }) {
-  const { puedeVerFinanzas, estadisticas, laboratoriosPendientes } = usePatientData();
+  const { puedeVerFinanzas, estadisticas, laboratoriosPendientes, presupuestosCreadosDetalle, irAExpediente } =
+    usePatientData();
   const presupuestadoPeriodo = sumarPresupuestosEnRango(estadisticas.presupuestosPorFecha, rango.desdeISO, rango.hastaISO);
   const [mostrarLaboratorios, setMostrarLaboratorios] = useState(false);
   const [mostrarPresupuestos, setMostrarPresupuestos] = useState(false);
+  const [detallePresupuestado, setDetallePresupuestado] = useState<"periodo" | "historico" | null>(null);
+
+  const entradasPresupuestos = Object.values(presupuestosCreadosDetalle.porPresupuesto);
+  const entradasPresupuestadoPanel =
+    detallePresupuestado === "periodo"
+      ? entradasPresupuestos.filter((e) => e.fecha >= rango.desdeISO && e.fecha <= rango.hastaISO)
+      : entradasPresupuestos;
+  const itemsPresupuestadoPanel: DashboardDetalleItem[] = entradasPresupuestadoPanel
+    .sort((a, b) => b.fecha.localeCompare(a.fecha))
+    .map((e) => ({
+      id: e.id,
+      primary: e.patientName || "Paciente",
+      secondary: `Folio ${e.folio} · ${e.fecha}`,
+      value: formatCurrency(e.total),
+      onSelect: () => {
+        setDetallePresupuestado(null);
+        irAExpediente(e.patientId, "Presupuestos");
+      },
+    }));
 
   const porEstado = estadisticas.presupuestosPorEstado ?? presupuestosPorEstadoInicial;
   const cantidadHistorica = Object.values(estadisticas.presupuestosPorMes).reduce((s, n) => s + n, 0);
@@ -59,14 +80,16 @@ export default function BudgetMetrics({ rango }: { rango: RangoPeriodo }) {
               value={formatCurrency(presupuestadoPeriodo.valor)}
               color="#ffb020"
               sensible
-              tooltip={`${presupuestadoPeriodo.cantidad} presupuesto(s) creado(s) en este periodo.`}
+              onClick={() => setDetallePresupuestado("periodo")}
+              tooltip={`${presupuestadoPeriodo.cantidad} presupuesto(s) creado(s) en este periodo. Ver detalle.`}
             />
             <DashboardMetricCard
               label="Valor Presupuestado (histórico)"
               value={formatCurrency(estadisticas.totalPresupuestado)}
               color="#ffb020"
               sensible
-              tooltip="Suma histórica de TODOS los presupuestos creados desde siempre — no del periodo seleccionado arriba."
+              onClick={() => setDetallePresupuestado("historico")}
+              tooltip="Suma histórica de TODOS los presupuestos creados desde siempre — no del periodo seleccionado arriba. Ver detalle."
             />
             <DashboardMetricCard
               label="Presupuestos Aceptados"
@@ -121,6 +144,15 @@ export default function BudgetMetrics({ rango }: { rango: RangoPeriodo }) {
 
       {mostrarLaboratorios && <LaboratoriosPendientesPanel onClose={() => setMostrarLaboratorios(false)} />}
       {mostrarPresupuestos && <PresupuestosPendientesPanel onClose={() => setMostrarPresupuestos(false)} />}
+      {detallePresupuestado && (
+        <DashboardDetallePanel
+          title={detallePresupuestado === "periodo" ? `Presupuestado (${rango.label})` : "Valor Presupuestado (histórico)"}
+          items={itemsPresupuestadoPanel}
+          emptyMessage="No hay presupuestos en el detalle todavía."
+          caveat="Este detalle solo refleja presupuestos creados desde que existe este seguimiento — puede mostrar menos que el total de la tarjeta hasta que se vaya completando con el uso normal."
+          onClose={() => setDetallePresupuestado(null)}
+        />
+      )}
     </>
   );
 }

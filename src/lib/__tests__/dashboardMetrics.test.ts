@@ -1,5 +1,29 @@
 import { describe, expect, it } from "vitest";
-import { calcularRangoPeriodo, sumarPresupuestosEnRango } from "../dashboardMetrics";
+import type { CitaAgenda } from "../patientData";
+import {
+  calcularRangoPeriodo,
+  citasProximas,
+  pacientesEnRangoDetalle,
+  sumarPresupuestosEnRango,
+} from "../dashboardMetrics";
+
+function cita(overrides: Partial<CitaAgenda>): CitaAgenda {
+  return {
+    id: overrides.id ?? "c1",
+    folio: "1",
+    recursoId: "",
+    patientId: "p1",
+    paciente: "Paciente Uno",
+    tratamientos: [],
+    comentarios: "",
+    fecha: "2026-06-15",
+    horaInicio: "09:00",
+    horaFin: "10:00",
+    estatus: "Atendida",
+    recurrenciaId: null,
+    ...overrides,
+  } as CitaAgenda;
+}
 
 describe("sumarPresupuestosEnRango", () => {
   const presupuestosPorFecha = {
@@ -60,5 +84,52 @@ describe("calcularRangoPeriodo (regresión — ya existía, sin test hasta ahora
       (new Date(`${rango.hastaAnteriorISO}T00:00:00`).getTime() - new Date(`${rango.desdeAnteriorISO}T00:00:00`).getTime()) / 86_400_000 + 1;
     expect(diasAnterior).toBe(dias);
     expect(rango.hastaAnteriorISO < rango.desdeISO).toBe(true);
+  });
+});
+
+describe("pacientesEnRangoDetalle", () => {
+  it("devuelve un renglón por paciente distinto con cita Atendida en el rango", () => {
+    const citas = [
+      cita({ id: "c1", patientId: "p1", paciente: "Ana", fecha: "2026-06-05" }),
+      cita({ id: "c2", patientId: "p1", paciente: "Ana", fecha: "2026-06-10" }),
+      cita({ id: "c3", patientId: "p2", paciente: "Beto", fecha: "2026-06-12" }),
+    ];
+    const detalle = pacientesEnRangoDetalle(citas, "2026-06-01", "2026-06-30");
+    expect(detalle).toHaveLength(2);
+    expect(detalle.map((d) => d.patientId).sort()).toEqual(["p1", "p2"]);
+    expect(detalle.find((d) => d.patientId === "p1")?.patientName).toBe("Ana");
+  });
+
+  it("ignora citas fuera del rango, sin patientId, o no Atendidas", () => {
+    const citas = [
+      cita({ id: "c1", patientId: "p1", fecha: "2026-05-30" }),
+      cita({ id: "c2", patientId: null, fecha: "2026-06-05" }),
+      cita({ id: "c3", patientId: "p2", fecha: "2026-06-05", estatus: "Cancelada" }),
+    ];
+    expect(pacientesEnRangoDetalle(citas, "2026-06-01", "2026-06-30")).toEqual([]);
+  });
+
+  it("length coincide con pacientesAtendidosEnRango (mismo criterio, distinta forma)", () => {
+    const citas = [
+      cita({ id: "c1", patientId: "p1", fecha: "2026-06-05" }),
+      cita({ id: "c2", patientId: "p2", fecha: "2026-06-05" }),
+    ];
+    expect(pacientesEnRangoDetalle(citas, "2026-06-01", "2026-06-30")).toHaveLength(2);
+  });
+});
+
+describe("citasProximas", () => {
+  it("incluye citas no resueltas dentro de la ventana de días, desde hoy", () => {
+    const citas = [
+      cita({ id: "c1", fecha: "2026-06-16", estatus: "Confirmada" }),
+      cita({ id: "c2", fecha: "2026-06-25", estatus: "Agendada" }),
+    ];
+    const detalle = citasProximas(citas, "2026-06-15", 7);
+    expect(detalle.map((c) => c.id)).toEqual(["c1"]);
+  });
+
+  it("excluye citas ya resueltas (Atendida, Cancelada, etc.) aunque caigan en la ventana", () => {
+    const citas = [cita({ id: "c1", fecha: "2026-06-16", estatus: "Atendida" })];
+    expect(citasProximas(citas, "2026-06-15", 7)).toEqual([]);
   });
 });
