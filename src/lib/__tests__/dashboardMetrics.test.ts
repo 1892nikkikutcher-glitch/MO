@@ -87,6 +87,65 @@ describe("calcularRangoPeriodo (regresión — ya existía, sin test hasta ahora
   });
 });
 
+describe("calcularRangoPeriodo — navegación con ancla distinta a hoy", () => {
+  it("'mes' del periodo ACTUAL sigue recortado a hoy (mes en curso, no se puede reportar el futuro)", () => {
+    const hoy = new Date(2026, 8, 2); // 2 de septiembre de 2026
+    const rango = calcularRangoPeriodo("mes", hoy, undefined, hoy);
+    expect(rango.desdeISO).toBe("2026-09-01");
+    expect(rango.hastaISO).toBe("2026-09-02");
+    expect(rango.label).toBe("Este mes");
+    expect(rango.detalleFecha).toBe("Septiembre 2026");
+  });
+
+  it("navegar 'mes' un paso atrás muestra el mes COMPLETO (agosto), no recortado al día del ancla", () => {
+    const hoyReal = new Date(2026, 8, 2); // hoy sigue siendo 2 de septiembre
+    const ancla = new Date(2026, 7, 2); // ancla movida a agosto (mismo día de mes)
+    const rango = calcularRangoPeriodo("mes", ancla, undefined, hoyReal);
+    expect(rango.desdeISO).toBe("2026-08-01");
+    expect(rango.hastaISO).toBe("2026-08-31");
+    expect(rango.label).toBe("Agosto 2026");
+    expect(rango.detalleFecha).toBe("Agosto 2026");
+  });
+
+  it("navegar 'mes' un paso adelante (mes futuro) también muestra el rango natural completo", () => {
+    const hoyReal = new Date(2026, 8, 2);
+    const ancla = new Date(2026, 9, 2); // octubre, todavía no llega
+    const rango = calcularRangoPeriodo("mes", ancla, undefined, hoyReal);
+    expect(rango.desdeISO).toBe("2026-10-01");
+    expect(rango.hastaISO).toBe("2026-10-31");
+    expect(rango.label).toBe("Octubre 2026");
+  });
+
+  it("'año' navegado muestra el año completo (1 ene – 31 dic), no recortado", () => {
+    const hoyReal = new Date(2026, 8, 2);
+    const ancla = new Date(2025, 8, 2);
+    const rango = calcularRangoPeriodo("año", ancla, undefined, hoyReal);
+    expect(rango.desdeISO).toBe("2025-01-01");
+    expect(rango.hastaISO).toBe("2025-12-31");
+    expect(rango.label).toBe("2025");
+    expect(rango.detalleFecha).toBe("2025");
+  });
+
+  it("'trimestre' navegado muestra el trimestre natural completo con el nombre de sus meses", () => {
+    const hoyReal = new Date(2026, 8, 2); // Q3 2026 (jul-sep)
+    const ancla = new Date(2026, 3, 15); // Q2 2026 (abr-jun)
+    const rango = calcularRangoPeriodo("trimestre", ancla, undefined, hoyReal);
+    expect(rango.desdeISO).toBe("2026-04-01");
+    expect(rango.hastaISO).toBe("2026-06-30");
+    expect(rango.label).toBe("Abril – Junio 2026");
+  });
+
+  it("'hoy' navegado a un día distinto de hoy real vuelve a la fecha concreta", () => {
+    const hoyReal = new Date(2026, 8, 2);
+    const ancla = new Date(2026, 8, 1);
+    const rango = calcularRangoPeriodo("hoy", ancla, undefined, hoyReal);
+    expect(rango.desdeISO).toBe("2026-09-01");
+    expect(rango.hastaISO).toBe("2026-09-01");
+    expect(rango.label).not.toBe("Hoy");
+    expect(rango.label).toContain("2026");
+  });
+});
+
 describe("pacientesEnRangoDetalle", () => {
   it("devuelve un renglón por paciente distinto con cita Atendida en el rango", () => {
     const citas = [

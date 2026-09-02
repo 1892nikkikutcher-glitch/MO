@@ -5,6 +5,7 @@ import { usePatientData } from "@/context/PatientDataContext";
 import { calcularEdadDetallada, formatCurrency } from "@/lib/patientData";
 import { calcularAvanceMetas } from "@/lib/metas";
 import { calcularRangoPeriodo, type PeriodoId } from "@/lib/dashboardMetrics";
+import { addDays, addMonths, toISODate } from "@/lib/agendaHelpers";
 import { usePrivacidad } from "@/context/PrivacidadContext";
 import CandadoPrivacidad from "@/components/CandadoPrivacidad";
 import PendientesConsultorio from "@/components/PendientesConsultorio";
@@ -204,7 +205,47 @@ export default function Inicio() {
     desdeISO: `${hoyISO.slice(0, 7)}-01`,
     hastaISO: hoyISO,
   }));
+  const [anclaFecha, setAnclaFecha] = useState<Date>(() => new Date());
   const [detalle, setDetalle] = useState<{ title: string; items: DashboardDetalleItem[] } | null>(null);
+
+  /** Cambiar de tipo de periodo (Hoy/Semana/Mes/...) siempre vuelve a "el
+   * actual" de ese tipo — las flechas navegan a partir de ahí. */
+  const seleccionarPeriodo = (id: PeriodoId) => {
+    setPeriodoId(id);
+    setAnclaFecha(new Date());
+  };
+
+  /** Mueve el periodo un "paso" natural hacia atrás (-1) o adelante (1):
+   * un día/semana/mes/trimestre/año según el tipo activo, o el mismo largo
+   * de la ventana elegida en "personalizado" (mismo espíritu que
+   * "personalizado", pero deslizando la ventana en vez de teclear fechas). */
+  const navegarPeriodo = (direccion: -1 | 1) => {
+    if (periodoId === "personalizado") {
+      const desde = new Date(`${personalizado.desdeISO}T00:00:00`);
+      const hasta = new Date(`${personalizado.hastaISO}T00:00:00`);
+      const dias = Math.max(1, Math.round((hasta.getTime() - desde.getTime()) / 86_400_000) + 1);
+      setPersonalizado({
+        desdeISO: toISODate(addDays(desde, direccion * dias)),
+        hastaISO: toISODate(addDays(hasta, direccion * dias)),
+      });
+      return;
+    }
+    setAnclaFecha((prev) => {
+      switch (periodoId) {
+        case "hoy":
+          return addDays(prev, direccion);
+        case "semana":
+          return addDays(prev, direccion * 7);
+        case "trimestre":
+          return addMonths(prev, direccion * 3);
+        case "año":
+          return addMonths(prev, direccion * 12);
+        case "mes":
+        default:
+          return addMonths(prev, direccion);
+      }
+    });
+  };
   // Reaccionan a este periodo: Finanzas, Operación (Pacientes), Agenda, el
   // valor presupuestado de Ventas, y los donuts de esta pantalla. Se quedan
   // fijos (histórico/estado-actual/ventana propia, no un periodo de
@@ -213,9 +254,9 @@ export default function Inicio() {
   // Pendientes del Consultorio, Metas, y las gráficas de tendencia — cada
   // una documentada en su propio archivo con la razón.
   const rango = useMemo(
-    () => calcularRangoPeriodo(periodoId, hoy, personalizado),
+    () => calcularRangoPeriodo(periodoId, anclaFecha, personalizado, hoy),
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [periodoId, personalizado, hoyISO]
+    [periodoId, personalizado, anclaFecha, hoyISO]
   );
 
   const avanceMetas = calcularAvanceMetas(finanzas.porFecha, metas.metaMensual);
@@ -293,9 +334,11 @@ export default function Inicio() {
       <div className="flex flex-wrap items-center justify-between gap-3">
         <PeriodSelector
           periodoId={periodoId}
-          onSelect={setPeriodoId}
+          onSelect={seleccionarPeriodo}
           personalizado={personalizado}
           onPersonalizadoChange={setPersonalizado}
+          rango={rango}
+          onNavigate={navegarPeriodo}
         />
         {puedeVerFinanzas && <CandadoPrivacidad />}
       </div>

@@ -7,6 +7,7 @@
 import type { CitaAgenda, HorarioAtencion, Patient } from "@/lib/patientData";
 import type { LaboratorioPendienteEntry } from "@/lib/laboratoriosPendientes";
 import { inicioSemana } from "@/lib/metas";
+import { DIAS_SEMANA, MESES, formatRangeLabel } from "@/lib/agendaHelpers";
 
 export function toIsoDate(d: Date): string {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
@@ -16,7 +17,15 @@ export type PeriodoId = "hoy" | "semana" | "mes" | "trimestre" | "año" | "perso
 
 export type RangoPeriodo = {
   id: PeriodoId;
+  /** Nombre amigable ("Este mes") cuando el periodo mostrado es el que
+   * contiene hoy; si se navegó a otro (con las flechas del selector), se
+   * vuelve la fecha concreta — igual que `detalleFecha` — para no decir
+   * "Este mes" estando en agosto. */
   label: string;
+  /** Fecha/rango concreto SIEMPRE, sin importar si es el periodo actual o
+   * uno navegado — ej. "Septiembre 2026", "1 – 7 de sep. de 2026". Para
+   * mostrar junto al selector qué fecha se está analizando. */
+  detalleFecha: string;
   desdeISO: string;
   hastaISO: string;
   /** Mismo número de días, justo antes de `desdeISO` — la base de
@@ -26,60 +35,104 @@ export type RangoPeriodo = {
   hastaAnteriorISO: string;
 };
 
-function inicioTrimestre(hoy: Date): Date {
-  const q = Math.floor(hoy.getMonth() / 3);
-  return new Date(hoy.getFullYear(), q * 3, 1);
+function inicioTrimestre(ancla: Date): Date {
+  const q = Math.floor(ancla.getMonth() / 3);
+  return new Date(ancla.getFullYear(), q * 3, 1);
 }
 
-function inicioAnio(hoy: Date): Date {
-  return new Date(hoy.getFullYear(), 0, 1);
+function inicioAnio(ancla: Date): Date {
+  return new Date(ancla.getFullYear(), 0, 1);
+}
+
+function capitalizarPrimera(s: string): string {
+  return s.charAt(0).toUpperCase() + s.slice(1);
+}
+
+/** Texto concreto de qué fecha/rango representa el periodo — a diferencia
+ * de `label` (que puede decir "Este mes"), esto siempre nombra la fecha
+ * real, para mostrarse junto al selector sin importar si se navegó o no. */
+function formatDetalleFecha(id: PeriodoId, desde: Date, hasta: Date): string {
+  switch (id) {
+    case "hoy":
+      return `${capitalizarPrimera(DIAS_SEMANA[(desde.getDay() + 6) % 7].replace(".", ""))} ${desde.getDate()} de ${MESES[desde.getMonth()]} de ${desde.getFullYear()}`;
+    case "mes":
+      return `${capitalizarPrimera(MESES[desde.getMonth()])} ${desde.getFullYear()}`;
+    case "trimestre":
+      return `${capitalizarPrimera(MESES[desde.getMonth()])} – ${capitalizarPrimera(MESES[hasta.getMonth()])} ${hasta.getFullYear()}`;
+    case "año":
+      return String(desde.getFullYear());
+    case "semana":
+    case "personalizado":
+    default:
+      return formatRangeLabel(desde, hasta);
+  }
 }
 
 /** Calcula el rango de fechas [desde, hasta] de un periodo del selector del
  * Dashboard, más el rango "anterior" equivalente (mismo número de días,
- * inmediatamente antes) para la comparación porcentual. `hasta` siempre es
- * hoy, salvo en "personalizado". */
+ * inmediatamente antes) para la comparación porcentual. `ancla` es la
+ * fecha de referencia (qué mes/semana/etc. se está viendo — se puede
+ * navegar con las flechas del selector, no siempre es hoy). `hoyReal`
+ * (por default, la misma `ancla`) es la fecha real de hoy: si el periodo
+ * mostrado la contiene, `hasta` se recorta a hoy (no se puede reportar el
+ * futuro); si es un periodo ya cerrado (navegado hacia atrás) o todavía no
+ * llega (navegado hacia adelante), `hasta` es el fin natural completo del
+ * periodo. "personalizado" nunca se recorta — el usuario ya eligió las
+ * fechas exactas. */
 export function calcularRangoPeriodo(
   id: PeriodoId,
-  hoy: Date,
-  personalizado?: { desdeISO: string; hastaISO: string }
+  ancla: Date,
+  personalizado?: { desdeISO: string; hastaISO: string },
+  hoyReal: Date = ancla
 ): RangoPeriodo {
-  const hoySinHora = new Date(hoy.getFullYear(), hoy.getMonth(), hoy.getDate());
+  const hoyRealSinHora = new Date(hoyReal.getFullYear(), hoyReal.getMonth(), hoyReal.getDate());
   let desde: Date;
-  let hasta: Date = hoySinHora;
+  let finNatural: Date;
   let label: string;
 
   if (id === "personalizado" && personalizado) {
     const a = new Date(`${personalizado.desdeISO}T00:00:00`);
     const b = new Date(`${personalizado.hastaISO}T00:00:00`);
     desde = a <= b ? a : b;
-    hasta = a <= b ? b : a;
+    finNatural = a <= b ? b : a;
     label = "Personalizado";
   } else {
+    const anclaSinHora = new Date(ancla.getFullYear(), ancla.getMonth(), ancla.getDate());
     switch (id) {
       case "hoy":
-        desde = hoySinHora;
+        desde = anclaSinHora;
+        finNatural = anclaSinHora;
         label = "Hoy";
         break;
       case "semana":
-        desde = inicioSemana(hoy);
+        desde = inicioSemana(ancla);
+        finNatural = new Date(desde.getFullYear(), desde.getMonth(), desde.getDate() + 6);
         label = "Esta semana";
         break;
       case "trimestre":
-        desde = inicioTrimestre(hoy);
+        desde = inicioTrimestre(ancla);
+        finNatural = new Date(desde.getFullYear(), desde.getMonth() + 3, 0);
         label = "Este trimestre";
         break;
       case "año":
-        desde = inicioAnio(hoy);
+        desde = inicioAnio(ancla);
+        finNatural = new Date(desde.getFullYear(), 11, 31);
         label = "Este año";
         break;
       case "mes":
       default:
-        desde = new Date(hoy.getFullYear(), hoy.getMonth(), 1);
+        desde = new Date(ancla.getFullYear(), ancla.getMonth(), 1);
+        finNatural = new Date(desde.getFullYear(), desde.getMonth() + 1, 0);
         label = "Este mes";
         break;
     }
   }
+
+  const contieneHoyReal =
+    hoyRealSinHora.getTime() >= desde.getTime() && hoyRealSinHora.getTime() <= finNatural.getTime();
+  const hasta = id !== "personalizado" && contieneHoyReal ? hoyRealSinHora : finNatural;
+  const detalleFecha = formatDetalleFecha(id, desde, finNatural);
+  if (id !== "personalizado" && !contieneHoyReal) label = detalleFecha;
 
   const dias = Math.max(1, Math.round((hasta.getTime() - desde.getTime()) / 86_400_000) + 1);
   const hastaAnterior = new Date(desde);
@@ -90,6 +143,7 @@ export function calcularRangoPeriodo(
   return {
     id,
     label,
+    detalleFecha,
     desdeISO: toIsoDate(desde),
     hastaISO: toIsoDate(hasta),
     desdeAnteriorISO: toIsoDate(desdeAnterior),
