@@ -2,7 +2,7 @@
 
 import { usePatientData } from "@/context/PatientDataContext";
 import { formatCurrency } from "@/lib/patientData";
-import { inicioMes, inicioSemana, sumarRango } from "@/lib/metas";
+import { contarPagosEnRango, inicioMes, inicioSemana, sumarRango } from "@/lib/metas";
 import { horasClinicasEnRango, variacionPct, type RangoPeriodo } from "@/lib/dashboardMetrics";
 import DashboardMetricCard from "./DashboardMetricCard";
 
@@ -14,9 +14,10 @@ function toIso(d: Date): string {
  * tarjetas de Corte Diario/Semanal/Mensual con una tarjeta de Ingresos más
  * completa, y agrega Ingreso por Hora Clínica. Solo visible para quien
  * puede ver finanzas (mismo gate que el resto de esta fila desde antes).
- * `rango` viene del selector de periodo en Inicio.tsx — Ingresos e Ingreso
- * por Hora Clínica se calculan sobre ese rango; Ticket Promedio y Saldo
- * Pendiente siguen siendo históricos (no tiene sentido "filtrarlos"). */
+ * `rango` viene del selector de periodo en Inicio.tsx — Ingresos, Ingreso
+ * por Hora Clínica y Ticket Promedio se calculan sobre ese rango. Saldo
+ * Pendiente sigue siendo histórico (es un balance actual, no algo que
+ * "ocurrió durante" un periodo — no tiene sentido filtrarlo). */
 export default function FinancialSummary({ rango }: { rango: RangoPeriodo }) {
   const { puedeVerFinanzas, citas, finanzas, estadisticas } = usePatientData();
 
@@ -38,9 +39,10 @@ export default function FinancialSummary({ rango }: { rango: RangoPeriodo }) {
   const comparacionIngresos = variacionPct(ingresosPeriodo, ingresosPeriodoAnterior);
 
   const totalPagadoHistorico = Object.values(finanzas.porFecha).reduce((sum, v) => sum + v, 0);
-  const ticketPromedio =
-    estadisticas.pagosCount > 0 ? Math.round(totalPagadoHistorico / estadisticas.pagosCount) : 0;
   const saldoPendiente = Math.max(0, estadisticas.totalPresupuestado - totalPagadoHistorico);
+
+  const cantidadPagosPeriodo = contarPagosEnRango(finanzas.pagosCountPorFecha, desdePeriodo, hastaPeriodo);
+  const ticketPromedio = cantidadPagosPeriodo > 0 ? Math.round(ingresosPeriodo / cantidadPagosPeriodo) : 0;
 
   const horasClinicasPeriodo = horasClinicasEnRango(citas, rango.desdeISO, rango.hastaISO);
   const ingresoPorHora =
@@ -74,11 +76,15 @@ export default function FinancialSummary({ rango }: { rango: RangoPeriodo }) {
       </DashboardMetricCard>
 
       <DashboardMetricCard
-        label="Ticket Promedio"
-        value={formatCurrency(ticketPromedio)}
+        label={`Ticket Promedio (${rango.label})`}
+        value={cantidadPagosPeriodo > 0 ? formatCurrency(ticketPromedio) : "—"}
         color="#2ee67a"
         sensible
-        tooltip="Ingresos cobrados entre número de pagos registrados históricamente."
+        tooltip={
+          cantidadPagosPeriodo > 0
+            ? `Ingresos del periodo entre ${cantidadPagosPeriodo} pago(s) registrados en ese mismo periodo.`
+            : "Aún no hay pagos en este periodo para calcularlo."
+        }
       />
 
       <DashboardMetricCard

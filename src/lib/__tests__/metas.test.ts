@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { aplicarDeltaDevolucion, finanzasInicial } from "../metas";
+import { aplicarDeltaDevolucion, contarPagosEnRango, finanzasInicial } from "../metas";
 
 describe("aplicarDeltaDevolucion", () => {
   it("acumula por fecha y por fecha+método", () => {
@@ -31,5 +31,28 @@ describe("aplicarDeltaDevolucion", () => {
     let finanzas = aplicarDeltaDevolucion(finanzasInicial, "2026-06-15", "efectivo", 100.1);
     finanzas = aplicarDeltaDevolucion(finanzas, "2026-06-15", "efectivo", 200.2);
     expect(finanzas.devolucionesPorFecha?.["2026-06-15"]).toBe(300.3);
+  });
+});
+
+describe("contarPagosEnRango", () => {
+  const pagosCountPorFecha = { "2026-06-01": 2, "2026-06-15": 3, "2026-07-01": 1 };
+
+  it("suma solo las fechas dentro del rango (inclusive)", () => {
+    const total = contarPagosEnRango(pagosCountPorFecha, new Date(2026, 5, 1), new Date(2026, 5, 30));
+    expect(total).toBe(5);
+  });
+
+  it("0 cuando el rollup no existe (documentos legados sin el campo)", () => {
+    expect(contarPagosEnRango(undefined, new Date(2026, 5, 1), new Date(2026, 5, 30))).toBe(0);
+  });
+
+  it("0 cuando ninguna fecha cae dentro del rango", () => {
+    const total = contarPagosEnRango(pagosCountPorFecha, new Date(2026, 0, 1), new Date(2026, 0, 31));
+    expect(total).toBe(0);
+  });
+
+  it("incluye los límites del rango", () => {
+    const total = contarPagosEnRango({ "2026-06-01": 4 }, new Date(2026, 5, 1), new Date(2026, 5, 1));
+    expect(total).toBe(4);
   });
 });

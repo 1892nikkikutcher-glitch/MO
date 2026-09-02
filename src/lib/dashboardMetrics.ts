@@ -142,6 +142,29 @@ export function horasDisponiblesEnRango(horario: HorarioAtencion, desdeISO: stri
   return Math.round(horasDisponiblesPorDia(horario) * dias * 10) / 10;
 }
 
+/** Suma cantidad + valor de `presupuestosPorFecha` (rollup por día de
+ * creación, ver EstadisticasGlobales en metas.ts) dentro de [desdeISO,
+ * hastaISO] — mismo espíritu que `sumarRango` de metas.ts, pero por
+ * comparación de string ISO en vez de Date, consistente con el resto de
+ * este archivo. Solo trackea CREACIÓN, nunca cambios posteriores de
+ * `estado` (ver limitación documentada en BudgetMetrics.tsx). */
+export function sumarPresupuestosEnRango(
+  presupuestosPorFecha: Record<string, { cantidad: number; valor: number }> | undefined,
+  desdeISO: string,
+  hastaISO: string
+): { cantidad: number; valor: number } {
+  if (!presupuestosPorFecha) return { cantidad: 0, valor: 0 };
+  let cantidad = 0;
+  let valor = 0;
+  Object.entries(presupuestosPorFecha).forEach(([fecha, entrada]) => {
+    if (fecha >= desdeISO && fecha <= hastaISO) {
+      cantidad += entrada.cantidad;
+      valor += entrada.valor;
+    }
+  });
+  return { cantidad, valor };
+}
+
 /** Variación porcentual entre el periodo actual y el anterior. null si no
  * hay base de comparación (periodo anterior en cero). */
 export function variacionPct(actual: number, anterior: number): number | null {

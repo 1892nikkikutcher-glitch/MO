@@ -16,11 +16,6 @@ import AppointmentMetrics from "@/components/dashboard/AppointmentMetrics";
 import AttentionAlerts from "@/components/dashboard/AttentionAlerts";
 import DashboardCharts from "@/components/dashboard/DashboardCharts";
 
-const MESES = [
-  "enero", "febrero", "marzo", "abril", "mayo", "junio",
-  "julio", "agosto", "septiembre", "octubre", "noviembre", "diciembre",
-];
-
 /** Franja de acento + resplandor neón muy sutil para las tarjetas KPI del
  * dashboard — mismo mecanismo que el borde inset de antes, solo con un
  * halo del mismo color, difuminado y a baja opacidad, alrededor. */
@@ -190,17 +185,19 @@ export default function Inicio() {
   const hoyISO = `${hoy.getFullYear()}-${String(hoy.getMonth() + 1).padStart(2, "0")}-${String(
     hoy.getDate()
   ).padStart(2, "0")}`;
-  const mesActualKey = hoyISO.slice(0, 7); // "YYYY-MM"
 
   const [periodoId, setPeriodoId] = useState<PeriodoId>("mes");
   const [personalizado, setPersonalizado] = useState(() => ({
     desdeISO: `${hoyISO.slice(0, 7)}-01`,
     hastaISO: hoyISO,
   }));
-  // Fila 1 (Finanzas), Fila 2 (Operación) y Fila 4 (Agenda) del dashboard
-  // reaccionan a este periodo — Presupuestos/Laboratorios (Fila 3) y las
-  // gráficas de evolución mensual se quedan históricas/de tendencia, no
-  // tiene sentido "filtrarlas" por periodo.
+  // Reaccionan a este periodo: Finanzas, Operación (Pacientes), Agenda, el
+  // valor presupuestado de Ventas, y los donuts de esta pantalla. Se quedan
+  // fijos (histórico/estado-actual/ventana propia, no un periodo de
+  // reporte): Aceptados/Pendientes/Conversión/Laboratorios de Ventas, Saldo
+  // Pendiente, Pacientes Activos, Próximas Citas, Requieren Atención,
+  // Pendientes del Consultorio, Metas, y las gráficas de tendencia — cada
+  // una documentada en su propio archivo con la razón.
   const rango = useMemo(
     () => calcularRangoPeriodo(periodoId, hoy, personalizado),
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -209,38 +206,39 @@ export default function Inicio() {
 
   const avanceMetas = calcularAvanceMetas(finanzas.porFecha, metas.metaMensual);
 
-  const citasDelMes = citas.filter((c) => c.fecha.slice(0, 7) === mesActualKey);
-  const citasPorMes = citasDelMes.length;
-  // Math.max(0, ...): es un contador acumulado desde que existe el campo,
-  // no un conteo real recalculado — crear y borrar presupuestos de prueba
-  // en meses distintos puede dejarlo en negativo; nunca debe mostrarse así.
-  const presupuestosDelMes = Math.max(0, estadisticas.presupuestosPorMes[mesActualKey] ?? 0);
-
-  const kpisVisibles = [{ label: "Presupuestos del Mes", value: String(presupuestosDelMes), color: "#b84dff" }];
+  const citasDelPeriodo = citas.filter((c) => c.fecha >= rango.desdeISO && c.fecha <= rango.hastaISO);
 
   const edades = patients
     .map((p) => calcularEdadDetallada(p.birthDate)?.years)
     .filter((y): y is number => typeof y === "number");
   const edadPromedio = edades.length > 0 ? Math.round(edades.reduce((s, y) => s + y, 0) / edades.length) : null;
 
-  const citasPorPaciente = new Map<string, number>();
+  // "Tipos de Paciente" del periodo: de los pacientes con AL MENOS una cita
+  // dentro de `rango`, cuántos tuvieron ahí su primera cita de siempre
+  // ("Nuevos") vs. cuántos ya tenían citas antes de rango.desdeISO
+  // ("Recurrentes") — comparado contra el historial COMPLETO de citas de
+  // cada paciente, no solo las del periodo. No incluye "Sin citas aún": esa
+  // es una condición permanente del paciente, no algo que pase "durante"
+  // un periodo — por definición no aplica a un paciente con cita en rango.
+  const primeraCitaPorPaciente = new Map<string, string>();
   citas.forEach((c) => {
     if (!c.patientId) return;
-    citasPorPaciente.set(c.patientId, (citasPorPaciente.get(c.patientId) ?? 0) + 1);
+    const actual = primeraCitaPorPaciente.get(c.patientId);
+    if (!actual || c.fecha < actual) primeraCitaPorPaciente.set(c.patientId, c.fecha);
   });
-  let primeraVez = 0;
-  let subsecuentes = 0;
-  let sinCitas = 0;
-  patients.forEach((p) => {
-    const n = citasPorPaciente.get(p.id) ?? 0;
-    if (n === 0) sinCitas++;
-    else if (n === 1) primeraVez++;
-    else subsecuentes++;
+  const pacientesConCitaEnPeriodo = new Set(
+    citasDelPeriodo.filter((c): c is typeof c & { patientId: string } => !!c.patientId).map((c) => c.patientId)
+  );
+  let nuevosEnPeriodo = 0;
+  let recurrentesEnPeriodo = 0;
+  pacientesConCitaEnPeriodo.forEach((patientId) => {
+    const primeraCita = primeraCitaPorPaciente.get(patientId);
+    if (primeraCita && primeraCita >= rango.desdeISO) nuevosEnPeriodo++;
+    else recurrentesEnPeriodo++;
   });
   const patientTypeData = [
-    { label: "Sin citas aún", value: sinCitas, color: "#64748b" },
-    { label: "Primera vez", value: primeraVez, color: "#3b82f6" },
-    { label: "Subsecuentes", value: subsecuentes, color: "#f59e0b" },
+    { label: "Nuevos", value: nuevosEnPeriodo, color: "#3b82f6" },
+    { label: "Recurrentes", value: recurrentesEnPeriodo, color: "#f59e0b" },
   ];
 
   const citasPorEstatusData = [
@@ -253,7 +251,7 @@ export default function Inicio() {
     "No Asistió",
   ].map((estatus) => ({
     label: estatus,
-    value: citasDelMes.filter((c) => c.estatus === estatus).length,
+    value: citasDelPeriodo.filter((c) => c.estatus === estatus).length,
     color: estatusColor[estatus],
   }));
 
@@ -286,23 +284,9 @@ export default function Inicio() {
 
       <SeccionDashboard titulo="Finanzas">
         <FinancialSummary rango={rango} />
-        <BudgetMetrics />
+        <BudgetMetrics rango={rango} />
         {puedeVerFinanzas && (
           <MetasCard metaMensual={metas.metaMensual} avanceMetas={avanceMetas} irAPagina={irAPagina} />
-        )}
-        {kpisVisibles.length > 0 && (
-          <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-6">
-            {kpisVisibles.map((kpi) => (
-              <div
-                key={kpi.label}
-                className="rounded-xl border border-edge/10 bg-surface p-4"
-                style={{ boxShadow: neonShadow(kpi.color) }}
-              >
-                <div className="text-xl font-bold text-ink">{kpi.value}</div>
-                <div className="mt-1 text-[11px] uppercase tracking-wide text-ink/40">{kpi.label}</div>
-              </div>
-            ))}
-          </div>
         )}
       </SeccionDashboard>
 
@@ -338,18 +322,18 @@ export default function Inicio() {
         </div>
 
         <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
-          <CardShell title="Tipos de Paciente">
+          <CardShell title={`Tipos de Paciente (${rango.label})`}>
             <DonutChart data={patientTypeData} />
           </CardShell>
 
-          <CardShell title={`Citas por Estatus de ${MESES[hoy.getMonth()]}`}>
+          <CardShell title={`Citas por Estatus (${rango.label})`}>
             <DonutChart
               data={citasPorEstatusData}
               center={
                 <>
-                  <span className="text-4xl font-bold text-ink">{citasPorMes}</span>
+                  <span className="text-4xl font-bold text-ink">{citasDelPeriodo.length}</span>
                   <span className="mt-1 text-[10px] uppercase tracking-wide text-ink/40">
-                    citas este mes
+                    citas en el periodo
                   </span>
                 </>
               }

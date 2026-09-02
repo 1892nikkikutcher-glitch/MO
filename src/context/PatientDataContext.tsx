@@ -1170,6 +1170,15 @@ export function PatientDataProvider({
     const mesesNext = conMes(next);
     const meses = new Set([...mesesPrev, ...mesesNext]);
 
+    // Mismo dato que conMes pero SIN recortar a "YYYY-MM" — día completo,
+    // para poder filtrar por un rango exacto (Hoy/Semana) en el Dashboard,
+    // no solo por mes calendario.
+    const conDiaYValor = (arr: SavedBudget[]) =>
+      arr.map((p) => ({ dia: fechaPagoAIso(p.fecha) ?? "", valor: p.total })).filter((p) => p.dia);
+    const diasPrev = conDiaYValor(prevArr);
+    const diasNext = conDiaYValor(next);
+    const dias = new Set([...diasPrev, ...diasNext].map((p) => p.dia));
+
     const estadoDe = (p: SavedBudget): EstadoPresupuesto => p.estado ?? "pendiente";
     const estados: EstadoPresupuesto[] = ["pendiente", "aceptado", "rechazado", "expirado"];
     const deltasPorEstado = Object.fromEntries(
@@ -1197,6 +1206,19 @@ export function PatientDataProvider({
           mesesNext.filter((m) => m === mes).length - mesesPrev.filter((m) => m === mes).length;
         if (deltaMes !== 0) presupuestosPorMes[mes] = (presupuestosPorMes[mes] ?? 0) + deltaMes;
       });
+      const presupuestosPorFecha = { ...(prevEst.presupuestosPorFecha ?? {}) };
+      dias.forEach((dia) => {
+        const cantidadPrev = diasPrev.filter((p) => p.dia === dia).length;
+        const cantidadNext = diasNext.filter((p) => p.dia === dia).length;
+        const valorPrevDia = diasPrev.filter((p) => p.dia === dia).reduce((s, p) => s + p.valor, 0);
+        const valorNextDia = diasNext.filter((p) => p.dia === dia).reduce((s, p) => s + p.valor, 0);
+        const deltaCantidad = cantidadNext - cantidadPrev;
+        const deltaValor = valorNextDia - valorPrevDia;
+        if (deltaCantidad !== 0 || deltaValor !== 0) {
+          const actual = presupuestosPorFecha[dia] ?? { cantidad: 0, valor: 0 };
+          presupuestosPorFecha[dia] = { cantidad: actual.cantidad + deltaCantidad, valor: actual.valor + deltaValor };
+        }
+      });
       const presupuestosPorEstadoPrev = prevEst.presupuestosPorEstado ?? presupuestosPorEstadoInicial;
       const presupuestosPorEstado = Object.fromEntries(
         estados.map((estado) => [
@@ -1211,6 +1233,7 @@ export function PatientDataProvider({
         ...prevEst,
         totalPresupuestado: prevEst.totalPresupuestado + deltaTotal,
         presupuestosPorMes,
+        presupuestosPorFecha,
         presupuestosPorEstado,
       };
     });
@@ -1390,11 +1413,17 @@ export function PatientDataProvider({
       // escribe aquí, así que siempre se respalda con {} en vez de asumir
       // que existe.
       const porFechaYFormaPago = { ...(prevFin.porFechaYFormaPago ?? {}) };
+      const pagosCountPorFecha = { ...(prevFin.pagosCountPorFecha ?? {}) };
       fechas.forEach((iso) => {
         const sumPrev = prevConIso.filter((p) => p._iso === iso).reduce((s, p) => s + p.total, 0);
         const sumNext = nextConIso.filter((p) => p._iso === iso).reduce((s, p) => s + p.total, 0);
         const delta = sumNext - sumPrev;
         if (delta !== 0) porFecha[iso] = (porFecha[iso] ?? 0) + delta;
+
+        const countPrev = prevConIso.filter((p) => p._iso === iso).length;
+        const countNext = nextConIso.filter((p) => p._iso === iso).length;
+        const deltaCount = countNext - countPrev;
+        if (deltaCount !== 0) pagosCountPorFecha[iso] = (pagosCountPorFecha[iso] ?? 0) + deltaCount;
 
         const porForma = { ...(porFechaYFormaPago[iso] ?? {}) };
         formasDePago.forEach((forma) => {
@@ -1409,7 +1438,10 @@ export function PatientDataProvider({
         });
         porFechaYFormaPago[iso] = porForma;
       });
-      return { porFecha, porFechaYFormaPago };
+      // Spread de prevFin PRIMERO — nunca se debe perder un campo que otra
+      // parte de la app ya haya escrito aquí (ej. devolucionesPorFecha) solo
+      // porque esta función todavía no lo conocía cuando se escribió.
+      return { ...prevFin, porFecha, porFechaYFormaPago, pagosCountPorFecha };
     });
   };
 

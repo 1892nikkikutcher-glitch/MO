@@ -4,14 +4,20 @@ import { useState } from "react";
 import { usePatientData } from "@/context/PatientDataContext";
 import { formatCurrency } from "@/lib/patientData";
 import { presupuestosPorEstadoInicial } from "@/lib/metas";
+import { sumarPresupuestosEnRango, type RangoPeriodo } from "@/lib/dashboardMetrics";
 import DashboardMetricCard from "./DashboardMetricCard";
 import LaboratoriosPendientesPanel from "./LaboratoriosPendientesPanel";
 import PresupuestosPendientesPanel from "./PresupuestosPendientesPanel";
 
 /** Fila 3 del Dashboard Principal — Ventas: qué tanto se está presupuestando,
  * qué tanto de eso se acepta, y qué trabajo de laboratorio sigue pendiente.
- * Los montos ($) son históricos (desde que existe cada rollup), no de un
- * periodo — mismo alcance que Saldo Pendiente en la Fila 1.
+ *
+ * "Presupuestado (periodo)" SÍ reacciona a `rango` (cuántos presupuestos se
+ * CREARON en ese rango, y su valor) — pero Aceptados/Pendientes/Conversión/
+ * Laboratorios Pendientes siguen siendo históricos/estado-actual: no existe
+ * (todavía) un registro de CUÁNDO un presupuesto cambió a "aceptado", así
+ * que esas cifras no se pueden filtrar por periodo sin inventar una fecha —
+ * mismo alcance que Saldo Pendiente en la Fila 1.
  *
  * "Pendiente" se calcula por resta (total histórico menos lo ya resuelto)
  * en vez de leerse directo del rollup por estado: el campo `estado` es
@@ -20,8 +26,9 @@ import PresupuestosPendientesPanel from "./PresupuestosPendientesPanel";
  * presupuestos reales sin resolver. Restar sí es correcto de inmediato,
  * porque el total histórico (`totalPresupuestado`/`presupuestosPorMes`) ya
  * existía antes y sí es completo. */
-export default function BudgetMetrics() {
+export default function BudgetMetrics({ rango }: { rango: RangoPeriodo }) {
   const { puedeVerFinanzas, estadisticas, laboratoriosPendientes } = usePatientData();
+  const presupuestadoPeriodo = sumarPresupuestosEnRango(estadisticas.presupuestosPorFecha, rango.desdeISO, rango.hastaISO);
   const [mostrarLaboratorios, setMostrarLaboratorios] = useState(false);
   const [mostrarPresupuestos, setMostrarPresupuestos] = useState(false);
 
@@ -48,11 +55,18 @@ export default function BudgetMetrics() {
         {puedeVerFinanzas && (
           <>
             <DashboardMetricCard
-              label="Valor Presupuestado"
+              label={`Presupuestado (${rango.label})`}
+              value={formatCurrency(presupuestadoPeriodo.valor)}
+              color="#ffb020"
+              sensible
+              tooltip={`${presupuestadoPeriodo.cantidad} presupuesto(s) creado(s) en este periodo.`}
+            />
+            <DashboardMetricCard
+              label="Valor Presupuestado (histórico)"
               value={formatCurrency(estadisticas.totalPresupuestado)}
               color="#ffb020"
               sensible
-              tooltip="Suma histórica de todos los presupuestos creados."
+              tooltip="Suma histórica de TODOS los presupuestos creados desde siempre — no del periodo seleccionado arriba."
             />
             <DashboardMetricCard
               label="Presupuestos Aceptados"

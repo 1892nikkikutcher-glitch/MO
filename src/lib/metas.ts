@@ -23,6 +23,11 @@ export type FinanzasConfig = {
    * existentes, igual que el resto de campos aditivos de esta config. */
   devolucionesPorFecha?: Record<string, number>;
   devolucionesPorFechaYMetodo?: Record<string, Record<string, number>>;
+  /** Cantidad de pagos por fecha (YYYY-MM-DD) — junto a `porFecha` (la
+   * suma) permite calcular un Ticket Promedio real POR PERIODO en el
+   * Dashboard Principal, en vez de solo el histórico total. Opcional por
+   * retrocompatibilidad, mismo criterio que el resto de campos aditivos. */
+  pagosCountPorFecha?: Record<string, number>;
 };
 
 export const finanzasInicial: FinanzasConfig = { porFecha: {}, porFechaYFormaPago: {} };
@@ -84,6 +89,12 @@ export type EstadisticasGlobales = {
    * `presupuestosPorEstadoInicial` (`estadisticas.presupuestosPorEstado ??
    * presupuestosPorEstadoInicial`). */
   presupuestosPorEstado?: PresupuestosPorEstado;
+  /** Presupuestos CREADOS por fecha exacta (YYYY-MM-DD), cantidad + valor —
+   * a diferencia de `presupuestosPorMes` (solo cantidad, granularidad de
+   * mes), esto permite un rango exacto tipo "Hoy"/"Semana" en el Dashboard
+   * Principal. Solo trackea creación, nunca cuándo cambió `estado` — ver
+   * limitación documentada en BudgetMetrics.tsx. */
+  presupuestosPorFecha?: Record<string, { cantidad: number; valor: number }>;
 };
 
 export const estadisticasInicial: EstadisticasGlobales = {
@@ -135,6 +146,19 @@ export function sumarRango(porFecha: Record<string, number>, desde: Date, hasta:
   Object.entries(porFecha).forEach(([fecha, monto]) => {
     const d = new Date(`${fecha}T00:00:00`);
     if (d >= desde && d <= hasta) total += monto;
+  });
+  return total;
+}
+
+/** Mismo patrón que `sumarRango`, pero para el conteo de pagos por fecha —
+ * junto con `sumarRango(finanzas.porFecha, ...)` permite calcular un Ticket
+ * Promedio real por periodo (suma / cantidad), no solo el histórico total. */
+export function contarPagosEnRango(pagosCountPorFecha: Record<string, number> | undefined, desde: Date, hasta: Date): number {
+  if (!pagosCountPorFecha) return 0;
+  let total = 0;
+  Object.entries(pagosCountPorFecha).forEach(([fecha, cantidad]) => {
+    const d = new Date(`${fecha}T00:00:00`);
+    if (d >= desde && d <= hasta) total += cantidad;
   });
   return total;
 }
