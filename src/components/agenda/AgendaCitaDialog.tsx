@@ -489,7 +489,10 @@ export default function AgendaCitaDialog({
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4">
-      <div className="max-h-[90vh] w-full max-w-5xl overflow-y-auto overscroll-contain rounded-2xl border border-edge/10 bg-modal-solid p-4 sm:p-6">
+      <div
+        className="max-h-[90vh] w-full max-w-5xl overflow-y-auto overscroll-contain rounded-2xl border bg-modal-solid p-4 sm:p-6"
+        style={{ borderColor: statusAlpha(CITA_ESTATUS_HEX[estatus] ?? CITA_BORDE_NEUTRO, 0.6) }}
+      >
         <div className="mb-4 flex flex-col gap-3 sm:relative sm:flex-row sm:items-center sm:justify-between">
           <div>
             <h2 className="text-lg font-semibold text-ink">
