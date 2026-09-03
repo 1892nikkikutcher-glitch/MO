@@ -108,6 +108,23 @@ function TarjetaAdministrativa({ nota }: { nota: NotaEvolucionAdministrativa }) 
       </div>
       <p className="mt-2 text-sm font-medium text-ink">{motivoNotaAdministrativaLabel[nota.motivo]}</p>
       {nota.notaLibre && <p className="mt-1 text-sm text-ink/70">{nota.notaLibre}</p>}
+      {nota.psoap && (
+        <div className="mt-3 space-y-2 border-t border-edge/10 pt-2">
+          {psoapCampos
+            .filter((campo) => nota.psoap![campo.key]?.trim())
+            .map((campo) => (
+              <div key={campo.key} className="flex gap-2 text-sm">
+                <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-accent/10 text-[11px] font-bold text-accent">
+                  {campo.letra}
+                </span>
+                <p className="text-ink/80">
+                  <span className="font-medium text-ink/50">{campo.label}: </span>
+                  {nota.psoap![campo.key]}
+                </p>
+              </div>
+            ))}
+        </div>
+      )}
     </div>
   );
 }

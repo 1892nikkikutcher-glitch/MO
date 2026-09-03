@@ -14,6 +14,7 @@ import {
   motivosNotaAdministrativa,
   notaAdministrativaInicial,
   type MotivoNotaAdministrativa,
+  type PsoapOpcional,
 } from "@/lib/notasEvolucion";
 import { botonPrimario, Chip, inputClass, labelClass } from "./NotaUI";
 
@@ -29,6 +30,15 @@ function motivoSugeridoPorEstatus(estatus: CitaAgenda["estatus"]): MotivoNotaAdm
       return null;
   }
 }
+
+const psoapCampos: { key: keyof PsoapOpcional; label: string; placeholder: string }[] = [
+  { key: "presentacion", label: "Presentación", placeholder: "¿Cómo llegó / qué refirió?" },
+  { key: "subjetivo", label: "Subjetivo", placeholder: "Lo que cuenta el paciente" },
+  { key: "objetivo", label: "Objetivo", placeholder: "Lo que observaste tú" },
+  { key: "analisis", label: "Análisis", placeholder: "Impresión clínica" },
+  { key: "pronostico", label: "Pronóstico", placeholder: "Plan / siguiente paso" },
+];
+const psoapVacio: PsoapOpcional = { presentacion: "", subjetivo: "", objetivo: "", analisis: "", pronostico: "" };
 
 export default function NotaAdministrativaRapida({
   patientId,
@@ -52,10 +62,14 @@ export default function NotaAdministrativaRapida({
   const paciente = patients.find((p) => p.id === patientId);
   const [motivo, setMotivo] = useState<MotivoNotaAdministrativa | null>(motivoSugeridoPorEstatus(cita.estatus));
   const [notaLibre, setNotaLibre] = useState(notaLibreSugerida ?? "");
+  const [mostrarPsoap, setMostrarPsoap] = useState(false);
+  const [psoap, setPsoap] = useState<PsoapOpcional>(psoapVacio);
   const [guardando, setGuardando] = useState(false);
   const [error, setError] = useState("");
 
   const puedeGuardar = motivo !== null && (motivo !== "otro" || notaLibre.trim().length > 0);
+
+  const psoapConContenido = Object.values(psoap).some((v) => v.trim());
 
   const guardar = async () => {
     if (!motivo || !puedeGuardar) return;
@@ -70,6 +84,15 @@ export default function NotaAdministrativaRapida({
           citaId,
           motivo,
           notaLibre: notaLibre.trim() || undefined,
+          psoap: psoapConContenido
+            ? {
+                presentacion: psoap.presentacion?.trim() || undefined,
+                subjetivo: psoap.subjetivo?.trim() || undefined,
+                objetivo: psoap.objetivo?.trim() || undefined,
+                analisis: psoap.analisis?.trim() || undefined,
+                pronostico: psoap.pronostico?.trim() || undefined,
+              }
+            : undefined,
           registradoPorUid: miUid,
         })
       );
@@ -108,6 +131,50 @@ export default function NotaAdministrativaRapida({
           className={inputClass}
           placeholder={motivo === "otro" ? "Ej. Paciente se comunicó por WhatsApp para avisar…" : ""}
         />
+      </div>
+
+      <div className="mt-4 border-t border-edge/10 pt-4">
+        {!mostrarPsoap ? (
+          <button
+            type="button"
+            onClick={() => setMostrarPsoap(true)}
+            className="text-xs font-medium text-accent hover:underline"
+          >
+            + Agregar notas clínicas (PSOAP) — opcional
+          </button>
+        ) : (
+          <div>
+            <div className="flex items-center justify-between">
+              <p className="text-xs font-medium text-ink/60">
+                Notas clínicas (PSOAP) — opcional, ningún campo es obligatorio
+              </p>
+              <button
+                type="button"
+                onClick={() => {
+                  setMostrarPsoap(false);
+                  setPsoap(psoapVacio);
+                }}
+                className="text-xs text-ink/40 hover:text-danger"
+              >
+                Quitar
+              </button>
+            </div>
+            <div className="mt-3 space-y-3">
+              {psoapCampos.map((campo) => (
+                <div key={campo.key}>
+                  <label className={labelClass}>{campo.label}</label>
+                  <textarea
+                    value={psoap[campo.key] ?? ""}
+                    onChange={(e) => setPsoap((prev) => ({ ...prev, [campo.key]: e.target.value }))}
+                    rows={2}
+                    className={inputClass}
+                    placeholder={campo.placeholder}
+                  />
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
       </div>
 
       {error && <p className="mt-3 text-xs text-danger">{error}</p>}

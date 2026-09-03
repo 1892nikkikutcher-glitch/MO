@@ -480,6 +480,20 @@ export const motivoNotaAdministrativaLabel: Record<MotivoNotaAdministrativa, str
   otro: "Otro",
 };
 
+/** PSOAP libre y opcional — a diferencia del formulario guiado v2 (chips,
+ * secciones obligatorias, checklist de firma), ningún campo aquí bloquea
+ * el guardado. Le da al médico la opción de anotar algo clínico breve sin
+ * salir de la nota rápida, para el caso en que sí hubo algo de contacto
+ * antes de cancelar/reagendar/no presentarse. Mismas 5 etiquetas que el
+ * formato v1 legado (`NotaEvolucion` en patientData.ts). */
+export type PsoapOpcional = {
+  presentacion?: string;
+  subjetivo?: string;
+  objetivo?: string;
+  analisis?: string;
+  pronostico?: string;
+};
+
 export type NotaEvolucionAdministrativa = {
   id: string;
   tipo: "administrativa";
@@ -488,6 +502,7 @@ export type NotaEvolucionAdministrativa = {
   citaId: string;
   motivo: MotivoNotaAdministrativa;
   notaLibre?: string;
+  psoap?: PsoapOpcional;
   registradoPorUid: string;
   creadoEn: string;
 };
@@ -498,6 +513,7 @@ export function notaAdministrativaInicial(args: {
   citaId: string;
   motivo: MotivoNotaAdministrativa;
   notaLibre?: string;
+  psoap?: PsoapOpcional;
   registradoPorUid: string;
 }): NotaEvolucionAdministrativa {
   return {
