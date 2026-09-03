@@ -2,7 +2,8 @@
 
 import { useEffect, useState } from "react";
 import { auth } from "@/lib/firebase";
-import Sidebar, { navItems } from "./Sidebar";
+import BottomNav, { navItems } from "./BottomNav";
+import { categoriaSugerenciaOptions, type CategoriaSugerencia } from "@/lib/patientData";
 import Inicio from "./pages/Inicio";
 import Pacientes from "./pages/Pacientes";
 import Agenda from "./pages/Agenda";
@@ -122,6 +123,159 @@ const quickActions = [
   { key: "membresias", pageId: "membresias", label: "Nueva Membresía", color: "amber" },
   { key: "gastos", pageId: "gastos", label: "Registrar Pago", color: "green" },
 ] as const;
+
+const categoriaSugerenciaLabel: Record<CategoriaSugerencia, string> = {
+  sugerencia: "Sugerencia",
+  problema: "Problema",
+  nueva_funcion: "Nueva función",
+  facturacion: "Facturación",
+  otro: "Otro",
+};
+
+function SugerenciaModal({ onClose }: { onClose: () => void }) {
+  const [categoria, setCategoria] = useState<CategoriaSugerencia>("sugerencia");
+  const [mensaje, setMensaje] = useState("");
+  const [enviando, setEnviando] = useState(false);
+  const [enviado, setEnviado] = useState(false);
+  const [error, setError] = useState("");
+
+  const enviar = async () => {
+    if (!mensaje.trim()) return;
+    setEnviando(true);
+    setError("");
+    try {
+      const token = await auth.currentUser?.getIdToken();
+      const res = await fetch("/api/sugerencias", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token ?? ""}` },
+        body: JSON.stringify({ categoria, mensaje: mensaje.trim() }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data.error || "No se pudo enviar.");
+      setEnviado(true);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "No se pudo enviar.");
+    } finally {
+      setEnviando(false);
+    }
+  };
+
+  return (
+    <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/70 p-4">
+      <div className="w-full max-w-sm rounded-2xl border border-edge/10 bg-modal p-6">
+        {enviado ? (
+          <>
+            <h3 className="text-base font-semibold text-ink">¡Gracias por tu sugerencia!</h3>
+            <p className="mt-2 text-sm text-ink/70">Ya la recibimos y la vamos a revisar.</p>
+            <button
+              onClick={onClose}
+              className="mt-6 w-full rounded-lg border border-accent/60 bg-accent/15 py-2.5 text-sm font-semibold text-accent hover:bg-accent/25"
+            >
+              Cerrar
+            </button>
+          </>
+        ) : (
+          <>
+            <h3 className="text-base font-semibold text-ink">Enviar sugerencia</h3>
+            <p className="mt-1 text-xs text-ink/50">Cuéntanos qué mejorarías, un problema, o lo que necesites.</p>
+
+            <label className="mb-1 mt-4 block text-xs font-medium text-ink/60">Categoría</label>
+            <select
+              value={categoria}
+              onChange={(e) => setCategoria(e.target.value as CategoriaSugerencia)}
+              className="w-full rounded-lg border border-edge/10 bg-field px-3 py-2 text-sm text-ink outline-none focus:border-accent/60"
+            >
+              {categoriaSugerenciaOptions.map((c) => (
+                <option key={c} value={c}>
+                  {categoriaSugerenciaLabel[c]}
+                </option>
+              ))}
+            </select>
+
+            <label className="mb-1 mt-4 block text-xs font-medium text-ink/60">Mensaje</label>
+            <textarea
+              value={mensaje}
+              onChange={(e) => setMensaje(e.target.value)}
+              rows={4}
+              className="w-full resize-none rounded-lg border border-edge/10 bg-field px-3 py-2 text-sm text-ink outline-none focus:border-accent/60"
+            />
+
+            {error && <p className="mt-2 text-xs text-danger">{error}</p>}
+
+            <div className="mt-6 flex gap-3">
+              <button onClick={onClose} className="flex-1 rounded-lg border border-edge/15 py-2.5 text-sm font-semibold text-ink/80 hover:bg-surface">
+                Cancelar
+              </button>
+              <button
+                onClick={enviar}
+                disabled={!mensaje.trim() || enviando}
+                className="flex-1 rounded-lg border border-accent/60 bg-accent/15 py-2.5 text-sm font-semibold text-accent transition-opacity hover:bg-accent/25 disabled:opacity-40"
+              >
+                {enviando ? "Enviando…" : "Enviar"}
+              </button>
+            </div>
+          </>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function SunIcon() {
+  return (
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" className="shrink-0">
+      <path
+        d="M12 3v2M12 19v2M5 5l1.4 1.4M17.6 17.6 19 19M3 12h2M19 12h2M5 19l1.4-1.4M17.6 6.4 19 5M12 8a4 4 0 1 0 0 8 4 4 0 0 0 0-8Z"
+        stroke="currentColor"
+        strokeWidth="1.8"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+    </svg>
+  );
+}
+
+function MoonIcon() {
+  return (
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" className="shrink-0">
+      <path
+        d="M20 14.5A8.5 8.5 0 1 1 9.5 4a7 7 0 0 0 10.5 10.5Z"
+        stroke="currentColor"
+        strokeWidth="1.8"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+    </svg>
+  );
+}
+
+function ShieldIcon() {
+  return (
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" className="shrink-0">
+      <path
+        d="M12 2 4 5v6c0 5 3.4 8.7 8 11 4.6-2.3 8-6 8-11V5l-8-3Z"
+        stroke="currentColor"
+        strokeWidth="1.8"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+    </svg>
+  );
+}
+
+function MessageIcon() {
+  return (
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" className="shrink-0">
+      <path
+        d="M4 4h16v12H7l-3 3V4Z"
+        stroke="currentColor"
+        strokeWidth="1.8"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+    </svg>
+  );
+}
 
 function InvitePrompt() {
   const { pendingInvite, aceptarInvite, rechazarInvite } = usePatientData();
@@ -364,8 +518,6 @@ function DashboardBody({
   setActivePage,
   theme,
   setTheme,
-  mobileMenuOpen,
-  setMobileMenuOpen,
   showRegistrarPago,
   setShowRegistrarPago,
   showNuevoPaciente,
@@ -378,8 +530,6 @@ function DashboardBody({
   setActivePage: (id: string) => void;
   theme: "dark" | "light";
   setTheme: (updater: (t: "dark" | "light") => "dark" | "light") => void;
-  mobileMenuOpen: boolean;
-  setMobileMenuOpen: (open: boolean) => void;
   showRegistrarPago: boolean;
   setShowRegistrarPago: (open: boolean) => void;
   showNuevoPaciente: boolean;
@@ -390,6 +540,7 @@ function DashboardBody({
 }) {
   const { clinicInfo } = usePatientData();
   const isLight = theme === "light";
+  const [mostrarSugerencia, setMostrarSugerencia] = useState(false);
   const activeLabel =
     activePage === "panel-admin"
       ? "Panel de administrador"
@@ -408,29 +559,9 @@ function DashboardBody({
 
   return (
     <PrivacidadProvider>
-    <div data-theme={theme} className="flex min-h-screen bg-app text-ink">
-      <Sidebar
-        active={activePage}
-        onNavigate={setActivePage}
-        theme={theme}
-        onToggleTheme={() => setTheme((t) => (t === "dark" ? "light" : "dark"))}
-        mobileOpen={mobileMenuOpen}
-        onCloseMobile={() => setMobileMenuOpen(false)}
-        esAdmin={esAdmin}
-      />
-
-      <main className="min-w-0 flex-1">
+    <div data-theme={theme} className="min-h-screen bg-app text-ink">
+      <main className="min-w-0">
         <header className="flex h-16 items-center gap-2 border-b border-edge/10 px-3 print:hidden sm:gap-4 sm:px-6">
-          <button
-            onClick={() => setMobileMenuOpen(true)}
-            className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg text-ink/70 hover:bg-surface hover:text-ink md:hidden"
-            title="Abrir menú"
-          >
-            <svg width="22" height="22" viewBox="0 0 24 24" fill="none">
-              <path d="M4 6h16M4 12h16M4 18h16" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
-            </svg>
-          </button>
-
           <div className="min-w-0 flex-1 overflow-x-auto">
             <QuickActionsBar
               isLight={isLight}
@@ -442,6 +573,32 @@ function DashboardBody({
 
           <span className="hidden h-6 w-px bg-edge/10 sm:block" />
 
+          {esAdmin && (
+            <button
+              onClick={() => setActivePage("panel-admin")}
+              title="Panel de administrador"
+              className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-lg transition-colors hover:bg-surface hover:text-ink ${
+                activePage === "panel-admin" ? "text-accent" : "text-ink/60"
+              }`}
+            >
+              <ShieldIcon />
+            </button>
+          )}
+          <button
+            onClick={() => setMostrarSugerencia(true)}
+            title="Enviar sugerencia"
+            className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg text-ink/60 transition-colors hover:bg-surface hover:text-ink"
+          >
+            <MessageIcon />
+          </button>
+          <button
+            onClick={() => setTheme((t) => (t === "dark" ? "light" : "dark"))}
+            title={isLight ? "Cambiar a modo oscuro" : "Cambiar a modo claro"}
+            className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg text-ink/60 transition-colors hover:bg-surface hover:text-ink"
+          >
+            {isLight ? <SunIcon /> : <MoonIcon />}
+          </button>
+
           <span className="hidden truncate text-sm text-ink/50 sm:inline">{userEmail}</span>
           <button
             onClick={onLogout}
@@ -451,7 +608,7 @@ function DashboardBody({
           </button>
         </header>
 
-        <div className="px-3 py-6 sm:px-6 sm:py-8">
+        <div className="px-3 py-6 pb-28 sm:px-6 sm:py-8 sm:pb-28">
           <h1 className="mb-6 text-2xl font-semibold print:hidden">
             {activePage === "inicio" ? "Dashboard Principal" : activeLabel}
           </h1>
@@ -509,12 +666,15 @@ function DashboardBody({
         </div>
       </main>
 
+      <BottomNav active={activePage} onNavigate={setActivePage} />
+
       {showRegistrarPago && (
         <GlobalAgregarPago onClose={() => setShowRegistrarPago(false)} />
       )}
       {showNuevoPaciente && (
         <GlobalNuevoPaciente onClose={() => setShowNuevoPaciente(false)} />
       )}
+      {mostrarSugerencia && <SugerenciaModal onClose={() => setMostrarSugerencia(false)} />}
 
       <AsistenteFlotante activePage={activePage} activeLabel={activeLabel} />
     </div>
@@ -535,7 +695,6 @@ export default function Dashboard({
   const [showRegistrarPago, setShowRegistrarPago] = useState(false);
   const [showNuevoPaciente, setShowNuevoPaciente] = useState(false);
   const [theme, setTheme] = useState<"dark" | "light">("dark");
-  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const esAdmin = uid === process.env.NEXT_PUBLIC_ADMIN_UID;
 
   return (
@@ -549,8 +708,6 @@ export default function Dashboard({
           setActivePage={setActivePage}
           theme={theme}
           setTheme={setTheme}
-          mobileMenuOpen={mobileMenuOpen}
-          setMobileMenuOpen={setMobileMenuOpen}
           showRegistrarPago={showRegistrarPago}
           setShowRegistrarPago={setShowRegistrarPago}
           showNuevoPaciente={showNuevoPaciente}
