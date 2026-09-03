@@ -7,7 +7,14 @@
  * expediente clínico definitivo. */
 
 import { usePatientData } from "@/context/PatientDataContext";
-import { esNotaV2, type NotaEvolucionAny, type NotaEvolucionV2 } from "@/lib/notasEvolucion";
+import {
+  esNotaAdministrativa,
+  esNotaV2,
+  motivoNotaAdministrativaLabel,
+  type NotaEvolucionAdministrativa,
+  type NotaEvolucionAny,
+  type NotaEvolucionV2,
+} from "@/lib/notasEvolucion";
 import { generarNarrativa } from "@/lib/notaNarrativa";
 import type { DiagnosticoPaciente } from "@/lib/notasEvolucion";
 import type { NotaEvolucion } from "@/lib/patientData";
@@ -90,6 +97,21 @@ function TarjetaFirmadaV2({ nota, diagnosticosCatalogo }: { nota: NotaEvolucionV
   );
 }
 
+function TarjetaAdministrativa({ nota }: { nota: NotaEvolucionAdministrativa }) {
+  return (
+    <div className="rounded-2xl border border-edge/10 bg-surface p-4">
+      <div className="flex flex-wrap items-center justify-between gap-2 text-xs text-ink/40">
+        <span className="font-medium text-ink/70">{new Date(nota.creadoEn).toLocaleDateString("es-MX")}</span>
+        <span className="rounded-full bg-ink/10 px-2 py-0.5 text-[10px] font-semibold uppercase text-ink/50">
+          Nota administrativa
+        </span>
+      </div>
+      <p className="mt-2 text-sm font-medium text-ink">{motivoNotaAdministrativaLabel[nota.motivo]}</p>
+      {nota.notaLibre && <p className="mt-1 text-sm text-ink/70">{nota.notaLibre}</p>}
+    </div>
+  );
+}
+
 function TarjetaV1({ nota }: { nota: NotaEvolucion }) {
   return (
     <div className="rounded-2xl border border-edge/10 bg-surface p-4">
@@ -123,10 +145,22 @@ export default function HistorialNotas({ patientId, onContinuarBorrador }: { pat
   const diagnosticosCatalogo = diagnosticosPorPaciente[patientId] ?? [];
 
   const borradores = notas.filter((n): n is NotaEvolucionV2 => esNotaV2(n) && (n.estado === "borrador" || n.estado === "lista_revision"));
-  const firmadasV2 = notas
-    .filter((n): n is NotaEvolucionV2 => esNotaV2(n) && (n.estado === "firmada" || n.estado === "con_aclaracion"))
-    .sort((a, b) => b.actualizadoEn.localeCompare(a.actualizadoEn));
-  const notasV1 = notas.filter((n): n is NotaEvolucion => !esNotaV2(n as NotaEvolucionAny));
+  const firmadasV2 = notas.filter(
+    (n): n is NotaEvolucionV2 => esNotaV2(n) && (n.estado === "firmada" || n.estado === "con_aclaracion")
+  );
+  const administrativas = notas.filter(esNotaAdministrativa);
+  const notasV1 = notas.filter((n): n is NotaEvolucion => !esNotaV2(n as NotaEvolucionAny) && !esNotaAdministrativa(n));
+
+  // Firmadas v2 + administrativas en una sola línea de tiempo (por fecha
+  // descendente) — una nota administrativa es un renglón de bitácora más,
+  // no una categoría aparte de segunda clase.
+  type EntradaHistorial =
+    | { tipo: "v2"; fecha: string; nota: NotaEvolucionV2 }
+    | { tipo: "administrativa"; fecha: string; nota: NotaEvolucionAdministrativa };
+  const historial: EntradaHistorial[] = [
+    ...firmadasV2.map((nota): EntradaHistorial => ({ tipo: "v2", fecha: nota.actualizadoEn, nota })),
+    ...administrativas.map((nota): EntradaHistorial => ({ tipo: "administrativa", fecha: nota.creadoEn, nota })),
+  ].sort((a, b) => b.fecha.localeCompare(a.fecha));
 
   if (notas.length === 0) {
     return <p className="rounded-2xl border border-dashed border-edge/15 bg-surface p-10 text-center text-sm text-ink/40">No hay notas de evolución registradas</p>;
@@ -148,9 +182,13 @@ export default function HistorialNotas({ patientId, onContinuarBorrador }: { pat
       <div>
         {borradores.length > 0 && <h3 className="mb-3 text-xs font-semibold uppercase tracking-wide text-ink/50">Historial</h3>}
         <div className="space-y-3">
-          {firmadasV2.map((n) => (
-            <TarjetaFirmadaV2 key={n.id} nota={n} diagnosticosCatalogo={diagnosticosCatalogo} />
-          ))}
+          {historial.map((entrada) =>
+            entrada.tipo === "v2" ? (
+              <TarjetaFirmadaV2 key={entrada.nota.id} nota={entrada.nota} diagnosticosCatalogo={diagnosticosCatalogo} />
+            ) : (
+              <TarjetaAdministrativa key={entrada.nota.id} nota={entrada.nota} />
+            )
+          )}
           {notasV1.map((n) => (
             <TarjetaV1 key={n.id} nota={n} />
           ))}

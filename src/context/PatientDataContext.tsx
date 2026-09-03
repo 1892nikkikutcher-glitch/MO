@@ -51,6 +51,7 @@ import {
   type FotosPaciente,
 } from "@/lib/patientData";
 import {
+  esNotaAdministrativa,
   esNotaV2,
   notaEvolucionV2Inicial,
   validarNotaParaFirmar,
@@ -58,6 +59,7 @@ import {
   type DiagnosticoPaciente,
   type EncabezadoNota,
   type ModoCaptura,
+  type NotaEvolucionAdministrativa,
   type NotaEvolucionAny,
   type NotaEvolucionV2,
 } from "@/lib/notasEvolucion";
@@ -494,6 +496,7 @@ type PatientDataContextValue = {
    * comentario). Cada una es un setDoc/updateDoc puntual por id. */
   crearBorradorNota: (patientId: string, nota: NotaEvolucionV2) => Promise<void>;
   guardarBorradorNota: (patientId: string, nota: NotaEvolucionV2) => Promise<void>;
+  crearNotaAdministrativa: (patientId: string, nota: NotaEvolucionAdministrativa) => Promise<void>;
   marcarListaParaRevision: (patientId: string, notaId: string) => Promise<void>;
   firmarNota: (patientId: string, nota: NotaEvolucionV2) => Promise<void>;
   agregarAclaracionNota: (
@@ -1851,11 +1854,14 @@ export function PatientDataProvider({
     if (!clinicUid) return;
     setNotasEvolucionPorPacienteState((prev) => {
       const prevAll = prev[patientId] ?? [];
-      const prevV1 = prevAll.filter((n): n is NotaEvolucion => !esNotaV2(n));
-      const v2Existentes = prevAll.filter(esNotaV2);
+      const prevV1 = prevAll.filter((n): n is NotaEvolucion => !esNotaV2(n) && !esNotaAdministrativa(n));
+      // v2 y administrativas conviven en el mismo arreglo pero nunca pasan
+      // por este diff (mismo motivo documentado arriba para v2) — ambas se
+      // preservan tal cual.
+      const otrasExistentes = prevAll.filter((n) => esNotaV2(n) || esNotaAdministrativa(n));
       const nextV1 = resolveUpdater(updater, prevV1);
       syncFirestoreList(`users/${clinicUid}/pacientes/${patientId}/notasEvolucion`, prevV1, nextV1);
-      return { ...prev, [patientId]: [...nextV1, ...v2Existentes] };
+      return { ...prev, [patientId]: [...nextV1, ...otrasExistentes] };
     });
   };
 
@@ -1879,6 +1885,14 @@ export function PatientDataProvider({
   // del documento completo) — se distinguen por nombre para que quien llama
   // exprese la intención (primer guardado vs. autoguardado subsecuente).
   const crearBorradorNota = guardarBorradorNota;
+
+  /** Nota administrativa (cita Cancelada/Reagendada/No Asistió) — mismo
+   * documento hermano de siempre en `notasEvolucion`, sin ciclo de
+   * borrador/firma: se guarda completa de una sola vez. */
+  const crearNotaAdministrativa = async (patientId: string, nota: NotaEvolucionAdministrativa) => {
+    if (!clinicUid) return;
+    await setDoc(notaEvolucionDocRef(patientId, nota.id), nota);
+  };
 
   const confirmarHorario = () => {
     setHorario((prev) => confirmarHorarioPuro(prev, uid, new Date().toISOString()));
@@ -2114,15 +2128,18 @@ export function PatientDataProvider({
     setPlanTratamientoPaciente(sobrevivienteId, (prev) => [...prev, ...(planTratamientoPorPaciente[perdedorId] ?? [])]);
     setMembresiasPaciente(sobrevivienteId, (prev) => [...prev, ...(membresiasPorPaciente[perdedorId] ?? [])]);
 
-    // Notas de evolución: v1 y v2 conviven en el mismo arreglo pero se
-    // escriben distinto — v1 vía el diff de setNotasEvolucionPaciente, v2
-    // con su escritura puntual por id (guardarBorradorNota), igual que en
-    // cualquier otro guardado normal de una nota v2.
+    // Notas de evolución: v1, v2 y administrativas conviven en el mismo
+    // arreglo pero se escriben distinto — v1 vía el diff de
+    // setNotasEvolucionPaciente, v2 y administrativas con su escritura
+    // puntual por id (guardarBorradorNota/crearNotaAdministrativa), igual
+    // que en cualquier otro guardado normal de esos tipos.
     const notasPerdedor = notasEvolucionPorPaciente[perdedorId] ?? [];
-    const notasV1Perdedor = notasPerdedor.filter((n): n is NotaEvolucion => !esNotaV2(n));
+    const notasV1Perdedor = notasPerdedor.filter((n): n is NotaEvolucion => !esNotaV2(n) && !esNotaAdministrativa(n));
     const notasV2Perdedor = notasPerdedor.filter(esNotaV2);
+    const notasAdminPerdedor = notasPerdedor.filter(esNotaAdministrativa);
     setNotasEvolucionPaciente(sobrevivienteId, (prev) => [...prev, ...notasV1Perdedor]);
     notasV2Perdedor.forEach((nota) => void guardarBorradorNota(sobrevivienteId, nota));
+    notasAdminPerdedor.forEach((nota) => void crearNotaAdministrativa(sobrevivienteId, nota));
 
     setRespuestasHistoriaClinica(sobrevivienteId, historiaClinicaResuelta);
     setFotosPaciente(sobrevivienteId, fotosResueltas);
@@ -2313,6 +2330,7 @@ export function PatientDataProvider({
         setNotasEvolucionPaciente,
         crearBorradorNota,
         guardarBorradorNota,
+        crearNotaAdministrativa,
         marcarListaParaRevision,
         firmarNota,
         agregarAclaracionNota,

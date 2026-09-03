@@ -463,13 +463,70 @@ export function estadoSeccion(nota: Partial<NotaEvolucionV2>, seccion: SeccionNo
   }
 }
 
-/** Una nota de evolución, v1 (PSOAP crudo, `patientData.ts`) o v2 —
- * conviven como documentos hermanos en la misma subcolección
- * `notasEvolucion`, nunca se migra una a la otra. */
-export type NotaEvolucionAny = NotaEvolucion | NotaEvolucionV2;
+/** Nota corta para una cita que no se atendió (Cancelada, Reagendada, No
+ * Asistió) — tercer documento hermano en la misma subcolección
+ * `notasEvolucion`, distinguido por `tipo: "administrativa"` (v1 no tiene
+ * `version` ni `tipo`; v2 tiene `version: 2`). Deliberadamente NO reutiliza
+ * `NotaEvolucionV2`: esa trae de fábrica secciones clínicas (hallazgos,
+ * diagnóstico, procedimiento...) que no aplican a una cita que nunca
+ * ocurrió — forzarlas ahí solo para dejarlas vacías sería más confuso que
+ * un tipo propio y minúsculo. */
+export const motivosNotaAdministrativa = ["no_asistio", "cancela_paciente", "reagenda_paciente", "otro"] as const;
+export type MotivoNotaAdministrativa = (typeof motivosNotaAdministrativa)[number];
+export const motivoNotaAdministrativaLabel: Record<MotivoNotaAdministrativa, string> = {
+  no_asistio: "Paciente no se presenta a su consulta",
+  cancela_paciente: "Paciente cancela su cita",
+  reagenda_paciente: "Paciente reagenda su cita",
+  otro: "Otro",
+};
+
+export type NotaEvolucionAdministrativa = {
+  id: string;
+  tipo: "administrativa";
+  patientId: string;
+  pacienteNombreSnapshot: string;
+  citaId: string;
+  motivo: MotivoNotaAdministrativa;
+  notaLibre?: string;
+  registradoPorUid: string;
+  creadoEn: string;
+};
+
+export function notaAdministrativaInicial(args: {
+  patientId: string;
+  pacienteNombreSnapshot: string;
+  citaId: string;
+  motivo: MotivoNotaAdministrativa;
+  notaLibre?: string;
+  registradoPorUid: string;
+}): NotaEvolucionAdministrativa {
+  return {
+    id: idNota("notaAdmin"),
+    tipo: "administrativa",
+    ...args,
+    creadoEn: new Date().toISOString(),
+  };
+}
+
+/** Una nota de evolución, v1 (PSOAP crudo, `patientData.ts`), v2, o
+ * administrativa — conviven como documentos hermanos en la misma
+ * subcolección `notasEvolucion`, nunca se migra una a otra. */
+export type NotaEvolucionAny = NotaEvolucion | NotaEvolucionV2 | NotaEvolucionAdministrativa;
 
 export function esNotaV2(nota: NotaEvolucionAny): nota is NotaEvolucionV2 {
   return (nota as NotaEvolucionV2).version === 2;
+}
+
+export function esNotaAdministrativa(nota: NotaEvolucionAny): nota is NotaEvolucionAdministrativa {
+  return (nota as NotaEvolucionAdministrativa).tipo === "administrativa";
+}
+
+/** `citaId` asociado a cualquier tipo de nota — v1 nunca lo tiene, v2 lo
+ * guarda en `encabezado.citaId`, administrativa lo trae en la raíz. */
+export function citaIdDeNota(nota: NotaEvolucionAny): string | null {
+  if (esNotaAdministrativa(nota)) return nota.citaId;
+  if (esNotaV2(nota)) return nota.encabezado.citaId ?? null;
+  return null;
 }
 
 /** Notas v2 creadas antes de que existiera `revision` (todas las que ya

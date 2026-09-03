@@ -14,6 +14,7 @@ import type { Recurso } from "@/lib/patientData";
 import { buscarBorradorLocalPorCita, buscarBorradorLocalPorPaciente } from "@/lib/borradorLocalNota";
 import { detectarConflictoBorrador, type RegistroBorradorLocal } from "@/lib/borradorLocalNotaPuro";
 import {
+  citaIdDeNota,
   estadoSeccion,
   normalizarRevision,
   notaEvolucionV2Inicial,
@@ -24,12 +25,15 @@ import {
 } from "@/lib/notasEvolucion";
 import { useAutoguardadoNota, type EstadoSincronizacionInicial } from "./useAutoguardadoNota";
 import { botonPrimario, botonSecundario, EstadoGuardadoIndicador, SeccionAcordeon } from "./NotaUI";
+import NotaAdministrativaRapida from "./NotaAdministrativaRapida";
 import SeccionComoLlega from "./SeccionComoLlega";
 import SeccionQueEncontraste from "./SeccionQueEncontraste";
 import SeccionDiagnostico from "./SeccionDiagnostico";
 import SeccionProcedimiento from "./SeccionProcedimiento";
 import SeccionEstadoFinal from "./SeccionEstadoFinal";
 import SeccionIndicaciones from "./SeccionIndicaciones";
+
+const ESTATUS_CITA_SIN_ATENDER = ["Cancelada", "Reagendada", "No Asistió"] as const;
 
 const seccionesOrden: { id: SeccionNota; titulo: string }[] = [
   { id: "como_llega", titulo: "¿Cómo llega hoy?" },
@@ -73,6 +77,7 @@ export default function RegistrarAtencionHoy({
   const [hayConflicto, setHayConflicto] = useState(false);
   const [arranqueNota, setArranqueNota] = useState<ArranqueNota | null>(null);
   const [forzarNueva, setForzarNueva] = useState(false);
+  const [notaCompletaForzada, setNotaCompletaForzada] = useState(false);
 
   const paciente = patients.find((p) => p.id === patientId);
   const medicos = useMemo(() => recursos.filter((r) => r.tipo === "medico"), [recursos]);
@@ -240,6 +245,29 @@ export default function RegistrarAtencionHoy({
     setForzarNueva(true);
     setArranqueNota(notaNuevaComoArranque());
     setFase("editando");
+  }
+
+  // Cita Cancelada/Reagendada/No Asistió sin ninguna nota todavía: el
+  // formulario clínico de 6 secciones no aplica (nunca hubo atención que
+  // documentar) — se ofrece una nota corta en su lugar. Si ya existe
+  // cualquier nota para esta cita (de cualquier tipo), o el usuario pidió
+  // explícitamente el formulario completo, se sigue el flujo normal de
+  // abajo sin interrumpirlo.
+  const notasDeEstaCita = citaId
+    ? (notasEvolucionPorPaciente[patientId] ?? []).filter((n) => citaIdDeNota(n) === citaId)
+    : [];
+  const citaSinAtender = !!cita && (ESTATUS_CITA_SIN_ATENDER as readonly string[]).includes(cita.estatus);
+
+  if (citaId && cita && citaSinAtender && notasDeEstaCita.length === 0 && !notaCompletaForzada) {
+    return (
+      <NotaAdministrativaRapida
+        patientId={patientId}
+        citaId={citaId}
+        cita={cita}
+        onGuardado={onGuardado}
+        onQuiereNotaCompleta={() => setNotaCompletaForzada(true)}
+      />
+    );
   }
 
   if (fase === "buscando") {

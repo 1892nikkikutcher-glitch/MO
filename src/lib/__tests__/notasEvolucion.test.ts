@@ -1,8 +1,11 @@
 import { describe, expect, it } from "vitest";
 import {
+  citaIdDeNota,
+  esNotaAdministrativa,
   esNotaV2,
   estadoSeccion,
   normalizarRevision,
+  notaAdministrativaInicial,
   notaEvolucionV2Inicial,
   obtenerFaltantesNota,
   recomendacionSignosVitales,
@@ -95,6 +98,46 @@ describe("esNotaV2", () => {
     const v2 = notaEvolucionV2Inicial(encabezado, "rapido", "uid-1");
     expect(esNotaV2(v1)).toBe(false);
     expect(esNotaV2(v2)).toBe(true);
+  });
+});
+
+describe("notaAdministrativaInicial / esNotaAdministrativa / citaIdDeNota", () => {
+  const v1: NotaEvolucion = {
+    id: "n1",
+    fecha: "01/01/2026",
+    medico: "Dr. X",
+    presentacion: "",
+    subjetivo: "",
+    objetivo: "",
+    analisis: "",
+    pronostico: "",
+  };
+  const v2 = notaEvolucionV2Inicial({ ...encabezado, citaId: "cita1" }, "rapido", "uid-1");
+  const administrativa = notaAdministrativaInicial({
+    patientId: "pac1",
+    pacienteNombreSnapshot: "Juan Pérez",
+    citaId: "cita2",
+    motivo: "cancela_paciente",
+    registradoPorUid: "uid-1",
+  });
+
+  it("crea una nota administrativa con los datos dados y un id propio", () => {
+    expect(administrativa.tipo).toBe("administrativa");
+    expect(administrativa.citaId).toBe("cita2");
+    expect(administrativa.motivo).toBe("cancela_paciente");
+    expect(administrativa.notaLibre).toBeUndefined();
+  });
+
+  it("esNotaAdministrativa distingue el tipo administrativa de v1 y v2", () => {
+    expect(esNotaAdministrativa(v1)).toBe(false);
+    expect(esNotaAdministrativa(v2)).toBe(false);
+    expect(esNotaAdministrativa(administrativa)).toBe(true);
+  });
+
+  it("citaIdDeNota lee el citaId correcto según el tipo — null para v1", () => {
+    expect(citaIdDeNota(v1)).toBeNull();
+    expect(citaIdDeNota(v2)).toBe("cita1");
+    expect(citaIdDeNota(administrativa)).toBe("cita2");
   });
 });
 
