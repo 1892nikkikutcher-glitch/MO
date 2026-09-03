@@ -89,6 +89,7 @@ function SiNoRow({
   detalle,
   onChangeDetalle,
   mostrarDetalle,
+  detallePlaceholder,
 }: {
   label: string;
   value: SiNo;
@@ -96,6 +97,7 @@ function SiNoRow({
   detalle?: string;
   onChangeDetalle?: (v: string) => void;
   mostrarDetalle?: boolean;
+  detallePlaceholder?: string;
 }) {
   return (
     <div className="border-b border-edge/5 py-2 last:border-0">
@@ -127,7 +129,7 @@ function SiNoRow({
           type="text"
           value={detalle ?? ""}
           onChange={(e) => onChangeDetalle?.(e.target.value)}
-          placeholder="Ej. desde cuándo, si está controlado(a) y con qué se controla..."
+          placeholder={detallePlaceholder || "Ej. desde cuándo, si está controlado(a) y con qué se controla..."}
           className={`${inputClass} mt-2`}
         />
       )}
@@ -1019,7 +1021,8 @@ function PreguntaRenderer({
         onChange={onChange}
         detalle={detalle}
         onChangeDetalle={onChangeDetalle}
-        mostrarDetalle={mostrarDetalle}
+        mostrarDetalle={mostrarDetalle || !!pregunta.mostrarDetalle}
+        detallePlaceholder={pregunta.detallePlaceholder}
       />
     );
   }

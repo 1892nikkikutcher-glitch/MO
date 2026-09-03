@@ -52,6 +52,16 @@ export type PreguntaTemplate = {
    * sugerencia para agilizar la captura — el campo sigue siendo texto
    * libre, se puede escribir cualquier cosa además de estos. */
   sugerencias?: string[];
+  /** Solo para tipo "sino": si es true, responder "Sí" revela un campo de
+   * texto libre adicional (mismo mecanismo ya usado en "Antecedentes
+   * Patológicos", ver esSeccionAntecedentesPatologicos/claveDetalleSiNo)
+   * — para preguntas donde un "Sí" por sí solo no basta (alcohol, tabaco,
+   * drogas...). Ausente = el "sino" se queda simple, como hoy. */
+  mostrarDetalle?: boolean;
+  /** Solo junto con mostrarDetalle: placeholder del campo de detalle. Si
+   * se omite, usa el genérico ya existente ("desde cuándo, si está
+   * controlado(a)..."). */
+  detallePlaceholder?: string;
 };
 
 export type SeccionTemplate = {
@@ -106,9 +116,9 @@ export const plantillaInicial: HistoriaClinicaTemplate = {
       titulo: "Medicación: ¿Está usted tomando…?",
       preguntas: [
         { id: id("p"), tipo: "texto", etiqueta: "Medicamentos" },
-        { id: id("p"), tipo: "sino", etiqueta: "Alcohol" },
-        { id: id("p"), tipo: "sino", etiqueta: "Tabaco" },
-        { id: id("p"), tipo: "sino", etiqueta: "Drogas" },
+        { id: id("p"), tipo: "sino", etiqueta: "Alcohol", mostrarDetalle: true, detallePlaceholder: "¿Con qué y con qué frecuencia?" },
+        { id: id("p"), tipo: "sino", etiqueta: "Tabaco", mostrarDetalle: true, detallePlaceholder: "¿Con qué y con qué frecuencia?" },
+        { id: id("p"), tipo: "sino", etiqueta: "Drogas", mostrarDetalle: true, detallePlaceholder: "¿Con qué y con qué frecuencia?" },
       ],
     },
     {

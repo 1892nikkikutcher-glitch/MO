@@ -122,6 +122,27 @@ function PreguntaEditor({
           className={`${inputClass} mt-2`}
         />
       )}
+      {pregunta.tipo === "sino" && (
+        <div className="mt-2 space-y-2">
+          <label className="flex items-center gap-2 text-xs text-ink/60">
+            <input
+              type="checkbox"
+              checked={pregunta.mostrarDetalle ?? false}
+              onChange={(e) => onCambiar({ mostrarDetalle: e.target.checked })}
+            />
+            Pedir un detalle adicional cuando responda "Sí"
+          </label>
+          {pregunta.mostrarDetalle && (
+            <input
+              type="text"
+              value={pregunta.detallePlaceholder ?? ""}
+              onChange={(e) => onCambiar({ detallePlaceholder: e.target.value })}
+              placeholder='Texto de ejemplo del detalle, ej. "¿Con qué y con qué frecuencia?"'
+              className={inputClass}
+            />
+          )}
+        </div>
+      )}
     </div>
   );
 }
