@@ -15,6 +15,7 @@ import { buscarBorradorLocalPorCita, buscarBorradorLocalPorPaciente } from "@/li
 import { detectarConflictoBorrador, type RegistroBorradorLocal } from "@/lib/borradorLocalNotaPuro";
 import {
   citaIdDeNota,
+  esNotaV2,
   estadoSeccion,
   normalizarRevision,
   notaEvolucionV2Inicial,
@@ -249,21 +250,36 @@ export default function RegistrarAtencionHoy({
 
   // Cita Cancelada/Reagendada/No Asistió sin ninguna nota todavía: el
   // formulario clínico de 6 secciones no aplica (nunca hubo atención que
-  // documentar) — se ofrece una nota corta en su lugar. Si ya existe
-  // cualquier nota para esta cita (de cualquier tipo), o el usuario pidió
-  // explícitamente el formulario completo, se sigue el flujo normal de
-  // abajo sin interrumpirlo.
+  // documentar) — se ofrece una nota corta en su lugar. También se ofrece
+  // si lo único que existe es un borrador v2 SIN FIRMAR (alguien empezó el
+  // formulario completo, típicamente escribió el motivo en "¿Cómo llega
+  // hoy?", y quiere terminar ahí) — un borrador nunca es parte del
+  // expediente definitivo, así que cambiar de flujo en ese punto es seguro.
+  // Si ya existe una nota FIRMADA/lista_revision, o hay más de una nota
+  // para esta cita, o el usuario pidió explícitamente el formulario
+  // completo, se sigue el flujo normal de abajo sin interrumpirlo.
   const notasDeEstaCita = citaId
     ? (notasEvolucionPorPaciente[patientId] ?? []).filter((n) => citaIdDeNota(n) === citaId)
     : [];
+  const borradorV2Descartable =
+    notasDeEstaCita.length === 1 && esNotaV2(notasDeEstaCita[0]) && notasDeEstaCita[0].estado === "borrador"
+      ? notasDeEstaCita[0]
+      : null;
   const citaSinAtender = !!cita && (ESTATUS_CITA_SIN_ATENDER as readonly string[]).includes(cita.estatus);
+  // `fase !== "editando"` es a propósito: una vez que el usuario ya está
+  // escribiendo en el formulario completo (llegó ahí por su cuenta o por
+  // "Necesito una nota clínica completa"), esta oferta nunca debe
+  // reaparecer a medio re-render y sacarlo de lo que está escribiendo.
+  const puedeOfrecerNotaRapida =
+    fase !== "editando" && citaSinAtender && (notasDeEstaCita.length === 0 || !!borradorV2Descartable);
 
-  if (citaId && cita && citaSinAtender && notasDeEstaCita.length === 0 && !notaCompletaForzada) {
+  if (citaId && cita && puedeOfrecerNotaRapida && !notaCompletaForzada) {
     return (
       <NotaAdministrativaRapida
         patientId={patientId}
         citaId={citaId}
         cita={cita}
+        notaLibreSugerida={borradorV2Descartable?.comoLlegaHoy.textoLibre}
         onGuardado={onGuardado}
         onQuiereNotaCompleta={() => setNotaCompletaForzada(true)}
       />

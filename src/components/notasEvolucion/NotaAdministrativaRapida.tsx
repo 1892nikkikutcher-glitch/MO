@@ -34,19 +34,24 @@ export default function NotaAdministrativaRapida({
   patientId,
   citaId,
   cita,
+  notaLibreSugerida,
   onGuardado,
   onQuiereNotaCompleta,
 }: {
   patientId: string;
   citaId: string;
   cita: CitaAgenda;
+  /** Texto ya escrito en "¿Cómo llega hoy?" de un borrador del formulario
+   * completo que se abandona a favor de esta nota rápida — para no hacer
+   * que el usuario lo vuelva a escribir. */
+  notaLibreSugerida?: string;
   onGuardado: () => void;
   onQuiereNotaCompleta: () => void;
 }) {
   const { miUid, patients, crearNotaAdministrativa } = usePatientData();
   const paciente = patients.find((p) => p.id === patientId);
   const [motivo, setMotivo] = useState<MotivoNotaAdministrativa | null>(motivoSugeridoPorEstatus(cita.estatus));
-  const [notaLibre, setNotaLibre] = useState("");
+  const [notaLibre, setNotaLibre] = useState(notaLibreSugerida ?? "");
   const [guardando, setGuardando] = useState(false);
   const [error, setError] = useState("");
 
