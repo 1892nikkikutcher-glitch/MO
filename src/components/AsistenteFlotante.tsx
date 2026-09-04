@@ -40,7 +40,7 @@ export default function AsistenteFlotante({
         onClick={() => setAbierto((v) => !v)}
         title="Asistente — qué puedo hacer aquí"
         style={{ boxShadow: "0 0 18px -2px rgb(var(--accent-rgb) / 0.7)" }}
-        className="fixed bottom-6 right-6 z-40 flex h-14 w-14 items-center justify-center rounded-full border border-accent/50 bg-accent/20 text-accent backdrop-blur transition-transform hover:scale-105 print:hidden"
+        className="fixed bottom-24 right-6 z-40 flex h-14 w-14 items-center justify-center rounded-full border border-accent/50 bg-accent/20 text-accent backdrop-blur transition-transform hover:scale-105 print:hidden"
       >
         <IconoAsistente />
       </button>
@@ -52,7 +52,7 @@ export default function AsistenteFlotante({
             className="fixed inset-0 z-40 print:hidden"
             aria-hidden
           />
-          <div className="fixed bottom-24 right-6 z-50 max-h-[70vh] w-[calc(100vw-3rem)] max-w-sm overflow-y-auto rounded-2xl border border-edge/10 bg-modal-solid p-5 shadow-2xl print:hidden">
+          <div className="fixed bottom-44 right-6 z-50 max-h-[70vh] w-[calc(100vw-3rem)] max-w-sm overflow-y-auto rounded-2xl border border-edge/10 bg-modal-solid p-5 shadow-2xl print:hidden">
             <div className="mb-3 flex items-start justify-between gap-3">
               <div>
                 <p className="text-[11px] font-semibold uppercase tracking-wide text-accent">

@@ -8,7 +8,7 @@
  * normal y nunca lo bloquee un popup blocker. */
 export default function AbrirWhatsAppPrompt({ waUrl, onCerrar }: { waUrl: string; onCerrar: () => void }) {
   return (
-    <div className="fixed inset-x-0 bottom-4 z-50 mx-auto flex w-full max-w-md items-center gap-3 rounded-xl border border-success/40 bg-modal-solid px-4 py-3 shadow-[0_8px_30px_-10px_rgba(0,0,0,0.6)]">
+    <div className="fixed inset-x-0 bottom-24 z-50 mx-auto flex w-full max-w-md items-center gap-3 rounded-xl border border-success/40 bg-modal-solid px-4 py-3 shadow-[0_8px_30px_-10px_rgba(0,0,0,0.6)]">
       <p className="flex-1 text-xs text-ink/70">El PDF ya se descargó — ábrelo en WhatsApp para adjuntarlo.</p>
       <a
         href={waUrl}

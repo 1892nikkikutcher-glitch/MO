@@ -1115,7 +1115,7 @@ export default function Expediente({
     .filter((c) => c.patientId === patient.id)
     .sort((a, b) => b.fecha.localeCompare(a.fecha) || b.horaInicio.localeCompare(a.horaInicio));
   const citasFuturas = citasPaciente
-    .filter((c) => c.fecha >= hoyISO)
+    .filter((c) => c.fecha >= hoyISO && c.estatus !== "Cancelada" && c.estatus !== "Reagendada")
     .sort((a, b) => a.fecha.localeCompare(b.fecha) || a.horaInicio.localeCompare(b.horaInicio));
   const ultimaCita = citasPaciente.find((c) => c.fecha < hoyISO && c.estatus !== "Cancelada");
 

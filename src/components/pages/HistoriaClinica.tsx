@@ -1376,7 +1376,7 @@ export default function HistoriaClinica({
         </div>
       )}
 
-      <div className="sticky bottom-4 z-10 flex items-center justify-between gap-4 rounded-2xl border border-edge/10 bg-modal p-4 shadow-card">
+      <div className="sticky bottom-24 z-10 flex items-center justify-between gap-4 rounded-2xl border border-edge/10 bg-modal p-4 shadow-card">
         <p className="text-xs text-ink/40">
           {guardadas.actualizadoEn
             ? `Última actualización: ${formatFechaHora(guardadas.actualizadoEn)}`

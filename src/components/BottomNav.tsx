@@ -366,7 +366,7 @@ export default function BottomNav({ active, onNavigate }: { active: string; onNa
               carouselRef.current.scrollLeft += e.deltaY;
             }
           }}
-          className="flex cursor-grab gap-1 overflow-x-auto px-2 py-2 [-ms-overflow-style:none] [scrollbar-width:none] active:cursor-grabbing lg:justify-center lg:gap-1.5 [&::-webkit-scrollbar]:hidden"
+          className="flex cursor-grab gap-1 overflow-x-auto px-2 py-2 [-ms-overflow-style:none] [scrollbar-width:none] active:cursor-grabbing lg:gap-1.5 [&::-webkit-scrollbar]:hidden"
         >
           {navItems.map((item) => {
             const hasChildren = "children" in item && !!item.children?.length;

@@ -608,7 +608,7 @@ function FormularioNota({
         </SeccionAcordeon>
       </div>
 
-      <div className="sticky bottom-0 rounded-2xl border border-edge/10 bg-modal p-4 shadow-card">
+      <div className="sticky bottom-24 z-10 rounded-2xl border border-edge/10 bg-modal p-4 shadow-card">
         {faltantes.length > 0 && !confirmando && (
           <div className="mb-3 text-xs text-ink/60">
             <p className="mb-1 font-medium text-ink/80">Tu nota está casi lista — falta confirmar:</p>
