@@ -92,12 +92,15 @@ function sumarMeses(fechaISO: string, meses: number): string {
 }
 
 /** Texto listo para insertar en {{proximaCita}} del recibo de pago: la
- * siguiente cita agendada de ESTE paciente (fecha de hoy en adelante, sin
- * contar canceladas ni reagendadas — una reagendada deja su fecha vieja
- * intacta en su propio registro, así que contarla mostraría la fecha
- * equivocada). Si no tiene ninguna, en vez de dejar la línea vacía sugiere
- * una fecha tentativa de control a 6 meses de la fecha del pago — es solo
- * texto informativo, nunca agenda una cita real. */
+ * siguiente cita agendada de ESTE paciente, DESPUÉS de hoy (no cuenta la
+ * cita de hoy mismo — normalmente es la que se está pagando ahora, no una
+ * "próxima" cita; sin este corte, cobrar la cita de hoy anunciaba "su
+ * próxima cita es hoy"), sin contar canceladas ni reagendadas — una
+ * reagendada deja su fecha vieja intacta en su propio registro, así que
+ * contarla mostraría la fecha equivocada. Si no tiene ninguna, en vez de
+ * dejar la línea vacía sugiere una fecha tentativa de control a 6 meses de
+ * la fecha del pago — es solo texto informativo, nunca agenda una cita
+ * real. */
 export function buildProximaCitaTexto(citas: CitaAgenda[], patientId: string, fechaPago: string): string {
   const hoy = new Date();
   const hoyISO = `${hoy.getFullYear()}-${String(hoy.getMonth() + 1).padStart(2, "0")}-${String(hoy.getDate()).padStart(2, "0")}`;
@@ -108,7 +111,7 @@ export function buildProximaCitaTexto(citas: CitaAgenda[], patientId: string, fe
         c.patientId === patientId &&
         c.estatus !== "Cancelada" &&
         c.estatus !== "Reagendada" &&
-        c.fecha >= hoyISO
+        c.fecha > hoyISO
     )
     .sort((a, b) => (a.fecha + a.horaInicio).localeCompare(b.fecha + b.horaInicio))[0];
 
