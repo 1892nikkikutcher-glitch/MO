@@ -476,7 +476,7 @@ export default function Agenda() {
 
   return (
     <div className="mx-auto flex w-full max-w-[1600px] flex-col gap-6">
-      <div className="min-w-0 flex-1 space-y-4">
+      <div className="min-w-0 flex-1 space-y-5">
         {avisoConflicto && (
           <div className="flex items-start justify-between gap-3 rounded-xl border border-warning/30 bg-warning/10 p-3 text-xs text-warning">
             <div className="space-y-0.5">
@@ -522,7 +522,7 @@ export default function Agenda() {
         </div>
 
         {/* 2. Estatus de cita. */}
-        <div className="flex flex-wrap gap-2">
+        <div className="flex flex-wrap gap-2.5">
           {conteoEstatus.map(({ estatus, total }) => {
             const oculto = estatusOcultos.has(estatus);
             const c = estatusColor[estatus];
@@ -531,7 +531,7 @@ export default function Agenda() {
               <button
                 key={estatus}
                 onClick={() => toggleEstatus(estatus)}
-                className={`flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-semibold transition-opacity ${c.bg} ${c.text} ${
+                className={`flex items-center gap-1.5 rounded-full px-3.5 py-1.5 text-xs font-semibold transition-opacity ${c.bg} ${c.text} ${
                   oculto ? "opacity-30" : ""
                 }`}
                 style={hex ? { color: hex, backgroundColor: statusAlpha(hex, 0.16) } : undefined}
@@ -543,7 +543,7 @@ export default function Agenda() {
           })}
         </div>
 
-        <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-6">
+        <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-6">
           {(() => {
             const ocupacionChip = {
               label: vista === "dia" ? "Ocupación" : "Ocupación prom.",
@@ -578,9 +578,9 @@ export default function Agenda() {
                       { label: "No asistieron", value: resumenVista.noAsistieron },
                     ];
             return chips.map((chip) => (
-              <div key={chip.label} className="rounded-xl border border-edge/10 bg-surface px-3 py-2">
+              <div key={chip.label} className="rounded-xl border border-edge/10 bg-surface px-3.5 py-3">
                 <p className="text-[10px] uppercase tracking-wide text-ink/40">{chip.label}</p>
-                <p className="text-base font-semibold text-ink">{chip.value}</p>
+                <p className="mt-0.5 text-base font-semibold text-ink">{chip.value}</p>
               </div>
             ));
           })()}
