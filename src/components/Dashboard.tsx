@@ -440,7 +440,7 @@ function QuickActionsBar({
   };
 
   return (
-    <div className="flex items-center gap-1 sm:flex-1 sm:justify-between sm:gap-0">
+    <div className="flex items-center gap-2 sm:flex-1 sm:justify-between sm:gap-0">
       {visibles.map((action) => {
         // Si pageId es un hijo de un submenú (ej. "deposito-dental" bajo
         // "Proveedores"), los hijos no tienen ícono propio — se usa el del
