@@ -12,6 +12,7 @@ import {
   onAuthStateChanged,
   sendEmailVerification,
   signInWithEmailAndPassword,
+  signOut,
   type User,
 } from "firebase/auth";
 import { auth } from "@/lib/firebase";
@@ -243,10 +244,25 @@ function ReclamarInvitacion({ token }: { token: string }) {
   }
   if (resultado?.tipo === "solicitud_creada") {
     return (
-      <p className="text-sm text-amber-300">
-        Tu identidad no coincide exactamente con la que el remitente registró — se envió una solicitud de acceso.
-        Espera su aprobación.
-      </p>
+      <div className="space-y-3">
+        <p className="text-sm text-amber-300">
+          Tu identidad no coincide exactamente con la que el remitente registró — se envió una solicitud de acceso.
+          Espera su aprobación.
+        </p>
+        <p className="text-xs text-white/50">
+          Mientras esperas, puedes entrar a MO para completar tu perfil profesional u otras cosas — el acceso a
+          este caso en particular aparecerá solo, en cuanto el remitente lo apruebe.
+        </p>
+        <a href="/" className={`${botonPrimario} block w-full text-center`}>
+          Ir a MO
+        </a>
+        <button
+          onClick={() => signOut(auth)}
+          className="w-full text-center text-xs text-white/50 hover:text-white/80"
+        >
+          ¿Esta invitación era para otra cuenta tuya? Cierra sesión e identifícate de nuevo
+        </button>
+      </div>
     );
   }
 
