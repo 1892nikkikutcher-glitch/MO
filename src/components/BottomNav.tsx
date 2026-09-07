@@ -341,7 +341,7 @@ export default function BottomNav({ active, onNavigate }: { active: string; onNa
       )}
 
       <nav
-        className="fixed inset-x-0 bottom-0 z-50 border-t border-edge/10 bg-app/95 backdrop-blur-sm print:hidden"
+        className="fixed inset-x-0 bottom-0 z-40 border-t border-edge/10 bg-app/95 backdrop-blur-sm print:hidden"
         aria-label="Navegación principal"
       >
         <div
