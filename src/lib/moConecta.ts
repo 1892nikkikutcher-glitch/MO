@@ -159,6 +159,7 @@ export const interconsultaEstados = [
   "completed",
   "counter_referral_sent",
   "closed",
+  "transferida",
   "cancelled",
 ] as const;
 
@@ -175,8 +176,20 @@ export const interconsultaEstadoLabel: Record<InterconsultaEstado, string> = {
   completed: "Tratamiento terminado",
   counter_referral_sent: "Contrarreferencia enviada",
   closed: "Cerrada",
+  transferida: "Transferida",
   cancelled: "Cancelada",
 };
+
+/** "aislado_con_retorno": el remitente conserva la responsabilidad
+ * principal, el receptor entra como colaborador y responsable de un
+ * episodio puntual, y el caso sigue la cola normal hasta "closed" vía
+ * contrarreferencia. "transferencia_continuidad": el receptor, al aceptar,
+ * se vuelve el nuevo responsable principal — el caso termina en
+ * "transferida", nunca en la cola de aislado_con_retorno (ver
+ * `puedeTransicionar`). Por ahora es solo el parámetro que distingue las
+ * dos colas; el campo real en `Interconsulta` y su selector en la UI se
+ * agregan cuando se conecta el resto del flujo (episodios/transferencia). */
+export type TipoInterconsulta = "aislado_con_retorno" | "transferencia_continuidad";
 
 /** Orden de avance normal del caso — de aquí sale qué es "adelante" y qué es
  * "un salto" (que exige justificación). rejected/cancelled/closed son
@@ -193,7 +206,19 @@ const ORDEN_AVANCE: InterconsultaEstado[] = [
   "closed",
 ];
 
-const ESTADOS_TERMINALES: InterconsultaEstado[] = ["closed", "cancelled", "rejected"];
+const ESTADOS_TERMINALES: InterconsultaEstado[] = ["closed", "transferida", "cancelled", "rejected"];
+
+/** Exclusiva de "aislado_con_retorno" — una "transferencia_continuidad"
+ * nunca pasa por aquí, termina en "transferida" directo desde "accepted"
+ * (ver `puedeTransicionar`). */
+const COLA_SOLO_AISLADO_CON_RETORNO: InterconsultaEstado[] = [
+  "patient_contacted",
+  "scheduled",
+  "in_treatment",
+  "completed",
+  "counter_referral_sent",
+  "closed",
+];
 
 /** true si `actual` → `siguiente` es una transición coherente con el flujo
  * de una interconsulta. Un salto hacia adelante de más de un paso (ej. de
@@ -205,14 +230,31 @@ const ESTADOS_TERMINALES: InterconsultaEstado[] = ["closed", "cancelled", "rejec
  * antes de aceptar (sent/received) el remitente cancela sin motivo; después
  * de aceptar, `tieneJustificacion` (la nota/motivo) es obligatoria; una vez
  * "completed" ya no se puede cancelar en absoluto — de ahí en adelante solo
- * procede contrarreferencia o cierre, nunca cancelación. */
+ * procede contrarreferencia o cierre, nunca cancelación.
+ *
+ * `tipoInterconsulta` separa las dos colas posibles después de "accepted":
+ * "aislado_con_retorno" sigue la cola de siempre hasta "closed" vía
+ * contrarreferencia; "transferencia_continuidad" solo puede llegar a
+ * "transferida" — nunca a patient_contacted/scheduled/in_treatment/
+ * completed/counter_referral_sent/closed, esa cola es exclusiva de un
+ * aislado con retorno. Por compatibilidad con las llamadas existentes
+ * (que todavía no distinguen tipo de interconsulta), el default preserva
+ * el único comportamiento real de hoy. */
 export function puedeTransicionar(
   actual: InterconsultaEstado,
   siguiente: InterconsultaEstado,
-  tieneJustificacion: boolean
+  tieneJustificacion: boolean,
+  tipoInterconsulta: TipoInterconsulta = "aislado_con_retorno"
 ): boolean {
   if (actual === siguiente) return false;
   if (ESTADOS_TERMINALES.includes(actual)) return false;
+
+  if (siguiente === "transferida") {
+    return tipoInterconsulta === "transferencia_continuidad" && actual === "accepted";
+  }
+  if (tipoInterconsulta === "transferencia_continuidad" && COLA_SOLO_AISLADO_CON_RETORNO.includes(siguiente)) {
+    return false;
+  }
 
   if (siguiente === "cancelled") {
     const idxActual = ORDEN_AVANCE.indexOf(actual);

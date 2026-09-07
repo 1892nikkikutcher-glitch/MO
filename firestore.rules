@@ -82,6 +82,14 @@ service cloud.firestore {
     // Identidad general del paciente (uid propio == patientId). Solo lo lee/escribe
     // el propio paciente en este incremento; el acceso del staff de clínica se
     // habilitará cuando se construyan los expedientes por clínica (incremento 2).
+    //
+    // RESERVADO, NO USAR para continuidad clínica entre clínicas — "incremento 2"
+    // nunca se construyó (cero código de la app lo referencia). Superado por
+    // pacientesGlobales/expedientesClinicos/relacionesClinica más abajo, que no
+    // exigen que el paciente tenga su propia cuenta (confirmado con el usuario:
+    // este bloque queda abandonado a propósito). Si algún día se retoma un
+    // portal de auto-acceso de pacientes, requerirá reconciliarse con
+    // pacientesGlobales (ver plan de arquitectura MO Conecta, §0.1).
     match /patients/{patientId} {
       allow read, write: if signedIn() && request.auth.uid == patientId;
     }
@@ -394,6 +402,84 @@ service cloud.firestore {
     match /configuracionConecta/{id} {
       allow read: if signedIn(); // transparencia — cualquiera puede ver la política vigente
       allow write: if false;     // solo /api/admin/conecta/*
+    }
+
+    // ============================================================
+    // EXPEDIENTE CLÍNICO COMPARTIDO — capa cross-clínica (nuevo, aditivo,
+    // Fase 0 del plan de arquitectura MO Conecta). Mismo principio que el
+    // bloque MO Conecta de arriba: ninguna colección de aquí abajo admite
+    // escritura desde el cliente — todo pasa por /api/expediente/* con
+    // Firebase Admin SDK. El cliente solo lee lo que ya le corresponde por
+    // participación activa (ver participaciones.ts para el convenio de id).
+    // Fase 0: estas colecciones todavía no tienen documentos — desplegar
+    // esto es, en la práctica, un no-op de seguridad (el catch-all de
+    // abajo ya cerraba el acceso).
+    // ============================================================
+
+    function participacionGeneralDoc(expedienteId) {
+      return get(/databases/$(database)/documents/participaciones/$(expedienteId + '_' + request.auth.uid + '_general'));
+    }
+    function tieneParticipacionActiva(expedienteId) {
+      return signedIn()
+        && exists(/databases/$(database)/documents/participaciones/$(expedienteId + '_' + request.auth.uid + '_general'))
+        && participacionGeneralDoc(expedienteId).data.estado == 'activa';
+    }
+    function participacionEpisodioDoc(expedienteId, episodioId) {
+      return get(/databases/$(database)/documents/participaciones/$(expedienteId + '_' + request.auth.uid + '_' + episodioId));
+    }
+    function tieneParticipacionEnEpisodioActiva(expedienteId, episodioId) {
+      return signedIn()
+        && exists(/databases/$(database)/documents/participaciones/$(expedienteId + '_' + request.auth.uid + '_' + episodioId))
+        && participacionEpisodioDoc(expedienteId, episodioId).data.estado == 'activa';
+    }
+
+    match /pacientesGlobales/{id} {
+      allow read: if tieneParticipacionActiva(id);
+      allow write: if false; // solo /api/expediente/*
+    }
+    match /expedientesClinicos/{id} {
+      allow read: if tieneParticipacionActiva(id);
+      allow write: if false;
+    }
+    // Mismo bloque, sin cambios, repetido para cada subcolección clínica
+    // mirroreada del expediente canónico: historiaClinica/{docId},
+    // notasEvolucion/{notaId}, diagnosticos/{id}, planTratamiento/{id},
+    // recetas/{id}, laboratorios/{id}, comparativas/{id}, fotos/{docId}.
+    match /expedientesClinicos/{id}/notasEvolucion/{notaId} {
+      allow read: if tieneParticipacionActiva(id);
+      allow write: if false;
+    }
+    match /expedientesClinicos/{id}/episodios/{episodioId} {
+      allow read: if tieneParticipacionActiva(id) || tieneParticipacionEnEpisodioActiva(id, episodioId);
+      allow write: if false;
+    }
+    match /expedientesClinicos/{id}/historialResponsabilidad/{registroId} {
+      allow read: if tieneParticipacionActiva(id);
+      allow write: if false; // bitácora — inmutable
+    }
+    match /expedientesClinicos/{id}/eventos/{eventoId} {
+      allow read: if tieneParticipacionActiva(id);
+      allow write: if false; // auditoría — inmutable, mismo criterio que interconsultas/{id}/eventos
+    }
+
+    match /relacionesClinica/{id} {
+      // Id determinístico {expedienteId}_{clinicaId} — exists()/get() en
+      // vez de query, mismo motivo que participaciones abajo.
+      allow read: if isActiveMember(resource.data.clinicaId) || tieneParticipacionActiva(resource.data.expedienteId);
+      allow write: if false;
+    }
+
+    match /participaciones/{id} {
+      // Contra resource.data directo (no un get() propio sobre esta misma
+      // colección) — mismo motivo que interconsultas de arriba: así no se
+      // rompe la consulta de lista ("mis participaciones activas").
+      allow read: if signedIn()
+        && (resource.data.profesionalUid == request.auth.uid || isActiveMember(resource.data.clinicaId));
+      allow write: if false;
+    }
+
+    match /migracionesExpediente/{id} {
+      allow read, write: if false; // solo /api/admin/* — mismo criterio que sugerenciasPlataforma
     }
 
     match /{document=**} {

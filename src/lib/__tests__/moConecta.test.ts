@@ -12,6 +12,7 @@ import {
   filtrarCamposPerfilPublico,
   FEATURE_FLAGS,
   type Interconsulta,
+  type InterconsultaEstado,
 } from "../moConecta";
 
 describe("puedeTransicionar", () => {
@@ -75,12 +76,42 @@ describe("puedeTransicionar", () => {
     expect(puedeTransicionar("rejected", "accepted", true)).toBe(false);
   });
 
-  it("interconsultaEstados incluye exactamente los 11 códigos internos pedidos", () => {
+  it("interconsultaEstados incluye exactamente los 12 códigos internos pedidos", () => {
     expect(interconsultaEstados).toEqual([
       "sent", "received", "accepted", "rejected", "patient_contacted",
       "scheduled", "in_treatment", "completed", "counter_referral_sent",
-      "closed", "cancelled",
+      "closed", "transferida", "cancelled",
     ]);
+  });
+
+  it("por defecto (sin tipoInterconsulta) se comporta igual que aislado_con_retorno — ninguna llamada existente cambia", () => {
+    expect(puedeTransicionar("accepted", "patient_contacted", false)).toBe(true);
+    expect(puedeTransicionar("counter_referral_sent", "closed", false)).toBe(true);
+    expect(puedeTransicionar("accepted", "transferida", false)).toBe(false);
+  });
+
+  it("transferencia_continuidad: accepted → transferida es la única salida real", () => {
+    expect(puedeTransicionar("accepted", "transferida", false, "transferencia_continuidad")).toBe(true);
+  });
+
+  it("transferida solo es alcanzable desde accepted, y solo para transferencia_continuidad", () => {
+    expect(puedeTransicionar("sent", "transferida", false, "transferencia_continuidad")).toBe(false);
+    expect(puedeTransicionar("received", "transferida", false, "transferencia_continuidad")).toBe(false);
+    expect(puedeTransicionar("accepted", "transferida", false, "aislado_con_retorno")).toBe(false);
+  });
+
+  it("transferencia_continuidad nunca llega a la cola exclusiva de aislado_con_retorno", () => {
+    const colaAislado: InterconsultaEstado[] = [
+      "patient_contacted", "scheduled", "in_treatment", "completed", "counter_referral_sent", "closed",
+    ];
+    for (const siguiente of colaAislado) {
+      expect(puedeTransicionar("accepted", siguiente, true, "transferencia_continuidad")).toBe(false);
+    }
+  });
+
+  it("transferida es terminal — ninguna transición más, ni con justificación", () => {
+    expect(puedeTransicionar("transferida", "closed", true, "aislado_con_retorno")).toBe(false);
+    expect(puedeTransicionar("transferida", "cancelled", true, "transferencia_continuidad")).toBe(false);
   });
 });
 

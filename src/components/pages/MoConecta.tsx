@@ -85,6 +85,7 @@ const estadoColor: Record<InterconsultaEstado, string> = {
   completed: "bg-success/10 text-success",
   counter_referral_sent: "bg-success/10 text-success",
   closed: "bg-success/15 text-success",
+  transferida: "bg-success/15 text-success",
   cancelled: "bg-danger/10 text-danger",
 };
 
