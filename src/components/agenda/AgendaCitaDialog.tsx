@@ -489,6 +489,21 @@ export default function AgendaCitaDialog({
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4">
+      {/* En celular el panel es tan alto que hay que hacer scroll para
+          llegar a "Cancelar" — el ✕ del encabezado (junto a expediente/
+          notas/WhatsApp/pago) se va con ese scroll porque vive dentro del
+          mismo contenedor con overflow-y-auto. Este botón flotante, fuera
+          de ese contenedor, se queda fijo en su lugar sin importar el
+          scroll. En sm: y más ancho no hace falta — ahí el encabezado
+          siempre cabe sin scroll (una sola fila, formulario más compacto). */}
+      <button
+        type="button"
+        onClick={onClose}
+        title="Cerrar"
+        className="absolute left-6 top-6 z-10 flex h-9 w-9 items-center justify-center rounded-full bg-modal-solid text-ink/60 shadow-card hover:bg-surface hover:text-ink sm:hidden"
+      >
+        ✕
+      </button>
       <div
         className="max-h-[90vh] w-full max-w-5xl overflow-y-auto overscroll-contain rounded-2xl border-2 bg-modal-solid p-4 sm:p-6"
         style={{
