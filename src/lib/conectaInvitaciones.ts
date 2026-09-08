@@ -158,6 +158,31 @@ export async function reclamarInvitacion(
       return { tipo: "acceso_otorgado" as const, interconsultaId: invitacion.interconsultaId };
     }
 
+    // A diferencia del acceso otorgado (arriba), un correo que NO coincide
+    // nunca marca la invitación como "reclamada" ni cuenta como uso — no se
+    // otorgó ningún acceso real, así que quemar el único uso permitido
+    // dejaría sin forma de reintentar a alguien que simplemente se
+    // equivocó de cuenta (ver "identifícate de nuevo" en la página de
+    // invitación). La invitación sigue "activa" y reintentable hasta que
+    // alguien la reclame de verdad o venza por fecha.
+    // Un solo campo en el where (sin índice compuesto que aprovisionar) —
+    // en la práctica son 0 o 1 documentos por uid, así que filtrar
+    // "pendiente" en memoria es tan barato como un segundo where y no
+    // depende de crear un índice nuevo en Firestore.
+    const solicitudesDeEsteUid = await tx.get(
+      interconsultaRef.collection("solicitudesAcceso").where("solicitanteUid", "==", uid)
+    );
+    const solicitudPendienteExistente = solicitudesDeEsteUid.docs
+      .map((d) => d.data() as SolicitudAcceso)
+      .find((s) => s.estado === "pendiente");
+    if (solicitudPendienteExistente) {
+      return {
+        tipo: "solicitud_creada" as const,
+        interconsultaId: invitacion.interconsultaId,
+        solicitudId: solicitudPendienteExistente.id,
+      };
+    }
+
     const solicitudRef = interconsultaRef.collection("solicitudesAcceso").doc();
     const solicitud: SolicitudAcceso = {
       id: solicitudRef.id,
@@ -168,7 +193,6 @@ export async function reclamarInvitacion(
       venceEl: fechaVencimientoSolicitudAcceso(),
     };
     tx.set(solicitudRef, solicitud);
-    tx.set(invitacionRef, { estado: "reclamada", usosActuales: FieldValue.increment(1) }, { merge: true });
     return { tipo: "solicitud_creada" as const, interconsultaId: invitacion.interconsultaId, solicitudId: solicitudRef.id };
   });
 
