@@ -1,12 +1,14 @@
 "use client";
 
-/** Navegación principal de MO — antes una barra lateral izquierda (colapsable
- * en escritorio, cajón deslizante en móvil), ahora una sola tira horizontal
- * fija al fondo de la pantalla en cualquier tamaño (celular, tablet,
- * computadora): mismo lugar, mismo gesto, sin importar el dispositivo. Los
- * módulos con submenú (Proveedores, Reportes, Administración) abren un
- * panel con sus opciones — como hoja que sube desde abajo en pantallas
- * angostas, como panel flotante centrado en pantallas anchas (`lg:`). */
+/** Navegación principal de MO — antes una tira horizontal fija al fondo,
+ * ahora una cápsula angosta flotando en el borde derecho (separada de los
+ * tres bordes, no de borde a borde ni de alto completo — por eso no es una
+ * barra lateral) en cualquier tamaño de pantalla. Se recorre arrastrando
+ * VERTICAL, con el dedo o con mouse: el arrastre horizontal pegado al
+ * borde inferior competía con el gesto del celular para cambiar de app.
+ * Los módulos con submenú (Proveedores, Reportes, Administración) abren un
+ * panel — como hoja que sube desde abajo en pantallas angostas, como panel
+ * junto a la cápsula en pantallas anchas (`lg:`). */
 
 import { useEffect, useRef, useState } from "react";
 
@@ -292,7 +294,7 @@ type NavItem = (typeof navItems)[number];
 export default function BottomNav({ active, onNavigate }: { active: string; onNavigate: (id: string) => void }) {
   const [abierto, setAbierto] = useState<NavItem | null>(null);
   const carouselRef = useRef<HTMLDivElement>(null);
-  const arrastreRef = useRef({ activo: false, inicioX: 0, scrollInicio: 0, seMovio: false });
+  const arrastreRef = useRef({ activo: false, inicioY: 0, scrollInicio: 0, seMovio: false });
 
   function seleccionar(item: NavItem) {
     const hasChildren = "children" in item && !!item.children?.length;
@@ -303,16 +305,16 @@ export default function BottomNav({ active, onNavigate }: { active: string; onNa
     }
   }
 
-  // Arrastrar con mouse para desplazar el carrusel — el dedo ya lo hace
-  // nativo en celular/tablet; esto es para poder usarlo con mouse en
-  // computadora sin depender de que el navegador traduzca la rueda vertical.
+  // Arrastrar VERTICAL con mouse para desplazar la cápsula — el dedo ya lo
+  // hace nativo en celular/tablet; esto es para poder usarla con mouse en
+  // computadora.
   useEffect(() => {
     function onMouseMove(e: MouseEvent) {
       const st = arrastreRef.current;
       if (!st.activo || !carouselRef.current) return;
-      const dx = e.pageX - st.inicioX;
-      if (Math.abs(dx) > 4) st.seMovio = true;
-      carouselRef.current.scrollLeft = st.scrollInicio - dx;
+      const dy = e.pageY - st.inicioY;
+      if (Math.abs(dy) > 4) st.seMovio = true;
+      carouselRef.current.scrollTop = st.scrollInicio - dy;
     }
     function onMouseUp() {
       arrastreRef.current.activo = false;
@@ -341,16 +343,17 @@ export default function BottomNav({ active, onNavigate }: { active: string; onNa
       )}
 
       <nav
-        className="fixed inset-x-0 bottom-0 z-40 border-t border-edge/10 bg-app/95 backdrop-blur-sm print:hidden"
         aria-label="Navegación principal"
+        className="fixed right-2.5 top-1/2 z-40 flex max-h-[62vh] w-[60px] -translate-y-1/2 flex-col rounded-[20px] border border-edge/10 bg-modal-solid/95 p-1.5 shadow-[0_12px_30px_-10px_rgba(0,0,0,0.6)] backdrop-blur-[10px] print:hidden lg:w-[84px] lg:p-2"
       >
+        <div className="pointer-events-none absolute inset-x-0 top-0 z-10 h-4 rounded-t-[20px] bg-gradient-to-b from-modal-solid/95 to-transparent" />
         <div
           ref={carouselRef}
           onMouseDown={(e) => {
             arrastreRef.current = {
               activo: true,
-              inicioX: e.pageX,
-              scrollInicio: carouselRef.current?.scrollLeft ?? 0,
+              inicioY: e.pageY,
+              scrollInicio: carouselRef.current?.scrollTop ?? 0,
               seMovio: false,
             };
           }}
@@ -360,13 +363,7 @@ export default function BottomNav({ active, onNavigate }: { active: string; onNa
               e.preventDefault();
             }
           }}
-          onWheel={(e) => {
-            if (!carouselRef.current) return;
-            if (Math.abs(e.deltaY) > Math.abs(e.deltaX)) {
-              carouselRef.current.scrollLeft += e.deltaY;
-            }
-          }}
-          className="flex cursor-grab gap-1 overflow-x-auto px-2 py-2 [-ms-overflow-style:none] [scrollbar-width:none] active:cursor-grabbing lg:gap-1.5 [&::-webkit-scrollbar]:hidden"
+          className="flex min-h-0 flex-1 cursor-grab flex-col gap-0.5 overflow-y-auto overscroll-contain [-ms-overflow-style:none] [scroll-snap-type:y_proximity] [scrollbar-width:none] active:cursor-grabbing lg:gap-1 [&::-webkit-scrollbar]:hidden"
         >
           {navItems.map((item) => {
             const hasChildren = "children" in item && !!item.children?.length;
@@ -376,25 +373,26 @@ export default function BottomNav({ active, onNavigate }: { active: string; onNa
               <button
                 key={item.id}
                 onClick={() => seleccionar(item)}
-                className={`flex w-16 shrink-0 select-none flex-col items-center gap-1 rounded-xl px-1 py-1.5 text-center transition-colors lg:w-[76px] lg:py-2 ${
+                className={`flex w-full shrink-0 select-none scroll-my-1 flex-col items-center gap-[3px] rounded-xl px-0.5 py-2 text-center transition-colors [scroll-snap-align:start] lg:py-2.5 ${
                   isActive ? "bg-accent/10 text-accent" : "text-ink/50 hover:bg-surface hover:text-ink"
                 }`}
               >
-                <svg width="21" height="21" viewBox="0 0 24 24" fill="none" className="shrink-0 lg:h-[23px] lg:w-[23px]">
+                <svg width="19" height="19" viewBox="0 0 24 24" fill="none" className="shrink-0 lg:h-[22px] lg:w-[22px]">
                   {item.icon}
                 </svg>
-                <span className="line-clamp-2 max-w-[58px] text-[9.5px] font-semibold leading-tight lg:max-w-[72px] lg:text-[10.5px]">
+                <span className="line-clamp-2 max-w-[44px] break-words text-[9px] font-semibold leading-tight lg:max-w-[68px] lg:text-[10px]">
                   {item.label}
                 </span>
               </button>
             );
           })}
         </div>
+        <div className="pointer-events-none absolute inset-x-0 bottom-0 z-10 h-4 rounded-b-[20px] bg-gradient-to-t from-modal-solid/95 to-transparent" />
       </nav>
 
       {abierto && (
         <div
-          className="fixed inset-x-0 bottom-0 z-50 flex max-h-[65vh] flex-col rounded-t-2xl border-t border-edge/10 bg-modal-solid p-4 pb-6 lg:inset-x-auto lg:left-1/2 lg:bottom-24 lg:w-[520px] lg:max-w-[90vw] lg:-translate-x-1/2 lg:rounded-2xl lg:border"
+          className="fixed inset-x-0 bottom-0 z-50 flex max-h-[65vh] flex-col rounded-t-2xl border-t border-edge/10 bg-modal-solid p-4 pb-6 lg:inset-x-auto lg:bottom-auto lg:left-auto lg:right-24 lg:top-1/2 lg:max-h-[80vh] lg:w-[420px] lg:max-w-[42vw] lg:-translate-y-1/2 lg:rounded-2xl lg:border"
         >
           <div className="mx-auto mb-3 h-1 w-10 shrink-0 rounded-full bg-edge/20 lg:hidden" />
           <div className="mb-3 flex shrink-0 items-center gap-2 text-sm font-semibold text-ink">

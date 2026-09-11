@@ -608,7 +608,7 @@ function DashboardBody({
           </button>
         </header>
 
-        <div className="px-3 py-6 pb-28 sm:px-6 sm:py-8 sm:pb-28">
+        <div className="px-3 py-6 pr-20 sm:px-6 sm:py-8 lg:pr-28">
           <h1 className="mb-6 text-2xl font-semibold print:hidden">
             {activePage === "inicio" ? "Dashboard Principal" : activeLabel}
           </h1>

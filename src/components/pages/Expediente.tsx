@@ -71,11 +71,11 @@ const estadoPresupuestoColor: Record<EstadoPresupuesto, string> = {
 
 const expedienteTabs = [
   "Datos del Paciente",
+  "Consentimientos Informados",
   "Historia Clínica",
   "Presupuestos",
   "Pagos",
   "Membresía",
-  "Consentimientos Informados",
   "Fotografías",
   "Laboratorios",
   "Listado de Citas",
