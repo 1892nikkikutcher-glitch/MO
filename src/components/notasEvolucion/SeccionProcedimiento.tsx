@@ -1,13 +1,61 @@
 "use client";
 
+import { usePatientData } from "@/context/PatientDataContext";
 import { Chip, botonSecundario, inputClass, labelClass } from "./NotaUI";
+import DetalleEndodonciaForm from "./DetalleEndodonciaForm";
+import DetalleExtraccionForm from "./DetalleExtraccionForm";
+import DetalleRestauracionForm from "./DetalleRestauracionForm";
+import DetalleLimpiezaForm from "./DetalleLimpiezaForm";
+import DetalleControlOrtodonciaForm from "./DetalleControlOrtodonciaForm";
+import DetalleOdontopediatriaForm from "./DetalleOdontopediatriaForm";
+import DetalleGenericoPlantillaForm from "./DetalleGenericoPlantillaForm";
 import type { NotaEvolucionV2 } from "@/lib/notasEvolucion";
-import type { DetalleGenerico, DetalleProcedimiento } from "@/lib/procedimientoNotaPlantillas";
+import {
+  tiposProcedimientoNota,
+  tipoProcedimientoNotaLabel,
+  tipoProcedimientoNotaSugerido,
+  type DetalleProcedimiento,
+  type TipoProcedimientoNota,
+} from "@/lib/procedimientoNotaPlantillas";
 
-/** Sección 4 — "¿Qué hiciste hoy?", en modo genérico (Fase 1): captura los
- * campos comunes a cualquier procedimiento. Las plantillas específicas por
- * tipo (endodoncia/extracción/resina/limpieza/ortodoncia) — con su propio
- * revelado progresivo — llegan en la Fase 3, sobre esta misma base. */
+/** Sección 4 — "¿Qué hiciste hoy?" (Fase 3): un picker por tipo de
+ * procedimiento, cada uno con su propia plantilla de revelado progresivo.
+ * Ningún tipo se autoselecciona ni pre-confirma un valor clínico al abrirse
+ * — solo el profesional decide qué tipo es y confirma cada dato (ver
+ * procedimientoNotaPlantillas.ts). Cambiar de tipo una vez elegido exige
+ * "Quitar procedimiento" primero — no hay conversión entre plantillas. */
+function crearDetalleInicial(
+  tipo: TipoProcedimientoNota,
+  nombre: string | undefined,
+  organosPorDefecto: number[]
+): DetalleProcedimiento {
+  const base = {
+    procedimientoNombre: nombre ?? "",
+    actividadRealizada: nombre ?? "",
+    organosDentales: organosPorDefecto,
+  };
+  switch (tipo) {
+    case "endodoncia":
+      return { ...base, tipo };
+    case "extraccion":
+      return { ...base, tipo };
+    case "resina":
+      return { ...base, tipo };
+    case "limpieza":
+      return { ...base, tipo };
+    case "control_ortodoncia":
+      return { ...base, tipo };
+    case "odontopediatria":
+      return { ...base, tipo };
+    case "valoracion":
+    case "protesis":
+    case "cirugia":
+    case "urgencia":
+    case "otro":
+      return { ...base, tipo };
+  }
+}
+
 export default function SeccionProcedimiento({
   detalle,
   justificacionSinProcedimiento,
@@ -23,30 +71,19 @@ export default function SeccionProcedimiento({
   onChange: (updater: (prev: NotaEvolucionV2) => NotaEvolucionV2, opts?: { inmediato?: boolean }) => void;
   onBlurTexto?: () => void;
 }) {
+  const { procedimientos } = usePatientData();
+
   // Iniciar/quitar un procedimiento es una decisión estructural (§7.2.1) —
   // se persiste de inmediato.
-  function iniciar(nombre?: string) {
-    onChange((prev) => ({
-      ...prev,
-      justificacionSinProcedimiento: undefined,
-      detalleProcedimiento: {
-        tipo: "otro",
-        procedimientoNombre: nombre ?? "",
-        actividadRealizada: nombre ?? "",
-        organosDentales: organosPorDefecto,
-      } satisfies DetalleGenerico,
-    }), { inmediato: true });
-  }
-
-  function set<K extends keyof DetalleGenerico>(key: K, value: DetalleGenerico[K]) {
-    if (!detalle) return;
-    onChange((prev) => ({ ...prev, detalleProcedimiento: { ...(detalle as DetalleGenerico), [key]: value } }));
-  }
-
-  function setAnestesico(campo: "nombre" | "concentracion" | "cantidad" | "via", valor: string) {
-    if (!detalle) return;
-    const actual = detalle.anestesico ?? { nombre: "", concentracion: "", cantidad: "", via: "" };
-    set("anestesico", { ...actual, [campo]: valor });
+  function iniciar(tipo: TipoProcedimientoNota, nombre?: string) {
+    onChange(
+      (prev) => ({
+        ...prev,
+        justificacionSinProcedimiento: undefined,
+        detalleProcedimiento: crearDetalleInicial(tipo, nombre, organosPorDefecto),
+      }),
+      { inmediato: true }
+    );
   }
 
   function marcarSinProcedimiento() {
@@ -54,23 +91,37 @@ export default function SeccionProcedimiento({
   }
 
   if (!detalle) {
+    // Sugerencia visual únicamente — nunca se autoconfirma ni bloquea elegir
+    // otro tipo (ver comentario de tipoProcedimientoNotaSugerido).
+    const tipoSugerido = tratamientosSugeridos
+      .map((t) => tipoProcedimientoNotaSugerido(t, procedimientos))
+      .find((t): t is TipoProcedimientoNota => t !== undefined);
+
     return (
-      <div className="space-y-3">
+      <div className="space-y-4">
         {tratamientosSugeridos.length > 0 && (
           <div>
             <label className={labelClass}>Tratamiento agendado — reutilizar (puedes modificarlo después)</label>
             <div className="flex flex-wrap gap-2">
               {tratamientosSugeridos.map((t) => (
-                <Chip key={t} seleccionado={false} onClick={() => iniciar(t)}>
+                <Chip key={t} seleccionado={false} onClick={() => iniciar(tipoProcedimientoNotaSugerido(t, procedimientos) ?? "otro", t)}>
                   {t}
                 </Chip>
               ))}
             </div>
           </div>
         )}
-        <button type="button" onClick={() => iniciar()} className={botonSecundario}>
-          + Registrar procedimiento realizado
-        </button>
+        <div>
+          <label className={labelClass}>O elige el tipo de procedimiento directamente</label>
+          <div className="flex flex-wrap gap-2">
+            {tiposProcedimientoNota.map((tipo) => (
+              <Chip key={tipo} seleccionado={tipo === tipoSugerido} onClick={() => iniciar(tipo)}>
+                {tipoProcedimientoNotaLabel[tipo]}
+                {tipo === tipoSugerido && " · Sugerido"}
+              </Chip>
+            ))}
+          </div>
+        </div>
         <div>
           <label className={labelClass}>O explica por qué no se realizó ningún procedimiento hoy</label>
           <input
@@ -84,53 +135,28 @@ export default function SeccionProcedimiento({
     );
   }
 
-  const generico = detalle as DetalleGenerico;
-
   return (
     <div className="space-y-3">
-      <div>
-        <label className={labelClass}>Procedimiento</label>
-        <input className={inputClass} value={generico.procedimientoNombre} onChange={(e) => set("procedimientoNombre", e.target.value)} />
-      </div>
-      <div>
-        <label className={labelClass}>Qué hiciste hoy (actividad realizada)</label>
-        <input className={inputClass} value={generico.actividadRealizada} onChange={(e) => set("actividadRealizada", e.target.value)} />
-      </div>
-      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-        <div>
-          <label className={labelClass}>Técnica (opcional)</label>
-          <input className={inputClass} value={generico.tecnica ?? ""} onChange={(e) => set("tecnica", e.target.value)} />
-        </div>
-        <div>
-          <label className={labelClass}>Aislamiento (opcional)</label>
-          <input className={inputClass} value={generico.aislamiento ?? ""} onChange={(e) => set("aislamiento", e.target.value)} />
-        </div>
-      </div>
+      {(() => {
+        switch (detalle.tipo) {
+          case "endodoncia":
+            return <DetalleEndodonciaForm detalle={detalle} onChange={onChange} onBlurTexto={onBlurTexto} />;
+          case "extraccion":
+            return <DetalleExtraccionForm detalle={detalle} onChange={onChange} onBlurTexto={onBlurTexto} />;
+          case "resina":
+            return <DetalleRestauracionForm detalle={detalle} onChange={onChange} onBlurTexto={onBlurTexto} />;
+          case "limpieza":
+            return <DetalleLimpiezaForm detalle={detalle} onChange={onChange} onBlurTexto={onBlurTexto} />;
+          case "control_ortodoncia":
+            return <DetalleControlOrtodonciaForm detalle={detalle} onChange={onChange} onBlurTexto={onBlurTexto} />;
+          case "odontopediatria":
+            return <DetalleOdontopediatriaForm detalle={detalle} onChange={onChange} onBlurTexto={onBlurTexto} />;
+          default:
+            return <DetalleGenericoPlantillaForm detalle={detalle} onChange={onChange} onBlurTexto={onBlurTexto} />;
+        }
+      })()}
 
-      <div>
-        <label className={labelClass}>Anestésico (opcional)</label>
-        <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
-          <input className={inputClass} placeholder="Nombre" value={generico.anestesico?.nombre ?? ""} onChange={(e) => setAnestesico("nombre", e.target.value)} />
-          <input className={inputClass} placeholder="Concentración" value={generico.anestesico?.concentracion ?? ""} onChange={(e) => setAnestesico("concentracion", e.target.value)} />
-          <input className={inputClass} placeholder="Cantidad" value={generico.anestesico?.cantidad ?? ""} onChange={(e) => setAnestesico("cantidad", e.target.value)} />
-          <input className={inputClass} placeholder="Vía" value={generico.anestesico?.via ?? ""} onChange={(e) => setAnestesico("via", e.target.value)} />
-        </div>
-      </div>
-
-      <div>
-        <label className={labelClass}>Materiales (opcional)</label>
-        <input className={inputClass} value={generico.materiales ?? ""} onChange={(e) => set("materiales", e.target.value)} />
-      </div>
-      <div>
-        <label className={labelClass}>Observaciones (opcional)</label>
-        <textarea className={inputClass} rows={2} value={generico.observaciones ?? ""} onChange={(e) => set("observaciones", e.target.value)} onBlur={onBlurTexto} />
-      </div>
-      <div>
-        <label className={labelClass}>Incidentes durante el procedimiento (opcional)</label>
-        <input className={inputClass} value={generico.incidentes ?? ""} onChange={(e) => set("incidentes", e.target.value)} />
-      </div>
-
-      <button type="button" onClick={marcarSinProcedimiento} className="text-xs text-ink/40 hover:text-ink">
+      <button type="button" onClick={marcarSinProcedimiento} className={`${botonSecundario} block`}>
         Quitar procedimiento — no se realizó ninguno
       </button>
     </div>

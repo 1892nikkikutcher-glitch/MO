@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, type Dispatch, type SetStateAction } from "react";
+import { useEffect, useRef, useState, type Dispatch, type SetStateAction } from "react";
 import NuevoPresupuesto from "./NuevoPresupuesto";
 import PresupuestoImpreso from "./PresupuestoImpreso";
 import PresupuestoTotalImpreso from "./PresupuestoTotalImpreso";
@@ -1004,6 +1004,29 @@ export default function Expediente({
   onBack: () => void;
 }) {
   const [activeTab, setActiveTab] = useState<ExpedienteTab>(expedienteTabs[0]);
+  // Arrastrar con mouse para desplazar el carrusel de pestañas — el dedo ya
+  // lo hace nativo en celular/tablet; esto es para poder usarlo con mouse
+  // en computadora.
+  const tabsRef = useRef<HTMLDivElement>(null);
+  const arrastreTabsRef = useRef({ activo: false, inicioX: 0, scrollInicio: 0, seMovio: false });
+  useEffect(() => {
+    function onMouseMove(e: MouseEvent) {
+      const st = arrastreTabsRef.current;
+      if (!st.activo || !tabsRef.current) return;
+      const dx = e.pageX - st.inicioX;
+      if (Math.abs(dx) > 4) st.seMovio = true;
+      tabsRef.current.scrollLeft = st.scrollInicio - dx;
+    }
+    function onMouseUp() {
+      arrastreTabsRef.current.activo = false;
+    }
+    window.addEventListener("mousemove", onMouseMove);
+    window.addEventListener("mouseup", onMouseUp);
+    return () => {
+      window.removeEventListener("mousemove", onMouseMove);
+      window.removeEventListener("mouseup", onMouseUp);
+    };
+  }, []);
   // Puente entre Historia Clínica y Presupuestos: al elegir diagnósticos del
   // odontograma y darle "Agregar a presupuesto", esto se llena y se cambia
   // de pestaña — PresupuestosTab lo consume para abrir Nuevo Presupuesto ya
@@ -1292,30 +1315,49 @@ export default function Expediente({
         </div>
       )}
 
-      <div className="flex flex-wrap gap-2 border-b border-edge/10 pb-4 print:hidden">
-        {expedienteTabs
-          .filter((tab) => tab !== "Pagos" || puedeVerFinanzas)
-          .map((tab) => (
-          <button
-            key={tab}
-            onClick={() => cambiarTab(tab)}
-            className={`rounded-lg border px-3 py-2 text-xs font-semibold uppercase tracking-wide transition-colors ${
-              activeTab === tab
-                ? "border-accent/70 bg-accent/15 text-accent"
-                : "border-accent/25 text-ink/40 hover:border-accent/50 hover:bg-surface hover:text-ink/70"
-            }`}
-            style={
-              activeTab === tab
-                ? {
-                    textShadow: "0 0 8px rgba(251,146,60,0.4)",
-                    boxShadow: "0 0 10px -2px rgb(var(--accent-rgb) / 0.55)",
-                  }
-                : { boxShadow: "0 0 6px -2px rgb(var(--accent-rgb) / 0.3)" }
+      <div className="relative border-b border-edge/10 pb-4 print:hidden">
+        <div
+          ref={tabsRef}
+          onMouseDown={(e) => {
+            arrastreTabsRef.current = {
+              activo: true,
+              inicioX: e.pageX,
+              scrollInicio: tabsRef.current?.scrollLeft ?? 0,
+              seMovio: false,
+            };
+          }}
+          onClickCapture={(e) => {
+            if (arrastreTabsRef.current.seMovio) {
+              e.stopPropagation();
+              e.preventDefault();
             }
-          >
-            {tab}
-          </button>
-        ))}
+          }}
+          className="flex cursor-grab gap-2 overflow-x-auto [-ms-overflow-style:none] [scrollbar-width:none] active:cursor-grabbing [&::-webkit-scrollbar]:hidden"
+        >
+          {expedienteTabs
+            .filter((tab) => tab !== "Pagos" || puedeVerFinanzas)
+            .map((tab) => (
+            <button
+              key={tab}
+              onClick={() => cambiarTab(tab)}
+              className={`shrink-0 select-none whitespace-nowrap rounded-lg border px-3 py-2 text-xs font-semibold uppercase tracking-wide transition-colors ${
+                activeTab === tab
+                  ? "border-accent/70 bg-accent/15 text-accent"
+                  : "border-accent/25 text-ink/40 hover:border-accent/50 hover:bg-surface hover:text-ink/70"
+              }`}
+              style={
+                activeTab === tab
+                  ? {
+                      textShadow: "0 0 8px rgba(251,146,60,0.4)",
+                      boxShadow: "0 0 10px -2px rgb(var(--accent-rgb) / 0.55)",
+                    }
+                  : { boxShadow: "0 0 6px -2px rgb(var(--accent-rgb) / 0.3)" }
+              }
+            >
+              {tab}
+            </button>
+          ))}
+        </div>
       </div>
 
       <div

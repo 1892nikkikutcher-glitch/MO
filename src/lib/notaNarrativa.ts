@@ -20,7 +20,7 @@ import type {
   Pronostico,
   QueEncontraste,
 } from "./notasEvolucion";
-import type { DetalleProcedimiento } from "./procedimientoNotaPlantillas";
+import { narrarCamposPlantilla, nivelManejoConductaLabel, type DetalleProcedimiento } from "./procedimientoNotaPlantillas";
 
 function narrarComoLlega(c: ComoLlegaHoy): string {
   const clausulas: string[] = [];
@@ -146,12 +146,14 @@ function narrarProcedimiento(detalle: DetalleProcedimiento): string {
     if (detalle.hemostasia?.trim()) partes.push(`Hemostasia: ${detalle.hemostasia.trim()}.`);
     if (detalle.sutura?.requerida) partes.push(`Sutura${detalle.sutura.material ? ` con ${detalle.sutura.material}` : ""}.`);
   } else if (detalle.tipo === "resina") {
-    if (detalle.superficiesTratadas.length > 0) partes.push(`Superficies tratadas: ${detalle.superficiesTratadas.join(", ")}.`);
+    if (detalle.superficiesTratadas && detalle.superficiesTratadas.length > 0) {
+      partes.push(`Superficies tratadas: ${detalle.superficiesTratadas.join(", ")}.`);
+    }
     if (detalle.materialRestaurador?.trim()) {
       partes.push(`Material restaurador: ${detalle.materialRestaurador.trim()}${detalle.color ? ` color ${detalle.color}` : ""}.`);
     }
   } else if (detalle.tipo === "limpieza") {
-    if (detalle.metodoUsado.length > 0) {
+    if (detalle.metodoUsado && detalle.metodoUsado.length > 0) {
       const etiquetas = detalle.metodoUsado.map((m) => (m === "ultrasonido" ? "ultrasonido" : "instrumentación manual"));
       partes.push(`Método: ${etiquetas.join(" y ")}.`);
     }
@@ -163,6 +165,26 @@ function narrarProcedimiento(detalle: DetalleProcedimiento): string {
       partes.push(`Se realiza ${acciones} de arco${detalle.arco.detalle ? ` (${detalle.arco.detalle})` : ""}.`);
     }
     if (detalle.activaciones?.trim()) partes.push(`Activaciones: ${detalle.activaciones.trim()}.`);
+  } else if (detalle.tipo === "odontopediatria") {
+    if (detalle.manejoConducta) {
+      partes.push(
+        `Manejo de conducta: ${nivelManejoConductaLabel[detalle.manejoConducta].toLowerCase()}${detalle.tecnicaManejoConducta?.trim() ? ` (${detalle.tecnicaManejoConducta.trim()})` : ""}.`
+      );
+    }
+    if (detalle.acompanante?.trim()) partes.push(`Acompañante: ${detalle.acompanante.trim()}.`);
+    if (detalle.indicacionesConsentimiento?.trim()) partes.push(`Consentimiento/indicaciones: ${detalle.indicacionesConsentimiento.trim()}.`);
+    if (detalle.terapiaPulpar?.requerida) {
+      partes.push(`Terapia pulpar${detalle.terapiaPulpar.tipo?.trim() ? `: ${detalle.terapiaPulpar.tipo.trim()}` : ""}.`);
+    }
+    if (detalle.coronaNiquelCromo?.colocada) {
+      partes.push(
+        `Corona de acero (níquel-cromo)${detalle.coronaNiquelCromo.numero?.trim() ? ` OD ${detalle.coronaNiquelCromo.numero.trim()}` : ""}${detalle.coronaNiquelCromo.ajustes?.trim() ? ` — ajustes: ${detalle.coronaNiquelCromo.ajustes.trim()}` : ""}.`
+      );
+    }
+    if (detalle.denticion) partes.push(`Dentición: ${detalle.denticion}.`);
+    if (detalle.piezasEnErupcion?.trim()) partes.push(`Piezas en erupción: ${detalle.piezasEnErupcion.trim()}.`);
+  } else {
+    narrarCamposPlantilla(detalle).forEach((linea) => partes.push(`${linea}.`));
   }
 
   if (detalle.observaciones?.trim()) partes.push(detalle.observaciones.trim());

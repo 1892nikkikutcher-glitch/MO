@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import Odontograma from "./Odontograma";
 import PresupuestoImpreso from "./PresupuestoImpreso";
 import { usePatientData } from "@/context/PatientDataContext";
@@ -48,6 +48,24 @@ function fechaLargaHoy() {
   return texto.charAt(0).toUpperCase() + texto.slice(1);
 }
 
+/** Borrador local (solo en este navegador, nunca en Firestore) para no
+ * perder renglones capturados si se va la luz o la señal antes de dar clic
+ * en "Guardar" — un presupuesto es un documento formal (folio, se manda a
+ * imprimir/WhatsApp), así que a diferencia de Historia Clínica NUNCA se
+ * autoguarda como definitivo mientras se sigue editando. */
+type PresupuestoBorrador = {
+  items: LineItem[];
+  medico: string;
+  tipoDePrecio: string;
+  especialidad: string;
+  vigenciaDias: number;
+  guardadoEn: string;
+};
+
+function presupuestoBorradorKey(patientId: string, folioOEditando: string) {
+  return `mo:presupuesto-borrador:${patientId}:${folioOEditando}`;
+}
+
 export default function NuevoPresupuesto({
   patient,
   initialBudget,
@@ -69,7 +87,8 @@ export default function NuevoPresupuesto({
   onSave: (budget: BudgetData) => void;
 }) {
   const patientName = patient.name;
-  const { recursos, procedimientos, setProcedimientos, perfilDoctor, irAPagina } = usePatientData();
+  const { recursos, procedimientos, setProcedimientos, perfilDoctor, irAPagina, setCambiosSinGuardar } =
+    usePatientData();
   const medicos = recursos.filter((r) => r.tipo === "medico");
   const procedimientosActivos = procedimientos.filter(esProcedimientoActivo);
   const gruposProcedimientos = agruparPorEspecialidad(procedimientosActivos);
@@ -132,6 +151,89 @@ export default function NuevoPresupuesto({
    * originalmente desde el catálogo o no — así se puede corregir cualquier
    * renglón, por ejemplo para agregar el OD que se te olvidó marcar. */
   const [editandoItemId, setEditandoItemId] = useState<string | null>(null);
+
+  const borradorKey = presupuestoBorradorKey(patient.id, initialBudget?.folio ?? "nuevo");
+  const [borradorRecuperable, setBorradorRecuperable] = useState<PresupuestoBorrador | null>(null);
+  const [decisionBorradorTomada, setDecisionBorradorTomada] = useState(false);
+
+  // Al abrir el formulario, si hay un borrador local más reciente que lo que
+  // se cargó (ej. se cerró el navegador sin dar "Guardar"), se ofrece
+  // recuperarlo en vez de aplicarlo solo — un presupuesto es un documento
+  // formal y el doctor debe decidir, nunca se reemplaza en silencio.
+  useEffect(() => {
+    try {
+      const crudo = localStorage.getItem(borradorKey);
+      if (crudo) {
+        const parsed = JSON.parse(crudo) as PresupuestoBorrador;
+        if (parsed.items?.length > 0 && JSON.stringify(parsed.items) !== JSON.stringify(items)) {
+          setBorradorRecuperable(parsed);
+          return;
+        }
+      }
+    } catch {
+      // Borrador corrupto o localStorage inaccesible — se ignora, no bloquea el formulario.
+    }
+    setDecisionBorradorTomada(true);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  const continuarBorrador = () => {
+    if (!borradorRecuperable) return;
+    setItems(borradorRecuperable.items);
+    setMedico(borradorRecuperable.medico);
+    setTipoDePrecio(borradorRecuperable.tipoDePrecio);
+    setEspecialidad(borradorRecuperable.especialidad);
+    setVigenciaDias(borradorRecuperable.vigenciaDias);
+    setBorradorRecuperable(null);
+    setDecisionBorradorTomada(true);
+  };
+
+  const descartarBorrador = () => {
+    try {
+      localStorage.removeItem(borradorKey);
+    } catch {
+      // no crítico
+    }
+    setBorradorRecuperable(null);
+    setDecisionBorradorTomada(true);
+  };
+
+  // Guarda el borrador local a cada cambio — nunca a Firestore, para no
+  // crear de golpe un presupuesto "oficial" a medio capturar.
+  useEffect(() => {
+    if (!decisionBorradorTomada) return;
+    try {
+      if (items.length === 0) {
+        localStorage.removeItem(borradorKey);
+      } else {
+        const borrador: PresupuestoBorrador = {
+          items,
+          medico,
+          tipoDePrecio,
+          especialidad,
+          vigenciaDias,
+          guardadoEn: new Date().toISOString(),
+        };
+        localStorage.setItem(borradorKey, JSON.stringify(borrador));
+      }
+    } catch {
+      // Almacenamiento local lleno o inaccesible — no crítico, "Guardar" sigue guardando el presupuesto real.
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [decisionBorradorTomada, items, medico, tipoDePrecio, especialidad, vigenciaDias]);
+
+  // Avisa antes de salir (cambiar de pestaña dentro del expediente, o
+  // volver al listado) si hay renglones capturados que no se han guardado
+  // con el botón "Guardar" — mismo mecanismo que Historia Clínica.
+  const hayCambiosSinGuardar =
+    decisionBorradorTomada &&
+    items.length > 0 &&
+    (!initialBudget || JSON.stringify(items) !== JSON.stringify(initialBudget.items));
+  useEffect(() => {
+    setCambiosSinGuardar(hayCambiosSinGuardar ? "Presupuesto tiene cambios sin guardar." : null);
+    return () => setCambiosSinGuardar(null);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [hayCambiosSinGuardar]);
 
   const toggleTooth = (tooth: number) => {
     setSelectedTeeth((prev) =>
@@ -275,6 +377,11 @@ export default function NuevoPresupuesto({
 
   const handleGuardar = () => {
     if (items.length === 0 || hayRenglonesSinPrecio) return;
+    try {
+      localStorage.removeItem(borradorKey);
+    } catch {
+      // no crítico
+    }
     onSave({
       folio,
       fecha,
@@ -352,6 +459,28 @@ export default function NuevoPresupuesto({
         </h2>
         <p className="mt-1 text-sm text-ink/50">Paciente: {patientName}</p>
       </div>
+
+      {borradorRecuperable && (
+        <div className="flex flex-wrap items-center gap-3 rounded-2xl border border-accent/40 bg-accent/10 p-4 text-sm text-ink print:hidden">
+          <span className="flex-1">
+            Encontramos un presupuesto sin guardar de este paciente ({borradorRecuperable.items.length}{" "}
+            {borradorRecuperable.items.length === 1 ? "renglón" : "renglones"}, guardado localmente el{" "}
+            {new Date(borradorRecuperable.guardadoEn).toLocaleString("es-MX")}). ¿Continuar donde te quedaste?
+          </span>
+          <button
+            onClick={continuarBorrador}
+            className="shrink-0 rounded-lg border border-accent/60 bg-accent/15 px-3 py-2 text-xs font-semibold text-accent hover:bg-accent/25"
+          >
+            Continuar borrador
+          </button>
+          <button
+            onClick={descartarBorrador}
+            className="shrink-0 rounded-lg border border-edge/15 px-3 py-2 text-xs font-semibold text-ink/60 hover:bg-surface2"
+          >
+            Descartar
+          </button>
+        </div>
+      )}
 
       <div className="space-y-6 print:hidden">
         <div className="space-y-5 rounded-2xl border border-edge/10 bg-surface p-6">

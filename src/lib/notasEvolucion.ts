@@ -10,7 +10,7 @@
 
 import type { Procedimiento } from "./procedimientos";
 import type { NotaEvolucion } from "./patientData";
-import type { DetalleProcedimiento } from "./procedimientoNotaPlantillas";
+import { plantillaCamposPorTipo, type DetalleProcedimiento } from "./procedimientoNotaPlantillas";
 
 export const FORMATO_NOTA_VERSION_ACTUAL = 2 as const;
 export type EstadoNotaEvolucion = "borrador" | "lista_revision" | "firmada" | "con_aclaracion";
@@ -340,6 +340,33 @@ export type SeccionNota =
   | "estado_final"
   | "indicaciones";
 
+/** El único campo "distintivo" de cada tipo de plantilla que sí es
+ * obligatorio antes de firmar — nunca se autoselecciona al abrir la
+ * plantilla (ver procedimientoNotaPlantillas.ts), así que aquí es donde se
+ * exige confirmarlo. Revelado progresivo: el resto de los campos de cada
+ * plantilla queda opcional a propósito, esto no los vuelve obligatorios. */
+function detalleProcedimientoFaltante(detalle: DetalleProcedimiento | undefined): string | null {
+  if (!detalle) return null;
+  switch (detalle.tipo) {
+    case "endodoncia":
+      return detalle.etapaRealizada ? null : "Confirma la etapa de endodoncia realizada";
+    case "extraccion":
+      return detalle.tipoExtraccion ? null : "Confirma si la extracción fue simple o quirúrgica";
+    case "odontopediatria":
+      return detalle.manejoConducta ? null : "Confirma el manejo de conducta (básico o avanzado)";
+    case "resina":
+    case "limpieza":
+    case "control_ortodoncia":
+      return null;
+    default: {
+      const campos = plantillaCamposPorTipo[detalle.tipo];
+      if (!campos) return null;
+      const faltan = campos.filter((c) => c.requerido && !detalle.camposAdicionales?.[c.key]?.trim());
+      return faltan.length > 0 ? `Completa: ${faltan.map((c) => c.label).join(", ")}` : null;
+    }
+  }
+}
+
 /** Detector de faltantes en lenguaje natural — misma validación que
  * `validarNotaParaFirmar`, pero en mensajes específicos y accionables
  * (nunca "existen campos obligatorios faltantes"), cada uno con la sección
@@ -370,6 +397,8 @@ export function obtenerFaltantesNota(nota: NotaEvolucionV2): FaltanteNota[] {
   if (sinProcedimiento && !nota.justificacionSinProcedimiento?.trim()) {
     faltantes.push({ seccion: "procedimiento", mensaje: "Registra qué hiciste hoy, o explica por qué no se realizó procedimiento" });
   }
+  const faltanteTipoProcedimiento = detalleProcedimientoFaltante(nota.detalleProcedimiento);
+  if (faltanteTipoProcedimiento) faltantes.push({ seccion: "procedimiento", mensaje: faltanteTipoProcedimiento });
 
   const chipsFinal = nota.estadoFinal?.chips ?? [];
   if (chipsFinal.length === 0) {
@@ -436,6 +465,7 @@ export function estadoSeccion(nota: Partial<NotaEvolucionV2>, seccion: SeccionNo
     case "procedimiento": {
       if (!nota.detalleProcedimiento && !nota.justificacionSinProcedimiento?.trim()) return "pendiente";
       if (nota.detalleProcedimiento && !nota.detalleProcedimiento.actividadRealizada?.trim()) return "atencion";
+      if (detalleProcedimientoFaltante(nota.detalleProcedimiento)) return "atencion";
       return "completa";
     }
     case "estado_final": {

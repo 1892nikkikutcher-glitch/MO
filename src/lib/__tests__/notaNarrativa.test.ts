@@ -120,6 +120,27 @@ describe("generarNarrativa", () => {
         },
         /retiro y colocación de arco/i,
       ],
+      [
+        {
+          tipo: "odontopediatria",
+          procedimientoNombre: "Consulta",
+          actividadRealizada: "Odontopediatría — manejo de conducta básico",
+          organosDentales: [],
+          manejoConducta: "basico",
+          tecnicaManejoConducta: "decir-mostrar-hacer",
+        },
+        /manejo de conducta: básico \(decir-mostrar-hacer\)/i,
+      ],
+      [
+        {
+          tipo: "cirugia",
+          procedimientoNombre: "Cirugía",
+          actividadRealizada: "Cirugía de terceros molares",
+          organosDentales: [],
+          camposAdicionales: { tipoCirugia: "Extracción de terceros molares" },
+        },
+        /tipo de cirugía: extracción de terceros molares/i,
+      ],
     ];
     for (const [detalle, patron] of casos) {
       const nota: NotaEvolucionV2 = { ...notaBase(), detalleProcedimiento: detalle };

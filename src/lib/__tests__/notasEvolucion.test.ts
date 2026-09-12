@@ -214,6 +214,95 @@ describe("obtenerFaltantesNota / validarNotaParaFirmar", () => {
     const nota: NotaEvolucionV2 = { ...notaCompleta(), indicaciones: { medicamentos: [], pronostico: "favorable" } };
     expect(obtenerFaltantesNota(nota).some((f) => f.seccion === "indicaciones")).toBe(true);
   });
+
+  describe("el campo distintivo de cada plantilla (Fase 3) — nunca autoseleccionado, exigido antes de firmar", () => {
+    it("endodoncia sin etapaRealizada confirmada es un faltante", () => {
+      const nota: NotaEvolucionV2 = {
+        ...notaCompleta(),
+        detalleProcedimiento: { tipo: "endodoncia", procedimientoNombre: "Endodoncia", actividadRealizada: "Endodoncia", organosDentales: [] },
+      };
+      expect(obtenerFaltantesNota(nota).some((f) => f.seccion === "procedimiento")).toBe(true);
+      expect(estadoSeccion(nota, "procedimiento")).toBe("atencion");
+    });
+
+    it("endodoncia con etapaRealizada confirmada no es un faltante", () => {
+      const nota: NotaEvolucionV2 = {
+        ...notaCompleta(),
+        detalleProcedimiento: {
+          tipo: "endodoncia",
+          procedimientoNombre: "Endodoncia",
+          actividadRealizada: "Endodoncia",
+          organosDentales: [],
+          etapaRealizada: "obturacion",
+        },
+      };
+      expect(obtenerFaltantesNota(nota).some((f) => f.seccion === "procedimiento")).toBe(false);
+      expect(estadoSeccion(nota, "procedimiento")).toBe("completa");
+    });
+
+    it("extracción sin tipoExtraccion confirmado es un faltante", () => {
+      const nota: NotaEvolucionV2 = {
+        ...notaCompleta(),
+        detalleProcedimiento: { tipo: "extraccion", procedimientoNombre: "Extracción", actividadRealizada: "Extracción", organosDentales: [] },
+      };
+      expect(obtenerFaltantesNota(nota).some((f) => f.seccion === "procedimiento")).toBe(true);
+    });
+
+    it("odontopediatría sin manejoConducta confirmado es un faltante", () => {
+      const nota: NotaEvolucionV2 = {
+        ...notaCompleta(),
+        detalleProcedimiento: { tipo: "odontopediatria", procedimientoNombre: "Consulta", actividadRealizada: "Consulta", organosDentales: [] },
+      };
+      expect(obtenerFaltantesNota(nota).some((f) => f.seccion === "procedimiento")).toBe(true);
+    });
+
+    it("odontopediatría con manejoConducta confirmado no es un faltante", () => {
+      const nota: NotaEvolucionV2 = {
+        ...notaCompleta(),
+        detalleProcedimiento: {
+          tipo: "odontopediatria",
+          procedimientoNombre: "Consulta",
+          actividadRealizada: "Consulta",
+          organosDentales: [],
+          manejoConducta: "basico",
+        },
+      };
+      expect(obtenerFaltantesNota(nota).some((f) => f.seccion === "procedimiento")).toBe(false);
+    });
+
+    it.each(["resina", "limpieza", "control_ortodoncia"] as const)(
+      "%s nunca tiene un campo distintivo obligatorio propio",
+      (tipo) => {
+        const nota: NotaEvolucionV2 = {
+          ...notaCompleta(),
+          detalleProcedimiento: { tipo, procedimientoNombre: "Procedimiento", actividadRealizada: "Procedimiento", organosDentales: [] },
+        };
+        expect(obtenerFaltantesNota(nota).some((f) => f.seccion === "procedimiento")).toBe(false);
+      }
+    );
+
+    it("un tipo genérico (cirugía) con su campo requerido vacío es un faltante", () => {
+      const nota: NotaEvolucionV2 = {
+        ...notaCompleta(),
+        detalleProcedimiento: { tipo: "cirugia", procedimientoNombre: "Cirugía", actividadRealizada: "Cirugía", organosDentales: [] },
+      };
+      expect(obtenerFaltantesNota(nota).some((f) => f.seccion === "procedimiento")).toBe(true);
+    });
+
+    it("un tipo genérico (cirugía) con su campo requerido lleno no es un faltante", () => {
+      const nota: NotaEvolucionV2 = {
+        ...notaCompleta(),
+        detalleProcedimiento: {
+          tipo: "cirugia",
+          procedimientoNombre: "Cirugía",
+          actividadRealizada: "Cirugía",
+          organosDentales: [],
+          camposAdicionales: { tipoCirugia: "Extracción de terceros molares" },
+        },
+      };
+      expect(obtenerFaltantesNota(nota).some((f) => f.seccion === "procedimiento")).toBe(false);
+    });
+  });
 });
 
 describe("estadoSeccion", () => {

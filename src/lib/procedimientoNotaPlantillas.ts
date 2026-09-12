@@ -15,6 +15,7 @@ export const tiposProcedimientoNota = [
   "control_ortodoncia",
   "protesis",
   "cirugia",
+  "odontopediatria",
   "urgencia",
   "otro",
 ] as const;
@@ -29,6 +30,7 @@ export const tipoProcedimientoNotaLabel: Record<TipoProcedimientoNota, string> =
   control_ortodoncia: "Control de ortodoncia",
   protesis: "Prótesis",
   cirugia: "Cirugía",
+  odontopediatria: "Odontopediatría",
   urgencia: "Urgencia",
   otro: "Otro",
 };
@@ -81,7 +83,11 @@ export const etapaEndodonciaLabel: Record<EtapaEndodoncia, string> = {
 
 export type DetalleEndodoncia = DetalleProcedimientoBase & {
   tipo: "endodoncia";
-  etapaRealizada: EtapaEndodoncia;
+  /** Opcional a propósito: abrir esta plantilla NO significa que la etapa ya
+   * ocurrió — es un hecho clínico que el profesional debe confirmar. Nunca
+   * se autoselecciona un valor por defecto (ver validación de firma en
+   * notasEvolucion.ts, que sí exige confirmarla antes de firmar). */
+  etapaRealizada?: EtapaEndodoncia;
   conductosLocalizados?: string;
   longitudesTrabajo?: string;
   tecnicaInstrumentacion?: string;
@@ -95,8 +101,10 @@ export type DetalleEndodoncia = DetalleProcedimientoBase & {
 
 export type DetalleExtraccion = DetalleProcedimientoBase & {
   tipo: "extraccion";
-  indicacion: string;
-  tipoExtraccion: "simple" | "quirurgica";
+  /** Ambos opcionales a propósito — hechos clínicos que el profesional debe
+   * confirmar, nunca un default al abrir la plantilla. */
+  indicacion?: string;
+  tipoExtraccion?: "simple" | "quirurgica";
   tecnicaExtraccion?: string;
   integridadOrganoExtraido?: string;
   revisionAlveolo?: string;
@@ -106,7 +114,9 @@ export type DetalleExtraccion = DetalleProcedimientoBase & {
 
 export type DetalleRestauracion = DetalleProcedimientoBase & {
   tipo: "resina";
-  superficiesTratadas: string[];
+  /** Opcional a propósito — sin confirmar hasta que el profesional las
+   * elija, nunca un arreglo vacío implicando "confirmado, cero superficies". */
+  superficiesTratadas?: string[];
   diagnosticoAsociado?: string;
   aislamientoTipo?: string;
   eliminacionTejidoCariado?: boolean;
@@ -124,7 +134,9 @@ export type DetalleLimpieza = DetalleProcedimientoBase & {
   porcentajePlaca?: string;
   porcentajeCalculo?: string;
   sangrado?: string;
-  metodoUsado: ("ultrasonido" | "manual")[];
+  /** Opcional a propósito — sin confirmar hasta que el profesional lo
+   * elija. */
+  metodoUsado?: ("ultrasonido" | "manual")[];
   pulido?: boolean;
   fluorAplicado?: boolean;
   educacionHigiene?: string;
@@ -141,6 +153,38 @@ export type DetalleControlOrtodoncia = DetalleProcedimientoBase & {
   activaciones?: string;
   cooperacion?: string;
   indicaciones?: string;
+};
+
+export const nivelesManejoConducta = ["basico", "avanzado"] as const;
+export type NivelManejoConducta = (typeof nivelesManejoConducta)[number];
+export const nivelManejoConductaLabel: Record<NivelManejoConducta, string> = {
+  basico: "Básico",
+  avanzado: "Avanzado",
+};
+
+/** "¿Qué hiciste hoy?" en odontopediatría — deliberadamente NO duplica
+ * hallazgos/contexto que ya viven en "¿Qué encontraste?" (dentición,
+ * piezas en erupción se dejan opcionales y de baja prioridad, no son el
+ * centro de esta sección). Se enfoca en lo que sí es "qué hiciste":
+ * manejo de conducta, acompañante/consentimiento, terapia pulpar y corona
+ * si se realizaron. La anestesia usa el bloque común de
+ * DetalleProcedimientoBase.anestesico — no se duplica aquí un campo
+ * pediátrico aparte; una sedación estructurada es un flujo clínico propio
+ * a considerar en otra fase, no un textarea genérico en esta. */
+export type DetalleOdontopediatria = DetalleProcedimientoBase & {
+  tipo: "odontopediatria";
+  /** Clasificación general — nunca se autoselecciona, el profesional debe
+   * confirmarla (ver validación de firma en notasEvolucion.ts). */
+  manejoConducta?: NivelManejoConducta;
+  /** Qué técnica concreta se usó (decir-mostrar-hacer, distracción, control
+   * de voz, etc.) — "básico/avanzado" por sí solo no documenta QUÉ se hizo. */
+  tecnicaManejoConducta?: string;
+  acompanante?: string;
+  indicacionesConsentimiento?: string;
+  terapiaPulpar?: { requerida: boolean; tipo?: string };
+  coronaNiquelCromo?: { colocada: boolean; numero?: string; ajustes?: string };
+  denticion?: "temporal" | "mixta" | "permanente";
+  piezasEnErupcion?: string;
 };
 
 /** Patrón extensible para el resto (prótesis/cirugía/valoración/urgencia/
@@ -189,25 +233,80 @@ export type DetalleProcedimiento =
   | DetalleRestauracion
   | DetalleLimpieza
   | DetalleControlOrtodoncia
+  | DetalleOdontopediatria
   | DetalleGenerico;
 
 /** Autogenera `actividadRealizada` a partir del tipo y sus campos más
  * distintivos — siempre editable después por el profesional. Nunca inventa
- * datos que no estén ya en el detalle. */
+ * datos que no estén ya en el detalle: si el campo distintivo del tipo
+ * (etapa/tipoExtraccion/manejoConducta) todavía no se confirmó, la
+ * sugerencia se queda en el nombre genérico del tipo, nunca asume un valor. */
 export function actividadRealizadaSugerida(detalle: DetalleProcedimiento): string {
   const organos = detalle.organosDentales.length > 0 ? ` OD ${detalle.organosDentales.join(", ")}` : "";
   switch (detalle.tipo) {
     case "endodoncia":
-      return `Endodoncia — ${etapaEndodonciaLabel[detalle.etapaRealizada]}${organos}`;
+      return detalle.etapaRealizada
+        ? `Endodoncia — ${etapaEndodonciaLabel[detalle.etapaRealizada]}${organos}`
+        : `Endodoncia${organos}`;
     case "extraccion":
-      return `Extracción ${detalle.tipoExtraccion === "quirurgica" ? "quirúrgica" : "simple"}${organos}`;
+      return detalle.tipoExtraccion
+        ? `Extracción ${detalle.tipoExtraccion === "quirurgica" ? "quirúrgica" : "simple"}${organos}`
+        : `Extracción${organos}`;
     case "resina":
       return `Restauración con resina${organos}`;
     case "limpieza":
       return "Limpieza dental";
     case "control_ortodoncia":
       return "Control de ortodoncia";
+    case "odontopediatria":
+      return detalle.manejoConducta
+        ? `Odontopediatría — manejo de conducta ${nivelManejoConductaLabel[detalle.manejoConducta].toLowerCase()}${organos}`
+        : `Odontopediatría${organos}`;
     default:
       return detalle.procedimientoNombre ? `${tipoProcedimientoNotaLabel[detalle.tipo]} — ${detalle.procedimientoNombre}` : tipoProcedimientoNotaLabel[detalle.tipo];
   }
+}
+
+/** Sugiere el tipo de plantilla a partir del nombre de un tratamiento
+ * agendado, cruzándolo contra el catálogo — mismo patrón que
+ * `especialidadDeCita` en Agenda.tsx: coincidencia EXACTA de nombre,
+ * insensible a mayúsculas, nunca una adivinanza cuando no hay match ni
+ * cuando la especialidad del catálogo no tiene un tipo de plantilla
+ * asociado. Lo ideal sería resolver por un `procedimientoId` estable en
+ * vez de comparar texto, pero `CitaAgenda.tratamientos` hoy es `string[]`
+ * sin esa referencia — se documenta como limitación conocida, no se amplía
+ * esa arquitectura aquí. Es SOLO una sugerencia: quien la use en la UI debe
+ * mostrarla como tal (ej. una insignia "Sugerido") y dejar que el
+ * profesional la acepte, la cambie, o elija "Otro" — nunca se autoconfirma
+ * por sí sola ni se trata como un hecho clínico ya ocurrido. */
+const especialidadATipoProcedimientoNota: Record<string, TipoProcedimientoNota> = {
+  "ortodoncia": "control_ortodoncia",
+  "endodoncia": "endodoncia",
+  "cirugía oral y maxilofacial": "cirugia",
+  "odontopediatría": "odontopediatria",
+  "prótesis": "protesis",
+};
+
+export function tipoProcedimientoNotaSugerido(
+  nombreTratamiento: string,
+  catalogo: { nombre: string; especialidad: string }[]
+): TipoProcedimientoNota | undefined {
+  const normalizado = nombreTratamiento.trim().toLowerCase();
+  if (!normalizado) return undefined;
+  const procedimiento = catalogo.find((p) => p.nombre.trim().toLowerCase() === normalizado);
+  if (!procedimiento) return undefined;
+  return especialidadATipoProcedimientoNota[procedimiento.especialidad.trim().toLowerCase()];
+}
+
+/** Narra los campos de la plantilla declarativa (prótesis/cirugía/
+ * valoración/urgencia) — sin esto, todo lo capturado ahí quedaba fuera de
+ * la narrativa firmada. Solo incluye los campos que el profesional llenó,
+ * en el mismo orden que se capturan; nunca inventa un valor para un campo
+ * vacío. */
+export function narrarCamposPlantilla(detalle: DetalleGenerico): string[] {
+  const campos = plantillaCamposPorTipo[detalle.tipo];
+  if (!campos) return [];
+  return campos
+    .filter((c) => detalle.camposAdicionales?.[c.key]?.trim())
+    .map((c) => `${c.label}: ${detalle.camposAdicionales![c.key].trim()}`);
 }

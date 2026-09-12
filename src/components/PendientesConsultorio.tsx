@@ -34,12 +34,28 @@ function TrashIcon() {
   );
 }
 
+function PencilIcon() {
+  return (
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none">
+      <path
+        d="M12 20h9M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4Z"
+        stroke="currentColor"
+        strokeWidth="1.8"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+    </svg>
+  );
+}
+
 export default function PendientesConsultorio() {
   const { pendientes, setPendientes, setArticulosFaltantes } = usePatientData();
   const [agregando, setAgregando] = useState(false);
   const [texto, setTexto] = useState("");
   const [verCompletados, setVerCompletados] = useState(false);
   const [pendienteAEliminar, setPendienteAEliminar] = useState<Pendiente | null>(null);
+  const [editandoId, setEditandoId] = useState<string | null>(null);
+  const [textoEdit, setTextoEdit] = useState("");
 
   const pendientesActivos = [...pendientes]
     .filter((p) => !p.completado)
@@ -75,6 +91,23 @@ export default function PendientesConsultorio() {
 
   const eliminar = (id: string) => {
     setPendientes((prev) => prev.filter((x) => x.id !== id));
+  };
+
+  const iniciarEdicion = (p: Pendiente) => {
+    setEditandoId(p.id);
+    setTextoEdit(p.texto);
+  };
+
+  const cancelarEdicion = () => {
+    setEditandoId(null);
+    setTextoEdit("");
+  };
+
+  const guardarEdicion = () => {
+    const limpio = textoEdit.trim();
+    if (!limpio || !editandoId) return;
+    setPendientes((prev) => prev.map((x) => (x.id === editandoId ? { ...x, texto: limpio } : x)));
+    cancelarEdicion();
   };
 
   /** Copia el texto del pendiente a Faltantes por Surtir (Depósito Dental)
@@ -158,40 +191,79 @@ export default function PendientesConsultorio() {
         {pendientesActivos.length === 0 && !agregando && (
           <p className="text-sm text-ink/40">No tienes pendientes por ahora. 🎉</p>
         )}
-        {pendientesActivos.map((p) => (
-          <div
-            key={p.id}
-            className="flex items-center gap-3 rounded-lg border border-edge/10 bg-inset px-3 py-2"
-          >
-            <input
-              type="checkbox"
-              checked={false}
-              onChange={() => toggleCompletado(p)}
-              className="h-4 w-4 shrink-0 accent-accent"
-            />
-            <span className="flex-1 text-sm text-ink">{p.texto}</span>
-            <button
-              onClick={() => !p.enviadoADeposito && enviarADeposito(p)}
-              disabled={p.enviadoADeposito}
-              title={
-                p.enviadoADeposito
-                  ? "Ya está en Faltantes por Surtir (Depósito Dental)"
-                  : "Agregar también a Faltantes por Surtir (Depósito Dental)"
-              }
-              className="flex shrink-0 items-center gap-1.5 rounded-lg border border-edge/15 px-2 py-1 text-xs font-medium text-ink/50 transition-colors hover:border-accent/50 hover:text-accent disabled:cursor-default disabled:border-success/30 disabled:text-success/70 disabled:hover:border-success/30 disabled:hover:text-success/70"
+        {pendientesActivos.map((p) =>
+          editandoId === p.id ? (
+            <div
+              key={p.id}
+              className="flex items-center gap-2 rounded-lg border border-edge/10 bg-inset px-3 py-2"
             >
-              <BoxIcon />
-              {p.enviadoADeposito ? "En Depósito Dental" : "Depósito Dental"}
-            </button>
-            <button
-              onClick={() => setPendienteAEliminar(p)}
-              title="Eliminar pendiente"
-              className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-ink/30 transition-colors hover:bg-danger/10 hover:text-danger"
+              <input
+                type="text"
+                autoFocus
+                value={textoEdit}
+                onChange={(e) => setTextoEdit(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") guardarEdicion();
+                  if (e.key === "Escape") cancelarEdicion();
+                }}
+                className="min-w-0 flex-1 rounded-lg border border-edge/10 bg-field px-3 py-1.5 text-sm text-ink outline-none focus:border-accent/60"
+              />
+              <button
+                onClick={guardarEdicion}
+                disabled={!textoEdit.trim()}
+                className="shrink-0 rounded-lg border border-accent/60 bg-accent/15 px-3 py-1.5 text-xs font-semibold text-accent transition-opacity hover:bg-accent/25 disabled:cursor-not-allowed disabled:opacity-40"
+              >
+                Guardar
+              </button>
+              <button
+                onClick={cancelarEdicion}
+                className="shrink-0 rounded-lg border border-edge/15 px-3 py-1.5 text-xs font-semibold text-ink/70 hover:bg-surface2"
+              >
+                Cancelar
+              </button>
+            </div>
+          ) : (
+            <div
+              key={p.id}
+              className="flex items-center gap-3 rounded-lg border border-edge/10 bg-inset px-3 py-2"
             >
-              <TrashIcon />
-            </button>
-          </div>
-        ))}
+              <input
+                type="checkbox"
+                checked={false}
+                onChange={() => toggleCompletado(p)}
+                className="h-4 w-4 shrink-0 accent-accent"
+              />
+              <span className="flex-1 text-sm text-ink">{p.texto}</span>
+              <button
+                onClick={() => !p.enviadoADeposito && enviarADeposito(p)}
+                disabled={p.enviadoADeposito}
+                title={
+                  p.enviadoADeposito
+                    ? "Ya está en Faltantes por Surtir (Depósito Dental)"
+                    : "Agregar también a Faltantes por Surtir (Depósito Dental)"
+                }
+                className="flex shrink-0 items-center gap-1.5 rounded-lg border border-edge/15 px-2 py-1 text-xs font-medium text-ink/50 transition-colors hover:border-accent/50 hover:text-accent disabled:cursor-default disabled:border-success/30 disabled:text-success/70 disabled:hover:border-success/30 disabled:hover:text-success/70"
+              >
+                <BoxIcon />
+                {p.enviadoADeposito ? "En Depósito Dental" : "Depósito Dental"}
+              </button>
+              <button
+                onClick={() => iniciarEdicion(p)}
+                title="Editar pendiente"
+                className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-ink/30 transition-colors hover:bg-accent/10 hover:text-accent"
+              >
+                <PencilIcon />
+              </button>
+              <button
+                onClick={() => setPendienteAEliminar(p)}
+                title="Eliminar pendiente"
+                className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-ink/30 transition-colors hover:bg-danger/10 hover:text-danger"
+              >
+                <TrashIcon />
+              </button>
+            </div>
+          )
+        )}
       </div>
 
       {completados.length > 0 && (
@@ -204,27 +276,66 @@ export default function PendientesConsultorio() {
           </button>
           {verCompletados && (
             <div className="mt-2 space-y-2">
-              {completados.map((p) => (
-                <div
-                  key={p.id}
-                  className="flex items-center gap-3 rounded-lg border border-edge/10 bg-inset px-3 py-2 opacity-60"
-                >
-                  <input
-                    type="checkbox"
-                    checked={true}
-                    onChange={() => toggleCompletado(p)}
-                    className="h-4 w-4 shrink-0 accent-accent"
-                  />
-                  <span className="flex-1 text-sm text-ink line-through">{p.texto}</span>
-                  <button
-                    onClick={() => setPendienteAEliminar(p)}
-                    title="Eliminar pendiente"
-                    className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-ink/30 transition-colors hover:bg-danger/10 hover:text-danger"
+              {completados.map((p) =>
+                editandoId === p.id ? (
+                  <div
+                    key={p.id}
+                    className="flex items-center gap-2 rounded-lg border border-edge/10 bg-inset px-3 py-2"
                   >
-                    <TrashIcon />
-                  </button>
-                </div>
-              ))}
+                    <input
+                      type="text"
+                      autoFocus
+                      value={textoEdit}
+                      onChange={(e) => setTextoEdit(e.target.value)}
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter") guardarEdicion();
+                        if (e.key === "Escape") cancelarEdicion();
+                      }}
+                      className="min-w-0 flex-1 rounded-lg border border-edge/10 bg-field px-3 py-1.5 text-sm text-ink outline-none focus:border-accent/60"
+                    />
+                    <button
+                      onClick={guardarEdicion}
+                      disabled={!textoEdit.trim()}
+                      className="shrink-0 rounded-lg border border-accent/60 bg-accent/15 px-3 py-1.5 text-xs font-semibold text-accent transition-opacity hover:bg-accent/25 disabled:cursor-not-allowed disabled:opacity-40"
+                    >
+                      Guardar
+                    </button>
+                    <button
+                      onClick={cancelarEdicion}
+                      className="shrink-0 rounded-lg border border-edge/15 px-3 py-1.5 text-xs font-semibold text-ink/70 hover:bg-surface2"
+                    >
+                      Cancelar
+                    </button>
+                  </div>
+                ) : (
+                  <div
+                    key={p.id}
+                    className="flex items-center gap-3 rounded-lg border border-edge/10 bg-inset px-3 py-2 opacity-60"
+                  >
+                    <input
+                      type="checkbox"
+                      checked={true}
+                      onChange={() => toggleCompletado(p)}
+                      className="h-4 w-4 shrink-0 accent-accent"
+                    />
+                    <span className="flex-1 text-sm text-ink line-through">{p.texto}</span>
+                    <button
+                      onClick={() => iniciarEdicion(p)}
+                      title="Editar pendiente"
+                      className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-ink/30 transition-colors hover:bg-accent/10 hover:text-accent"
+                    >
+                      <PencilIcon />
+                    </button>
+                    <button
+                      onClick={() => setPendienteAEliminar(p)}
+                      title="Eliminar pendiente"
+                      className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-ink/30 transition-colors hover:bg-danger/10 hover:text-danger"
+                    >
+                      <TrashIcon />
+                    </button>
+                  </div>
+                )
+              )}
             </div>
           )}
         </div>
