@@ -295,10 +295,15 @@ type NavItem = (typeof navItems)[number];
 // recto hacia arriba) a ANGULO_FIN (un poco más allá de la horizontal
 // izquierda), separados PASO grados entre sí: con estos valores caben ~5
 // módulos a la vez, suficientemente separados para leerse bien.
-const FAN_RADIO = 210;
-const FAN_ANGULO_INICIO = 82;
+// FAN_ANGULO_INICIO nunca debe bajar de 90°: con ángulos menores a 90°,
+// cos(ángulo) es positivo y el ítem se desplaza hacia la DERECHA del
+// ícono (no hacia arriba en línea recta) — como el ícono ya está pegado
+// al borde derecho, eso lo saca de pantalla. Arriba de 90° el desplazamiento
+// es hacia la izquierda (seguro).
+const FAN_RADIO = 240;
+const FAN_ANGULO_INICIO = 100;
 const FAN_ANGULO_FIN = 190;
-const FAN_PASO = 27;
+const FAN_PASO = 32;
 
 export default function BottomNav({ active, onNavigate }: { active: string; onNavigate: (id: string) => void }) {
   const [abierto, setAbierto] = useState<NavItem | null>(null);
@@ -530,17 +535,18 @@ export default function BottomNav({ active, onNavigate }: { active: string; onNa
         type="button"
         title="Navegación"
         onClick={() => setFanAbierto((v) => !v)}
-        className="fixed bottom-[62px] right-6 z-40 flex h-14 w-14 items-center justify-center rounded-full border border-edge/10 bg-modal-solid/95 text-accent shadow-[0_10px_26px_-8px_rgba(0,0,0,0.65)] backdrop-blur-[8px] transition-transform active:scale-95 print:hidden lg:hidden"
+        style={{ touchAction: "manipulation" }}
+        className="fixed bottom-[62px] right-6 z-40 flex h-20 w-20 items-center justify-center rounded-full border border-ink/25 bg-modal-solid/70 text-accent shadow-[0_10px_26px_-8px_rgba(0,0,0,0.65)] backdrop-blur-xl transition-transform active:scale-95 print:hidden lg:hidden"
       >
-        <svg
-          width="24"
-          height="24"
-          viewBox="0 0 24 24"
-          fill="none"
-          className={`shrink-0 transition-transform duration-200 ${fanAbierto ? "rotate-[135deg]" : ""}`}
-        >
-          {(navItems.find((n) => n.id === active) ?? navItems[0]).icon}
-        </svg>
+        {fanAbierto ? (
+          <svg width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" className="shrink-0">
+            <path d="M6 6l12 12M18 6 6 18" />
+          </svg>
+        ) : (
+          <svg width="30" height="30" viewBox="0 0 24 24" fill="none" className="shrink-0">
+            {(navItems.find((n) => n.id === active) ?? navItems[0]).icon}
+          </svg>
+        )}
       </button>
 
       <div
@@ -556,6 +562,7 @@ export default function BottomNav({ active, onNavigate }: { active: string; onNa
             e.preventDefault();
           }
         }}
+        style={{ touchAction: "none" }}
         className="fixed bottom-[62px] right-6 z-40 h-px w-px cursor-grab active:cursor-grabbing lg:hidden"
       >
         {navItems.map((item, i) => {
@@ -567,20 +574,20 @@ export default function BottomNav({ active, onNavigate }: { active: string; onNa
               key={item.id}
               onClick={() => seleccionar(item)}
               style={estiloFanItem(i)}
-              className={`absolute left-0 top-0 -ml-7 -mt-7 flex h-14 w-14 select-none flex-col items-center justify-center rounded-full border shadow-[0_8px_20px_-6px_rgba(0,0,0,0.55)] ${
+              className={`absolute left-0 top-0 -ml-10 -mt-10 flex h-20 w-20 select-none flex-col items-center justify-center rounded-full border shadow-[0_8px_20px_-6px_rgba(0,0,0,0.55)] backdrop-blur-xl ${
                 fanArrastrando ? "" : "transition-[transform,opacity] duration-[380ms] ease-[cubic-bezier(0.25,1.1,0.4,1)]"
               } ${
                 isActive
-                  ? "border-accent/50 bg-accent/15 text-accent"
-                  : "border-edge/10 bg-modal-solid/95 text-ink/70"
+                  ? "border-accent/60 bg-accent/20 text-accent"
+                  : "border-ink/25 bg-modal-solid/70 text-ink/70"
               }`}
             >
-              <svg width="26" height="26" viewBox="0 0 24 24" fill="none" className="shrink-0">
+              <svg width="32" height="32" viewBox="0 0 24 24" fill="none" className="shrink-0">
                 {item.icon}
               </svg>
               <span
-                className={`absolute -bottom-4 max-w-[64px] break-words rounded bg-modal-solid/80 px-1 text-center text-[9.5px] font-semibold leading-tight ${
-                  isActive ? "text-accent" : "text-ink/50"
+                className={`absolute -bottom-5 left-1/2 max-w-[70px] -translate-x-1/2 break-words rounded bg-modal-solid/80 px-1 text-center text-[9.5px] font-semibold leading-tight ${
+                  isActive ? "text-accent" : "text-ink/60"
                 }`}
               >
                 {item.label}
