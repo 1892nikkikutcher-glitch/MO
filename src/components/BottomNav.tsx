@@ -300,10 +300,54 @@ type NavItem = (typeof navItems)[number];
 // ícono (no hacia arriba en línea recta) — como el ícono ya está pegado
 // al borde derecho, eso lo saca de pantalla. Arriba de 90° el desplazamiento
 // es hacia la izquierda (seguro).
-const FAN_RADIO = 240;
+//
+// Un radio fijo en píxeles ocupa una PROPORCIÓN distinta de pantalla en
+// cada modelo (ej. se ve más grande/desparramado en un iPhone más chico
+// que en un Pro Max) — por eso "corría diferente" entre un modelo y otro.
+// En vez de calibrar contra un modelo específico (o mantener una lista de
+// medidas de teléfonos, que se desactualiza con cada modelo nuevo), el
+// radio se calcula en tiempo real como una PROPORCIÓN del lado más chico
+// de la pantalla de quien sea que abra la app — automáticamente
+// consistente en iPhone, Samsung, o cualquier otro dispositivo, sin
+// conocer de antemano sus medidas. Un techo/piso lo mantienen dentro de
+// un rango razonable, y nunca se sale de pantalla (ver useRadioDelAbanico).
+const FAN_RADIO_PROPORCION = 0.55; // del lado más chico de la ventana
+const FAN_RADIO_MIN = 140;
+const FAN_RADIO_MAX = 260;
 const FAN_ANGULO_INICIO = 100;
 const FAN_ANGULO_FIN = 190;
 const FAN_PASO = 32;
+const FAN_ANCHOR_INSET_PX = 24; // right-6
+const FAN_ANCHOR_BOTTOM_PX = 62; // bottom-[62px]
+const FAN_ITEM_RADIO_PX = 40; // la mitad de h-20/w-20 (80px)
+
+/** Radio del abanico: proporcional al tamaño REAL de la ventana (no un
+ * modelo asumido), acotado entre un mínimo/máximo razonables y, sobre
+ * todo, nunca más grande que lo que en verdad cabe sin salirse de
+ * pantalla. Se recalcula en cada resize/rotación — funciona igual en
+ * cualquier iPhone, Samsung, o modelo futuro, sin mantener una lista. */
+function useRadioDelAbanico() {
+  const [radio, setRadio] = useState(FAN_RADIO_MAX);
+  useEffect(() => {
+    function recalcular() {
+      const cosFin = Math.abs(Math.cos((FAN_ANGULO_FIN * Math.PI) / 180));
+      const senInicio = Math.abs(Math.sin((FAN_ANGULO_INICIO * Math.PI) / 180));
+      const maxPorAncho = (window.innerWidth - FAN_ANCHOR_INSET_PX - FAN_ITEM_RADIO_PX) / cosFin;
+      const maxPorAlto = (window.innerHeight - FAN_ANCHOR_BOTTOM_PX - FAN_ITEM_RADIO_PX) / senInicio;
+      const proporcional = Math.min(window.innerWidth, window.innerHeight) * FAN_RADIO_PROPORCION;
+      const acotado = Math.max(FAN_RADIO_MIN, Math.min(proporcional, FAN_RADIO_MAX));
+      setRadio(Math.min(acotado, maxPorAncho, maxPorAlto));
+    }
+    recalcular();
+    window.addEventListener("resize", recalcular);
+    window.addEventListener("orientationchange", recalcular);
+    return () => {
+      window.removeEventListener("resize", recalcular);
+      window.removeEventListener("orientationchange", recalcular);
+    };
+  }, []);
+  return radio;
+}
 
 export default function BottomNav({
   active,
@@ -324,6 +368,7 @@ export default function BottomNav({
   const arrastreRef = useRef({ activo: false, inicioY: 0, scrollInicio: 0, seMovio: false });
 
   const setFanAbierto = onFanAbiertoChange;
+  const fanRadio = useRadioDelAbanico();
   const [fanOffset, setFanOffset] = useState(0);
   const [fanArrastrando, setFanArrastrando] = useState(false);
   const fanTrackRef = useRef<HTMLDivElement>(null);
@@ -374,8 +419,8 @@ export default function BottomNav({
       return { transform: "translate(0px, 0px) scale(0.5)", opacity: 0, pointerEvents: "none" };
     }
     const rad = (angulo * Math.PI) / 180;
-    const dx = Math.cos(rad) * FAN_RADIO;
-    const dy = -Math.sin(rad) * FAN_RADIO;
+    const dx = Math.cos(rad) * fanRadio;
+    const dy = -Math.sin(rad) * fanRadio;
     return { transform: `translate(${dx}px, ${dy}px) scale(1)`, opacity: 1 };
   }
 
