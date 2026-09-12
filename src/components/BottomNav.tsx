@@ -295,7 +295,7 @@ type NavItem = (typeof navItems)[number];
 // recto hacia arriba) a ANGULO_FIN (un poco más allá de la horizontal
 // izquierda), separados PASO grados entre sí: con estos valores caben ~5
 // módulos a la vez, suficientemente separados para leerse bien.
-const FAN_RADIO = 140;
+const FAN_RADIO = 210;
 const FAN_ANGULO_INICIO = 82;
 const FAN_ANGULO_FIN = 190;
 const FAN_PASO = 27;
@@ -533,7 +533,7 @@ export default function BottomNav({ active, onNavigate }: { active: string; onNa
           if (fanArrastreRef.current.seMovio) return;
           setFanAbierto((v) => !v);
         }}
-        className="fixed bottom-6 right-4 z-40 flex h-14 w-14 items-center justify-center rounded-full border border-edge/10 bg-modal-solid/95 text-accent shadow-[0_10px_26px_-8px_rgba(0,0,0,0.65)] backdrop-blur-[8px] transition-transform active:scale-95 print:hidden lg:hidden"
+        className="fixed bottom-[62px] right-6 z-40 flex h-14 w-14 items-center justify-center rounded-full border border-edge/10 bg-modal-solid/95 text-accent shadow-[0_10px_26px_-8px_rgba(0,0,0,0.65)] backdrop-blur-[8px] transition-transform active:scale-95 print:hidden lg:hidden"
       >
         <svg
           width="24"
@@ -559,7 +559,7 @@ export default function BottomNav({ active, onNavigate }: { active: string; onNa
             e.preventDefault();
           }
         }}
-        className="fixed bottom-6 right-4 z-40 h-px w-px cursor-grab active:cursor-grabbing lg:hidden"
+        className="fixed bottom-[62px] right-6 z-40 h-px w-px cursor-grab active:cursor-grabbing lg:hidden"
       >
         {navItems.map((item, i) => {
           const hasChildren = "children" in item && !!item.children?.length;
