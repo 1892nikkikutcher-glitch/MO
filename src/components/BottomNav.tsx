@@ -305,12 +305,25 @@ const FAN_ANGULO_INICIO = 100;
 const FAN_ANGULO_FIN = 190;
 const FAN_PASO = 32;
 
-export default function BottomNav({ active, onNavigate }: { active: string; onNavigate: (id: string) => void }) {
+export default function BottomNav({
+  active,
+  onNavigate,
+  fanAbierto,
+  onFanAbiertoChange,
+}: {
+  active: string;
+  onNavigate: (id: string) => void;
+  /** El Asistente flotante necesita saber cuándo el abanico está abierto
+   * para esconderse (comparten la misma esquina) — por eso este estado
+   * vive controlado desde Dashboard en vez de manejarse solo aquí adentro. */
+  fanAbierto: boolean;
+  onFanAbiertoChange: (abierto: boolean) => void;
+}) {
   const [abierto, setAbierto] = useState<NavItem | null>(null);
   const carouselRef = useRef<HTMLDivElement>(null);
   const arrastreRef = useRef({ activo: false, inicioY: 0, scrollInicio: 0, seMovio: false });
 
-  const [fanAbierto, setFanAbierto] = useState(false);
+  const setFanAbierto = onFanAbiertoChange;
   const [fanOffset, setFanOffset] = useState(0);
   const [fanArrastrando, setFanArrastrando] = useState(false);
   const fanTrackRef = useRef<HTMLDivElement>(null);
@@ -534,7 +547,7 @@ export default function BottomNav({ active, onNavigate }: { active: string; onNa
       <button
         type="button"
         title="Navegación"
-        onClick={() => setFanAbierto((v) => !v)}
+        onClick={() => setFanAbierto(!fanAbierto)}
         style={{ touchAction: "manipulation" }}
         className="fixed bottom-[62px] right-6 z-40 flex h-20 w-20 items-center justify-center rounded-full border border-ink/25 bg-modal-solid/70 text-accent shadow-[0_10px_26px_-8px_rgba(0,0,0,0.65)] backdrop-blur-xl transition-transform active:scale-95 print:hidden lg:hidden"
       >

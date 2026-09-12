@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { auth } from "@/lib/firebase";
 import BottomNav, { navItems } from "./BottomNav";
 import { categoriaSugerenciaOptions, type CategoriaSugerencia } from "@/lib/patientData";
@@ -541,6 +541,36 @@ function DashboardBody({
   const { clinicInfo } = usePatientData();
   const isLight = theme === "light";
   const [mostrarSugerencia, setMostrarSugerencia] = useState(false);
+  // Comparten esquina: el Asistente se esconde mientras el abanico de
+  // navegación está abierto, así que ambos necesitan enterarse del mismo
+  // estado — vive aquí, controlado, en vez de duplicarse en cada uno.
+  const [fanAbierto, setFanAbierto] = useState(false);
+
+  // Carrusel infinito del header: el contenido se repite 3 veces seguidas
+  // (idénticas) y arranca a la mitad, en la copia de en medio — así hay una
+  // copia de sobra a cada lado como colchón. Al acercarse al principio o al
+  // final, salta sin transición una copia completa hacia el lado contrario:
+  // como las tres copias son pixel-idénticas, el salto no se nota, y se
+  // siente como si nunca se acabara. `scroll` (no un handler de arrastre)
+  // porque esto debe funcionar igual con scroll nativo del dedo, rueda del
+  // mouse o cualquier otro método — no solo con un arrastre reconocido a mano.
+  const headerScrollRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    const el = headerScrollRef.current;
+    if (!el) return;
+    const anchoUnaCopia = () => el.scrollWidth / 3;
+    el.scrollLeft = anchoUnaCopia();
+    function onScroll() {
+      if (!el) return;
+      const ancho = anchoUnaCopia();
+      if (ancho <= 0) return;
+      if (el.scrollLeft <= 0) el.scrollLeft += ancho;
+      else if (el.scrollLeft >= ancho * 2) el.scrollLeft -= ancho;
+    }
+    el.addEventListener("scroll", onScroll);
+    return () => el.removeEventListener("scroll", onScroll);
+  }, []);
+
   const activeLabel =
     activePage === "panel-admin"
       ? "Panel de administrador"
@@ -571,49 +601,56 @@ function DashboardBody({
              sesión) parecían haber desaparecido en vez de solo estar fuera
              de vista. */}
           <div className="pointer-events-none absolute inset-y-0 left-0 z-10 w-6 bg-gradient-to-r from-app to-transparent sm:w-10" />
-          <div className="flex min-w-0 flex-1 items-center gap-2 overflow-x-auto [-ms-overflow-style:none] [scrollbar-width:none] sm:gap-4 [&::-webkit-scrollbar]:hidden">
-            <QuickActionsBar
-              isLight={isLight}
-              onNavigate={setActivePage}
-              onOpenPago={() => setShowRegistrarPago(true)}
-              onOpenNuevoPaciente={() => setShowNuevoPaciente(true)}
-            />
+          <div
+            ref={headerScrollRef}
+            className="flex min-w-0 flex-1 items-center gap-2 overflow-x-auto [-ms-overflow-style:none] [scrollbar-width:none] sm:gap-4 [&::-webkit-scrollbar]:hidden"
+          >
+            {["a", "b", "c"].map((copia) => (
+              <div key={copia} className="flex shrink-0 items-center gap-2 sm:gap-4">
+                <QuickActionsBar
+                  isLight={isLight}
+                  onNavigate={setActivePage}
+                  onOpenPago={() => setShowRegistrarPago(true)}
+                  onOpenNuevoPaciente={() => setShowNuevoPaciente(true)}
+                />
 
-            <span className="h-6 w-px shrink-0 bg-edge/10" />
+                <span className="h-6 w-px shrink-0 bg-edge/10" />
 
-            {esAdmin && (
-              <button
-                onClick={() => setActivePage("panel-admin")}
-                title="Panel de administrador"
-                className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-lg transition-colors hover:bg-surface hover:text-ink ${
-                  activePage === "panel-admin" ? "text-accent" : "text-ink/60"
-                }`}
-              >
-                <ShieldIcon />
-              </button>
-            )}
-            <button
-              onClick={() => setMostrarSugerencia(true)}
-              title="Enviar sugerencia"
-              className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg text-ink/60 transition-colors hover:bg-surface hover:text-ink"
-            >
-              <MessageIcon />
-            </button>
-            <button
-              onClick={() => setTheme((t) => (t === "dark" ? "light" : "dark"))}
-              title={isLight ? "Cambiar a modo oscuro" : "Cambiar a modo claro"}
-              className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg text-ink/60 transition-colors hover:bg-surface hover:text-ink"
-            >
-              {isLight ? <SunIcon /> : <MoonIcon />}
-            </button>
+                {esAdmin && (
+                  <button
+                    onClick={() => setActivePage("panel-admin")}
+                    title="Panel de administrador"
+                    className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-lg transition-colors hover:bg-surface hover:text-ink ${
+                      activePage === "panel-admin" ? "text-accent" : "text-ink/60"
+                    }`}
+                  >
+                    <ShieldIcon />
+                  </button>
+                )}
+                <button
+                  onClick={() => setMostrarSugerencia(true)}
+                  title="Enviar sugerencia"
+                  className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg text-ink/60 transition-colors hover:bg-surface hover:text-ink"
+                >
+                  <MessageIcon />
+                </button>
+                <button
+                  onClick={() => setTheme((t) => (t === "dark" ? "light" : "dark"))}
+                  title={isLight ? "Cambiar a modo oscuro" : "Cambiar a modo claro"}
+                  className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg text-ink/60 transition-colors hover:bg-surface hover:text-ink"
+                >
+                  {isLight ? <SunIcon /> : <MoonIcon />}
+                </button>
 
-            <span className="hidden shrink-0 truncate text-sm text-ink/50 sm:inline">{userEmail}</span>
-            <button
-              onClick={onLogout}
-              className="shrink-0 rounded-lg border border-edge/10 bg-surface px-2.5 py-1.5 text-xs text-ink/70 transition-colors hover:text-ink sm:px-3"
-            >
-              Cerrar sesión
-            </button>
+                <span className="hidden shrink-0 truncate text-sm text-ink/50 sm:inline">{userEmail}</span>
+                <button
+                  onClick={onLogout}
+                  className="shrink-0 rounded-lg border border-edge/10 bg-surface px-2.5 py-1.5 text-xs text-ink/70 transition-colors hover:text-ink sm:px-3"
+                >
+                  Cerrar sesión
+                </button>
+              </div>
+            ))}
           </div>
           <div className="pointer-events-none absolute inset-y-0 right-0 z-10 w-6 bg-gradient-to-l from-app to-transparent sm:w-10" />
         </header>
@@ -676,7 +713,12 @@ function DashboardBody({
         </div>
       </main>
 
-      <BottomNav active={activePage} onNavigate={setActivePage} />
+      <BottomNav
+        active={activePage}
+        onNavigate={setActivePage}
+        fanAbierto={fanAbierto}
+        onFanAbiertoChange={setFanAbierto}
+      />
 
       {showRegistrarPago && (
         <GlobalAgregarPago onClose={() => setShowRegistrarPago(false)} />
@@ -686,7 +728,7 @@ function DashboardBody({
       )}
       {mostrarSugerencia && <SugerenciaModal onClose={() => setMostrarSugerencia(false)} />}
 
-      <AsistenteFlotante activePage={activePage} activeLabel={activeLabel} />
+      <AsistenteFlotante activePage={activePage} activeLabel={activeLabel} oculto={fanAbierto} />
     </div>
     </PrivacidadProvider>
   );
