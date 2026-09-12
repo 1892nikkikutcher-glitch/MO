@@ -328,6 +328,20 @@ export default function BottomNav({ active, onNavigate }: { active: string; onNa
     setFanAbierto(false);
   }
 
+  function iniciarArrastreFan(clientX: number, clientY: number) {
+    if (!fanAbierto) return;
+    const r = fanTrackRef.current?.getBoundingClientRect();
+    const anguloInicial = r ? (Math.atan2(-(clientY - r.top), clientX - r.left) * 180) / Math.PI : 0;
+    fanArrastreRef.current = {
+      activo: true,
+      anguloAnterior: anguloInicial,
+      anguloAcumulado: 0,
+      offsetInicio: fanOffset,
+      seMovio: false,
+    };
+    setFanArrastrando(true);
+  }
+
   function anguloFanDelItem(i: number) {
     return FAN_ANGULO_INICIO + (i - fanOffset) * FAN_PASO;
   }
@@ -373,6 +387,14 @@ export default function BottomNav({ active, onNavigate }: { active: string; onNa
   // abanico — sigue el ÁNGULO real del dedo/mouse respecto al centro (no
   // solo un eje), para que se sienta como girar una perilla sin importar en
   // qué parte del arco estés arrastrando.
+  //
+  // A diferencia de la cápsula (que se recorre con scroll nativo — el dedo
+  // ya lo hace solo, sin JS), el abanico se posiciona con transform, así
+  // que no hay ningún scroll nativo de por medio: necesita eventos de
+  // touch de verdad. mousemove NO sirve para esto en un celular real — un
+  // navegador móvil no dispara mousemove continuo mientras arrastras el
+  // dedo, solo sintetiza mouse/click al soltar (por eso la maqueta y las
+  // pruebas con mouse sí "funcionaban" pero en el iPhone no pasaba nada).
   useEffect(() => {
     function anguloDesdeCentro(clientX: number, clientY: number) {
       const el = fanTrackRef.current;
@@ -380,10 +402,10 @@ export default function BottomNav({ active, onNavigate }: { active: string; onNa
       const r = el.getBoundingClientRect();
       return (Math.atan2(-(clientY - r.top), clientX - r.left) * 180) / Math.PI;
     }
-    function onMouseMove(e: MouseEvent) {
+    function mover(clientX: number, clientY: number) {
       const st = fanArrastreRef.current;
       if (!st.activo) return;
-      const anguloActual = anguloDesdeCentro(e.clientX, e.clientY);
+      const anguloActual = anguloDesdeCentro(clientX, clientY);
       let delta = anguloActual - st.anguloAnterior;
       if (delta > 180) delta -= 360; // no dejar que salte al cruzar +/-180°
       if (delta < -180) delta += 360;
@@ -393,15 +415,35 @@ export default function BottomNav({ active, onNavigate }: { active: string; onNa
       const next = Math.max(0, Math.min(fanMaxOffset, st.offsetInicio + st.anguloAcumulado / FAN_PASO));
       setFanOffset(next);
     }
-    function onMouseUp() {
+    function terminar() {
       fanArrastreRef.current.activo = false;
       setFanArrastrando(false);
     }
+    function onMouseMove(e: MouseEvent) {
+      mover(e.clientX, e.clientY);
+    }
+    function onTouchMove(e: TouchEvent) {
+      if (!fanArrastreRef.current.activo) return;
+      const t = e.touches[0];
+      if (!t) return;
+      // Reclama el gesto — sin esto, el navegador podría interpretar el
+      // arrastre como un desplazamiento de la página o (peor) el sistema
+      // operativo como su propio gesto de regresar/cambiar de app, que es
+      // justo lo que se quería evitar desde el principio con este rediseño.
+      e.preventDefault();
+      mover(t.clientX, t.clientY);
+    }
     window.addEventListener("mousemove", onMouseMove);
-    window.addEventListener("mouseup", onMouseUp);
+    window.addEventListener("mouseup", terminar);
+    window.addEventListener("touchmove", onTouchMove, { passive: false });
+    window.addEventListener("touchend", terminar);
+    window.addEventListener("touchcancel", terminar);
     return () => {
       window.removeEventListener("mousemove", onMouseMove);
-      window.removeEventListener("mouseup", onMouseUp);
+      window.removeEventListener("mouseup", terminar);
+      window.removeEventListener("touchmove", onTouchMove);
+      window.removeEventListener("touchend", terminar);
+      window.removeEventListener("touchcancel", terminar);
     };
   }, [fanMaxOffset]);
 
@@ -506,19 +548,10 @@ export default function BottomNav({ active, onNavigate }: { active: string; onNa
 
       <div
         ref={fanTrackRef}
-        onMouseDown={(e) => {
-          if (!fanAbierto) return;
-          const el = fanTrackRef.current;
-          const r = el?.getBoundingClientRect();
-          const anguloInicial = r ? (Math.atan2(-(e.clientY - r.top), e.clientX - r.left) * 180) / Math.PI : 0;
-          fanArrastreRef.current = {
-            activo: true,
-            anguloAnterior: anguloInicial,
-            anguloAcumulado: 0,
-            offsetInicio: fanOffset,
-            seMovio: false,
-          };
-          setFanArrastrando(true);
+        onMouseDown={(e) => iniciarArrastreFan(e.clientX, e.clientY)}
+        onTouchStart={(e) => {
+          const t = e.touches[0];
+          if (t) iniciarArrastreFan(t.clientX, t.clientY);
         }}
         onClickCapture={(e) => {
           if (fanArrastreRef.current.seMovio) {
