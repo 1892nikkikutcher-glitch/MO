@@ -475,7 +475,7 @@ export default function BottomNav({
       st.anguloAcumulado += delta;
       st.anguloAnterior = anguloActual;
       if (Math.abs(st.anguloAcumulado) > 3) st.seMovio = true;
-      const next = Math.max(0, Math.min(fanMaxOffset, st.offsetInicio + st.anguloAcumulado / FAN_PASO));
+      const next = Math.max(0, Math.min(fanMaxOffset, st.offsetInicio - st.anguloAcumulado / FAN_PASO));
       setFanOffset(next);
     }
     function terminar() {
