@@ -561,11 +561,16 @@ function DashboardBody({
     <PrivacidadProvider>
     <div data-theme={theme} className="min-h-screen bg-app text-ink">
       <main className="min-w-0">
-        <header className="flex h-16 items-center border-b border-edge/10 px-3 print:hidden sm:px-6">
+        <header className="relative flex h-16 items-center border-b border-edge/10 px-3 print:hidden sm:px-6">
           {/* Un solo carrusel horizontal para TODO el header — antes las
              acciones rápidas tenían su propio scroll y el resto (panel de
              administrador, sugerencia, tema, sesión) vivía afuera, cramped
-             en pantallas angostas. Ahora todo se arrastra/se desliza junto. */}
+             en pantallas angostas. Ahora todo se arrastra/se desliza junto.
+             Los difuminados en los bordes avisan que hay más para deslizar
+             — sin esto, los últimos íconos (sugerencia, tema, cerrar
+             sesión) parecían haber desaparecido en vez de solo estar fuera
+             de vista. */}
+          <div className="pointer-events-none absolute inset-y-0 left-0 z-10 w-6 bg-gradient-to-r from-app to-transparent sm:w-10" />
           <div className="flex min-w-0 flex-1 items-center gap-2 overflow-x-auto [-ms-overflow-style:none] [scrollbar-width:none] sm:gap-4 [&::-webkit-scrollbar]:hidden">
             <QuickActionsBar
               isLight={isLight}
@@ -610,6 +615,7 @@ function DashboardBody({
               Cerrar sesión
             </button>
           </div>
+          <div className="pointer-events-none absolute inset-y-0 right-0 z-10 w-6 bg-gradient-to-l from-app to-transparent sm:w-10" />
         </header>
 
         <div className="px-3 py-6 sm:px-6 sm:py-8 lg:pr-28">
