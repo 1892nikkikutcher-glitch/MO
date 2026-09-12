@@ -440,7 +440,7 @@ function QuickActionsBar({
   };
 
   return (
-    <div className="flex items-center gap-2 sm:flex-1 sm:justify-between sm:gap-0">
+    <div className="flex shrink-0 items-center gap-2 sm:gap-3">
       {visibles.map((action) => {
         // Si pageId es un hijo de un submenú (ej. "deposito-dental" bajo
         // "Proveedores"), los hijos no tienen ícono propio — se usa el del
@@ -454,7 +454,7 @@ function QuickActionsBar({
             key={action.key}
             onClick={() => manejarClick(action.key, action.pageId)}
             title={action.label}
-            className={`relative flex h-12 w-12 items-center justify-center rounded-xl transition-colors hover:bg-surface ${
+            className={`relative flex h-12 w-12 shrink-0 items-center justify-center rounded-xl transition-colors hover:bg-surface ${
               action.color === "green"
                 ? "text-success/80 hover:text-success"
                 : "text-accent/70 hover:text-accent"
@@ -561,54 +561,58 @@ function DashboardBody({
     <PrivacidadProvider>
     <div data-theme={theme} className="min-h-screen bg-app text-ink">
       <main className="min-w-0">
-        <header className="flex h-16 items-center gap-2 border-b border-edge/10 px-3 print:hidden sm:gap-4 sm:px-6">
-          <div className="min-w-0 flex-1 overflow-x-auto">
+        <header className="flex h-16 items-center border-b border-edge/10 px-3 print:hidden sm:px-6">
+          {/* Un solo carrusel horizontal para TODO el header — antes las
+             acciones rápidas tenían su propio scroll y el resto (panel de
+             administrador, sugerencia, tema, sesión) vivía afuera, cramped
+             en pantallas angostas. Ahora todo se arrastra/se desliza junto. */}
+          <div className="flex min-w-0 flex-1 items-center gap-2 overflow-x-auto [-ms-overflow-style:none] [scrollbar-width:none] sm:gap-4 [&::-webkit-scrollbar]:hidden">
             <QuickActionsBar
               isLight={isLight}
               onNavigate={setActivePage}
               onOpenPago={() => setShowRegistrarPago(true)}
               onOpenNuevoPaciente={() => setShowNuevoPaciente(true)}
             />
-          </div>
 
-          <span className="hidden h-6 w-px bg-edge/10 sm:block" />
+            <span className="h-6 w-px shrink-0 bg-edge/10" />
 
-          {esAdmin && (
+            {esAdmin && (
+              <button
+                onClick={() => setActivePage("panel-admin")}
+                title="Panel de administrador"
+                className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-lg transition-colors hover:bg-surface hover:text-ink ${
+                  activePage === "panel-admin" ? "text-accent" : "text-ink/60"
+                }`}
+              >
+                <ShieldIcon />
+              </button>
+            )}
             <button
-              onClick={() => setActivePage("panel-admin")}
-              title="Panel de administrador"
-              className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-lg transition-colors hover:bg-surface hover:text-ink ${
-                activePage === "panel-admin" ? "text-accent" : "text-ink/60"
-              }`}
+              onClick={() => setMostrarSugerencia(true)}
+              title="Enviar sugerencia"
+              className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg text-ink/60 transition-colors hover:bg-surface hover:text-ink"
             >
-              <ShieldIcon />
+              <MessageIcon />
             </button>
-          )}
-          <button
-            onClick={() => setMostrarSugerencia(true)}
-            title="Enviar sugerencia"
-            className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg text-ink/60 transition-colors hover:bg-surface hover:text-ink"
-          >
-            <MessageIcon />
-          </button>
-          <button
-            onClick={() => setTheme((t) => (t === "dark" ? "light" : "dark"))}
-            title={isLight ? "Cambiar a modo oscuro" : "Cambiar a modo claro"}
-            className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg text-ink/60 transition-colors hover:bg-surface hover:text-ink"
-          >
-            {isLight ? <SunIcon /> : <MoonIcon />}
-          </button>
+            <button
+              onClick={() => setTheme((t) => (t === "dark" ? "light" : "dark"))}
+              title={isLight ? "Cambiar a modo oscuro" : "Cambiar a modo claro"}
+              className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg text-ink/60 transition-colors hover:bg-surface hover:text-ink"
+            >
+              {isLight ? <SunIcon /> : <MoonIcon />}
+            </button>
 
-          <span className="hidden truncate text-sm text-ink/50 sm:inline">{userEmail}</span>
-          <button
-            onClick={onLogout}
-            className="shrink-0 rounded-lg border border-edge/10 bg-surface px-2.5 py-1.5 text-xs text-ink/70 transition-colors hover:text-ink sm:px-3"
-          >
-            Cerrar sesión
-          </button>
+            <span className="hidden shrink-0 truncate text-sm text-ink/50 sm:inline">{userEmail}</span>
+            <button
+              onClick={onLogout}
+              className="shrink-0 rounded-lg border border-edge/10 bg-surface px-2.5 py-1.5 text-xs text-ink/70 transition-colors hover:text-ink sm:px-3"
+            >
+              Cerrar sesión
+            </button>
+          </div>
         </header>
 
-        <div className="px-3 py-6 pr-20 sm:px-6 sm:py-8 lg:pr-28">
+        <div className="px-3 py-6 sm:px-6 sm:py-8 lg:pr-28">
           <h1 className="mb-6 text-2xl font-semibold print:hidden">
             {activePage === "inicio" ? "Dashboard Principal" : activeLabel}
           </h1>

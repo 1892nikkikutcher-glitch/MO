@@ -1,14 +1,14 @@
 "use client";
 
-/** Navegación principal de MO — antes una tira horizontal fija al fondo,
- * ahora una cápsula angosta flotando en el borde derecho (separada de los
- * tres bordes, no de borde a borde ni de alto completo — por eso no es una
- * barra lateral) en cualquier tamaño de pantalla. Se recorre arrastrando
- * VERTICAL, con el dedo o con mouse: el arrastre horizontal pegado al
- * borde inferior competía con el gesto del celular para cambiar de app.
- * Los módulos con submenú (Proveedores, Reportes, Administración) abren un
- * panel — como hoja que sube desde abajo en pantallas angostas, como panel
- * junto a la cápsula en pantallas anchas (`lg:`). */
+/** Navegación principal de MO. En computadora (`lg:`): la cápsula angosta
+ * de siempre, flotando en el borde derecho, recorrida con arrastre
+ * VERTICAL. En celular/tablet: un solo ícono flotante (como el stack de
+ * Descargas en macOS) que no reserva espacio de la pantalla mientras está
+ * cerrado — al tocarlo despliega los módulos en abanico, arrastrando en
+ * círculo alrededor del ícono para ver el resto. Los módulos con submenú
+ * (Proveedores, Reportes, Administración) abren un panel — como hoja que
+ * sube desde abajo en pantallas angostas, como panel junto a la cápsula en
+ * pantallas anchas (`lg:`). */
 
 import { useEffect, useRef, useState } from "react";
 
@@ -70,7 +70,7 @@ export const navItems = [
     label: "Proveedores",
     icon: (
       <path
-        d="M3 21V10l9-6 9 6v11M3 21h18M7 21v-6h4v6M15 13h3M15 16h3"
+        d="M4 21V7a1 1 0 0 1 1-1h14a1 1 0 0 1 1 1v14M4 21h16M9 21v-4h6v4M7 10h2M11 10h2M15 10h2M7 14h2M11 14h2M15 14h2"
         stroke="currentColor"
         strokeWidth="1.8"
         strokeLinecap="round"
@@ -291,10 +291,32 @@ export const navItems = [
 
 type NavItem = (typeof navItems)[number];
 
+// Geometría del abanico (celular/tablet) — arco de ANGULO_INICIO (casi
+// recto hacia arriba) a ANGULO_FIN (un poco más allá de la horizontal
+// izquierda), separados PASO grados entre sí: con estos valores caben ~5
+// módulos a la vez, suficientemente separados para leerse bien.
+const FAN_RADIO = 140;
+const FAN_ANGULO_INICIO = 82;
+const FAN_ANGULO_FIN = 190;
+const FAN_PASO = 27;
+
 export default function BottomNav({ active, onNavigate }: { active: string; onNavigate: (id: string) => void }) {
   const [abierto, setAbierto] = useState<NavItem | null>(null);
   const carouselRef = useRef<HTMLDivElement>(null);
   const arrastreRef = useRef({ activo: false, inicioY: 0, scrollInicio: 0, seMovio: false });
+
+  const [fanAbierto, setFanAbierto] = useState(false);
+  const [fanOffset, setFanOffset] = useState(0);
+  const [fanArrastrando, setFanArrastrando] = useState(false);
+  const fanTrackRef = useRef<HTMLDivElement>(null);
+  const fanArrastreRef = useRef({
+    activo: false,
+    anguloAnterior: 0,
+    anguloAcumulado: 0,
+    offsetInicio: 0,
+    seMovio: false,
+  });
+  const fanMaxOffset = navItems.length - 1;
 
   function seleccionar(item: NavItem) {
     const hasChildren = "children" in item && !!item.children?.length;
@@ -303,6 +325,26 @@ export default function BottomNav({ active, onNavigate }: { active: string; onNa
     } else {
       onNavigate(item.id);
     }
+    setFanAbierto(false);
+  }
+
+  function anguloFanDelItem(i: number) {
+    return FAN_ANGULO_INICIO + (i - fanOffset) * FAN_PASO;
+  }
+
+  // Posición de cada módulo del abanico: colapsado (o fuera del arco
+  // visible) se queda encima del ícono, invisible, listo para "brotar" de
+  // ahí — igual que un stack de macOS.
+  function estiloFanItem(i: number): React.CSSProperties {
+    const angulo = anguloFanDelItem(i);
+    const enRango = angulo >= FAN_ANGULO_INICIO - FAN_PASO * 0.5 && angulo <= FAN_ANGULO_FIN + FAN_PASO * 0.5;
+    if (!fanAbierto || !enRango) {
+      return { transform: "translate(0px, 0px) scale(0.5)", opacity: 0, pointerEvents: "none" };
+    }
+    const rad = (angulo * Math.PI) / 180;
+    const dx = Math.cos(rad) * FAN_RADIO;
+    const dy = -Math.sin(rad) * FAN_RADIO;
+    return { transform: `translate(${dx}px, ${dy}px) scale(1)`, opacity: 1 };
   }
 
   // Arrastrar VERTICAL con mouse para desplazar la cápsula — el dedo ya lo
@@ -327,14 +369,52 @@ export default function BottomNav({ active, onNavigate }: { active: string; onNa
     };
   }, []);
 
+  // Arrastrar en cualquier dirección alrededor del ícono para girar el
+  // abanico — sigue el ÁNGULO real del dedo/mouse respecto al centro (no
+  // solo un eje), para que se sienta como girar una perilla sin importar en
+  // qué parte del arco estés arrastrando.
   useEffect(() => {
-    if (!abierto) return;
+    function anguloDesdeCentro(clientX: number, clientY: number) {
+      const el = fanTrackRef.current;
+      if (!el) return 0;
+      const r = el.getBoundingClientRect();
+      return (Math.atan2(-(clientY - r.top), clientX - r.left) * 180) / Math.PI;
+    }
+    function onMouseMove(e: MouseEvent) {
+      const st = fanArrastreRef.current;
+      if (!st.activo) return;
+      const anguloActual = anguloDesdeCentro(e.clientX, e.clientY);
+      let delta = anguloActual - st.anguloAnterior;
+      if (delta > 180) delta -= 360; // no dejar que salte al cruzar +/-180°
+      if (delta < -180) delta += 360;
+      st.anguloAcumulado += delta;
+      st.anguloAnterior = anguloActual;
+      if (Math.abs(st.anguloAcumulado) > 3) st.seMovio = true;
+      const next = Math.max(0, Math.min(fanMaxOffset, st.offsetInicio + st.anguloAcumulado / FAN_PASO));
+      setFanOffset(next);
+    }
+    function onMouseUp() {
+      fanArrastreRef.current.activo = false;
+      setFanArrastrando(false);
+    }
+    window.addEventListener("mousemove", onMouseMove);
+    window.addEventListener("mouseup", onMouseUp);
+    return () => {
+      window.removeEventListener("mousemove", onMouseMove);
+      window.removeEventListener("mouseup", onMouseUp);
+    };
+  }, [fanMaxOffset]);
+
+  useEffect(() => {
+    if (!abierto && !fanAbierto) return;
     function onKeyDown(e: KeyboardEvent) {
-      if (e.key === "Escape") setAbierto(null);
+      if (e.key !== "Escape") return;
+      setAbierto(null);
+      setFanAbierto(false);
     }
     window.addEventListener("keydown", onKeyDown);
     return () => window.removeEventListener("keydown", onKeyDown);
-  }, [abierto]);
+  }, [abierto, fanAbierto]);
 
   return (
     <>
@@ -344,7 +424,7 @@ export default function BottomNav({ active, onNavigate }: { active: string; onNa
 
       <nav
         aria-label="Navegación principal"
-        className="fixed right-2.5 top-1/2 z-40 flex max-h-[62vh] w-[60px] -translate-y-1/2 flex-col rounded-[20px] border border-edge/10 bg-modal-solid/95 p-1.5 shadow-[0_12px_30px_-10px_rgba(0,0,0,0.6)] backdrop-blur-[10px] print:hidden lg:w-[84px] lg:p-2"
+        className="fixed right-2.5 top-1/2 z-40 hidden max-h-[62vh] w-[60px] -translate-y-1/2 flex-col rounded-[20px] border border-edge/10 bg-modal-solid/95 p-1.5 shadow-[0_12px_30px_-10px_rgba(0,0,0,0.6)] backdrop-blur-[10px] print:hidden lg:flex lg:w-[84px] lg:p-2"
       >
         <div className="pointer-events-none absolute inset-x-0 top-0 z-10 h-4 rounded-t-[20px] bg-gradient-to-b from-modal-solid/95 to-transparent" />
         <div
@@ -389,6 +469,96 @@ export default function BottomNav({ active, onNavigate }: { active: string; onNa
         </div>
         <div className="pointer-events-none absolute inset-x-0 bottom-0 z-10 h-4 rounded-b-[20px] bg-gradient-to-t from-modal-solid/95 to-transparent" />
       </nav>
+
+      {fanAbierto && (
+        <div
+          onClick={() => {
+            // Si el mouseup de un arrastre termina sobre el fondo (los
+            // íconos ya rotaron a otra posición y el dedo/mouse quedó en
+            // espacio vacío), no debe interpretarse como "tocar afuera
+            // para cerrar" — solo cierra en un toque genuino.
+            if (fanArrastreRef.current.seMovio) return;
+            setFanAbierto(false);
+          }}
+          className="fixed inset-0 z-40 bg-black/25 print:hidden lg:hidden"
+        />
+      )}
+
+      <button
+        type="button"
+        title="Navegación"
+        onClick={() => {
+          if (fanArrastreRef.current.seMovio) return;
+          setFanAbierto((v) => !v);
+        }}
+        className="fixed bottom-6 right-4 z-40 flex h-14 w-14 items-center justify-center rounded-full border border-edge/10 bg-modal-solid/95 text-accent shadow-[0_10px_26px_-8px_rgba(0,0,0,0.65)] backdrop-blur-[8px] transition-transform active:scale-95 print:hidden lg:hidden"
+      >
+        <svg
+          width="24"
+          height="24"
+          viewBox="0 0 24 24"
+          fill="none"
+          className={`shrink-0 transition-transform duration-200 ${fanAbierto ? "rotate-[135deg]" : ""}`}
+        >
+          {(navItems.find((n) => n.id === active) ?? navItems[0]).icon}
+        </svg>
+      </button>
+
+      <div
+        ref={fanTrackRef}
+        onMouseDown={(e) => {
+          if (!fanAbierto) return;
+          const el = fanTrackRef.current;
+          const r = el?.getBoundingClientRect();
+          const anguloInicial = r ? (Math.atan2(-(e.clientY - r.top), e.clientX - r.left) * 180) / Math.PI : 0;
+          fanArrastreRef.current = {
+            activo: true,
+            anguloAnterior: anguloInicial,
+            anguloAcumulado: 0,
+            offsetInicio: fanOffset,
+            seMovio: false,
+          };
+          setFanArrastrando(true);
+        }}
+        onClickCapture={(e) => {
+          if (fanArrastreRef.current.seMovio) {
+            e.stopPropagation();
+            e.preventDefault();
+          }
+        }}
+        className="fixed bottom-6 right-4 z-40 h-px w-px cursor-grab active:cursor-grabbing lg:hidden"
+      >
+        {navItems.map((item, i) => {
+          const hasChildren = "children" in item && !!item.children?.length;
+          const isActiveParent = hasChildren && item.children!.some((c) => c.id === active);
+          const isActive = active === item.id || isActiveParent;
+          return (
+            <button
+              key={item.id}
+              onClick={() => seleccionar(item)}
+              style={estiloFanItem(i)}
+              className={`absolute left-0 top-0 -ml-[23px] -mt-[23px] flex h-[46px] w-[46px] select-none flex-col items-center justify-center rounded-full border shadow-[0_8px_20px_-6px_rgba(0,0,0,0.55)] ${
+                fanArrastrando ? "" : "transition-[transform,opacity] duration-[380ms] ease-[cubic-bezier(0.25,1.1,0.4,1)]"
+              } ${
+                isActive
+                  ? "border-accent/50 bg-accent/15 text-accent"
+                  : "border-edge/10 bg-modal-solid/95 text-ink/70"
+              }`}
+            >
+              <svg width="19" height="19" viewBox="0 0 24 24" fill="none" className="shrink-0">
+                {item.icon}
+              </svg>
+              <span
+                className={`absolute -bottom-4 max-w-[52px] break-words rounded bg-modal-solid/80 px-1 text-center text-[8.5px] font-semibold leading-tight ${
+                  isActive ? "text-accent" : "text-ink/50"
+                }`}
+              >
+                {item.label}
+              </span>
+            </button>
+          );
+        })}
+      </div>
 
       {abierto && (
         <div

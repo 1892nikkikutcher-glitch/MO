@@ -4,6 +4,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import Odontograma from "./Odontograma";
 import { usePatientData } from "@/context/PatientDataContext";
 import ConfirmarEliminar from "@/components/ConfirmarEliminar";
+import { sonEquivalentes } from "@/lib/deepEqual";
 import {
   claveDetalleSiNo,
   esNegacionExplicita,
@@ -1200,7 +1201,12 @@ export default function HistoriaClinica({
   }, [resumenAntecedentes, preguntaDiagSistemicoId, borrador.porPregunta]);
 
   const yaGuardado = Boolean(guardadas.actualizadoEn);
-  const hayCambiosSinGuardar = JSON.stringify(borrador) !== JSON.stringify(guardadas);
+  // No comparar con JSON.stringify: un documento recién leído de Firestore
+  // (`guardadas`) puede reconstruirse con las llaves en otro orden que el
+  // objeto local (`borrador`) aunque el contenido sea idéntico — eso hacía
+  // que el aviso de "cambios sin guardar" apareciera incluso justo después
+  // de guardar con éxito.
+  const hayCambiosSinGuardar = !sonEquivalentes(borrador, guardadas);
 
   // Avisa antes de salir (cambiar de pestaña dentro del expediente, ir a
   // otro módulo, o cerrar la pestaña) si hay ediciones sin guardar — antes
@@ -1226,12 +1232,14 @@ export default function HistoriaClinica({
     setGuardando(false);
   };
 
-  // Auto-guardado: cada 8s, si quedaron ediciones sin guardar, se guardan
+  // Auto-guardado: cada 1s, si quedaron ediciones sin guardar, se guardan
   // solas — para no depender de que el doctor se acuerde de dar clic en
-  // "Guardar" (información clínica delicada no debe depender de eso). Usa
-  // refs en vez de depender de [borrador] directamente para que el
-  // intervalo no se reinicie con cada tecleo — así se garantiza que corre
-  // cada 8s de verdad, incluso si el doctor escribe sin pausar.
+  // "Guardar" (información clínica delicada no debe depender de eso). Un
+  // segundo ya es imperceptible para una persona; bajarlo más (ej. medio
+  // segundo) solo duplicaría las escrituras a Firestore sin ninguna mejora
+  // perceptible. Usa refs en vez de depender de [borrador] directamente
+  // para que el intervalo no se reinicie con cada tecleo — así se garantiza
+  // que corre cada 1s de verdad, incluso si el doctor escribe sin pausar.
   const guardarRef = useRef(guardar);
   guardarRef.current = guardar;
   const hayCambiosSinGuardarRef = useRef(hayCambiosSinGuardar);
@@ -1239,7 +1247,7 @@ export default function HistoriaClinica({
   useEffect(() => {
     const intervalo = setInterval(() => {
       if (hayCambiosSinGuardarRef.current) guardarRef.current();
-    }, 8000);
+    }, 1000);
     return () => clearInterval(intervalo);
   }, []);
 

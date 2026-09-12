@@ -1044,8 +1044,8 @@ export default function Expediente({
     puedeVerFinanzas,
     historiaClinicaTemplate,
     historiaClinicaPorPaciente,
-    cambiosSinGuardar,
     setCambiosSinGuardar,
+    confirmarSalirSinGuardar,
     irAExpediente,
     irAPagina,
     setAyudaContexto,
@@ -1064,15 +1064,17 @@ export default function Expediente({
   // tienen ediciones sin guardar — antes se perdían silenciosamente al
   // cambiar de pestaña dentro del expediente o volver al listado.
   const cambiarTab = (tab: ExpedienteTab) => {
-    if (cambiosSinGuardar && !window.confirm(`${cambiosSinGuardar} ¿Salir sin guardar?`)) return;
-    setCambiosSinGuardar(null);
-    setActiveTab(tab);
+    confirmarSalirSinGuardar(() => {
+      setCambiosSinGuardar(null);
+      setActiveTab(tab);
+    });
   };
 
   const volverAPacientes = () => {
-    if (cambiosSinGuardar && !window.confirm(`${cambiosSinGuardar} ¿Salir sin guardar?`)) return;
-    setCambiosSinGuardar(null);
-    onBack();
+    confirmarSalirSinGuardar(() => {
+      setCambiosSinGuardar(null);
+      onBack();
+    });
   };
 
   useEffect(() => {

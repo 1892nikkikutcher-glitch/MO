@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import Odontograma from "./Odontograma";
 import PresupuestoImpreso from "./PresupuestoImpreso";
 import { usePatientData } from "@/context/PatientDataContext";
+import { sonEquivalentes } from "@/lib/deepEqual";
 import {
   agruparPorEspecialidad,
   especialidadesPredefinidas,
@@ -165,7 +166,7 @@ export default function NuevoPresupuesto({
       const crudo = localStorage.getItem(borradorKey);
       if (crudo) {
         const parsed = JSON.parse(crudo) as PresupuestoBorrador;
-        if (parsed.items?.length > 0 && JSON.stringify(parsed.items) !== JSON.stringify(items)) {
+        if (parsed.items?.length > 0 && !sonEquivalentes(parsed.items, items)) {
           setBorradorRecuperable(parsed);
           return;
         }
@@ -228,7 +229,7 @@ export default function NuevoPresupuesto({
   const hayCambiosSinGuardar =
     decisionBorradorTomada &&
     items.length > 0 &&
-    (!initialBudget || JSON.stringify(items) !== JSON.stringify(initialBudget.items));
+    (!initialBudget || !sonEquivalentes(items, initialBudget.items));
   useEffect(() => {
     setCambiosSinGuardar(hayCambiosSinGuardar ? "Presupuesto tiene cambios sin guardar." : null);
     return () => setCambiosSinGuardar(null);

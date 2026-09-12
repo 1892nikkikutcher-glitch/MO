@@ -24,6 +24,7 @@ import {
   type Unsubscribe,
 } from "firebase/firestore";
 import { db } from "@/lib/firebase";
+import ConfirmarEliminar from "@/components/ConfirmarEliminar";
 import { confirmarHorarioPuro } from "@/lib/horarioAtencion";
 import {
   horarioInicial,
@@ -691,6 +692,10 @@ type PatientDataContextValue = {
   irAPagina: (pageId: string) => void;
   cambiosSinGuardar: string | null;
   setCambiosSinGuardar: (mensaje: string | null) => void;
+  /** Ejecuta `accion` de inmediato si no hay cambios sin guardar; si los
+   * hay, primero pregunta (con un diálogo propio, no window.confirm) y solo
+   * la ejecuta si el usuario confirma salir sin guardar. */
+  confirmarSalirSinGuardar: (accion: () => void) => void;
   /** Contexto más específico que activePage para el Asistente flotante —
    * ej. una pestaña del Expediente ("pacientes-Pagos") — para que la ayuda
    * mostrada sea más precisa que solo el nombre de la página. Vuelve a
@@ -917,6 +922,20 @@ export function PatientDataProvider({
   // por navegación dentro de la app (irAPagina) o al cerrar/recargar la
   // pestaña — para no perder información como pasó antes.
   const [cambiosSinGuardar, setCambiosSinGuardar] = useState<string | null>(null);
+  // Diálogo propio (no window.confirm, que se ve fuera de lugar en la app)
+  // para cuando `confirmarSalirSinGuardar` necesita preguntar antes de
+  // ejecutar una navegación.
+  const [confirmacionSalida, setConfirmacionSalida] = useState<{
+    mensaje: string;
+    accion: () => void;
+  } | null>(null);
+  const confirmarSalirSinGuardar = (accion: () => void) => {
+    if (cambiosSinGuardar) {
+      setConfirmacionSalida({ mensaje: cambiosSinGuardar, accion });
+    } else {
+      accion();
+    }
+  };
   const [ayudaContexto, setAyudaContexto] = useState<string | null>(null);
 
   useEffect(() => {
@@ -1143,10 +1162,11 @@ export function PatientDataProvider({
   };
 
   const irAExpediente = (patientId: string, tab?: string, citaId?: string) => {
-    if (cambiosSinGuardar && !window.confirm(`${cambiosSinGuardar} ¿Salir sin guardar?`)) return;
-    setCambiosSinGuardar(null);
-    setNavegacionExpediente({ patientId, tab, citaId });
-    onIrAPagina?.("pacientes");
+    confirmarSalirSinGuardar(() => {
+      setCambiosSinGuardar(null);
+      setNavegacionExpediente({ patientId, tab, citaId });
+      onIrAPagina?.("pacientes");
+    });
   };
 
   const consumirNavegacionExpediente = () => setNavegacionExpediente(null);
@@ -1166,9 +1186,10 @@ export function PatientDataProvider({
   const consumirSolicitudNuevaCitaBlanco = () => setSolicitudNuevaCitaBlanco(false);
 
   const irAPagina = (pageId: string) => {
-    if (cambiosSinGuardar && !window.confirm(`${cambiosSinGuardar} ¿Salir sin guardar?`)) return;
-    setCambiosSinGuardar(null);
-    onIrAPagina?.(pageId);
+    confirmarSalirSinGuardar(() => {
+      setCambiosSinGuardar(null);
+      onIrAPagina?.(pageId);
+    });
   };
 
   /** Refleja en `config/estadisticas` el total presupuestado y el conteo por
@@ -2457,6 +2478,7 @@ export function PatientDataProvider({
         puedeVerFinanzas: rol === "admin",
         clinicInfo,
         setClinicInfo,
+        confirmarSalirSinGuardar,
         pendingInvite,
         aceptarInvite,
         rechazarInvite,
@@ -2474,6 +2496,19 @@ export function PatientDataProvider({
       }}
     >
       {children}
+      {confirmacionSalida && (
+        <ConfirmarEliminar
+          titulo="Cambios sin guardar"
+          mensaje={confirmacionSalida.mensaje}
+          confirmLabel="Salir sin guardar"
+          onCancel={() => setConfirmacionSalida(null)}
+          onConfirm={() => {
+            const { accion } = confirmacionSalida;
+            setConfirmacionSalida(null);
+            accion();
+          }}
+        />
+      )}
     </PatientDataContext.Provider>
   );
 }
