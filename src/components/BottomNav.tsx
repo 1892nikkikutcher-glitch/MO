@@ -522,17 +522,14 @@ export default function BottomNav({ active, onNavigate }: { active: string; onNa
             if (fanArrastreRef.current.seMovio) return;
             setFanAbierto(false);
           }}
-          className="fixed inset-0 z-40 bg-black/25 print:hidden lg:hidden"
+          className="fixed inset-0 z-40 bg-black/25 backdrop-blur-sm print:hidden lg:hidden"
         />
       )}
 
       <button
         type="button"
         title="Navegación"
-        onClick={() => {
-          if (fanArrastreRef.current.seMovio) return;
-          setFanAbierto((v) => !v);
-        }}
+        onClick={() => setFanAbierto((v) => !v)}
         className="fixed bottom-[62px] right-6 z-40 flex h-14 w-14 items-center justify-center rounded-full border border-edge/10 bg-modal-solid/95 text-accent shadow-[0_10px_26px_-8px_rgba(0,0,0,0.65)] backdrop-blur-[8px] transition-transform active:scale-95 print:hidden lg:hidden"
       >
         <svg
@@ -570,7 +567,7 @@ export default function BottomNav({ active, onNavigate }: { active: string; onNa
               key={item.id}
               onClick={() => seleccionar(item)}
               style={estiloFanItem(i)}
-              className={`absolute left-0 top-0 -ml-[23px] -mt-[23px] flex h-[46px] w-[46px] select-none flex-col items-center justify-center rounded-full border shadow-[0_8px_20px_-6px_rgba(0,0,0,0.55)] ${
+              className={`absolute left-0 top-0 -ml-7 -mt-7 flex h-14 w-14 select-none flex-col items-center justify-center rounded-full border shadow-[0_8px_20px_-6px_rgba(0,0,0,0.55)] ${
                 fanArrastrando ? "" : "transition-[transform,opacity] duration-[380ms] ease-[cubic-bezier(0.25,1.1,0.4,1)]"
               } ${
                 isActive
@@ -578,11 +575,11 @@ export default function BottomNav({ active, onNavigate }: { active: string; onNa
                   : "border-edge/10 bg-modal-solid/95 text-ink/70"
               }`}
             >
-              <svg width="19" height="19" viewBox="0 0 24 24" fill="none" className="shrink-0">
+              <svg width="26" height="26" viewBox="0 0 24 24" fill="none" className="shrink-0">
                 {item.icon}
               </svg>
               <span
-                className={`absolute -bottom-4 max-w-[52px] break-words rounded bg-modal-solid/80 px-1 text-center text-[8.5px] font-semibold leading-tight ${
+                className={`absolute -bottom-4 max-w-[64px] break-words rounded bg-modal-solid/80 px-1 text-center text-[9.5px] font-semibold leading-tight ${
                   isActive ? "text-accent" : "text-ink/50"
                 }`}
               >
