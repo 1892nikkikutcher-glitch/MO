@@ -15,6 +15,7 @@ import {
   type EstadoAfiliacion,
   type ModalidadAtencion,
   type PrioridadInterconsulta,
+  type TipoInterconsulta,
 } from "@/lib/moConecta";
 import {
   crearInterconsultaApi,
@@ -962,6 +963,7 @@ function NuevaInterconsultaDialog({
   const [motivo, setMotivo] = useState("");
   const [preguntaClinica, setPreguntaClinica] = useState("");
   const [prioridad, setPrioridad] = useState<PrioridadInterconsulta>("ordinaria");
+  const [tipoInterconsulta, setTipoInterconsulta] = useState<TipoInterconsulta>("aislado_con_retorno");
   const [informacionMinima, setInformacionMinima] = useState("");
   const [nombreEspecialista, setNombreEspecialista] = useState("");
   const [correoEspecialista, setCorreoEspecialista] = useState("");
@@ -987,6 +989,7 @@ function NuevaInterconsultaDialog({
         motivo,
         preguntaClinica,
         prioridad,
+        tipoInterconsulta,
         destinatarioUid: destinatario?.uid,
         informacionMinima: informacionMinima || undefined,
         consentimiento: {
@@ -1243,6 +1246,22 @@ function NuevaInterconsultaDialog({
               <option value="preferente">Preferente</option>
               <option value="urgente">Urgente</option>
             </select>
+          </div>
+          <div>
+            <label className={labelClass}>Tipo de interconsulta</label>
+            <select
+              className={inputClass}
+              value={tipoInterconsulta}
+              onChange={(e) => setTipoInterconsulta(e.target.value as TipoInterconsulta)}
+            >
+              <option value="aislado_con_retorno">Consulta puntual (el paciente regresa contigo)</option>
+              <option value="transferencia_continuidad">Transferencia de responsabilidad</option>
+            </select>
+            <p className="mt-1 text-xs text-ink/50">
+              {tipoInterconsulta === "aislado_con_retorno"
+                ? "El colega atiende este caso puntual y te lo regresa con una contrarreferencia."
+                : "El colega asume el tratamiento continuo del paciente a partir de este caso."}
+            </p>
           </div>
 
           <div className="rounded-lg border border-edge/10 bg-field p-3 text-xs text-ink/60">
@@ -1671,6 +1690,12 @@ function SalaDelCaso({ interconsulta, onVolver }: { interconsulta: Interconsulta
                 m.autor === uid ? "ml-auto bg-accent/15 text-ink" : "bg-field text-ink/80"
               }`}
             >
+              {m.autor !== uid && m.autorNombre && (
+                <p className="mb-0.5 text-xs font-medium text-ink/50">
+                  {m.autorNombre}
+                  {m.autorEspecialidad ? ` · ${m.autorEspecialidad}` : ""}
+                </p>
+              )}
               {m.contenido}
             </div>
           ))}

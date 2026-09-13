@@ -341,6 +341,11 @@ export type Interconsulta = {
   resumenPaciente: ResumenPacienteAutorizado;
   destinatarioUid?: string;
   destinatarioClinicaId?: string;
+  /** Ausente en interconsultas creadas antes de este campo — tratarla como
+   * "aislado_con_retorno" en ese caso (mismo default que ya usa
+   * `puedeTransicionar`), nunca asumir "transferencia_continuidad" por
+   * ausencia de dato. */
+  tipoInterconsulta?: TipoInterconsulta;
   especialidadSolicitada: string;
   motivo: string;
   preguntaClinica: string;

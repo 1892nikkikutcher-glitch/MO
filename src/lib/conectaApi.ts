@@ -5,7 +5,7 @@
  * Firebase Auth de la sesión actual, nunca escribe Firestore directo. */
 
 import { auth } from "./firebase";
-import type { CategoriaArchivoInterconsulta, InterconsultaEstado, PrioridadInterconsulta } from "./moConecta";
+import type { CategoriaArchivoInterconsulta, InterconsultaEstado, PrioridadInterconsulta, TipoInterconsulta } from "./moConecta";
 
 /** Cuando la ruta rechaza el body por Zod, `detalles.fieldErrors` trae el
  * motivo exacto por campo (ej. `{ modalidadAtencion: ["Invalid enum value..."] }`)
@@ -72,6 +72,8 @@ export type CrearInterconsultaBody = {
   motivo: string;
   preguntaClinica: string;
   prioridad: PrioridadInterconsulta;
+  /** Ausente = "aislado_con_retorno" (mismo default que `puedeTransicionar`). */
+  tipoInterconsulta?: TipoInterconsulta;
   antecedentesAlertas?: string;
   destinatarioUid?: string;
   destinatarioClinicaId?: string;

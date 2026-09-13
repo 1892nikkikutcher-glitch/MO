@@ -67,6 +67,7 @@ export const interconsultaCrearSchema = z
     motivo: z.string().trim().min(1).max(4000),
     preguntaClinica: z.string().trim().min(1).max(4000),
     prioridad: z.enum(["ordinaria", "preferente", "urgente"]),
+    tipoInterconsulta: z.enum(["aislado_con_retorno", "transferencia_continuidad"]).optional(),
     antecedentesAlertas: z.string().trim().max(2000).optional(),
     destinatarioUid: z.string().trim().min(1).max(200).optional(),
     destinatarioClinicaId: z.string().trim().min(1).max(200).optional(),

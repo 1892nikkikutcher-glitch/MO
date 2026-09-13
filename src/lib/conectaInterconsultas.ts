@@ -10,6 +10,7 @@ import {
   VERSION_AVISO_PRIVACIDAD_CONECTA,
   type ConsentimientoInterconsulta,
   type Interconsulta,
+  type TipoInterconsulta,
 } from "./moConecta";
 import { plantillaInicial, respuestasVacias, type HistoriaClinicaTemplate, type RespuestasHistoriaClinica } from "./historiaClinica";
 import type { Patient } from "./patientData";
@@ -21,6 +22,8 @@ export type CrearInterconsultaInput = {
   motivo: string;
   preguntaClinica: string;
   prioridad: "ordinaria" | "preferente" | "urgente";
+  /** Ausente = "aislado_con_retorno" (mismo default que `puedeTransicionar`). */
+  tipoInterconsulta?: TipoInterconsulta;
   antecedentesAlertas?: string;
   destinatarioUid?: string;
   destinatarioClinicaId?: string;
@@ -92,6 +95,7 @@ export async function crearInterconsulta(remitenteUid: string, input: CrearInter
     resumenPaciente,
     destinatarioUid: input.destinatarioUid,
     destinatarioClinicaId: input.destinatarioClinicaId,
+    tipoInterconsulta: input.tipoInterconsulta ?? "aislado_con_retorno",
     especialidadSolicitada: input.especialidadSolicitada,
     motivo: input.motivo,
     preguntaClinica: input.preguntaClinica,

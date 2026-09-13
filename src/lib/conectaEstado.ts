@@ -5,6 +5,7 @@
 import { dbAdmin } from "./firebaseAdmin";
 import { ConectaError, nowISO, sinIndefinidos } from "./conectaServer";
 import { puedeTransicionar, type EventoHistorialEstado, type Interconsulta, type InterconsultaEstado } from "./moConecta";
+import type { Episodio } from "./episodios";
 
 export async function transicionarEstadoInterconsulta(
   uid: string,
@@ -29,8 +30,9 @@ export async function transicionarEstadoInterconsulta(
       throw new ConectaError(403, "Solo el odontólogo destinatario puede aceptar o rechazar el caso.");
     }
 
+    const tipoInterconsulta = interconsulta.tipoInterconsulta ?? "aislado_con_retorno";
     const tieneJustificacion = Boolean(nota && nota.trim().length > 0);
-    if (!puedeTransicionar(interconsulta.estado, siguiente, tieneJustificacion)) {
+    if (!puedeTransicionar(interconsulta.estado, siguiente, tieneJustificacion, tipoInterconsulta)) {
       throw new ConectaError(409, "Esa transición de estado no es válida en este momento.");
     }
 
@@ -45,6 +47,26 @@ export async function transicionarEstadoInterconsulta(
     if (siguiente === "closed") actualizacion.concluidoEl = ahora;
 
     tx.set(ref, sinIndefinidos(actualizacion), { merge: true });
+
+    // Un "aislado con retorno" abre un episodio acotado al aceptar — el
+    // destinatario responde por ESTE tratamiento puntual, no por el
+    // expediente completo (ver episodios.ts). Una "transferencia_continuidad"
+    // no crea episodio: el destinatario asume el caso completo (Fase 4).
+    if (siguiente === "accepted" && tipoInterconsulta === "aislado_con_retorno") {
+      const episodioRef = ref.collection("episodios").doc();
+      const episodio: Episodio = sinIndefinidos({
+        id: episodioRef.id,
+        interconsultaId,
+        titulo: interconsulta.especialidadSolicitada,
+        especialidad: interconsulta.especialidadSolicitada,
+        motivoOrigen: interconsulta.motivo,
+        responsableUid: uid,
+        clinicaOrigenId: interconsulta.clinicaRemitenteId,
+        estado: "activo",
+        creadoEl: ahora,
+      });
+      tx.set(episodioRef, episodio);
+    }
 
     return { estadoAnterior: interconsulta.estado, estadoNuevo: siguiente };
   });
