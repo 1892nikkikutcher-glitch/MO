@@ -6,13 +6,62 @@ service cloud.firestore {
       return request.auth != null;
     }
 
+    // ============================================================
+    // PREPARADO, NO DESPLEGADO — bloqueo real de escritura clínica local
+    // tras migrar un paciente a expedientesClinicos (arquitectura MO
+    // Conecta v3, §9). Definidas ANTES del comodín de más abajo que las
+    // usa — a propósito, para no depender de que Firestore permita
+    // referenciar una función definida más adelante en el archivo (sin
+    // el emulador funcionando en esta máquina no se puede verificar esa
+    // suposición, así que se evita por completo). Sin datos reales
+    // todavía (Fase 2+ no ha corrido), hoy esto es un no-op: ningún
+    // documento de pacientes tiene `migracionEstado` puesto. NUNCA se
+    // aplica a fotos/estudios cuyo binario vive en Storage — ver además
+    // la ruta de servidor de descarga (v3 §9); storage.rules no cambia
+    // aquí.
+    function migracionEstadoPaciente(clinicaId, patientId) {
+      return get(/databases/$(database)/documents/users/$(clinicaId)/pacientes/$(patientId))
+        .data.get('migracionEstado', 'no_migrado');
+    }
+    // Ausente ("no_migrado") o cualquier estado previo a "congelado"
+    // sigue permitiendo escritura local sin restricción (v3 §11/§12) — el
+    // bloqueo real empieza justo en "congelado", no antes.
+    function escrituraClinicaLocalPermitida(clinicaId, patientId) {
+      return !exists(/databases/$(database)/documents/users/$(clinicaId)/pacientes/$(patientId))
+        || !(migracionEstadoPaciente(clinicaId, patientId)
+             in ['congelado', 'sincronizando_final', 'migrado', 'fallido_despues_congelamiento', 'reversion_pendiente']);
+    }
+    // Las siete subcolecciones clínicas confirmadas bajo
+    // users/{clinicId}/pacientes/{patientId}/ — nunca presupuestos/pagos/
+    // membresias/citas/recursos (administrativo, siempre local, v3 §9).
+    // `allPaths` es la lista capturada por el comodín de más abajo (hoy
+    // da acceso incondicional al dueño de la cuenta) — esto existe para
+    // que ESE comodín también respete el candado; sin esto, el candado
+    // de las coincidencias específicas de más abajo no tendría efecto
+    // sobre el dueño de la clínica, solo sobre colaboradores.
+    function esRutaClinicaCompartible(allPaths) {
+      return allPaths.size() == 4
+        && allPaths[0] == 'pacientes'
+        && allPaths[2] in ['historiaClinica', 'notasEvolucion', 'diagnosticos', 'planTratamiento', 'recetas', 'comparativas', 'fotos'];
+    }
+
     // ACCESO TOTAL AL SILO DEL USUARIO (arquitectura actual, sin cambios)
     // Esta regla otorga permisos absolutos de lectura y escritura al dueño de la cuenta
     // en todas las profundidades de sus colecciones. Se conserva intacta: todos los
     // módulos existentes (agenda, expediente, odontograma, presupuestos, pagos, etc.)
     // siguen dependiendo de ella hasta que se migren a la capa multi-clínica.
     match /users/{userId}/{allPaths=**} {
-      allow read, write: if signedIn() && request.auth.uid == userId;
+      allow read: if signedIn() && request.auth.uid == userId;
+      // PREPARADO, NO DESPLEGADO (v3 §9): sin esta condición extra, el
+      // candado de escritura de las coincidencias específicas de más
+      // abajo no protegería nada contra el propio dueño de la cuenta —
+      // este comodín ya le concede lectura/escritura incondicional a
+      // TODO lo de users/{userId}/**, y Firestore evalúa todas las
+      // coincidencias con OR (la más específica nunca "gana" sobre esta).
+      // Hoy es un no-op: sin `migracionEstado` en ningún documento,
+      // `esRutaClinicaCompartible` nunca bloquea nada real.
+      allow write: if signedIn() && request.auth.uid == userId
+        && (!esRutaClinicaCompartible(allPaths) || escrituraClinicaLocalPermitida(userId, allPaths[1]));
     }
 
     // Acceso al documento raíz del usuario
@@ -183,19 +232,24 @@ service cloud.firestore {
       allow read, write: if isActiveMember(ownerId);
     }
     match /users/{ownerId}/pacientes/{patientId}/recetas/{recetaId} {
-      allow read, write: if isActiveMember(ownerId);
+      allow read: if isActiveMember(ownerId);
+      allow write: if isActiveMember(ownerId) && escrituraClinicaLocalPermitida(ownerId, patientId);
     }
     match /users/{ownerId}/pacientes/{patientId}/notasEvolucion/{notaId} {
-      allow read, write: if isActiveMember(ownerId);
+      allow read: if isActiveMember(ownerId);
+      allow write: if isActiveMember(ownerId) && escrituraClinicaLocalPermitida(ownerId, patientId);
     }
     match /users/{ownerId}/pacientes/{patientId}/diagnosticos/{diagnosticoId} {
-      allow read, write: if isActiveMember(ownerId);
+      allow read: if isActiveMember(ownerId);
+      allow write: if isActiveMember(ownerId) && escrituraClinicaLocalPermitida(ownerId, patientId);
     }
     match /users/{ownerId}/pacientes/{patientId}/planTratamiento/{planTratamientoItemId} {
-      allow read, write: if isActiveMember(ownerId);
+      allow read: if isActiveMember(ownerId);
+      allow write: if isActiveMember(ownerId) && escrituraClinicaLocalPermitida(ownerId, patientId);
     }
     match /users/{ownerId}/pacientes/{patientId}/comparativas/{comparativaId} {
-      allow read, write: if isActiveMember(ownerId);
+      allow read: if isActiveMember(ownerId);
+      allow write: if isActiveMember(ownerId) && escrituraClinicaLocalPermitida(ownerId, patientId);
     }
     match /users/{ownerId}/pacientes/{patientId}/pagos/{pagoId} {
       allow read, write: if isClinicAdmin(ownerId);
@@ -235,10 +289,12 @@ service cloud.firestore {
       allow write: if isClinicAdmin(ownerId);
     }
     match /users/{ownerId}/pacientes/{patientId}/historiaClinica/{docId} {
-      allow read, write: if isActiveMember(ownerId);
+      allow read: if isActiveMember(ownerId);
+      allow write: if isActiveMember(ownerId) && escrituraClinicaLocalPermitida(ownerId, patientId);
     }
     match /users/{ownerId}/pacientes/{patientId}/fotos/{docId} {
-      allow read, write: if isActiveMember(ownerId);
+      allow read: if isActiveMember(ownerId);
+      allow write: if isActiveMember(ownerId) && escrituraClinicaLocalPermitida(ownerId, patientId);
     }
     match /users/{ownerId}/medicamentos/{medicamentoId} {
       allow read: if isActiveMember(ownerId);
@@ -405,15 +461,24 @@ service cloud.firestore {
     }
 
     // ============================================================
-    // EXPEDIENTE CLÍNICO COMPARTIDO — capa cross-clínica (nuevo, aditivo,
-    // Fase 0 del plan de arquitectura MO Conecta). Mismo principio que el
-    // bloque MO Conecta de arriba: ninguna colección de aquí abajo admite
-    // escritura desde el cliente — todo pasa por /api/expediente/* con
-    // Firebase Admin SDK. El cliente solo lee lo que ya le corresponde por
-    // participación activa (ver participaciones.ts para el convenio de id).
-    // Fase 0: estas colecciones todavía no tienen documentos — desplegar
-    // esto es, en la práctica, un no-op de seguridad (el catch-all de
-    // abajo ya cerraba el acceso).
+    // EXPEDIENTE CLÍNICO COMPARTIDO — capa cross-clínica (arquitectura MO
+    // Conecta v3, ver plan). Mismo principio que el bloque MO Conecta de
+    // arriba: ninguna colección de aquí abajo admite escritura desde el
+    // cliente — todo pasa por /api/expediente/* con Firebase Admin SDK.
+    //
+    // PREPARADO, NO DESPLEGADO — Fase 0/en curso: estas colecciones
+    // todavía no tienen documentos (ninguna ruta de /api/expediente/*
+    // existe aún), así que desplegar esto hoy sería, en la práctica, un
+    // no-op de seguridad (el catch-all de más abajo ya cerraba el
+    // acceso). Se preparan de una vez, completas, para no tener que
+    // volver a tocar reglas de seguridad cada vez que avance una fase.
+    //
+    // Regla que gobierna todo este bloque (v3): folio para localizar,
+    // consentimiento para autorizar, participación para acceder, sesión
+    // auditada para leer. Ninguna sección con datos identificables o
+    // clínicos se lee sin `tieneParticipacionActiva` Y
+    // `tieneSesionAccesoActiva` — no solo las subcolecciones, también
+    // pacientesGlobales y el documento raíz del expediente (v3 §9).
     // ============================================================
 
     function participacionGeneralDoc(expedienteId) {
@@ -424,47 +489,80 @@ service cloud.firestore {
         && exists(/databases/$(database)/documents/participaciones/$(expedienteId + '_' + request.auth.uid + '_general'))
         && participacionGeneralDoc(expedienteId).data.estado == 'activa';
     }
-    function participacionEpisodioDoc(expedienteId, episodioId) {
-      return get(/databases/$(database)/documents/participaciones/$(expedienteId + '_' + request.auth.uid + '_' + episodioId));
+    // NOTA (v3 §5): ya NO existe una función paralela "tieneParticipacionEnEpisodioActiva"
+    // usada como acceso independiente — una participación de episodio,
+    // sola, nunca abre el expediente general. Corrige una contradicción
+    // de una ronda de diseño anterior.
+
+    function sesionDoc(expedienteId) {
+      return get(/databases/$(database)/documents/sesionesAccesoExpediente/$(expedienteId + '_' + request.auth.uid));
     }
-    function tieneParticipacionEnEpisodioActiva(expedienteId, episodioId) {
+    // Espejo exacto de `sesionAccesoActivaValida` en sesionAccesoExpediente.ts
+    // (mismo criterio de este proyecto que ya usa esParticipanteInterconsulta:
+    // la lógica que hace falta también del lado servidor se duplica a
+    // propósito, no se referencia). No basta con que exista un documento
+    // en el id esperado — también se valida su contenido, para no confiar
+    // ciegamente en uno que una ruta administrativa o un error de
+    // servidor pudieran haber creado con el id correcto pero datos
+    // inconsistentes (última precisión de la ronda de aprobación de v3).
+    function tieneSesionAccesoActiva(expedienteId) {
       return signedIn()
-        && exists(/databases/$(database)/documents/participaciones/$(expedienteId + '_' + request.auth.uid + '_' + episodioId))
-        && participacionEpisodioDoc(expedienteId, episodioId).data.estado == 'activa';
+        && exists(/databases/$(database)/documents/sesionesAccesoExpediente/$(expedienteId + '_' + request.auth.uid))
+        && sesionDoc(expedienteId).data.expedienteId == expedienteId
+        && sesionDoc(expedienteId).data.profesionalUid == request.auth.uid
+        && sesionDoc(expedienteId).data.estado == 'activa'
+        && sesionDoc(expedienteId).data.expiresAt > request.time
+        && sesionDoc(expedienteId).data.participacionId == (expedienteId + '_' + request.auth.uid + '_general');
+    }
+    function puedeLeerExpediente(expedienteId) {
+      return tieneParticipacionActiva(expedienteId) && tieneSesionAccesoActiva(expedienteId);
     }
 
     match /pacientesGlobales/{id} {
-      allow read: if tieneParticipacionActiva(id);
+      allow read: if puedeLeerExpediente(id);
       allow write: if false; // solo /api/expediente/*
     }
     match /expedientesClinicos/{id} {
-      allow read: if tieneParticipacionActiva(id);
+      allow read: if puedeLeerExpediente(id);
       allow write: if false;
     }
     // Mismo bloque, sin cambios, repetido para cada subcolección clínica
     // mirroreada del expediente canónico: historiaClinica/{docId},
     // notasEvolucion/{notaId}, diagnosticos/{id}, planTratamiento/{id},
-    // recetas/{id}, laboratorios/{id}, comparativas/{id}, fotos/{docId}.
+    // recetas/{id}, comparativas/{id}, fotos/{docId} — y
+    // presupuestosCompartidos/{id} (v3 §13, snapshot opt-in, no la
+    // colección local `presupuestos` de cada clínica, que nunca se toca
+    // aquí). "laboratorios" no existe como subcolección de pacientes hoy
+    // (confirmado) — se agrega este mismo bloque si algún día se crea.
     match /expedientesClinicos/{id}/notasEvolucion/{notaId} {
-      allow read: if tieneParticipacionActiva(id);
+      allow read: if puedeLeerExpediente(id);
+      allow write: if false;
+    }
+    match /expedientesClinicos/{id}/presupuestosCompartidos/{presupuestoId} {
+      allow read: if puedeLeerExpediente(id);
       allow write: if false;
     }
     match /expedientesClinicos/{id}/episodios/{episodioId} {
-      allow read: if tieneParticipacionActiva(id) || tieneParticipacionEnEpisodioActiva(id, episodioId);
+      // Sin la rama alterna "o tiene participación de episodio" — ver
+      // nota de tieneParticipacionActiva arriba (v3 §5).
+      allow read: if puedeLeerExpediente(id);
       allow write: if false;
     }
     match /expedientesClinicos/{id}/historialResponsabilidad/{registroId} {
-      allow read: if tieneParticipacionActiva(id);
+      allow read: if puedeLeerExpediente(id);
       allow write: if false; // bitácora — inmutable
     }
     match /expedientesClinicos/{id}/eventos/{eventoId} {
-      allow read: if tieneParticipacionActiva(id);
+      allow read: if puedeLeerExpediente(id);
       allow write: if false; // auditoría — inmutable, mismo criterio que interconsultas/{id}/eventos
     }
 
     match /relacionesClinica/{id} {
       // Id determinístico {expedienteId}_{clinicaId} — exists()/get() en
-      // vez de query, mismo motivo que participaciones abajo.
+      // vez de query, mismo motivo que participaciones abajo. Esta SÍ se
+      // lee sin exigir sesión — es información administrativa ("esta
+      // clínica atiende a este paciente"), no clínica (v3 §7 del plan
+      // original, sin cambios).
       allow read: if isActiveMember(resource.data.clinicaId) || tieneParticipacionActiva(resource.data.expedienteId);
       allow write: if false;
     }
@@ -472,10 +570,47 @@ service cloud.firestore {
     match /participaciones/{id} {
       // Contra resource.data directo (no un get() propio sobre esta misma
       // colección) — mismo motivo que interconsultas de arriba: así no se
-      // rompe la consulta de lista ("mis participaciones activas").
+      // rompe la consulta de lista ("mis participaciones activas"). Sin
+      // exigir sesión — la participación es lo que la SESIÓN necesita
+      // verificar, exigírsela aquí sería circular.
       allow read: if signedIn()
         && (resource.data.profesionalUid == request.auth.uid || isActiveMember(resource.data.clinicaId));
       allow write: if false;
+    }
+
+    // Contenido inmutable con estado de ciclo de vida controlado (v3 §6)
+    // — nunca se escribe desde el cliente en ningún caso, ni para
+    // otorgar ni para revocar.
+    match /consentimientosExpediente/{id} {
+      allow read: if signedIn() && resource.data.odontologoAutorizadoUid == request.auth.uid;
+      allow write: if false; // solo /api/expediente/consentimientos/*
+    }
+
+    match /solicitudesAccesoExpediente/{id} {
+      allow read: if signedIn()
+        && (resource.data.solicitanteUid == request.auth.uid
+            || resource.data.responsablePrincipalUidDestino == request.auth.uid);
+      allow write: if false; // solo /api/expediente/solicitudes-acceso/*
+    }
+
+    // El folio nunca aparece como condición de acceso en ninguna regla
+    // de este archivo (v3 §17) — esta colección solo la lee/escribe
+    // /api/expedientes/buscar-folio con Admin SDK.
+    match /codigosPaciente/{hash} {
+      allow read, write: if false;
+    }
+
+    // Sesión de acceso auditada (v3 §9-10) — no se puede crear, leer ni
+    // modificar desde el cliente bajo ninguna circunstancia; solo
+    // /api/expedientes/{id}/abrir (creación atómica junto con su evento
+    // de apertura) y /api/expedientes/{id}/sesion/* (renovación, cierre)
+    // la tocan, siempre con Admin SDK.
+    match /sesionesAccesoExpediente/{id} {
+      allow read, write: if false;
+    }
+
+    match /vinculacionesPosiblesPaciente/{id} {
+      allow read, write: if false; // solo /api/admin/* — revisión humana de posibles duplicados
     }
 
     match /migracionesExpediente/{id} {

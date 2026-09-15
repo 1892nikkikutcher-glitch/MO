@@ -1,11 +1,15 @@
+import { Timestamp } from "firebase-admin/firestore";
 import { describe, expect, it } from "vitest";
 import {
   idParticipacion,
   esParticipacionGeneral,
   participacionActiva,
+  participacionVigente,
   esResponsablePrincipal,
   type Participacion,
 } from "../participaciones";
+
+const AHORA = Timestamp.fromDate(new Date("2026-09-14T12:00:00.000Z"));
 
 function participacion(overrides: Partial<Participacion>): Participacion {
   return {
@@ -15,8 +19,13 @@ function participacion(overrides: Partial<Participacion>): Participacion {
     clinicaId: "clinica-a",
     rol: "colaborador",
     nivelAcceso: "lectura",
-    desde: "2026-09-07T00:00:00.000Z",
+    alcance: "completo",
+    consentimientoId: "cons1",
+    solicitudAccesoId: "sol1",
+    interconsultaId: "ic1",
+    desde: Timestamp.fromDate(new Date("2026-09-07T00:00:00.000Z")),
     estado: "activa",
+    createdBy: "uid-remitente",
     ...overrides,
   };
 }
@@ -50,6 +59,33 @@ describe("participacionActiva", () => {
   it("true solo para estado activa", () => {
     expect(participacionActiva(participacion({ estado: "activa" }))).toBe(true);
     expect(participacionActiva(participacion({ estado: "concluida" }))).toBe(false);
+    expect(participacionActiva(participacion({ estado: "revocada" }))).toBe(false);
+  });
+});
+
+describe("participacionVigente", () => {
+  it("una participación activa sin fecha de vencimiento permite acceso", () => {
+    expect(participacionVigente(participacion({ estado: "activa", hasta: undefined }), AHORA)).toBe(true);
+  });
+
+  it("una participación activa y vigente (hasta en el futuro) permite acceso", () => {
+    const hasta = Timestamp.fromDate(new Date("2026-12-31T00:00:00.000Z"));
+    expect(participacionVigente(participacion({ estado: "activa", hasta }), AHORA)).toBe(true);
+  });
+
+  it("una participación vencida (hasta en el pasado) rechaza acceso aunque el estado siga 'activa'", () => {
+    const hasta = Timestamp.fromDate(new Date("2026-01-01T00:00:00.000Z"));
+    expect(participacionVigente(participacion({ estado: "activa", hasta }), AHORA)).toBe(false);
+  });
+
+  it("una fecha ausente se interpreta como sin vencimiento explícito, nunca como vencida", () => {
+    expect(participacionVigente(participacion({ estado: "activa", hasta: undefined }), AHORA)).toBe(true);
+  });
+
+  it("un estado no-activo nunca produce acceso, sin importar la fecha", () => {
+    const hasta = Timestamp.fromDate(new Date("2027-01-01T00:00:00.000Z")); // muy en el futuro
+    expect(participacionVigente(participacion({ estado: "concluida", hasta }), AHORA)).toBe(false);
+    expect(participacionVigente(participacion({ estado: "revocada", hasta }), AHORA)).toBe(false);
   });
 });
 

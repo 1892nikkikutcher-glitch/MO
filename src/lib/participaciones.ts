@@ -13,9 +13,18 @@
  * completo solo pueden comprobar el doc "_general", nunca enumerar
  * episodios de antemano. */
 
+import type { Timestamp } from "firebase-admin/firestore";
+
 export type RolParticipacion = "responsable_principal" | "colaborador" | "responsable_episodio";
 export type NivelAcceso = "lectura" | "lectura_escritura";
-export type EstadoParticipacion = "activa" | "concluida";
+/** "revocada" es distinta de "concluida" — una revocación es una acción
+ * activa de alguien (arquitectura v3, §5/§15), una conclusión es el
+ * episodio terminando solo. Ambas cuentan como no-activa para las reglas,
+ * pero se distinguen para la bitácora de auditoría. */
+export type EstadoParticipacion = "activa" | "concluida" | "revocada";
+/** Reservado para restringir el expediente compartido por sección a
+ * futuro (arquitectura v3, §5) — hoy siempre "completo". */
+export type AlcanceParticipacion = "completo";
 
 export const PARTICIPACION_GENERAL = "general";
 
@@ -26,14 +35,22 @@ export type Participacion = {
   clinicaId: string;
   rol: RolParticipacion;
   nivelAcceso: NivelAcceso;
+  alcance: AlcanceParticipacion;
+  consentimientoId: string;
+  solicitudAccesoId: string;
+  interconsultaId: string;
   /** Ausente = participación general del expediente (responsable
    * principal o colaborador general). Presente = alcance de un episodio
    * puntual (siempre junto con rol "responsable_episodio", o un
    * "colaborador" cuya aportación se limita a ese episodio). */
   episodioId?: string;
-  desde: string;
-  hasta?: string;
+  desde: Timestamp;
+  /** == expiresAt de la arquitectura v3 — ausente = sin vencimiento explícito. */
+  hasta?: Timestamp;
   estado: EstadoParticipacion;
+  createdBy: string;
+  revokedAt?: Timestamp;
+  revokedBy?: string;
 };
 
 /** Construye el id determinístico — usar SIEMPRE esta función al leer o
@@ -49,6 +66,16 @@ export function esParticipacionGeneral(participacion: Pick<Participacion, "episo
 
 export function participacionActiva(participacion: Pick<Participacion, "estado">): boolean {
   return participacion.estado === "activa";
+}
+
+/** true si la participación está activa Y, cuando tiene una fecha de
+ * vencimiento explícita (`hasta`), esa fecha todavía no pasó — mismo
+ * criterio que exige `tieneSesionAccesoActiva`/`tieneParticipacionActiva`
+ * en la arquitectura v3 (§5/§9): "activa" sola no basta si ya venció. */
+export function participacionVigente(participacion: Pick<Participacion, "estado" | "hasta">, ahora: Timestamp): boolean {
+  if (!participacionActiva(participacion)) return false;
+  if (!participacion.hasta) return true;
+  return participacion.hasta.toMillis() > ahora.toMillis();
 }
 
 /** true si este rol implica coordinar el tratamiento general vigente del
