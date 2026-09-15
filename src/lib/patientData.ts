@@ -536,6 +536,11 @@ export type Recurso = {
   nombre: string;
   color: string;
   tipo: TipoRecurso;
+  /** % que le corresponde a este médico de lo que él mismo cobra (Corte de
+   * Caja → Desglose por médico) — para calcular cuánto pagarle, no cuánto
+   * cobra la clínica. Solo aplica a tipo "medico"; ausente = todavía sin
+   * configurar, nunca se asume un valor por defecto. */
+  porcentajeComision?: number;
 };
 
 /** Paleta neón — se usa como franja lateral, resplandor y punto de color

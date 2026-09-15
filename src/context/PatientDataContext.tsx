@@ -1480,13 +1480,15 @@ export function PatientDataProvider({
     const fechas = new Set([...prevConIso, ...nextConIso].map((p) => p._iso as string));
     if (fechas.size === 0) return;
     const formasDePago = new Set([...prevConIso, ...nextConIso].map((p) => p.formaPago));
+    const medicosEnPagos = new Set([...prevConIso, ...nextConIso].map((p) => p.medico));
     setFinanzas((prevFin) => {
       const porFecha = { ...prevFin.porFecha };
-      // porFechaYFormaPago no existía antes de este campo — los documentos
-      // ya guardados en Firestore no lo traen hasta la primera vez que se
-      // escribe aquí, así que siempre se respalda con {} en vez de asumir
-      // que existe.
+      // porFechaYFormaPago/porFechaYMedico no existían antes de esos
+      // campos — los documentos ya guardados en Firestore no los traen
+      // hasta la primera vez que se escribe aquí, así que siempre se
+      // respaldan con {} en vez de asumir que existen.
       const porFechaYFormaPago = { ...(prevFin.porFechaYFormaPago ?? {}) };
+      const porFechaYMedico = { ...(prevFin.porFechaYMedico ?? {}) };
       const pagosCountPorFecha = { ...(prevFin.pagosCountPorFecha ?? {}) };
       fechas.forEach((iso) => {
         const sumPrev = prevConIso.filter((p) => p._iso === iso).reduce((s, p) => s + p.total, 0);
@@ -1511,11 +1513,24 @@ export function PatientDataProvider({
           if (deltaForma !== 0) porForma[forma] = (porForma[forma] ?? 0) + deltaForma;
         });
         porFechaYFormaPago[iso] = porForma;
+
+        const porMedico = { ...(porFechaYMedico[iso] ?? {}) };
+        medicosEnPagos.forEach((medico) => {
+          const sumPrevMedico = prevConIso
+            .filter((p) => p._iso === iso && p.medico === medico)
+            .reduce((s, p) => s + p.total, 0);
+          const sumNextMedico = nextConIso
+            .filter((p) => p._iso === iso && p.medico === medico)
+            .reduce((s, p) => s + p.total, 0);
+          const deltaMedico = sumNextMedico - sumPrevMedico;
+          if (deltaMedico !== 0) porMedico[medico] = (porMedico[medico] ?? 0) + deltaMedico;
+        });
+        porFechaYMedico[iso] = porMedico;
       });
       // Spread de prevFin PRIMERO — nunca se debe perder un campo que otra
       // parte de la app ya haya escrito aquí (ej. devolucionesPorFecha) solo
       // porque esta función todavía no lo conocía cuando se escribió.
-      return { ...prevFin, porFecha, porFechaYFormaPago, pagosCountPorFecha };
+      return { ...prevFin, porFecha, porFechaYFormaPago, porFechaYMedico, pagosCountPorFecha };
     });
   };
 

@@ -13,7 +13,7 @@ function hoyIso(): string {
 }
 
 export default function ReporteCorteCaja() {
-  const { finanzas } = usePatientData();
+  const { finanzas, recursos } = usePatientData();
   const [fecha, setFecha] = useState(hoyIso());
 
   const cobrosBrutos = finanzas.porFecha[fecha] ?? 0;
@@ -23,6 +23,13 @@ export default function ReporteCorteCaja() {
   const formas = Object.entries(porForma).sort((a, b) => b[1] - a[1]);
   const porMetodoDevolucion = finanzas.devolucionesPorFechaYMetodo?.[fecha] ?? {};
   const metodosDevolucion = Object.entries(porMetodoDevolucion).sort((a, b) => b[1] - a[1]);
+
+  // El nombre del médico en un Pago es texto libre (capturado en Pagos.tsx),
+  // no una referencia al id del recurso — se empareja por nombre, mismo
+  // criterio que ya usa Comisiones.tsx para citas sin catálogo.
+  const medicosPorNombre = new Map(recursos.filter((r) => r.tipo === "medico").map((r) => [r.nombre, r]));
+  const porMedico = finanzas.porFechaYMedico?.[fecha] ?? {};
+  const medicos = Object.entries(porMedico).sort((a, b) => b[1] - a[1]);
 
   const ultimosDias = Object.entries(finanzas.porFecha)
     .filter(([, monto]) => monto !== 0)
@@ -62,7 +69,12 @@ export default function ReporteCorteCaja() {
               {metodosDevolucion.map(([metodo, monto]) => (
                 <div key={metodo} className="flex items-center justify-between rounded-lg border border-danger/15 bg-danger/5 px-4 py-2.5 text-sm">
                   <span className="text-ink/80">{metodo}</span>
-                  <span className="font-semibold text-danger">−{formatCurrency(monto)}</span>
+                  <span className="flex items-center gap-2">
+                    <span className="text-xs text-danger/60">
+                      {devolucionesMonto > 0 ? ((monto / devolucionesMonto) * 100).toFixed(1) : "0.0"}%
+                    </span>
+                    <span className="font-semibold text-danger">−{formatCurrency(monto)}</span>
+                  </span>
                 </div>
               ))}
             </div>
@@ -85,9 +97,51 @@ export default function ReporteCorteCaja() {
                   className="flex items-center justify-between rounded-lg border border-edge/10 bg-inset px-4 py-2.5 text-sm"
                 >
                   <span className="text-ink/80">{forma}</span>
-                  <span className="font-semibold text-ink">{formatCurrency(monto)}</span>
+                  <span className="flex items-center gap-2">
+                    <span className="text-xs text-ink/40">
+                      {cobrosBrutos > 0 ? ((monto / cobrosBrutos) * 100).toFixed(1) : "0.0"}%
+                    </span>
+                    <span className="font-semibold text-ink">{formatCurrency(monto)}</span>
+                  </span>
                 </div>
               ))}
+            </div>
+          )}
+
+          {medicos.length > 0 && (
+            <div className="mt-4 space-y-2">
+              <h4 className="text-xs font-semibold uppercase tracking-wide text-ink/40">Desglose por médico</h4>
+              <p className="text-[11px] text-ink/40">
+                El % es su comisión (cuánto pagarle), no su parte del total del día — se configura en
+                Agenda → Recursos.
+              </p>
+              {medicos.map(([nombreMedico, monto]) => {
+                const recurso = medicosPorNombre.get(nombreMedico);
+                const pct = recurso?.porcentajeComision;
+                return (
+                  <div
+                    key={nombreMedico}
+                    className="rounded-lg border border-edge/10 bg-inset px-4 py-2.5 text-sm"
+                  >
+                    <div className="flex items-center justify-between">
+                      <span className="text-ink/80">{nombreMedico}</span>
+                      <span className="font-semibold text-ink">{formatCurrency(monto)}</span>
+                    </div>
+                    {pct != null ? (
+                      <div className="mt-1 flex items-center justify-between text-xs">
+                        <span className="text-ink/40">Comisión ({pct}%)</span>
+                        <span className="font-semibold text-accent">{formatCurrency((monto * pct) / 100)}</span>
+                      </div>
+                    ) : (
+                      <p className="mt-1 text-[11px] text-ink/30">
+                        {recurso
+                          ? "Sin % de comisión configurado — edítalo en Agenda → Recursos."
+                          : "Sin un recurso registrado con este nombre exacto en Agenda → Recursos."}
+                      </p>
+                    )}
+                  </div>
+                );
+              })}
             </div>
           )}
         </div>
@@ -100,20 +154,28 @@ export default function ReporteCorteCaja() {
         {ultimosDias.length === 0 ? (
           <p className="text-xs text-ink/30">Aún no hay pagos registrados.</p>
         ) : (
-          <div className="space-y-1.5">
-            {ultimosDias.map(([iso, monto]) => (
-              <button
-                key={iso}
-                onClick={() => setFecha(iso)}
-                className={`flex w-full items-center justify-between rounded-lg px-3 py-2 text-left text-sm transition-colors hover:bg-inset ${
-                  iso === fecha ? "bg-accent/10 text-accent" : "text-ink/70"
-                }`}
-              >
-                <span>{iso}</span>
-                <span className="font-semibold">{formatCurrency(monto)}</span>
-              </button>
-            ))}
-          </div>
+          <>
+            <div className="space-y-1.5">
+              {ultimosDias.map(([iso, monto]) => (
+                <button
+                  key={iso}
+                  onClick={() => setFecha(iso)}
+                  className={`flex w-full items-center justify-between rounded-lg px-3 py-2 text-left text-sm transition-colors hover:bg-inset ${
+                    iso === fecha ? "bg-accent/10 text-accent" : "text-ink/70"
+                  }`}
+                >
+                  <span>{iso}</span>
+                  <span className="font-semibold">{formatCurrency(monto)}</span>
+                </button>
+              ))}
+            </div>
+            <div className="mt-2 flex items-center justify-between border-t border-edge/10 px-3 pt-2.5 text-sm">
+              <span className="font-semibold text-ink/60">Total</span>
+              <span className="font-bold text-ink">
+                {formatCurrency(ultimosDias.reduce((suma, [, monto]) => suma + monto, 0))}
+              </span>
+            </div>
+          </>
         )}
       </div>
     </div>

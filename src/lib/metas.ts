@@ -16,6 +16,11 @@ export const metaConfigInicial: MetaConfig = { metaMensual: 0 };
 export type FinanzasConfig = {
   porFecha: Record<string, number>;
   porFechaYFormaPago: Record<string, Record<string, number>>;
+  /** Mismo criterio que porFechaYFormaPago, desglosado por el texto libre
+   * `Pago.medico` en vez de la forma de pago — alimenta "Desglose por
+   * médico" en Corte de Caja. Opcional por retrocompatibilidad, igual que
+   * el resto de campos aditivos de esta config. */
+  porFechaYMedico?: Record<string, Record<string, number>>;
   /** Devoluciones completadas — indexado por la fecha REAL en que se
    * completó la devolución (completadoEn), NUNCA por la fecha del pago
    * original, para que el corte histórico del día del pago nunca se

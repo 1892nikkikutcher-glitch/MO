@@ -14,11 +14,19 @@ export default function AgendaRecursoDialog({
   inicial?: Recurso;
   coloresEnUso: string[];
   onClose: () => void;
-  onSave: (recurso: { nombre: string; tipo: "medico" | "unidad"; color: string }) => void;
+  onSave: (recurso: {
+    nombre: string;
+    tipo: "medico" | "unidad";
+    color: string;
+    porcentajeComision?: number;
+  }) => void;
 }) {
   const [nombre, setNombre] = useState(inicial?.nombre ?? "");
   const [tipo, setTipo] = useState<"medico" | "unidad">(inicial?.tipo ?? "medico");
   const [color, setColor] = useState(() => inicial?.color ?? elegirColorDisponible(coloresEnUso));
+  const [porcentajeComision, setPorcentajeComision] = useState(
+    inicial?.porcentajeComision != null ? String(inicial.porcentajeComision) : ""
+  );
 
   const puedeGuardar = nombre.trim().length > 0;
 
@@ -70,6 +78,25 @@ export default function AgendaRecursoDialog({
               className={inputClass}
             />
           </div>
+          {tipo === "medico" && (
+            <div>
+              <label className="mb-1 block text-xs font-medium text-ink/60">% de comisión</label>
+              <p className="mb-1.5 text-[11px] text-ink/40">
+                Qué porcentaje de lo que él mismo cobra le corresponde a él — se usa en Corte de Caja
+                para calcular cuánto pagarle. Déjalo vacío si todavía no lo defines.
+              </p>
+              <input
+                type="number"
+                min={0}
+                max={100}
+                step="0.1"
+                value={porcentajeComision}
+                onChange={(e) => setPorcentajeComision(e.target.value)}
+                placeholder="Ej. 50"
+                className={inputClass}
+              />
+            </div>
+          )}
           <div>
             <label className="mb-1 block text-xs font-medium text-ink/60">
               Color de identificación en agenda
@@ -102,7 +129,20 @@ export default function AgendaRecursoDialog({
             Cancelar
           </button>
           <button
-            onClick={() => puedeGuardar && onSave({ nombre: nombre.trim(), tipo, color })}
+            onClick={() => {
+              if (!puedeGuardar) return;
+              const base = { nombre: nombre.trim(), tipo, color };
+              // Nunca `porcentajeComision: undefined` explícito — Firestore
+              // rechaza escribir un campo con ese valor. Si no hay nada
+              // capturado, se omite la llave por completo en vez de
+              // asignarle undefined (ver Agenda.tsx: al editar, esto deja
+              // intacto lo que ya hubiera guardado, nunca lo borra).
+              onSave(
+                tipo === "medico" && porcentajeComision.trim() !== ""
+                  ? { ...base, porcentajeComision: Math.min(100, Math.max(0, Number(porcentajeComision))) }
+                  : base
+              );
+            }}
             disabled={!puedeGuardar}
             className="flex-1 rounded-lg border border-accent/60 bg-accent/15 py-2 text-sm font-semibold text-accent transition-opacity hover:bg-accent/25 disabled:cursor-not-allowed disabled:opacity-40"
           >
