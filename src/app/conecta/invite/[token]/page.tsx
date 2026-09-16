@@ -210,6 +210,12 @@ function VerificarCorreo({ user, token }: { user: User; token: string }) {
       >
         {verificando ? "Comprobando…" : "Ya verifiqué, continuar"}
       </button>
+      <button
+        onClick={() => signOut(auth)}
+        className="w-full text-center text-xs text-white/50 hover:text-white/80"
+      >
+        ¿Este correo está equivocado? Cierra sesión e identifícate de nuevo
+      </button>
     </div>
   );
 }
