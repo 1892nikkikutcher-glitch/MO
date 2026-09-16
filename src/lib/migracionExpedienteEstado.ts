@@ -17,6 +17,13 @@ export type MigracionExpediente = {
   id: string; // clinicaOrigenId_patientIdOrigen — determinístico, ver v3 §11
   patientIdOrigen: string;
   clinicaOrigenId: string;
+  /** uid de quien disparó `iniciarMigracion` — el plan (v3 §11 paso 2) no
+   * lo nombra explícitamente, pero crear la participación responsable_
+   * principal (participaciones.ts) exige un `createdBy`, y el expediente
+   * (expedienteClinico.ts) exige un `responsablePrincipalUid`; ninguno de
+   * los dos puede inventarse, así que se registra aquí en el momento en
+   * que sí se conoce. */
+  iniciadoPorUid?: string;
   pacienteGlobalId?: string;
   expedienteId?: string;
   estado: MigracionEstado;
@@ -95,6 +102,24 @@ export function puedeAvanzarMigracion(actual: MigracionEstado, siguiente: Migrac
   const idxSiguiente = ORDEN_MIGRACION.indexOf(siguiente);
   if (idxActual === -1 || idxSiguiente === -1) return false;
   return idxSiguiente === idxActual + 1;
+}
+
+/** true si una función orquestadora (migracionesExpediente.ts, Fase 2)
+ * puede hacer el trabajo de llegar a `destino` en este momento — cubre dos
+ * casos válidos: una transición fresca (`puedeAvanzarMigracion`) o un
+ * REINTENTO del mismo paso (`actual === destino`, ej. el proceso se
+ * interrumpió a medio copiar lotes). `puedeAvanzarMigracion` por sí sola
+ * rechaza el segundo caso (`actual === siguiente` siempre es `false`), y
+ * por diseño: esa función responde "¿es un AVANCE válido?", no "¿puedo
+ * seguir intentando este paso?" — son preguntas distintas, cada una con un
+ * único dueño. */
+export function puedeContinuarHacia(actual: MigracionEstado, destino: MigracionEstado): boolean {
+  // Un estado TERMINAL nunca "se reintenta a sí mismo" — no hay trabajo
+  // pendiente que retomar (distinto de un estado intermedio interrumpido a
+  // medias). Mismo criterio que ya usa puedeAvanzarMigracion para rechazar
+  // cualquier transición de salida de un estado terminal.
+  if (actual === destino) return !ESTADOS_TERMINALES.includes(actual);
+  return puedeAvanzarMigracion(actual, destino);
 }
 
 /** Refleja la tabla de fuente canónica de v3 §12 — true si este estado

@@ -1,10 +1,33 @@
 import { describe, expect, it } from "vitest";
 import {
+  calcularHashFolio,
   formatoFolioValido,
   generarFolioCrudo,
   normalizarFolio,
   resolverFolioPorVersionDeClave,
 } from "../folioPaciente";
+
+// Nunca con el pepper real de ningún entorno — un secreto de prueba basta
+// para probar las propiedades del hash sin tocar process.env ni Firestore.
+const SECRETO_PRUEBA = "secreto-de-prueba-nunca-real";
+
+describe("calcularHashFolio", () => {
+  it("es determinístico: mismo folio + mismo secreto = mismo hash", () => {
+    expect(calcularHashFolio("MOABC123", SECRETO_PRUEBA)).toBe(calcularHashFolio("MOABC123", SECRETO_PRUEBA));
+  });
+
+  it("folios distintos con el mismo secreto dan hashes distintos", () => {
+    expect(calcularHashFolio("MOABC123", SECRETO_PRUEBA)).not.toBe(calcularHashFolio("MOXYZ789", SECRETO_PRUEBA));
+  });
+
+  it("el mismo folio con secretos distintos da hashes distintos (rotación de clave)", () => {
+    expect(calcularHashFolio("MOABC123", SECRETO_PRUEBA)).not.toBe(calcularHashFolio("MOABC123", "otro-secreto"));
+  });
+
+  it("nunca contiene el folio crudo en el resultado", () => {
+    expect(calcularHashFolio("MOABC123", SECRETO_PRUEBA)).not.toContain("MOABC123");
+  });
+});
 
 describe("normalizarFolio", () => {
   it("recorta espacios y pasa a mayúsculas", () => {

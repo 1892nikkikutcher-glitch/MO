@@ -8,6 +8,7 @@
  * un secreto real. `conectaFolioPaciente.ts` (Fase 2, todavía no escrito)
  * la envuelve con `crypto.createHmac` y `dbAdmin` de verdad. */
 
+import { createHmac } from "crypto";
 import type { Timestamp } from "firebase-admin/firestore";
 
 /** Sin 0/O/1/I/L — ambiguos al leerlos en voz alta o escritos a mano,
@@ -54,6 +55,16 @@ export function generarFolioCrudo(): string {
     cuerpo += ALFABETO_FOLIO[Math.floor(Math.random() * ALFABETO_FOLIO.length)];
   }
   return `MO${cuerpo}`;
+}
+
+/** HMAC-SHA256 puro dado un secreto ya resuelto (v3 §17) — `crypto` es un
+ * módulo nativo de Node sin relación alguna con Firebase, así que vive
+ * aquí (con el resto de la lógica pura del folio) y no en
+ * conectaFolioPaciente.ts: ese archivo importa `dbAdmin`, que inicializa
+ * Firebase Admin al cargarse el módulo — con eso ahí, hasta probar esta
+ * función pura con Vitest tronaría por falta de credenciales. */
+export function calcularHashFolio(folioNormalizado: string, secreto: string): string {
+  return createHmac("sha256", secreto).update(folioNormalizado).digest("hex");
 }
 
 export type ResolucionFolio<T> = { encontrado: T; version: number };

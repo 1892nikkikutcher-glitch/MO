@@ -1,6 +1,7 @@
 import { capitalizarNombre } from "./textoNombre";
 import type { PrioridadTratamiento } from "./planTratamiento";
 import { montoMayorQue, redondearDinero } from "./dinero";
+import type { MigracionEstado } from "./migracionExpedienteEstado";
 
 export type Patient = {
   id: string;
@@ -65,6 +66,17 @@ export type Patient = {
   fusionadoEnId?: string;
   /** ISO datetime — cuándo se fusionó. */
   fusionadoEn?: string;
+
+  /** Estado de la migración hacia el expediente clínico compartido
+   * (arquitectura MO Conecta v3, §11) — ausente equivale a "no_migrado".
+   * `firestore.rules` (`escrituraClinicaLocalPermitida`) lee este mismo
+   * campo por su nombre exacto para bloquear la escritura clínica local
+   * desde "congelado" en adelante; nunca renombrar sin actualizar la regla. */
+  migracionEstado?: MigracionEstado;
+  /** Presente solo una vez `migracionEstado === "migrado"` — id de
+   * `expedientesClinicos/{id}` (== `pacientesGlobales/{id}`) que la
+   * interfaz debe leer/escribir en vez de las subcolecciones locales. */
+  expedienteCanonicoId?: string;
 };
 
 /** Convierte la fecha ISO ("YYYY-MM-DD") de una cita a formato día/mes/año

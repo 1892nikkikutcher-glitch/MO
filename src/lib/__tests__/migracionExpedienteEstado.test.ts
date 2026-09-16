@@ -3,6 +3,7 @@ import {
   migracionBloqueaEscrituraLocal,
   migracionYaCongeloOrigen,
   puedeAvanzarMigracion,
+  puedeContinuarHacia,
 } from "../migracionExpedienteEstado";
 
 describe("puedeAvanzarMigracion — avance normal", () => {
@@ -66,6 +67,25 @@ describe("puedeAvanzarMigracion — fallos", () => {
   it("los estados terminales (migrado, reversion_pendiente) no tienen ninguna transición de salida", () => {
     expect(puedeAvanzarMigracion("migrado", "reversion_pendiente")).toBe(false);
     expect(puedeAvanzarMigracion("reversion_pendiente", "copiando")).toBe(false);
+  });
+});
+
+describe("puedeContinuarHacia — avance fresco o reintento del mismo paso", () => {
+  it("un avance fresco válido sigue permitido, igual que puedeAvanzarMigracion", () => {
+    expect(puedeContinuarHacia("preparando", "copiando")).toBe(true);
+  });
+
+  it("reintentar el mismo paso (el proceso se interrumpió a medio copiar) está permitido", () => {
+    expect(puedeContinuarHacia("copiando", "copiando")).toBe(true);
+  });
+
+  it("nunca permite ni saltarse una etapa ni retroceder, ni como reintento", () => {
+    expect(puedeContinuarHacia("iniciada", "copiando")).toBe(false);
+    expect(puedeContinuarHacia("congelado", "copiando")).toBe(false);
+  });
+
+  it("un estado terminal nunca 'continúa', ni hacia sí mismo", () => {
+    expect(puedeContinuarHacia("migrado", "migrado")).toBe(false);
   });
 });
 
