@@ -72,8 +72,7 @@ export type CrearInterconsultaBody = {
   motivo: string;
   preguntaClinica: string;
   prioridad: PrioridadInterconsulta;
-  /** Ausente = "aislado_con_retorno" (mismo default que `puedeTransicionar`). */
-  tipoInterconsulta?: TipoInterconsulta;
+  tipoInterconsulta: TipoInterconsulta;
   antecedentesAlertas?: string;
   destinatarioUid?: string;
   destinatarioClinicaId?: string;

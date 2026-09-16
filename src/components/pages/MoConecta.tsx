@@ -1473,7 +1473,14 @@ function SalaDelCaso({ interconsulta, onVolver }: { interconsulta: Interconsulta
     "completed",
     "closed",
     "cancelled",
-  ].filter((e) => puedeTransicionar(interconsulta.estado, e as InterconsultaEstado, tieneJustificacion)) as InterconsultaEstado[];
+  ].filter((e) =>
+    puedeTransicionar(
+      interconsulta.estado,
+      e as InterconsultaEstado,
+      tieneJustificacion,
+      interconsulta.tipoInterconsulta ?? "legacy_sin_clasificar"
+    )
+  ) as InterconsultaEstado[];
 
   return (
     <div className="space-y-4">

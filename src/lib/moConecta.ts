@@ -186,10 +186,11 @@ export const interconsultaEstadoLabel: Record<InterconsultaEstado, string> = {
  * contrarreferencia. "transferencia_continuidad": el receptor, al aceptar,
  * se vuelve el nuevo responsable principal — el caso termina en
  * "transferida", nunca en la cola de aislado_con_retorno (ver
- * `puedeTransicionar`). Por ahora es solo el parámetro que distingue las
- * dos colas; el campo real en `Interconsulta` y su selector en la UI se
- * agregan cuando se conecta el resto del flujo (episodios/transferencia). */
-export type TipoInterconsulta = "aislado_con_retorno" | "transferencia_continuidad";
+ * `puedeTransicionar`). "legacy_sin_clasificar": SOLO para interconsultas
+ * creadas antes de que este campo existiera — nunca elegible al crear una
+ * nueva (v3 §14); bloquea el avance más allá de "accepted" hasta que el
+ * responsable reclasifique explícitamente el caso. */
+export type TipoInterconsulta = "aislado_con_retorno" | "transferencia_continuidad" | "legacy_sin_clasificar";
 
 /** Orden de avance normal del caso — de aquí sale qué es "adelante" y qué es
  * "un salto" (que exige justificación). rejected/cancelled/closed son
@@ -237,9 +238,13 @@ const COLA_SOLO_AISLADO_CON_RETORNO: InterconsultaEstado[] = [
  * contrarreferencia; "transferencia_continuidad" solo puede llegar a
  * "transferida" — nunca a patient_contacted/scheduled/in_treatment/
  * completed/counter_referral_sent/closed, esa cola es exclusiva de un
- * aislado con retorno. Por compatibilidad con las llamadas existentes
- * (que todavía no distinguen tipo de interconsulta), el default preserva
- * el único comportamiento real de hoy. */
+ * aislado con retorno. "legacy_sin_clasificar" (v3 §14) comparte ese mismo
+ * bloqueo: una interconsulta histórica sin clasificar tampoco avanza más
+ * allá de "accepted" hasta que el responsable elige explícitamente uno de
+ * los dos tipos reales — cancelar o rechazar el caso sigue funcionando
+ * igual, solo "avanzar" queda bloqueado. Por compatibilidad con las
+ * llamadas existentes (que todavía no distinguen tipo de interconsulta),
+ * el default preserva el único comportamiento real de hoy. */
 export function puedeTransicionar(
   actual: InterconsultaEstado,
   siguiente: InterconsultaEstado,
@@ -252,7 +257,10 @@ export function puedeTransicionar(
   if (siguiente === "transferida") {
     return tipoInterconsulta === "transferencia_continuidad" && actual === "accepted";
   }
-  if (tipoInterconsulta === "transferencia_continuidad" && COLA_SOLO_AISLADO_CON_RETORNO.includes(siguiente)) {
+  if (
+    (tipoInterconsulta === "transferencia_continuidad" || tipoInterconsulta === "legacy_sin_clasificar") &&
+    COLA_SOLO_AISLADO_CON_RETORNO.includes(siguiente)
+  ) {
     return false;
   }
 
@@ -341,10 +349,10 @@ export type Interconsulta = {
   resumenPaciente: ResumenPacienteAutorizado;
   destinatarioUid?: string;
   destinatarioClinicaId?: string;
-  /** Ausente en interconsultas creadas antes de este campo — tratarla como
-   * "aislado_con_retorno" en ese caso (mismo default que ya usa
-   * `puedeTransicionar`), nunca asumir "transferencia_continuidad" por
-   * ausencia de dato. */
+  /** Ausente en interconsultas creadas antes de este campo — el código que
+   * lee este valor para decidir transiciones debe resolverlo como
+   * "legacy_sin_clasificar" (v3 §14), nunca asumir "aislado_con_retorno" ni
+   * "transferencia_continuidad" por ausencia de dato. */
   tipoInterconsulta?: TipoInterconsulta;
   especialidadSolicitada: string;
   motivo: string;

@@ -45,7 +45,8 @@ export async function registrarContrarreferencia(
     const actualizacion: Partial<Interconsulta> = { contrarreferencia, actualizadoEl: ahora };
 
     if (!input.esBorrador) {
-      if (!puedeTransicionar(interconsulta.estado, "counter_referral_sent", false)) {
+      const tipoInterconsulta = interconsulta.tipoInterconsulta ?? "legacy_sin_clasificar";
+      if (!puedeTransicionar(interconsulta.estado, "counter_referral_sent", false, tipoInterconsulta)) {
         throw new ConectaError(409, "No se puede enviar la contrarreferencia en el estado actual del caso.");
       }
       actualizacion.estado = "counter_referral_sent";

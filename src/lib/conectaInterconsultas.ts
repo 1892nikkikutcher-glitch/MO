@@ -22,8 +22,7 @@ export type CrearInterconsultaInput = {
   motivo: string;
   preguntaClinica: string;
   prioridad: "ordinaria" | "preferente" | "urgente";
-  /** Ausente = "aislado_con_retorno" (mismo default que `puedeTransicionar`). */
-  tipoInterconsulta?: TipoInterconsulta;
+  tipoInterconsulta: TipoInterconsulta;
   antecedentesAlertas?: string;
   destinatarioUid?: string;
   destinatarioClinicaId?: string;
@@ -95,7 +94,7 @@ export async function crearInterconsulta(remitenteUid: string, input: CrearInter
     resumenPaciente,
     destinatarioUid: input.destinatarioUid,
     destinatarioClinicaId: input.destinatarioClinicaId,
-    tipoInterconsulta: input.tipoInterconsulta ?? "aislado_con_retorno",
+    tipoInterconsulta: input.tipoInterconsulta,
     especialidadSolicitada: input.especialidadSolicitada,
     motivo: input.motivo,
     preguntaClinica: input.preguntaClinica,

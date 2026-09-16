@@ -113,6 +113,27 @@ describe("puedeTransicionar", () => {
     expect(puedeTransicionar("transferida", "closed", true, "aislado_con_retorno")).toBe(false);
     expect(puedeTransicionar("transferida", "cancelled", true, "transferencia_continuidad")).toBe(false);
   });
+
+  it("legacy_sin_clasificar: antes de 'accepted' se comporta igual que cualquier otro tipo", () => {
+    expect(puedeTransicionar("sent", "received", false, "legacy_sin_clasificar")).toBe(true);
+    expect(puedeTransicionar("received", "accepted", false, "legacy_sin_clasificar")).toBe(true);
+    expect(puedeTransicionar("sent", "rejected", false, "legacy_sin_clasificar")).toBe(true);
+    expect(puedeTransicionar("sent", "cancelled", false, "legacy_sin_clasificar")).toBe(true);
+  });
+
+  it("legacy_sin_clasificar: no avanza más allá de 'accepted' hasta que el responsable reclasifique", () => {
+    const colaAislado: InterconsultaEstado[] = [
+      "patient_contacted", "scheduled", "in_treatment", "completed", "counter_referral_sent", "closed",
+    ];
+    for (const siguiente of colaAislado) {
+      expect(puedeTransicionar("accepted", siguiente, true, "legacy_sin_clasificar")).toBe(false);
+    }
+    expect(puedeTransicionar("accepted", "transferida", false, "legacy_sin_clasificar")).toBe(false);
+  });
+
+  it("legacy_sin_clasificar: cancelar (abandonar el caso) sigue funcionando sin reclasificar", () => {
+    expect(puedeTransicionar("accepted", "cancelled", true, "legacy_sin_clasificar")).toBe(true);
+  });
 });
 
 describe("puedeCerrarInterconsulta", () => {
