@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { auth } from "@/lib/firebase";
 import BottomNav, { navItems } from "./BottomNav";
 import { categoriaSugerenciaOptions, type CategoriaSugerencia } from "@/lib/patientData";
@@ -554,10 +554,35 @@ function DashboardBody({
   // siente como si nunca se acabara. `scroll` (no un handler de arrastre)
   // porque esto debe funcionar igual con scroll nativo del dedo, rueda del
   // mouse o cualquier otro método — no solo con un arrastre reconocido a mano.
+  //
+  // El truco SOLO tiene sentido si una copia es más ancha que la ventana
+  // visible (por eso sirve en celular) — en una ventana ancha de escritorio
+  // una sola copia ya cabe completa, y triplicar el contenido ahí solo
+  // muestra 2-3 copias del header a la vez (botones repetidos, varios
+  // "Cerrar sesión"). `necesitaCarrusel` mide la copia real en el DOM
+  // (nunca `el.scrollWidth` completo, que ya incluiría las 3 copias y
+  // nunca podría "des-activarse" al ensanchar la ventana) y decide cuántas
+  // copias renderizar.
   const headerScrollRef = useRef<HTMLDivElement>(null);
-  useEffect(() => {
+  const [necesitaCarrusel, setNecesitaCarrusel] = useState(false);
+
+  useLayoutEffect(() => {
     const el = headerScrollRef.current;
     if (!el) return;
+    function medir() {
+      if (!el) return;
+      const primeraCopia = el.firstElementChild as HTMLElement | null;
+      if (!primeraCopia) return;
+      setNecesitaCarrusel(primeraCopia.scrollWidth > el.clientWidth + 1);
+    }
+    medir();
+    window.addEventListener("resize", medir);
+    return () => window.removeEventListener("resize", medir);
+  }, [esAdmin]);
+
+  useEffect(() => {
+    const el = headerScrollRef.current;
+    if (!el || !necesitaCarrusel) return;
     const anchoUnaCopia = () => el.scrollWidth / 3;
     el.scrollLeft = anchoUnaCopia();
     function onScroll() {
@@ -569,7 +594,7 @@ function DashboardBody({
     }
     el.addEventListener("scroll", onScroll);
     return () => el.removeEventListener("scroll", onScroll);
-  }, []);
+  }, [necesitaCarrusel]);
 
   const activeLabel =
     activePage === "panel-admin"
@@ -599,13 +624,17 @@ function DashboardBody({
              Los difuminados en los bordes avisan que hay más para deslizar
              — sin esto, los últimos íconos (sugerencia, tema, cerrar
              sesión) parecían haber desaparecido en vez de solo estar fuera
-             de vista. */}
-          <div className="pointer-events-none absolute inset-y-0 left-0 z-10 w-6 bg-gradient-to-r from-app to-transparent sm:w-10" />
+             de vista. Ambos (difuminados y las copias extra "b"/"c") solo
+             aparecen cuando `necesitaCarrusel` — si todo ya cabe, no hay
+             nada que insinuar que se puede deslizar. */}
+          {necesitaCarrusel && (
+            <div className="pointer-events-none absolute inset-y-0 left-0 z-10 w-6 bg-gradient-to-r from-app to-transparent sm:w-10" />
+          )}
           <div
             ref={headerScrollRef}
             className="flex min-w-0 flex-1 items-center gap-2 overflow-x-auto [-ms-overflow-style:none] [scrollbar-width:none] sm:gap-4 [&::-webkit-scrollbar]:hidden"
           >
-            {["a", "b", "c"].map((copia) => (
+            {(necesitaCarrusel ? ["a", "b", "c"] : ["a"]).map((copia) => (
               <div key={copia} className="flex shrink-0 items-center gap-2 sm:gap-4">
                 <QuickActionsBar
                   isLight={isLight}
@@ -652,7 +681,9 @@ function DashboardBody({
               </div>
             ))}
           </div>
-          <div className="pointer-events-none absolute inset-y-0 right-0 z-10 w-6 bg-gradient-to-l from-app to-transparent sm:w-10" />
+          {necesitaCarrusel && (
+            <div className="pointer-events-none absolute inset-y-0 right-0 z-10 w-6 bg-gradient-to-l from-app to-transparent sm:w-10" />
+          )}
         </header>
 
         <div className="px-3 py-6 sm:px-6 sm:py-8 lg:pr-28">
