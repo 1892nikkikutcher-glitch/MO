@@ -1,9 +1,11 @@
+import { Timestamp } from "firebase-admin/firestore";
 import { describe, expect, it } from "vitest";
 import { episodioActivo, type Episodio } from "../episodios";
 
 function episodio(overrides: Partial<Episodio>): Episodio {
   return {
     id: "ep1",
+    expedienteId: "exp1",
     interconsultaId: "ic1",
     titulo: "Extracción de terceros molares",
     especialidad: "Cirugía Oral y Maxilofacial",
@@ -11,7 +13,7 @@ function episodio(overrides: Partial<Episodio>): Episodio {
     responsableUid: "uid-cirujano",
     clinicaOrigenId: "clinica-a",
     estado: "activo",
-    creadoEl: "2026-09-07T00:00:00.000Z",
+    creadoEl: Timestamp.fromDate(new Date("2026-09-07T00:00:00.000Z")),
     ...overrides,
   };
 }
