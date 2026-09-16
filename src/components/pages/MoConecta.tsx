@@ -1781,7 +1781,7 @@ function InvitarColegaDialog({ interconsultaId, onClose }: { interconsultaId: st
           <div className="space-y-3">
             <div>
               <label className={labelClass}>Nombre (opcional)</label>
-              <input className={inputClass} value={nombre} onChange={(e) => setNombre(e.target.value)} />
+              <input className={inputClass} value={nombre} onChange={(e) => manejarCambioNombre(e, setNombre)} />
             </div>
             <div>
               <label className={labelClass}>Correo del colega</label>

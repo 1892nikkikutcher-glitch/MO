@@ -14,7 +14,7 @@ import { subirFirmaRecepcionDevolucion, dataUrlABlob } from "@/lib/firmaRecepcio
 import { generarComprobanteDevolucionPdf } from "@/lib/generarComprobanteDevolucionPdf";
 import { enviarPdfPorWhatsapp } from "@/lib/enviarPdfWhatsapp";
 import AbrirWhatsAppPrompt from "@/components/AbrirWhatsAppPrompt";
-import { slugify } from "@/lib/textoNombre";
+import { manejarCambioNombre, slugify } from "@/lib/textoNombre";
 import {
   formatCurrency,
   motivoDevolucionOptions,
@@ -455,7 +455,7 @@ export default function RegistrarDevolucionDialog({
               <div className="space-y-2">
                 <div>
                   <label className="mb-1 block text-xs font-medium text-ink/60">¿Quién recibe el efectivo?</label>
-                  <input type="text" value={recibeNombre} onChange={(e) => setRecibeNombre(e.target.value)} placeholder="Nombre de quien recibe" className={inputClass} />
+                  <input type="text" value={recibeNombre} onChange={(e) => manejarCambioNombre(e, setRecibeNombre)} placeholder="Nombre de quien recibe" className={inputClass} />
                 </div>
                 <div>
                   <label className="mb-1 block text-xs font-medium text-ink/60">Relación con el paciente</label>
