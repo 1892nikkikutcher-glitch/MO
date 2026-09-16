@@ -1,6 +1,6 @@
 import { Timestamp } from "firebase-admin/firestore";
 import { describe, expect, it } from "vitest";
-import { idSesionAccesoExpediente, sesionAccesoActivaValida } from "../sesionAccesoExpediente";
+import { calcularExpiresAt, idSesionAccesoExpediente, sesionAccesoActivaValida } from "../sesionAccesoExpediente";
 
 const AHORA = Timestamp.fromDate(new Date("2026-09-14T12:00:00.000Z"));
 const EN_UNA_HORA = Timestamp.fromDate(new Date("2026-09-14T13:00:00.000Z"));
@@ -66,6 +66,34 @@ describe("sesionAccesoActivaValida — estado no activo", () => {
 
   it("false si la sesión está expirada", () => {
     expect(sesionAccesoActivaValida(sesionValida({ estado: "expirada" }), CONTEXTO)).toBe(false);
+  });
+});
+
+describe("calcularExpiresAt — v3 §10: min(inactividad 15 min, duración absoluta 60 min)", () => {
+  it("al abrir la sesión (iniciadaEl == ahora), gana la ventana de inactividad de 15 min — es menor que el tope de 60", () => {
+    const resultado = calcularExpiresAt(AHORA, AHORA);
+    expect(resultado.toMillis()).toBe(AHORA.toMillis() + 15 * 60_000);
+  });
+
+  it("al renovar bien entrada la sesión, sigue ganando la inactividad si todavía falta para el tope absoluto", () => {
+    const iniciadaEl = AHORA;
+    const ahoraRenovando = Timestamp.fromMillis(AHORA.toMillis() + 20 * 60_000); // 20 min después de abrir
+    const resultado = calcularExpiresAt(iniciadaEl, ahoraRenovando);
+    expect(resultado.toMillis()).toBe(ahoraRenovando.toMillis() + 15 * 60_000);
+  });
+
+  it("cerca del tope absoluto, la renovación queda recortada al tope — nunca lo rebasa", () => {
+    const iniciadaEl = AHORA;
+    // A 50 min de iniciada — 15 min de inactividad la llevarían a 65 min,
+    // pero el tope absoluto es 60 min desde iniciadaEl.
+    const ahoraRenovando = Timestamp.fromMillis(AHORA.toMillis() + 50 * 60_000);
+    const resultado = calcularExpiresAt(iniciadaEl, ahoraRenovando);
+    expect(resultado.toMillis()).toBe(iniciadaEl.toMillis() + 60 * 60_000);
+  });
+
+  it("justo en el momento de abrir, el resultado nunca excede el tope absoluto de 60 min", () => {
+    const resultado = calcularExpiresAt(AHORA, AHORA);
+    expect(resultado.toMillis()).toBeLessThanOrEqual(AHORA.toMillis() + 60 * 60_000);
   });
 });
 

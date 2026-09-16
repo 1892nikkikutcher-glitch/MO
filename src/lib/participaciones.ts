@@ -36,12 +36,17 @@ export type Participacion = {
   rol: RolParticipacion;
   nivelAcceso: NivelAcceso;
   alcance: AlcanceParticipacion;
-  /** Los tres ausentes SOLO en la participación "responsable_principal"
-   * original que crea una migración (v3 §11 paso 2) — esa participación no
-   * nace de la cadena folio→solicitud→consentimiento (§7): es la propia
-   * clínica dueña del paciente, nunca alguien pidiendo acceso a un
-   * expediente ajeno. Cualquier OTRA participación (otorgada por acceso
-   * cross-clínica) sí exige los tres, siempre. */
+  /** `consentimientoId`/`solicitudAccesoId` están ausentes SOLO en la
+   * participación "responsable_principal" original que crea una migración
+   * (v3 §11 paso 2, migracionesExpediente.ts) — esa no nace de la cadena
+   * folio→solicitud→consentimiento (§7): es la propia clínica dueña del
+   * paciente, nunca alguien pidiendo acceso a un expediente ajeno.
+   * Cualquier OTRA participación (otorgada por acceso cross-clínica,
+   * conectaConsentimientoExpediente.ts) sí exige ambos, siempre.
+   * `interconsultaId` es más ampliamente opcional: también está ausente en
+   * una participación otorgada por la cadena de folio cuando no hay
+   * ninguna interconsulta previa vinculando a ambos profesionales — se
+   * puebla solo cuando de verdad existe una. */
   consentimientoId?: string;
   solicitudAccesoId?: string;
   interconsultaId?: string;
