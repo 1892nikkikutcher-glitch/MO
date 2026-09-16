@@ -78,3 +78,22 @@ export function formaConsentimientoValida(
   if (!c.otorgantePacienteUid && !c.representanteLegalId) return false;
   return true;
 }
+
+/** true solo si ESTE consentimiento respalda ESTA participación en
+ * concreto: mismo profesional, mismo expediente, y vigente — nunca un
+ * consentimiento de otro profesional o de otro expediente, aunque
+ * ambos existan y estén vigentes por separado (v3, "el consentimiento
+ * debe ser específico para el profesionista y el expediente
+ * correspondiente"). No sustituye la verificación de vigencia por fecha
+ * (`vigencia`) — esa se hace aparte con el mismo criterio que
+ * `participacionVigente`. */
+export function consentimientoRespaldaParticipacion(
+  consentimiento: Pick<ConsentimientoExpediente, "odontologoAutorizadoUid" | "expedienteId" | "estado">,
+  participacion: { profesionalUid: string; expedienteId: string }
+): boolean {
+  return (
+    consentimiento.estado === "vigente" &&
+    consentimiento.odontologoAutorizadoUid === participacion.profesionalUid &&
+    consentimiento.expedienteId === participacion.expedienteId
+  );
+}

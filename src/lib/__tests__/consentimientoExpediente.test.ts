@@ -1,5 +1,9 @@
 import { describe, expect, it } from "vitest";
-import { formaConsentimientoValida, requiereCapturadoPor } from "../consentimientoExpediente";
+import {
+  consentimientoRespaldaParticipacion,
+  formaConsentimientoValida,
+  requiereCapturadoPor,
+} from "../consentimientoExpediente";
 
 describe("requiereCapturadoPor", () => {
   it("true solo para asistido_con_evidencia", () => {
@@ -93,5 +97,40 @@ describe("formaConsentimientoValida", () => {
         representanteLegalId: "repr-1",
       })
     ).toBe(true);
+  });
+});
+
+describe("consentimientoRespaldaParticipacion — el consentimiento debe ser específico por profesional y expediente", () => {
+  const consentimientoBase = {
+    odontologoAutorizadoUid: "uid-dr-garcia",
+    expedienteId: "exp1",
+    estado: "vigente" as const,
+  };
+
+  it("respalda la participación cuando profesional y expediente coinciden y está vigente", () => {
+    expect(
+      consentimientoRespaldaParticipacion(consentimientoBase, { profesionalUid: "uid-dr-garcia", expedienteId: "exp1" })
+    ).toBe(true);
+  });
+
+  it("NO respalda una participación de otro profesional, aunque el consentimiento esté vigente", () => {
+    expect(
+      consentimientoRespaldaParticipacion(consentimientoBase, { profesionalUid: "uid-otro-doctor", expedienteId: "exp1" })
+    ).toBe(false);
+  });
+
+  it("NO respalda una participación sobre otro expediente, aunque sea el mismo profesional", () => {
+    expect(
+      consentimientoRespaldaParticipacion(consentimientoBase, { profesionalUid: "uid-dr-garcia", expedienteId: "exp-otro" })
+    ).toBe(false);
+  });
+
+  it("un consentimiento revocado nunca respalda ninguna participación, aunque el resto coincida exactamente", () => {
+    expect(
+      consentimientoRespaldaParticipacion(
+        { ...consentimientoBase, estado: "revocado" },
+        { profesionalUid: "uid-dr-garcia", expedienteId: "exp1" }
+      )
+    ).toBe(false);
   });
 });

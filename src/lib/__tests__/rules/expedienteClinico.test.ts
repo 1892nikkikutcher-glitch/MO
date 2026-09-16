@@ -146,6 +146,14 @@ describe("prueba prioritaria #6 — la revocación bloquea de inmediato", () => 
     const cliente = testEnv.authenticatedContext(UID).firestore();
     await assertFails(getDoc(doc(cliente, `expedientesClinicos/${EXP_ID}`)));
   });
+
+  it("una participación concluida (cierre normal, no revocación) tampoco permite leer — la regla exige == 'activa', no 'distinto de revocada'", async () => {
+    await sembrar(`participaciones/${EXP_ID}_${UID}_general`, participacionGeneralValida({ estado: "concluida" }));
+    await sembrar(`sesionesAccesoExpediente/${EXP_ID}_${UID}`, sesionValida());
+    await sembrar(`expedientesClinicos/${EXP_ID}`, { responsablePrincipalUid: UID });
+    const cliente = testEnv.authenticatedContext(UID).firestore();
+    await assertFails(getDoc(doc(cliente, `expedientesClinicos/${EXP_ID}`)));
+  });
 });
 
 describe("prueba prioritaria #7 — pacientesGlobales exige sesión, igual que el expediente", () => {
