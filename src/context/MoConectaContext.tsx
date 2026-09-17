@@ -30,6 +30,12 @@ type MoConectaContextValue = {
   pacientePreseleccionado: PacientePreseleccionado | null;
   prepararInterconsulta: (patientId: string, patientName: string) => void;
   limpiarPacientePreseleccionado: () => void;
+  /** Caso elegido desde Expediente (pestaña "MO Conecta") para abrirlo
+   * directo en la sala del caso, en vez de tener que buscarlo dentro de la
+   * lista de interconsultas — mismo patrón que pacientePreseleccionado. */
+  interconsultaPreseleccionada: string | null;
+  verInterconsulta: (interconsultaId: string) => void;
+  limpiarInterconsultaPreseleccionada: () => void;
 };
 
 const MoConectaContext = createContext<MoConectaContextValue | null>(null);
@@ -43,6 +49,7 @@ export function MoConectaProvider({ uid, children }: { uid: string; children: Re
   const [cargandoPerfil, setCargandoPerfil] = useState(true);
   const [cargandoCasos, setCargandoCasos] = useState(true);
   const [pacientePreseleccionado, setPacientePreseleccionado] = useState<PacientePreseleccionado | null>(null);
+  const [interconsultaPreseleccionada, setInterconsultaPreseleccionada] = useState<string | null>(null);
 
   useEffect(() => {
     if (!uid) return;
@@ -120,6 +127,9 @@ export function MoConectaProvider({ uid, children }: { uid: string; children: Re
         pacientePreseleccionado,
         prepararInterconsulta: (patientId, patientName) => setPacientePreseleccionado({ patientId, patientName }),
         limpiarPacientePreseleccionado: () => setPacientePreseleccionado(null),
+        interconsultaPreseleccionada,
+        verInterconsulta: (interconsultaId) => setInterconsultaPreseleccionada(interconsultaId),
+        limpiarInterconsultaPreseleccionada: () => setInterconsultaPreseleccionada(null),
       }}
     >
       {children}

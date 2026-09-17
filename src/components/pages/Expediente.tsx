@@ -14,6 +14,7 @@ import Pagos from "./Pagos";
 import ConsentimientoInformado from "./ConsentimientoInformado";
 import Laboratorios from "./Laboratorios";
 import NotasEvolucionTab from "@/components/notasEvolucion/NotasEvolucionTab";
+import InterconsultasPaciente from "./InterconsultasPaciente";
 import MembresiaTab from "./MembresiaTab";
 import { usePatientData } from "@/context/PatientDataContext";
 import { useMoConecta } from "@/context/MoConectaContext";
@@ -80,6 +81,7 @@ const expedienteTabs = [
   "Laboratorios",
   "Listado de Citas",
   "Notas de Evolución y Seguimiento",
+  "MO Conecta",
 ] as const;
 
 type ExpedienteTab = (typeof expedienteTabs)[number];
@@ -1050,7 +1052,7 @@ export default function Expediente({
     irAPagina,
     setAyudaContexto,
   } = usePatientData();
-  const { prepararInterconsulta } = useMoConecta();
+  const { prepararInterconsulta, verInterconsulta } = useMoConecta();
 
   // Publica la pestaña activa para que el Asistente flotante muestre ayuda
   // específica (ej. "cómo hacer un pago") en vez de solo "Pacientes" —
@@ -1245,15 +1247,12 @@ export default function Expediente({
           </button>
 
           <button
-            onClick={() => {
-              prepararInterconsulta(patient.id, patient.name);
-              irAPagina("mo-conecta");
-            }}
-            title="Enviar este caso a un colega para interconsulta por MO Conecta"
+            onClick={() => setActiveTab("MO Conecta")}
+            title="Ver interconsultas de este paciente en MO Conecta"
             style={{ boxShadow: "0 0 14px -2px rgb(var(--accent-rgb) / 0.7)" }}
             className="flex shrink-0 items-center justify-center gap-2 rounded-lg border border-accent/40 px-3 py-2 text-xs font-semibold text-accent transition-colors hover:bg-accent/10"
           >
-            Solicitar interconsulta
+            MO Conecta
           </button>
         </div>
 
@@ -1411,6 +1410,19 @@ export default function Expediente({
           {activeTab === "Notas de Evolución y Seguimiento" && (
             <NotasEvolucionTab patientId={patient.id} citaId={initialCitaId} />
           )}
+          {activeTab === "MO Conecta" && (
+            <InterconsultasPaciente
+              patientId={patient.id}
+              onSolicitar={() => {
+                prepararInterconsulta(patient.id, patient.name);
+                irAPagina("mo-conecta");
+              }}
+              onAbrirCaso={(interconsultaId) => {
+                verInterconsulta(interconsultaId);
+                irAPagina("mo-conecta");
+              }}
+            />
+          )}
           {activeTab === "Membresía" && (
             <MembresiaTab patientId={patient.id} patientName={patient.name} />
           )}
@@ -1423,7 +1435,8 @@ export default function Expediente({
             activeTab !== "Membresía" &&
             activeTab !== "Consentimientos Informados" &&
             activeTab !== "Laboratorios" &&
-            activeTab !== "Notas de Evolución y Seguimiento" && (
+            activeTab !== "Notas de Evolución y Seguimiento" &&
+            activeTab !== "MO Conecta" && (
               <div className="rounded-2xl border border-dashed border-edge/15 bg-surface p-10 text-center text-sm text-ink/40">
                 {activeTab} — próximamente
               </div>

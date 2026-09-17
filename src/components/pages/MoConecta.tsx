@@ -90,7 +90,7 @@ const estadoColor: Record<InterconsultaEstado, string> = {
   cancelled: "bg-danger/10 text-danger",
 };
 
-function EstadoBadge({ estado }: { estado: InterconsultaEstado }) {
+export function EstadoBadge({ estado }: { estado: InterconsultaEstado }) {
   return (
     <span className={`rounded-full px-2.5 py-1 text-xs font-medium ${estadoColor[estado]}`}>
       {interconsultaEstadoLabel[estado]}
@@ -101,9 +101,19 @@ function EstadoBadge({ estado }: { estado: InterconsultaEstado }) {
 type TabId = "resumen" | "directorio" | "interconsultas" | "perfil" | "afiliacion";
 
 export default function MoConecta() {
-  const { perfilPublico, pacientePreseleccionado } = useMoConecta();
-  const [tab, setTab] = useState<TabId>(pacientePreseleccionado ? "directorio" : "resumen");
-  const [casoAbierto, setCasoAbierto] = useState<string | null>(null);
+  const { perfilPublico, pacientePreseleccionado, interconsultaPreseleccionada, limpiarInterconsultaPreseleccionada } =
+    useMoConecta();
+  const [tab, setTab] = useState<TabId>(
+    interconsultaPreseleccionada ? "interconsultas" : pacientePreseleccionado ? "directorio" : "resumen"
+  );
+  const [casoAbierto, setCasoAbierto] = useState<string | null>(interconsultaPreseleccionada);
+
+  // Se consume una sola vez al montar (mismo criterio que pacientePreseleccionado)
+  // — así volver a entrar a MO Conecta más tarde no reabre el mismo caso viejo.
+  useEffect(() => {
+    if (interconsultaPreseleccionada) limpiarInterconsultaPreseleccionada();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
   const [mostrarNuevaInterconsulta, setMostrarNuevaInterconsulta] = useState(false);
   const [mostrarInvitarOdontologo, setMostrarInvitarOdontologo] = useState(false);
 
