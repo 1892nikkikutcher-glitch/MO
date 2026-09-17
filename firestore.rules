@@ -7,18 +7,16 @@ service cloud.firestore {
     }
 
     // ============================================================
-    // PREPARADO, NO DESPLEGADO — bloqueo real de escritura clínica local
-    // tras migrar un paciente a expedientesClinicos (arquitectura MO
-    // Conecta v3, §9). Definidas ANTES del comodín de más abajo que las
-    // usa — a propósito, para no depender de que Firestore permita
-    // referenciar una función definida más adelante en el archivo (sin
-    // el emulador funcionando en esta máquina no se puede verificar esa
-    // suposición, así que se evita por completo). Sin datos reales
-    // todavía (Fase 2+ no ha corrido), hoy esto es un no-op: ningún
-    // documento de pacientes tiene `migracionEstado` puesto. NUNCA se
-    // aplica a fotos/estudios cuyo binario vive en Storage — ver además
-    // la ruta de servidor de descarga (v3 §9); storage.rules no cambia
-    // aquí.
+    // DESPLEGADO (v3 §9) — bloqueo real de escritura clínica local tras
+    // migrar un paciente a expedientesClinicos. Definidas ANTES del
+    // comodín de más abajo que las usa — a propósito, para no depender de
+    // que Firestore permita referenciar una función definida más adelante
+    // en el archivo. Sin datos reales todavía (el migrador de Fase 2
+    // nunca ha corrido contra un paciente real), hoy esto sigue siendo un
+    // no-op en la práctica: ningún documento de pacientes tiene
+    // `migracionEstado` puesto todavía. NUNCA se aplica a fotos/estudios
+    // cuyo binario vive en Storage — ver además la ruta de servidor de
+    // descarga (v3 §9); storage.rules no cambia aquí.
     function migracionEstadoPaciente(clinicaId, patientId) {
       return get(/databases/$(database)/documents/users/$(clinicaId)/pacientes/$(patientId))
         .data.get('migracionEstado', 'no_migrado');
@@ -52,14 +50,16 @@ service cloud.firestore {
     // siguen dependiendo de ella hasta que se migren a la capa multi-clínica.
     match /users/{userId}/{allPaths=**} {
       allow read: if signedIn() && request.auth.uid == userId;
-      // PREPARADO, NO DESPLEGADO (v3 §9): sin esta condición extra, el
-      // candado de escritura de las coincidencias específicas de más
-      // abajo no protegería nada contra el propio dueño de la cuenta —
-      // este comodín ya le concede lectura/escritura incondicional a
-      // TODO lo de users/{userId}/**, y Firestore evalúa todas las
-      // coincidencias con OR (la más específica nunca "gana" sobre esta).
-      // Hoy es un no-op: sin `migracionEstado` en ningún documento,
-      // `esRutaClinicaCompartible` nunca bloquea nada real.
+      // DESPLEGADO (v3 §9): sin esta condición extra, el candado de
+      // escritura de las coincidencias específicas de más abajo no
+      // protegería nada contra el propio dueño de la cuenta — este
+      // comodín ya le concede lectura/escritura incondicional a TODO lo
+      // de users/{userId}/**, y Firestore evalúa todas las coincidencias
+      // con OR (la más específica nunca "gana" sobre esta). Hoy sigue
+      // siendo un no-op en la práctica: sin `migracionEstado` en ningún
+      // documento real todavía, `esRutaClinicaCompartible` nunca bloquea
+      // nada de verdad — pero la regla ya está viva, lista para cuando
+      // exista el primer documento migrado.
       allow write: if signedIn() && request.auth.uid == userId
         && (!esRutaClinicaCompartible(allPaths) || escrituraClinicaLocalPermitida(userId, allPaths[1]));
     }
@@ -466,12 +466,13 @@ service cloud.firestore {
     // arriba: ninguna colección de aquí abajo admite escritura desde el
     // cliente — todo pasa por /api/expediente/* con Firebase Admin SDK.
     //
-    // PREPARADO, NO DESPLEGADO — Fase 0/en curso: estas colecciones
-    // todavía no tienen documentos (ninguna ruta de /api/expediente/*
-    // existe aún), así que desplegar esto hoy sería, en la práctica, un
-    // no-op de seguridad (el catch-all de más abajo ya cerraba el
-    // acceso). Se preparan de una vez, completas, para no tener que
-    // volver a tocar reglas de seguridad cada vez que avance una fase.
+    // DESPLEGADO — estas colecciones todavía no tienen documentos
+    // (ninguna ruta de /api/expediente/* existe aún, ningún folio real se
+    // ha generado), así que en la práctica esto sigue siendo un no-op de
+    // seguridad (el catch-all de más abajo ya cerraba el acceso) hasta
+    // que exista el primer documento real. Se prepararon de una vez,
+    // completas, para no tener que volver a tocar reglas de seguridad
+    // cada vez que avance una fase.
     //
     // Regla que gobierna todo este bloque (v3): folio para localizar,
     // consentimiento para autorizar, participación para acceder, sesión
