@@ -503,28 +503,27 @@ service cloud.firestore {
     // servidor pudieran haber creado con el id correcto pero datos
     // inconsistentes (última precisión de la ronda de aprobación de v3).
     //
-    // Una sola lectura real (`let sesion = get(...)`), reutilizada para las
-    // cinco comparaciones — la primera versión llamaba get() cinco veces
-    // sobre la misma ruta (una por comparación) y eso hacía tronar la
-    // evaluación de la regla contra el emulador real (confirmado
-    // empíricamente: tieneParticipacionActiva, que solo llama get() una
-    // vez, nunca falló).
+    // Tercera versión — una sola lectura, sin `exists()` aparte. Las dos
+    // versiones anteriores (5x get() por comparación; luego 1x let-get() +
+    // 1x exists() sobre la misma ruta) tronaban la evaluación contra el
+    // emulador real de forma intermitente incluso en un entorno Linux
+    // limpio (GitHub Actions, sin Windows de por medio) — descartando que
+    // fuera un problema de esta máquina. Se sospecha que el propio
+    // `exists()` sobre una ruta que YA se leyó vía `let get()` en la misma
+    // evaluación interactúa mal con el motor de reglas del emulador.
+    // `.data.get(campo, valorSeguro)` (mismo patrón ya probado en
+    // `migracionEstadoPaciente` arriba) nunca truena si el documento no
+    // existe o le falta un campo — sustituye por completo la necesidad de
+    // `exists()`.
     function tieneSesionAccesoActiva(expedienteId) {
-      // Ruta escrita inline en exists() (nunca una variable let) — igual
-      // que el patrón ya probado de tieneParticipacionActiva. Una segunda
-      // versión que ligaba la RUTA (no el resultado) a una variable let y
-      // la reusaba en exists()+get() seguía tronando contra el emulador
-      // real, así que se descarta ese patrón aquí, aunque en teoría
-      // debería ser válido.
       let sesion = get(/databases/$(database)/documents/sesionesAccesoExpediente/$(expedienteId + '_' + request.auth.uid));
       let participacionEsperada = expedienteId + '_' + request.auth.uid + '_general';
       return signedIn()
-        && exists(/databases/$(database)/documents/sesionesAccesoExpediente/$(expedienteId + '_' + request.auth.uid))
-        && sesion.data.expedienteId == expedienteId
-        && sesion.data.profesionalUid == request.auth.uid
-        && sesion.data.estado == 'activa'
-        && sesion.data.expiresAt > request.time
-        && sesion.data.participacionId == participacionEsperada;
+        && sesion.data.get('estado', '') == 'activa'
+        && sesion.data.get('expedienteId', '') == expedienteId
+        && sesion.data.get('profesionalUid', '') == request.auth.uid
+        && sesion.data.get('expiresAt', request.time) > request.time
+        && sesion.data.get('participacionId', '') == participacionEsperada;
     }
     function puedeLeerExpediente(expedienteId) {
       return tieneParticipacionActiva(expedienteId) && tieneSesionAccesoActiva(expedienteId);
