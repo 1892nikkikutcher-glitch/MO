@@ -1,0 +1,36 @@
+name: Pruebas de reglas de Firestore
+
+# Corre el mismo suite de src/lib/__tests__/rules/** contra el emulador
+# real de Firebase, pero en Linux — elimina la variable Windows/Java
+# (AF_UNIX) que causa fallas intermitentes al correrlo en esta máquina de
+# desarrollo. workflow_dispatch para poder correrlo bajo demanda antes de
+# desplegar firestore.rules; también corre solo cuando cambian las reglas
+# o sus pruebas, para detectar regresiones futuras automáticamente.
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - "firestore.rules"
+      - "storage.rules"
+      - "src/lib/__tests__/rules/**"
+
+jobs:
+  rules-tests:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: "npm"
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: "temurin"
+          java-version: "17"
+
+      - run: npm ci
+
+      - run: npx firebase emulators:exec --only auth,firestore,storage "npm run test:emulator"
