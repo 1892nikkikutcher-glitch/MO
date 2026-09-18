@@ -68,9 +68,9 @@ export function resolverAfiliacionApi(id: string, accion: "aceptar" | "rechazar"
 export type CrearInterconsultaBody = {
   clinicaRemitenteId: string;
   pacienteId: string;
-  especialidadSolicitada: string;
-  motivo: string;
-  preguntaClinica: string;
+  especialidadSolicitada?: string;
+  motivo?: string;
+  preguntaClinica?: string;
   prioridad: PrioridadInterconsulta;
   tipoInterconsulta: TipoInterconsulta;
   antecedentesAlertas?: string;

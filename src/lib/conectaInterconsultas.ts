@@ -18,9 +18,9 @@ import type { Patient } from "./patientData";
 export type CrearInterconsultaInput = {
   clinicaRemitenteId: string;
   pacienteId: string;
-  especialidadSolicitada: string;
-  motivo: string;
-  preguntaClinica: string;
+  especialidadSolicitada?: string;
+  motivo?: string;
+  preguntaClinica?: string;
   prioridad: "ordinaria" | "preferente" | "urgente";
   tipoInterconsulta: TipoInterconsulta;
   antecedentesAlertas?: string;

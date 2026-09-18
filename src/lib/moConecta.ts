@@ -354,9 +354,12 @@ export type Interconsulta = {
    * "legacy_sin_clasificar" (v3 §14), nunca asumir "aislado_con_retorno" ni
    * "transferencia_continuidad" por ausencia de dato. */
   tipoInterconsulta?: TipoInterconsulta;
-  especialidadSolicitada: string;
-  motivo: string;
-  preguntaClinica: string;
+  /** Los tres opcionales a propósito: el envío rápido por WhatsApp (nombre +
+   * teléfono del colega) no debe bloquearse por pedir detalle clínico que a
+   * veces se termina de acordar por chat una vez que el colega acepta. */
+  especialidadSolicitada?: string;
+  motivo?: string;
+  preguntaClinica?: string;
   prioridad: PrioridadInterconsulta;
   antecedentesAlertas?: string;
   archivos: ArchivoInterconsulta[];

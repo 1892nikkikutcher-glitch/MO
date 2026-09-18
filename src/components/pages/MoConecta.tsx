@@ -90,6 +90,13 @@ const estadoColor: Record<InterconsultaEstado, string> = {
   cancelled: "bg-danger/10 text-danger",
 };
 
+/** Especialidad/motivo/preguntaClinica son opcionales (envío rápido por
+ * WhatsApp, sin detalle clínico) — nunca se deja un " · " colgando ni un
+ * hueco en blanco donde antes siempre había texto. */
+export function nombreYEspecialidad(nombre: string, especialidad?: string): string {
+  return especialidad?.trim() ? `${nombre} · ${especialidad}` : nombre;
+}
+
 export function EstadoBadge({ estado }: { estado: InterconsultaEstado }) {
   return (
     <span className={`rounded-full px-2.5 py-1 text-xs font-medium ${estadoColor[estado]}`}>
@@ -299,9 +306,9 @@ function ResumenTab({
                 >
                   <div className="min-w-0">
                     <p className="truncate text-sm font-medium text-ink">
-                      {c.resumenPaciente.nombre} · {c.especialidadSolicitada}
+                      {nombreYEspecialidad(c.resumenPaciente.nombre, c.especialidadSolicitada)}
                     </p>
-                    <p className="truncate text-xs text-ink/50">{c.motivo}</p>
+                    {c.motivo && <p className="truncate text-xs text-ink/50">{c.motivo}</p>}
                   </div>
                   <EstadoBadge estado={c.estado} />
                 </button>
@@ -1214,7 +1221,7 @@ function NuevaInterconsultaDialog({
             </select>
           </div>
           <div>
-            <label className={labelClass}>Especialidad solicitada</label>
+            <label className={labelClass}>Especialidad solicitada (opcional)</label>
             <input
               className={inputClass}
               value={especialidadSolicitada}
@@ -1223,11 +1230,11 @@ function NuevaInterconsultaDialog({
             />
           </div>
           <div>
-            <label className={labelClass}>Motivo</label>
+            <label className={labelClass}>Motivo (opcional)</label>
             <textarea className={inputClass} rows={2} value={motivo} onChange={(e) => setMotivo(e.target.value)} />
           </div>
           <div>
-            <label className={labelClass}>Pregunta clínica</label>
+            <label className={labelClass}>Pregunta clínica (opcional)</label>
             <textarea
               className={inputClass}
               rows={2}
@@ -1299,9 +1306,6 @@ function NuevaInterconsultaDialog({
             disabled={
               enviando ||
               !pacienteId ||
-              !especialidadSolicitada.trim() ||
-              !motivo.trim() ||
-              !preguntaClinica.trim() ||
               !aceptaConsentimiento ||
               (!destinatario && !whatsappEspecialista.trim())
             }
@@ -1364,9 +1368,9 @@ function CasosTab({
             >
               <div className="min-w-0">
                 <p className="truncate font-medium text-ink">
-                  {c.resumenPaciente.nombre} · {c.especialidadSolicitada}
+                  {nombreYEspecialidad(c.resumenPaciente.nombre, c.especialidadSolicitada)}
                 </p>
-                <p className="truncate text-xs text-ink/50">{c.motivo}</p>
+                {c.motivo && <p className="truncate text-xs text-ink/50">{c.motivo}</p>}
               </div>
               <EstadoBadge estado={c.estado} />
             </button>
@@ -1509,9 +1513,9 @@ function SalaDelCaso({ interconsulta, onVolver }: { interconsulta: Interconsulta
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div>
             <h2 className="text-lg font-semibold text-ink">
-              {interconsulta.resumenPaciente.nombre} · {interconsulta.especialidadSolicitada}
+              {nombreYEspecialidad(interconsulta.resumenPaciente.nombre, interconsulta.especialidadSolicitada)}
             </h2>
-            <p className="text-sm text-ink/60">{interconsulta.motivo}</p>
+            <p className="text-sm text-ink/60">{interconsulta.motivo || "Sin motivo especificado"}</p>
           </div>
           <EstadoBadge estado={interconsulta.estado} />
         </div>
@@ -1535,7 +1539,7 @@ function SalaDelCaso({ interconsulta, onVolver }: { interconsulta: Interconsulta
           )}
           <div className="sm:col-span-2">
             <p className="text-xs text-ink/40">Pregunta clínica</p>
-            <p className="text-ink/80">{interconsulta.preguntaClinica}</p>
+            <p className="text-ink/80">{interconsulta.preguntaClinica || "Sin pregunta clínica especificada"}</p>
           </div>
         </div>
       </div>

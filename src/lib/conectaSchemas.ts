@@ -63,9 +63,9 @@ export const interconsultaCrearSchema = z
   .object({
     clinicaRemitenteId: z.string().trim().min(1).max(200),
     pacienteId: z.string().trim().min(1).max(200),
-    especialidadSolicitada: z.string().trim().min(1).max(200),
-    motivo: z.string().trim().min(1).max(4000),
-    preguntaClinica: z.string().trim().min(1).max(4000),
+    especialidadSolicitada: z.string().trim().max(200).optional(),
+    motivo: z.string().trim().max(4000).optional(),
+    preguntaClinica: z.string().trim().max(4000).optional(),
     prioridad: z.enum(["ordinaria", "preferente", "urgente"]),
     tipoInterconsulta: z.enum(["aislado_con_retorno", "transferencia_continuidad"]),
     antecedentesAlertas: z.string().trim().max(2000).optional(),
