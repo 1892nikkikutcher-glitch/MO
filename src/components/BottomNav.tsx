@@ -529,7 +529,7 @@ export default function BottomNav({
 
       <nav
         aria-label="Navegación principal"
-        className="fixed right-2.5 top-1/2 z-40 hidden max-h-[62vh] w-[60px] -translate-y-1/2 flex-col rounded-[20px] border border-edge/10 bg-modal-solid/95 p-1.5 shadow-[0_12px_30px_-10px_rgba(0,0,0,0.6)] backdrop-blur-[10px] print:hidden lg:flex lg:w-[84px] lg:p-2"
+        className="fixed right-2.5 top-1/2 z-40 hidden max-h-[62vh] w-[60px] -translate-y-1/2 flex-col rounded-[20px] border border-edge/10 bg-modal-solid/95 p-1.5 shadow-[0_12px_30px_-10px_rgba(0,0,0,0.6)] backdrop-blur-[10px] print:hidden lg:flex lg:max-h-[68vh] lg:w-[84px] lg:p-2"
       >
         <div className="pointer-events-none absolute inset-x-0 top-0 z-10 h-4 rounded-t-[20px] bg-gradient-to-b from-modal-solid/95 to-transparent" />
         <div

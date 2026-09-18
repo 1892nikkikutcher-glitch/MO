@@ -54,7 +54,7 @@ export default function AsistenteFlotante({
         onClick={() => setAbierto((v) => !v)}
         title="Asistente — qué puedo hacer aquí"
         style={{ boxShadow: "0 0 18px -2px rgb(var(--accent-rgb) / 0.7)" }}
-        className="fixed bottom-[150px] right-6 z-40 flex h-10 w-10 items-center justify-center rounded-full border border-accent/50 bg-accent/20 text-accent backdrop-blur transition-transform hover:scale-105 print:hidden lg:bottom-6 lg:left-6 lg:right-auto lg:h-20 lg:w-20"
+        className="fixed bottom-[150px] right-6 z-40 flex h-10 w-10 items-center justify-center rounded-full border border-accent/50 bg-accent/20 text-accent backdrop-blur transition-transform hover:scale-105 print:hidden lg:bottom-6 lg:h-20 lg:w-20"
       >
         <IconoAsistente />
       </button>
@@ -66,7 +66,7 @@ export default function AsistenteFlotante({
             className="fixed inset-0 z-40 print:hidden"
             aria-hidden
           />
-          <div className="fixed bottom-[200px] right-6 z-50 max-h-[70vh] w-[calc(100vw-3rem)] max-w-sm overflow-y-auto rounded-2xl border border-edge/10 bg-modal-solid p-5 shadow-2xl print:hidden lg:bottom-[158px] lg:left-6 lg:right-auto">
+          <div className="fixed bottom-[200px] right-6 z-50 max-h-[70vh] w-[calc(100vw-3rem)] max-w-sm overflow-y-auto rounded-2xl border border-edge/10 bg-modal-solid p-5 shadow-2xl print:hidden lg:bottom-[158px]">
             <div className="mb-3 flex items-start justify-between gap-3">
               <div>
                 <p className="text-[11px] font-semibold uppercase tracking-wide text-accent">
