@@ -11,6 +11,7 @@ import CandadoPrivacidad from "@/components/CandadoPrivacidad";
 import PendientesConsultorio from "@/components/PendientesConsultorio";
 import PeriodSelector from "@/components/dashboard/PeriodSelector";
 import FinancialSummary from "@/components/dashboard/FinancialSummary";
+import FondosFinancieros from "@/components/dashboard/FondosFinancieros";
 import ProductivitySummary from "@/components/dashboard/ProductivitySummary";
 import BudgetMetrics from "@/components/dashboard/BudgetMetrics";
 import AppointmentMetrics from "@/components/dashboard/AppointmentMetrics";
@@ -355,6 +356,7 @@ export default function Inicio() {
       <SeccionDashboard titulo="Finanzas">
         <FinancialSummary rango={rango} />
         <BudgetMetrics rango={rango} />
+        <FondosFinancieros rango={rango} />
         {puedeVerFinanzas && (
           <MetasCard metaMensual={metas.metaMensual} avanceMetas={avanceMetas} irAPagina={irAPagina} />
         )}
