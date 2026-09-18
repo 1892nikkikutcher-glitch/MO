@@ -356,7 +356,7 @@ export default function Inicio() {
       <SeccionDashboard titulo="Finanzas">
         <FinancialSummary rango={rango} />
         <BudgetMetrics rango={rango} />
-        <FondosFinancieros rango={rango} />
+        <FondosFinancieros />
         {puedeVerFinanzas && (
           <MetasCard metaMensual={metas.metaMensual} avanceMetas={avanceMetas} irAPagina={irAPagina} />
         )}

@@ -1,16 +1,24 @@
 "use client";
 
+import { useState } from "react";
 import { usePatientData } from "@/context/PatientDataContext";
 import { usePrivacidad } from "@/context/PrivacidadContext";
 import { formatCurrency } from "@/lib/patientData";
-import type { RangoPeriodo } from "@/lib/dashboardMetrics";
 import {
   GRUPOS_EFECTIVO,
   GRUPOS_ELECTRONICO,
   calcularAsignacionFondos,
+  rangoVistaFondos,
   sumarRangoPorFormaPago,
   type GrupoConMonto,
+  type VistaFondos,
 } from "@/lib/fondosFinancieros";
+
+const OPCIONES_VISTA: { id: VistaFondos; label: string }[] = [
+  { id: "quincena1", label: "Quincena 1–15" },
+  { id: "quincena2", label: "Quincena 16–fin" },
+  { id: "mes", label: "Mes" },
+];
 
 /** Marco naranja fosforescente que separa la regla de sobres del resto de
  * Finanzas — mucho más marcado que el `neonShadow` de una sola franja que
@@ -91,33 +99,52 @@ function CanalFondos({
 
 /** Regla de sobres del consultorio: separa lo que entra por Efectivo de lo
  * que entra Electrónico (tarjeta/transferencia/cheque) y reparte cada
- * canal entre fondos fijos, en pesos reales del periodo activo — mismo
- * `rango` que el resto de Finanzas (Inicio.tsx). Los porcentajes son fijos
- * (definidos por el usuario), no editables desde aquí todavía. */
-export default function FondosFinancieros({ rango }: { rango: RangoPeriodo }) {
+ * canal entre fondos fijos, en pesos reales de la vista elegida (Quincena
+ * 1/2 o Mes) — siempre relativo al mes actual, independiente del selector
+ * de periodo general de Inicio.tsx (que no tiene noción de quincena). Los
+ * porcentajes son fijos (definidos por el usuario), no editables desde
+ * aquí todavía. */
+export default function FondosFinancieros() {
   const { puedeVerFinanzas, finanzas } = usePatientData();
   const { oculto } = usePrivacidad();
+  const [vista, setVista] = useState<VistaFondos>("mes");
 
   if (!puedeVerFinanzas) return null;
 
-  const desdePeriodo = new Date(`${rango.desdeISO}T00:00:00`);
-  const hastaPeriodo = new Date(`${rango.hastaISO}T00:00:00`);
-  const ingresos = sumarRangoPorFormaPago(finanzas.porFechaYFormaPago, desdePeriodo, hastaPeriodo);
+  const rangoActivo = rangoVistaFondos(vista, new Date());
+  const ingresos = sumarRangoPorFormaPago(finanzas.porFechaYFormaPago, rangoActivo.desde, rangoActivo.hasta);
 
   const gruposElectronico = calcularAsignacionFondos(GRUPOS_ELECTRONICO, ingresos.electronico);
   const gruposEfectivo = calcularAsignacionFondos(GRUPOS_EFECTIVO, ingresos.efectivo);
 
   return (
     <div className="rounded-2xl bg-surface p-6" style={MARCO_FOSFORESCENTE}>
-      <div className="mb-1 flex items-center gap-2">
-        <span
-          className="h-2 w-2 shrink-0 rounded-full"
-          style={{ backgroundColor: "#ff8c00", boxShadow: "0 0 8px #ff8c00" }}
-        />
-        <h2 className="text-sm font-semibold uppercase tracking-wide text-ink">Fondos · Regla de Sobres</h2>
+      <div className="mb-1 flex flex-wrap items-center justify-between gap-3">
+        <div className="flex items-center gap-2">
+          <span
+            className="h-2 w-2 shrink-0 rounded-full"
+            style={{ backgroundColor: "#ff8c00", boxShadow: "0 0 8px #ff8c00" }}
+          />
+          <h2 className="text-sm font-semibold uppercase tracking-wide text-ink">Fondos · Regla de Sobres</h2>
+        </div>
+        <div className="flex flex-wrap items-center gap-1.5">
+          {OPCIONES_VISTA.map((op) => (
+            <button
+              key={op.id}
+              onClick={() => setVista(op.id)}
+              className={`rounded-lg border px-2.5 py-1 text-[11px] font-semibold transition-colors ${
+                vista === op.id
+                  ? "border-accent bg-accent/15 text-accent"
+                  : "border-edge/10 bg-surface text-ink/50 hover:text-ink/80"
+              }`}
+            >
+              {op.label}
+            </button>
+          ))}
+        </div>
       </div>
       <p className="mb-5 text-xs text-ink/40">
-        Reparto fijo de {rango.label.toLowerCase()} entre fondos, según cómo pagó el paciente.
+        Reparto fijo de {rangoActivo.label} entre fondos, según cómo pagó el paciente.
       </p>
 
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
@@ -126,14 +153,14 @@ export default function FondosFinancieros({ rango }: { rango: RangoPeriodo }) {
           ingresoCanal={ingresos.electronico}
           grupos={gruposElectronico}
           oculto={oculto}
-          rangoLabel={rango.label}
+          rangoLabel={rangoActivo.label}
         />
         <CanalFondos
           nombre="Efectivo"
           ingresoCanal={ingresos.efectivo}
           grupos={gruposEfectivo}
           oculto={oculto}
-          rangoLabel={rango.label}
+          rangoLabel={rangoActivo.label}
         />
       </div>
     </div>

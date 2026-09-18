@@ -3,8 +3,13 @@ import {
   GRUPOS_EFECTIVO,
   GRUPOS_ELECTRONICO,
   calcularAsignacionFondos,
+  rangoVistaFondos,
   sumarRangoPorFormaPago,
 } from "../fondosFinancieros";
+
+function iso(d: Date): string {
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+}
 
 describe("sumarRangoPorFormaPago", () => {
   it("separa Efectivo de cualquier otra forma de pago", () => {
@@ -68,5 +73,45 @@ describe("calcularAsignacionFondos", () => {
   it("ingreso en cero da montos en cero, no NaN ni error", () => {
     const grupos = calcularAsignacionFondos(GRUPOS_EFECTIVO, 0);
     expect(grupos[0].fondos.every((f) => f.monto === 0)).toBe(true);
+  });
+});
+
+describe("rangoVistaFondos", () => {
+  it("hoy a medio quincena 1 (día 8): quincena 1 corta a hoy, quincena 2 todavía no arranca (rango vacío)", () => {
+    const hoy = new Date(2026, 8, 8); // 8 de septiembre
+    const q1 = rangoVistaFondos("quincena1", hoy);
+    expect(iso(q1.desde)).toBe("2026-09-01");
+    expect(iso(q1.hasta)).toBe("2026-09-08"); // cortado a hoy, no llega al día 15 todavía
+
+    const q2 = rangoVistaFondos("quincena2", hoy);
+    expect(q2.desde.getTime()).toBeGreaterThan(q2.hasta.getTime()); // día 16 > hoy (día 8) — rango vacío
+  });
+
+  it("hoy a medio quincena 2 (día 18): quincena 1 ya cerrada completa (1-15), quincena 2 corta a hoy", () => {
+    const hoy = new Date(2026, 8, 18); // 18 de septiembre
+    const q1 = rangoVistaFondos("quincena1", hoy);
+    expect(iso(q1.desde)).toBe("2026-09-01");
+    expect(iso(q1.hasta)).toBe("2026-09-15"); // ya pasó completa, no se corta
+
+    const q2 = rangoVistaFondos("quincena2", hoy);
+    expect(iso(q2.desde)).toBe("2026-09-16");
+    expect(iso(q2.hasta)).toBe("2026-09-18"); // cortado a hoy
+
+    const mes = rangoVistaFondos("mes", hoy);
+    expect(iso(mes.desde)).toBe("2026-09-01");
+    expect(iso(mes.hasta)).toBe("2026-09-18");
+  });
+
+  it("el último día de un mes de 30 días: quincena 2 llega completa hasta el día 30, no se corta antes", () => {
+    const hoy = new Date(2026, 8, 30); // 30 de septiembre (septiembre tiene 30 días)
+    const q2 = rangoVistaFondos("quincena2", hoy);
+    expect(iso(q2.hasta)).toBe("2026-09-30");
+  });
+
+  it("etiquetas legibles por vista", () => {
+    const hoy = new Date(2026, 8, 18);
+    expect(rangoVistaFondos("quincena1", hoy).label).toBe("1–15 sep.");
+    expect(rangoVistaFondos("quincena2", hoy).label).toBe("16–30 sep.");
+    expect(rangoVistaFondos("mes", hoy).label).toBe("sep. 2026");
   });
 });

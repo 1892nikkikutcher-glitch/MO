@@ -4,6 +4,7 @@
  * ver Inicio.tsx para dónde se muestran. */
 
 import { redondearDinero } from "./dinero";
+import { MESES_ABR } from "./agendaHelpers";
 
 export type FondoAsignacion = { label: string; porcentaje: number };
 
@@ -76,6 +77,46 @@ export function sumarRangoPorFormaPago(
     });
   });
   return { efectivo: redondearDinero(efectivo), electronico: redondearDinero(electronico) };
+}
+
+export type VistaFondos = "quincena1" | "quincena2" | "mes";
+
+export type RangoFondos = { desde: Date; hasta: Date; label: string };
+
+/** Rango de fechas de la vista elegida, siempre relativo al mes de `hoy`
+ * (esta sección no navega a meses pasados, a diferencia del selector de
+ * periodo general de Inicio.tsx) — quincena 1 = días 1-15, quincena 2 =
+ * día 16 al último día del mes (mismo corte que ya usa `inicioQuincena` en
+ * metas.ts para la Meta Quincenal). `hasta` nunca pasa de hoy — un periodo
+ * que todavía no llega (ej. quincena 2 vista el día 8) da un rango vacío,
+ * que `sumarRangoPorFormaPago` ya interpreta como cero sin necesitar un
+ * caso especial. */
+export function rangoVistaFondos(vista: VistaFondos, hoy: Date): RangoFondos {
+  const anio = hoy.getFullYear();
+  const mes = hoy.getMonth();
+  const hoySinHora = new Date(anio, mes, hoy.getDate());
+  const ultimoDiaMes = new Date(anio, mes + 1, 0).getDate();
+
+  let desde: Date;
+  let finNatural: Date;
+  let label: string;
+
+  if (vista === "quincena1") {
+    desde = new Date(anio, mes, 1);
+    finNatural = new Date(anio, mes, 15);
+    label = `1–15 ${MESES_ABR[mes]}`;
+  } else if (vista === "quincena2") {
+    desde = new Date(anio, mes, 16);
+    finNatural = new Date(anio, mes, ultimoDiaMes);
+    label = `16–${ultimoDiaMes} ${MESES_ABR[mes]}`;
+  } else {
+    desde = new Date(anio, mes, 1);
+    finNatural = new Date(anio, mes, ultimoDiaMes);
+    label = `${MESES_ABR[mes]} ${anio}`;
+  }
+
+  const hasta = finNatural < hoySinHora ? finNatural : hoySinHora;
+  return { desde, hasta, label };
 }
 
 export type FondoConMonto = FondoAsignacion & { monto: number };
