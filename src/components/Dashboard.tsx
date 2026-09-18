@@ -3,7 +3,7 @@
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { auth } from "@/lib/firebase";
 import BottomNav, { navItems } from "./BottomNav";
-import { categoriaSugerenciaOptions, type CategoriaSugerencia } from "@/lib/patientData";
+import { categoriaSugerenciaOptions, DURACION_PRUEBA_DIAS, pruebaVencida, type CategoriaSugerencia } from "@/lib/patientData";
 import Inicio from "./pages/Inicio";
 import Pacientes from "./pages/Pacientes";
 import Agenda from "./pages/Agenda";
@@ -513,6 +513,35 @@ function CuentaSuspendida({ onLogout }: { onLogout: () => void }) {
   );
 }
 
+/** Pantalla que reemplaza todo el dashboard cuando la prueba gratuita de
+ * 14 días ya se cumplió y la clínica sigue en plan "prueba" — la única
+ * salida es "Ver planes", que deja pasar SOLO a esa página (ver el check
+ * de activePage !== "planes" más abajo) para que de verdad se pueda pagar
+ * y salir del bloqueo por cuenta propia, sin depender de que un admin
+ * intervenga (a diferencia de CuentaSuspendida, que si depende de eso). */
+function PruebaVencida({ onVerPlanes, onLogout }: { onVerPlanes: () => void; onLogout: () => void }) {
+  return (
+    <div className="flex min-h-screen items-center justify-center bg-app px-4">
+      <div className="w-full max-w-sm rounded-2xl border border-edge/10 bg-modal p-8 text-center">
+        <h2 className="text-lg font-semibold text-ink">Tu periodo de prueba terminó</h2>
+        <p className="mt-2 text-sm text-ink/60">
+          Tus {DURACION_PRUEBA_DIAS} días de prueba gratuita ya se cumplieron. Elige un plan para seguir usando MO
+          sin interrupciones.
+        </p>
+        <button
+          onClick={onVerPlanes}
+          className="mt-6 w-full rounded-lg bg-accent py-2.5 text-sm font-semibold text-black transition-opacity hover:opacity-90"
+        >
+          Ver planes
+        </button>
+        <button onClick={onLogout} className="mt-2 w-full py-1 text-xs text-ink/40 transition-colors hover:text-ink/70">
+          Cerrar sesión
+        </button>
+      </div>
+    </div>
+  );
+}
+
 function DashboardBody({
   activePage,
   setActivePage,
@@ -538,7 +567,7 @@ function DashboardBody({
   onLogout: () => void;
   esAdmin: boolean;
 }) {
-  const { clinicInfo } = usePatientData();
+  const { clinicInfo, suscripcion } = usePatientData();
   const isLight = theme === "light";
   const [mostrarSugerencia, setMostrarSugerencia] = useState(false);
   // Comparten esquina: el Asistente se esconde mientras el abanico de
@@ -610,6 +639,14 @@ function DashboardBody({
   // dejaría sin forma de entrar al Panel de administrador para revertirla.
   if (!esAdmin && clinicInfo && (clinicInfo.estadoCuenta === "suspendida" || clinicInfo.estadoCuenta === "cancelada")) {
     return <CuentaSuspendida onLogout={onLogout} />;
+  }
+
+  // Mismo motivo que la excepción de esAdmin arriba — el dueño de la
+  // plataforma nunca queda bloqueado por su propia prueba. "planes" queda
+  // siempre alcanzable para poder pagar y salir del bloqueo sin ayuda de
+  // un admin.
+  if (!esAdmin && activePage !== "planes" && pruebaVencida(suscripcion)) {
+    return <PruebaVencida onVerPlanes={() => setActivePage("planes")} onLogout={onLogout} />;
   }
 
   return (

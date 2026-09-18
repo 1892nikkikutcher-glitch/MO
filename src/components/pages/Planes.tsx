@@ -2,23 +2,26 @@
 
 import { useState } from "react";
 import { usePatientData } from "@/context/PatientDataContext";
-import { DURACION_PRUEBA_DIAS, planesDisponibles, type PlanId } from "@/lib/patientData";
+import {
+  DURACION_PRUEBA_DIAS,
+  diasRestantesDePrueba,
+  planesDisponibles,
+  pruebaVencida as calcularPruebaVencida,
+  type PlanId,
+} from "@/lib/patientData";
 
-function diasRestantesDePrueba(pruebaIniciadaEl: string | undefined) {
-  if (!pruebaIniciadaEl) return DURACION_PRUEBA_DIAS;
-  const inicio = new Date(`${pruebaIniciadaEl}T00:00:00`);
-  if (Number.isNaN(inicio.getTime())) return DURACION_PRUEBA_DIAS;
-  const fin = new Date(inicio);
-  fin.setDate(fin.getDate() + DURACION_PRUEBA_DIAS);
+/** Fecha LOCAL en formato YYYY-MM-DD — nunca `.toISOString()`, que da la
+ * fecha en UTC y podía correr el inicio de la prueba unas horas respecto a
+ * cómo `diasRestantesDePrueba` la interpreta después (medianoche local). */
+function hoyLocalIso(): string {
   const hoy = new Date();
-  const msPorDia = 24 * 60 * 60 * 1000;
-  return Math.ceil((fin.getTime() - hoy.getTime()) / msPorDia);
+  return `${hoy.getFullYear()}-${String(hoy.getMonth() + 1).padStart(2, "0")}-${String(hoy.getDate()).padStart(2, "0")}`;
 }
 
 export default function Planes() {
   const { suscripcion, setSuscripcion, clinicUid, userEmail } = usePatientData();
   const diasRestantes = diasRestantesDePrueba(suscripcion.pruebaIniciadaEl);
-  const pruebaVencida = suscripcion.planActivo === "prueba" && diasRestantes <= 0;
+  const pruebaVencida = calcularPruebaVencida(suscripcion);
   const [cargando, setCargando] = useState<PlanId | null>(null);
   const [error, setError] = useState("");
 
@@ -100,7 +103,11 @@ export default function Planes() {
                     setSuscripcion((prev) => ({
                       ...prev,
                       planActivo: plan.id,
-                      pruebaIniciadaEl: prev.pruebaIniciadaEl || new Date().toISOString().slice(0, 10),
+                      // Fecha LOCAL, nunca .toISOString() (da la fecha en
+                      // UTC) — diasRestantesDePrueba interpreta este string
+                      // como medianoche en hora local; mezclar UTC aquí con
+                      // local allá corría el periodo de prueba unas horas.
+                      pruebaIniciadaEl: prev.pruebaIniciadaEl || hoyLocalIso(),
                     }));
                   } else {
                     suscribirse(plan.id);

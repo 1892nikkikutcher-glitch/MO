@@ -1,5 +1,64 @@
 import { describe, expect, it } from "vitest";
-import { computeTratamientosPendientes, type DevolucionPago, type Pago, type SavedBudget } from "../patientData";
+import {
+  computeTratamientosPendientes,
+  diasRestantesDePrueba,
+  DURACION_PRUEBA_DIAS,
+  pruebaVencida,
+  type DevolucionPago,
+  type Pago,
+  type SavedBudget,
+} from "../patientData";
+
+// Fecha LOCAL (nunca .toISOString(), que da la fecha en UTC) — coincide con
+// cómo diasRestantesDePrueba interpreta el string (`${fecha}T00:00:00`,
+// hora local) y con cómo el resto de la app ya genera estas fechas
+// (ej. hoyIso() en ReporteCorteCaja.tsx).
+function haceNDias(n: number): string {
+  const fecha = new Date();
+  fecha.setDate(fecha.getDate() - n);
+  return `${fecha.getFullYear()}-${String(fecha.getMonth() + 1).padStart(2, "0")}-${String(fecha.getDate()).padStart(2, "0")}`;
+}
+
+describe("diasRestantesDePrueba", () => {
+  it("recién iniciada, quedan los 14 días completos (redondeado hacia arriba)", () => {
+    expect(diasRestantesDePrueba(haceNDias(0))).toBe(DURACION_PRUEBA_DIAS);
+  });
+
+  it("a la mitad, quedan aproximadamente la mitad de los días", () => {
+    expect(diasRestantesDePrueba(haceNDias(7))).toBe(7);
+  });
+
+  it("justo el día 14, ya no queda ningún día (vencida)", () => {
+    expect(diasRestantesDePrueba(haceNDias(DURACION_PRUEBA_DIAS))).toBeLessThanOrEqual(0);
+  });
+
+  it("mucho después de vencida, el número sigue siendo negativo (nunca se congela en 0)", () => {
+    expect(diasRestantesDePrueba(haceNDias(30))).toBeLessThan(0);
+  });
+
+  it("sin pruebaIniciadaEl (dato faltante), nunca se asume vencida — se da el beneficio de la duda", () => {
+    expect(diasRestantesDePrueba(undefined)).toBe(DURACION_PRUEBA_DIAS);
+  });
+
+  it("una fecha con formato inválido tampoco se asume vencida", () => {
+    expect(diasRestantesDePrueba("no-es-una-fecha")).toBe(DURACION_PRUEBA_DIAS);
+  });
+});
+
+describe("pruebaVencida", () => {
+  it("false mientras sigan quedando días de prueba", () => {
+    expect(pruebaVencida({ planActivo: "prueba", pruebaIniciadaEl: haceNDias(1) })).toBe(false);
+  });
+
+  it("true una vez que los 14 días ya se cumplieron", () => {
+    expect(pruebaVencida({ planActivo: "prueba", pruebaIniciadaEl: haceNDias(20) })).toBe(true);
+  });
+
+  it("nunca es 'vencida' si el plan activo ya es de pago, sin importar cuánto tiempo pasó", () => {
+    expect(pruebaVencida({ planActivo: "consultorio", pruebaIniciadaEl: haceNDias(365) })).toBe(false);
+    expect(pruebaVencida({ planActivo: "clinicas", pruebaIniciadaEl: haceNDias(365) })).toBe(false);
+  });
+});
 
 const presupuesto: SavedBudget = {
   id: "pres-1",

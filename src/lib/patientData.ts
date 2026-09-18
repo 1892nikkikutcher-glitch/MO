@@ -445,6 +445,31 @@ export type SuscripcionPlan = {
   origenSuscripcion?: "stripe" | "manual";
 };
 
+/** Días que faltan para que termine el periodo de prueba de 14 días —
+ * negativo o cero significa que ya venció. Sin `pruebaIniciadaEl` (no
+ * debería pasar, pero por si acaso) se asume que la prueba apenas
+ * comienza, nunca que ya venció — así un dato faltante nunca bloquea a
+ * nadie por error. Única fuente de verdad — Planes.tsx y Dashboard.tsx
+ * (bloqueo real de acceso) comparten esta misma función a propósito, para
+ * que nunca puedan quedar desalineados sobre cuándo "ya venció". */
+export function diasRestantesDePrueba(pruebaIniciadaEl: string | undefined): number {
+  if (!pruebaIniciadaEl) return DURACION_PRUEBA_DIAS;
+  const inicio = new Date(`${pruebaIniciadaEl}T00:00:00`);
+  if (Number.isNaN(inicio.getTime())) return DURACION_PRUEBA_DIAS;
+  const fin = new Date(inicio);
+  fin.setDate(fin.getDate() + DURACION_PRUEBA_DIAS);
+  const hoy = new Date();
+  const msPorDia = 24 * 60 * 60 * 1000;
+  return Math.ceil((fin.getTime() - hoy.getTime()) / msPorDia);
+}
+
+/** true solo si el plan activo sigue siendo "prueba" Y esos 14 días ya se
+ * cumplieron — nunca aplica a un plan pagado (activo, atrasado o incluso
+ * cancelado), donde el vencimiento de la prueba ya no significa nada. */
+export function pruebaVencida(suscripcion: Pick<SuscripcionPlan, "planActivo" | "pruebaIniciadaEl">): boolean {
+  return suscripcion.planActivo === "prueba" && diasRestantesDePrueba(suscripcion.pruebaIniciadaEl) <= 0;
+}
+
 export type RolClinica = "admin" | "colaborador";
 
 /** Documento `clinics/{clinicId}` — clinicId es el uid del dueño. */
