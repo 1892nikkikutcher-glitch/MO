@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState, type Dispatch, type SetStateAction } from "react";
+import { useEffect, useLayoutEffect, useRef, useState, type Dispatch, type SetStateAction } from "react";
 import NuevoPresupuesto from "./NuevoPresupuesto";
 import PresupuestoImpreso from "./PresupuestoImpreso";
 import PresupuestoTotalImpreso from "./PresupuestoTotalImpreso";
@@ -158,6 +158,47 @@ function WhatsAppIcon() {
         strokeLinejoin="round"
       />
     </svg>
+  );
+}
+
+/** Un botón de pestaña — se renderiza dos veces cuando el carrusel
+ * perpetuo está activo (ver ExpedienteView más abajo), así que vive aparte
+ * en vez de repetir el JSX inline. La copia duplicada (visual, para el
+ * lazo continuo) se marca `tabIndex={-1}` para que teclado/lector de
+ * pantalla nunca la encuentren — solo la primera copia es "la pestaña
+ * real" para navegación asistida. */
+function TabButton({
+  tab,
+  activo,
+  onClick,
+  tabIndex,
+}: {
+  tab: string;
+  activo: boolean;
+  onClick: () => void;
+  tabIndex?: number;
+}) {
+  return (
+    <button
+      onClick={onClick}
+      tabIndex={tabIndex}
+      aria-hidden={tabIndex === -1 ? true : undefined}
+      className={`shrink-0 select-none whitespace-nowrap rounded-lg border px-3 py-2 text-xs font-semibold uppercase tracking-wide transition-colors ${
+        activo
+          ? "border-accent/70 bg-accent/15 text-accent"
+          : "border-accent/25 text-ink/40 hover:border-accent/50 hover:bg-surface hover:text-ink/70"
+      }`}
+      style={
+        activo
+          ? {
+              textShadow: "0 0 8px rgba(251,146,60,0.4)",
+              boxShadow: "0 0 10px -2px rgb(var(--accent-rgb) / 0.55)",
+            }
+          : { boxShadow: "0 0 6px -2px rgb(var(--accent-rgb) / 0.3)" }
+      }
+    >
+      {tab}
+    </button>
   );
 }
 
@@ -1029,6 +1070,7 @@ export default function Expediente({
       window.removeEventListener("mouseup", onMouseUp);
     };
   }, []);
+
   // Puente entre Historia Clínica y Presupuestos: al elegir diagnósticos del
   // odontograma y darle "Agregar a presupuesto", esto se llena y se cambia
   // de pestaña — PresupuestosTab lo consume para abrir Nuevo Presupuesto ya
@@ -1095,6 +1137,58 @@ export default function Expediente({
   useEffect(() => {
     if (activeTab === "Pagos" && !puedeVerFinanzas) setActiveTab(expedienteTabs[0]);
   }, [activeTab, puedeVerFinanzas]);
+
+  // Carrusel de pestañas con movimiento perpetuo, como un anuncio: se
+  // desplaza solo, lento, y se detiene en cuanto el mouse/dedo se acerca —
+  // igual patrón de "medir la copia real y duplicar solo si hace falta" que
+  // ya usa el header del Dashboard (Dashboard.tsx) para su propio carrusel
+  // infinito, para que el salto entre la copia 1 y la copia 2 sea
+  // imperceptible (contenido idéntico). Sin esto, animar sin fin un
+  // `scrollLeft` que nunca vuelve a 0 se saldría del contenido real.
+  const primeraCopiaTabsRef = useRef<HTMLDivElement>(null);
+  const [necesitaMarqueeTabs, setNecesitaMarqueeTabs] = useState(false);
+  const marqueeTabsPausadoRef = useRef(false);
+
+  useLayoutEffect(() => {
+    const el = tabsRef.current;
+    const primeraCopia = primeraCopiaTabsRef.current;
+    if (!el || !primeraCopia) return;
+    function medir() {
+      if (!el || !primeraCopia) return;
+      setNecesitaMarqueeTabs(primeraCopia.scrollWidth > el.clientWidth + 1);
+    }
+    medir();
+    window.addEventListener("resize", medir);
+    return () => window.removeEventListener("resize", medir);
+  }, [puedeVerFinanzas]);
+
+  useEffect(() => {
+    if (!necesitaMarqueeTabs) return;
+    if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
+
+    const VELOCIDAD_PX_POR_SEG = 22;
+    let raf: number;
+    let ultimoTs: number | null = null;
+
+    function tick(ts: number) {
+      const el = tabsRef.current;
+      const anchoUnaCopia = primeraCopiaTabsRef.current?.scrollWidth ?? 0;
+      if (
+        el &&
+        anchoUnaCopia > 0 &&
+        ultimoTs !== null &&
+        !marqueeTabsPausadoRef.current &&
+        !arrastreTabsRef.current.activo
+      ) {
+        el.scrollLeft += (VELOCIDAD_PX_POR_SEG * (ts - ultimoTs)) / 1000;
+        if (el.scrollLeft >= anchoUnaCopia) el.scrollLeft -= anchoUnaCopia;
+      }
+      ultimoTs = ts;
+      raf = requestAnimationFrame(tick);
+    }
+    raf = requestAnimationFrame(tick);
+    return () => cancelAnimationFrame(raf);
+  }, [necesitaMarqueeTabs]);
 
   const presupuestos = presupuestosPorPaciente[patient.id] ?? [];
   const setPresupuestos: Dispatch<SetStateAction<SavedBudget[]>> = (updater) =>
@@ -1179,6 +1273,8 @@ export default function Expediente({
     const telefono = patient.phone.replace(/\D/g, "");
     window.open(`https://wa.me/${telefono}?text=${encodeURIComponent(texto)}`, "_blank");
   };
+
+  const tabsVisibles = expedienteTabs.filter((tab) => tab !== "Pagos" || puedeVerFinanzas);
 
   return (
     <div className="space-y-6">
@@ -1333,31 +1429,38 @@ export default function Expediente({
               e.preventDefault();
             }
           }}
+          onMouseEnter={() => {
+            marqueeTabsPausadoRef.current = true;
+          }}
+          onMouseLeave={() => {
+            marqueeTabsPausadoRef.current = false;
+          }}
+          onTouchStart={() => {
+            marqueeTabsPausadoRef.current = true;
+          }}
+          onTouchEnd={() => {
+            marqueeTabsPausadoRef.current = false;
+          }}
           className="flex cursor-grab gap-2 overflow-x-auto [-ms-overflow-style:none] [scrollbar-width:none] active:cursor-grabbing [&::-webkit-scrollbar]:hidden"
         >
-          {expedienteTabs
-            .filter((tab) => tab !== "Pagos" || puedeVerFinanzas)
-            .map((tab) => (
-            <button
-              key={tab}
-              onClick={() => cambiarTab(tab)}
-              className={`shrink-0 select-none whitespace-nowrap rounded-lg border px-3 py-2 text-xs font-semibold uppercase tracking-wide transition-colors ${
-                activeTab === tab
-                  ? "border-accent/70 bg-accent/15 text-accent"
-                  : "border-accent/25 text-ink/40 hover:border-accent/50 hover:bg-surface hover:text-ink/70"
-              }`}
-              style={
-                activeTab === tab
-                  ? {
-                      textShadow: "0 0 8px rgba(251,146,60,0.4)",
-                      boxShadow: "0 0 10px -2px rgb(var(--accent-rgb) / 0.55)",
-                    }
-                  : { boxShadow: "0 0 6px -2px rgb(var(--accent-rgb) / 0.3)" }
-              }
-            >
-              {tab}
-            </button>
-          ))}
+          <div ref={primeraCopiaTabsRef} className="flex shrink-0 gap-2">
+            {tabsVisibles.map((tab) => (
+              <TabButton key={tab} tab={tab} activo={activeTab === tab} onClick={() => cambiarTab(tab)} />
+            ))}
+          </div>
+          {necesitaMarqueeTabs && (
+            <div className="flex shrink-0 gap-2" aria-hidden="true">
+              {tabsVisibles.map((tab) => (
+                <TabButton
+                  key={`dup-${tab}`}
+                  tab={tab}
+                  activo={activeTab === tab}
+                  onClick={() => cambiarTab(tab)}
+                  tabIndex={-1}
+                />
+              ))}
+            </div>
+          )}
         </div>
       </div>
 
