@@ -88,6 +88,10 @@ describe("coincideIdentidad — solo Firebase Auth, nunca un campo editable", ()
   it("no coincide si no hay correo verificado en el token", () => {
     expect(coincideIdentidad("colega@correo.com", undefined, true)).toBe(false);
   });
+
+  it("nunca coincide si la invitación se creó sin correo (solo WhatsApp) — cae siempre a solicitud manual", () => {
+    expect(coincideIdentidad(undefined, "quien-sea@correo.com", true)).toBe(false);
+  });
 });
 
 function invitacionBase(overrides: Partial<InvitacionConecta> = {}): InvitacionConecta {
@@ -138,6 +142,16 @@ describe("existeInvitacionActivaDuplicada", () => {
   it("ignora mayúsculas/espacios al comparar el correo", () => {
     const existentes = [invitacionBase({ destinatarioCorreoNormalizado: "colega@correo.com" })];
     expect(existeInvitacionActivaDuplicada(existentes, "ic1", "  Colega@Correo.com  ", ahora)).toBe(true);
+  });
+
+  it("sin correo nuevo (invitación solo por WhatsApp), nunca se marca duplicada — no hay identidad que comparar", () => {
+    const existentes = [invitacionBase({ destinatarioCorreoNormalizado: undefined })];
+    expect(existeInvitacionActivaDuplicada(existentes, "ic1", undefined, ahora)).toBe(false);
+  });
+
+  it("una invitación existente sin correo tampoco choca con una nueva que sí trae correo", () => {
+    const existentes = [invitacionBase({ destinatarioCorreoNormalizado: undefined })];
+    expect(existeInvitacionActivaDuplicada(existentes, "ic1", "colega@correo.com", ahora)).toBe(false);
   });
 });
 

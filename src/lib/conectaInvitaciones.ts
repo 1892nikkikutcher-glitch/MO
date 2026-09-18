@@ -23,7 +23,10 @@ import type { Interconsulta } from "./moConecta";
 export type CrearInvitacionInput = {
   interconsultaId: string;
   destinatarioNombre?: string;
-  destinatarioCorreo: string;
+  /** Opcional — sin él, la invitación solo puede enviarse por WhatsApp
+   * (nunca se guarda ese número aquí, solo se usa del lado del cliente
+   * para armar el mensaje) y todo reclamo exige aprobación manual. */
+  destinatarioCorreo?: string;
   canal: CanalInvitacion;
 };
 
@@ -68,7 +71,7 @@ export async function crearInvitacion(
     remitenteClinicaId: interconsulta.clinicaRemitenteId,
     remitenteNombre,
     destinatarioNombre: input.destinatarioNombre,
-    destinatarioCorreoNormalizado: normalizarCorreo(input.destinatarioCorreo),
+    destinatarioCorreoNormalizado: input.destinatarioCorreo ? normalizarCorreo(input.destinatarioCorreo) : undefined,
     interconsultaId: input.interconsultaId,
     canal: input.canal,
     creadoEl: ahora.toISOString(),

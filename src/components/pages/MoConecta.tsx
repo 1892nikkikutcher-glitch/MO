@@ -1025,7 +1025,7 @@ function NuevaInterconsultaDialog({
       const { enlace: url } = await crearInvitacionApi({
         interconsultaId: interconsulta.id,
         destinatarioNombre: nombreEspecialista || undefined,
-        destinatarioCorreo: correoEspecialista,
+        destinatarioCorreo: correoEspecialista.trim() || undefined,
         canal: "copiar_enlace",
       });
       setInterconsultaCreadaId(interconsulta.id);
@@ -1181,23 +1181,23 @@ function NuevaInterconsultaDialog({
                 />
               </div>
               <div>
-                <label className={labelClass}>Correo del especialista</label>
-                <input
-                  className={inputClass}
-                  type="email"
-                  value={correoEspecialista}
-                  onChange={(e) => setCorreoEspecialista(e.target.value)}
-                  placeholder="para identificarlo al reclamar el enlace"
-                />
-              </div>
-              <div>
-                <label className={labelClass}>WhatsApp del especialista (opcional)</label>
+                <label className={labelClass}>WhatsApp del especialista</label>
                 <input
                   className={inputClass}
                   type="tel"
                   value={whatsappEspecialista}
                   onChange={(e) => setWhatsappEspecialista(e.target.value)}
-                  placeholder="10 dígitos — para mandarle el enlace directo si no revisa su correo"
+                  placeholder="10 dígitos — para enviarle el enlace directo por WhatsApp"
+                />
+              </div>
+              <div>
+                <label className={labelClass}>Correo del especialista (opcional)</label>
+                <input
+                  className={inputClass}
+                  type="email"
+                  value={correoEspecialista}
+                  onChange={(e) => setCorreoEspecialista(e.target.value)}
+                  placeholder="si lo agregas, el enlace se reclama solo si coincide su correo verificado"
                 />
               </div>
             </>
@@ -1303,7 +1303,7 @@ function NuevaInterconsultaDialog({
               !motivo.trim() ||
               !preguntaClinica.trim() ||
               !aceptaConsentimiento ||
-              (!destinatario && !correoEspecialista.trim())
+              (!destinatario && !whatsappEspecialista.trim())
             }
             className={botonPrimario}
           >
@@ -1759,7 +1759,7 @@ function InvitarColegaDialog({ interconsultaId, onClose }: { interconsultaId: st
       const { id, enlace: url } = await crearInvitacionApi({
         interconsultaId,
         destinatarioNombre: nombre || undefined,
-        destinatarioCorreo: correo,
+        destinatarioCorreo: correo.trim() || undefined,
         canal: "copiar_enlace",
       });
       setEnlace(url);
@@ -1794,29 +1794,29 @@ function InvitarColegaDialog({ interconsultaId, onClose }: { interconsultaId: st
               <input className={inputClass} value={nombre} onChange={(e) => manejarCambioNombre(e, setNombre)} />
             </div>
             <div>
-              <label className={labelClass}>Correo del colega</label>
-              <input className={inputClass} type="email" value={correo} onChange={(e) => setCorreo(e.target.value)} />
-            </div>
-            <div>
-              <label className={labelClass}>WhatsApp del colega (opcional)</label>
+              <label className={labelClass}>WhatsApp del colega</label>
               <input
                 className={inputClass}
                 type="tel"
                 value={whatsapp}
                 onChange={(e) => setWhatsapp(e.target.value)}
-                placeholder="10 dígitos — para mandarle el enlace directo si no revisa su correo"
+                placeholder="10 dígitos — para enviarle el enlace directo por WhatsApp"
               />
             </div>
+            <div>
+              <label className={labelClass}>Correo del colega (opcional)</label>
+              <input className={inputClass} type="email" value={correo} onChange={(e) => setCorreo(e.target.value)} />
+            </div>
             <p className="text-xs text-ink/50">
-              El enlace solo se puede reclamar identificándose con ese correo (verificado por Firebase) — si alguien más
-              lo abre con otra identidad, se te pedirá aprobar su acceso antes de que vea el caso.
+              Si agregas su correo, el enlace se reclama solo si coincide con su correo verificado por Firebase — si no lo
+              agregas, o si alguien más lo abre, se te pedirá aprobar su acceso antes de que vea el caso.
             </p>
             {error && <p className="text-sm text-danger">{error}</p>}
             <div className="flex justify-end gap-2">
               <button onClick={onClose} className={botonSecundario}>
                 Cancelar
               </button>
-              <button onClick={crear} disabled={enviando || !correo.trim()} className={botonPrimario}>
+              <button onClick={crear} disabled={enviando || !whatsapp.trim()} className={botonPrimario}>
                 {enviando ? "Creando…" : "Crear enlace"}
               </button>
             </div>

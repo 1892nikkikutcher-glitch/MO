@@ -2,9 +2,13 @@
  * revisión de seguridad: el token NUNCA es el id del documento (solo se
  * guarda su hash), la identidad del destinatario se verifica exclusivamente
  * contra el correo verificado de Firebase Auth (nunca un campo editable por
- * el usuario), y los 3 canales de invitación exigen el correo del
- * destinatario desde la creación — no existen invitaciones "sin identidad
- * asignada" en esta fase. */
+ * el usuario). El correo del destinatario es OPCIONAL en la creación (se
+ * puede invitar con solo nombre + WhatsApp, que nunca se guarda aquí, solo
+ * se usa para armar el mensaje del lado del cliente) — sin correo, cada
+ * reclamo cae siempre a la solicitud de aprobación manual del remitente
+ * (`coincideIdentidad` ya es segura ante ausencia: nunca compara `undefined`
+ * como si fuera una coincidencia), nunca se otorga acceso automático. Con
+ * correo, la identidad se sigue verificando exactamente igual que antes. */
 
 export type CanalInvitacion = "whatsapp" | "correo" | "copiar_enlace";
 export type EstadoInvitacion = "activa" | "reclamada" | "vencida" | "cancelada";
@@ -18,11 +22,13 @@ export type InvitacionConecta = {
   remitenteClinicaId: string;
   remitenteNombre: string;
   destinatarioNombre?: string;
-  /** OBLIGATORIO en los 3 canales — es la única señal de identidad que se
-   * compara al reclamar (contra el correo VERIFICADO de Firebase Auth, no
-   * contra este campo directamente ni al revés: este es lo que el remitente
-   * declaró, y se compara normalizado contra lo que Firebase ya verificó). */
-  destinatarioCorreoNormalizado: string;
+  /** Opcional — es la única señal de identidad que se compara al reclamar
+   * (contra el correo VERIFICADO de Firebase Auth, no contra este campo
+   * directamente ni al revés: esto es lo que el remitente declaró, y se
+   * compara normalizado contra lo que Firebase ya verificó). Ausente cuando
+   * la invitación se creó solo con WhatsApp — en ese caso todo reclamo cae
+   * a la solicitud de aprobación manual, nunca a acceso automático. */
+  destinatarioCorreoNormalizado?: string;
   interconsultaId: string;
   canal: CanalInvitacion;
   creadoEl: string;
@@ -102,10 +108,14 @@ export function normalizarCorreo(correo: string): string {
  * `emailVerificado` de `decodedToken.email_verified`; ambos los produce el
  * servidor al decodificar el ID token, nunca el cliente. */
 export function coincideIdentidad(
-  destinatarioCorreoNormalizado: string,
+  destinatarioCorreoNormalizado: string | undefined,
   correoVerificado: string | undefined,
   emailVerificado: boolean | undefined
 ): boolean {
+  // Sin correo declarado (invitación creada solo con WhatsApp) nunca hay
+  // coincidencia posible — cae siempre a la solicitud de aprobación manual,
+  // nunca a acceso automático.
+  if (!destinatarioCorreoNormalizado) return false;
   if (!emailVerificado || !correoVerificado) return false;
   return destinatarioCorreoNormalizado === normalizarCorreo(correoVerificado);
 }
@@ -118,9 +128,13 @@ export function coincideIdentidad(
 export function existeInvitacionActivaDuplicada(
   invitacionesExistentes: InvitacionConecta[],
   interconsultaId: string,
-  destinatarioCorreo: string,
+  destinatarioCorreo: string | undefined,
   ahora = new Date()
 ): boolean {
+  // Sin correo (invitación solo por WhatsApp) no hay identidad confiable que
+  // comparar — nunca se declara "duplicada" solo porque otra invitación
+  // tampoco tenía correo; cada envío por WhatsApp es independiente.
+  if (!destinatarioCorreo) return false;
   const correoNormalizado = normalizarCorreo(destinatarioCorreo);
   return invitacionesExistentes.some(
     (inv) =>

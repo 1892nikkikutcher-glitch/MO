@@ -140,7 +140,7 @@ export const invitacionCrearSchema = z
   .object({
     interconsultaId: z.string().trim().min(1).max(200),
     destinatarioNombre: z.string().trim().max(200).optional(),
-    destinatarioCorreo: z.string().trim().email().max(300),
+    destinatarioCorreo: z.string().trim().email().max(300).optional(),
     canal: z.enum(["whatsapp", "correo", "copiar_enlace"]),
   })
   .strict();

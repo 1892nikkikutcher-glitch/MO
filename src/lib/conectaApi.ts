@@ -194,7 +194,7 @@ export async function descargarArchivoInterconsultaApi(interconsultaId: string, 
 export type CrearInvitacionBody = {
   interconsultaId: string;
   destinatarioNombre?: string;
-  destinatarioCorreo: string;
+  destinatarioCorreo?: string;
   canal: "whatsapp" | "correo" | "copiar_enlace";
 };
 
