@@ -3,6 +3,8 @@ import { dbAdmin, authAdmin } from "@/lib/firebaseAdmin";
 import { verificarAdmin } from "@/lib/adminAuth";
 import {
   planesDisponibles,
+  diasRestantesDePrueba,
+  pruebaVencida as calcularPruebaVencida,
   type ClinicInfo,
   type SuscripcionPlan,
   type SugerenciaPlataforma,
@@ -114,6 +116,7 @@ export async function GET(req: NextRequest) {
       const estadoSuscripcion = suscripcion.estadoSuscripcion ?? "prueba";
       const plan = planesDisponibles.find((p) => p.id === planActivo);
       const mrr = estadoSuscripcion === "activa" ? plan?.precioMensualAprox ?? 0 : 0;
+      const pruebaIniciadaEl = suscripcion.pruebaIniciadaEl ?? "";
 
       return {
         id: c.id,
@@ -130,6 +133,10 @@ export async function GET(req: NextRequest) {
         origenSuscripcion: suscripcion.origenSuscripcion ?? "manual",
         mrr,
         ultimaActividad,
+        // Solo tiene sentido mientras el plan siga siendo "prueba" — un plan
+        // ya pagado nunca se marca vencido sin importar cuánto tiempo pasó.
+        diasRestantesPrueba: planActivo === "prueba" ? diasRestantesDePrueba(pruebaIniciadaEl) : null,
+        pruebaVencida: calcularPruebaVencida({ planActivo, pruebaIniciadaEl }),
       };
     })
   );
@@ -149,6 +156,7 @@ export async function GET(req: NextRequest) {
   const mesActualISO = new Date().toISOString().slice(0, 7); // YYYY-MM
   const nuevasDelMes = clinicas.filter((c) => c.creadoEl?.startsWith(mesActualISO)).length;
   const pruebasActivas = clinicas.filter((c) => c.estadoSuscripcion === "prueba").length;
+  const pruebasVencidas = clinicas.filter((c) => c.pruebaVencida).length;
   const cancelaciones = clinicas.filter((c) => c.estadoSuscripcion === "cancelada").length;
 
   const sugerenciasSnap = await dbAdmin.collection("sugerenciasPlataforma").orderBy("fecha", "desc").get();
@@ -166,6 +174,7 @@ export async function GET(req: NextRequest) {
     conversion: consultoriosRegistrados > 0 ? (pagando.length / consultoriosRegistrados) * 100 : 0,
     nuevasDelMes,
     pruebasActivas,
+    pruebasVencidas,
     cancelaciones,
     // Requiere una foto histórica mensual (ej. un job programado que guarde
     // "suscripciones activas" cada fin de mes) que todavía no existe — se

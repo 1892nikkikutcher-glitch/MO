@@ -20,6 +20,8 @@ type ClinicaResumen = {
   origenSuscripcion: "stripe" | "manual";
   mrr: number;
   ultimaActividad: string | null;
+  diasRestantesPrueba: number | null;
+  pruebaVencida: boolean;
 };
 
 type SugerenciaResumen = {
@@ -65,6 +67,7 @@ type Resumen = {
   conversion: number;
   nuevasDelMes: number;
   pruebasActivas: number;
+  pruebasVencidas: number;
   cancelaciones: number;
   churnMensual: number | null;
   clinicas: ClinicaResumen[];
@@ -568,6 +571,11 @@ export default function PanelAdministrador() {
         <MetricCard label="ARPU" value={formatMoneda(Math.round(resumen.arpu))} sensible oculto={oculto} />
         <MetricCard label="Nuevas clínicas (mes)" value={String(resumen.nuevasDelMes)} />
         <MetricCard label="Pruebas activas" value={String(resumen.pruebasActivas)} />
+        <MetricCard
+          label="Pruebas vencidas"
+          value={String(resumen.pruebasVencidas)}
+          sub={resumen.pruebasVencidas > 0 ? "Ya deberían ver la pantalla de bloqueo" : undefined}
+        />
         <MetricCard label="Cancelaciones" value={String(resumen.cancelaciones)} />
         <MetricCard
           label="Churn mensual"
@@ -599,7 +607,7 @@ export default function PanelAdministrador() {
       </div>
 
       <div className="overflow-x-auto rounded-2xl border border-edge/10 bg-surface">
-        <table className="w-full min-w-[900px] text-left text-sm">
+        <table className="w-full min-w-[1000px] text-left text-sm">
           <thead>
             <tr className="border-b border-edge/10 text-xs uppercase tracking-wide text-ink/40">
               <th className="px-4 py-3">Clínica</th>
@@ -607,6 +615,7 @@ export default function PanelAdministrador() {
               <th className="px-4 py-3">Usuarios</th>
               <th className="px-4 py-3">Plan</th>
               <th className="px-4 py-3">Suscripción</th>
+              <th className="px-4 py-3">Prueba</th>
               <th className="px-4 py-3">MRR</th>
               <th className="px-4 py-3">Alta</th>
               <th className="px-4 py-3">Última actividad</th>
@@ -625,6 +634,23 @@ export default function PanelAdministrador() {
                   <span className={`rounded-full px-2 py-0.5 text-xs font-semibold ${estadoSuscripcionLabel[c.estadoSuscripcion].clase}`}>
                     {estadoSuscripcionLabel[c.estadoSuscripcion].texto}
                   </span>
+                </td>
+                <td className="px-4 py-3">
+                  {c.planActivo !== "prueba" ? (
+                    <span className="text-ink/30">—</span>
+                  ) : c.pruebaVencida ? (
+                    <span className="rounded-full bg-danger/10 px-2 py-0.5 text-xs font-semibold text-danger">
+                      Vencida hace {Math.abs(c.diasRestantesPrueba ?? 0)}d
+                    </span>
+                  ) : (
+                    <span
+                      className={`rounded-full px-2 py-0.5 text-xs font-semibold ${
+                        (c.diasRestantesPrueba ?? 0) <= 3 ? "bg-warning/10 text-warning" : "bg-ink/10 text-ink/60"
+                      }`}
+                    >
+                      {c.diasRestantesPrueba}d restantes
+                    </span>
+                  )}
                 </td>
                 <td className={`px-4 py-3 text-ink/60 ${oculto ? "blur-[6px] select-none" : ""}`}>
                   {oculto ? "••••••" : formatMoneda(c.mrr)}
