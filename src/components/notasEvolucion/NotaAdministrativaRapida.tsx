@@ -9,6 +9,7 @@
 import { useState } from "react";
 import { usePatientData } from "@/context/PatientDataContext";
 import type { CitaAgenda } from "@/lib/patientData";
+import { textoNoAsistioDeCita } from "@/lib/agendaHelpers";
 import {
   motivoNotaAdministrativaLabel,
   motivosNotaAdministrativa,
@@ -121,9 +122,21 @@ export default function NotaAdministrativaRapida({
       </div>
 
       <div className="mt-4">
-        <label className={labelClass}>
-          {motivo === "otro" ? "Describe brevemente el motivo" : "Nota adicional (opcional)"}
-        </label>
+        <div className="flex items-center justify-between gap-3">
+          <label className={labelClass}>
+            {motivo === "otro" ? "Describe brevemente el motivo" : "Nota adicional (opcional)"}
+          </label>
+          {motivo === "no_asistio" && (
+            <button
+              type="button"
+              onClick={() => setNotaLibre(textoNoAsistioDeCita(cita))}
+              className="mb-1 shrink-0 text-xs font-medium text-accent hover:underline"
+              title="Llena el texto con el día, hora y procedimiento de esta cita"
+            >
+              Llenar con día, hora y procedimiento
+            </button>
+          )}
+        </div>
         <textarea
           value={notaLibre}
           onChange={(e) => setNotaLibre(e.target.value)}

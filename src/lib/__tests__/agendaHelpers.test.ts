@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { addMonths, estaDentroDeHorario, toISODate } from "../agendaHelpers";
+import { addMonths, estaDentroDeHorario, textoNoAsistioDeCita, toISODate } from "../agendaHelpers";
 
 describe("addMonths", () => {
   it("suma meses en un caso normal (regresión, sin desborde de mes)", () => {
@@ -40,5 +40,37 @@ describe("estaDentroDeHorario", () => {
 
   it("después del cierre", () => {
     expect(estaDentroDeHorario(horario, "18:30", "19:30")).toBe(false);
+  });
+});
+
+describe("textoNoAsistioDeCita", () => {
+  it("incluye fecha en español, hora y procedimiento", () => {
+    const texto = textoNoAsistioDeCita({
+      fecha: "2026-09-15",
+      horaInicio: "10:00",
+      tratamientos: ["Limpieza dental"],
+    });
+    expect(texto).toBe(
+      "El paciente no se presentó a su cita programada el 15 de septiembre de 2026 a las 10:00 hrs para Limpieza dental."
+    );
+  });
+
+  it("varios tratamientos se unen con coma", () => {
+    const texto = textoNoAsistioDeCita({
+      fecha: "2026-01-05",
+      horaInicio: "09:30",
+      tratamientos: ["Endodoncia OD 36", "Corona OD 36"],
+    });
+    expect(texto).toContain("para Endodoncia OD 36, Corona OD 36.");
+  });
+
+  it("sin tratamientos, la frase termina en la hora sin dejar un 'para' vacío", () => {
+    const texto = textoNoAsistioDeCita({ fecha: "2026-09-15", horaInicio: "10:00", tratamientos: [] });
+    expect(texto).toBe("El paciente no se presentó a su cita programada el 15 de septiembre de 2026 a las 10:00 hrs.");
+  });
+
+  it("una fecha con formato inválido no truena — se usa tal cual", () => {
+    const texto = textoNoAsistioDeCita({ fecha: "no-es-una-fecha", horaInicio: "10:00", tratamientos: [] });
+    expect(texto).toContain("no-es-una-fecha");
   });
 });

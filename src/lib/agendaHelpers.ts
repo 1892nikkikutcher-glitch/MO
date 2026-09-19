@@ -220,6 +220,21 @@ export function formatRangeLabel(inicio: Date, fin: Date) {
     : `${inicio.getDate()} de ${mesInicio} – ${fin.getDate()} de ${mesFin} de ${fin.getFullYear()}`;
 }
 
+/** Frase lista para pegar en la nota rápida de "no asistió" — día, hora y
+ * procedimiento de la cita, para no tener que escribirlos a mano cada vez
+ * (ver NotaAdministrativaRapida.tsx). `cita.fecha` es "YYYY-MM-DD"; un
+ * valor con formato inválido se usa tal cual en vez de fallar. */
+export function textoNoAsistioDeCita(cita: { fecha: string; horaInicio: string; tratamientos: string[] }): string {
+  const fecha = new Date(`${cita.fecha}T00:00:00`);
+  const fechaTexto = Number.isNaN(fecha.getTime())
+    ? cita.fecha
+    : `${fecha.getDate()} de ${MESES[fecha.getMonth()]} de ${fecha.getFullYear()}`;
+  const procedimiento = cita.tratamientos.filter(Boolean).join(", ");
+  return `El paciente no se presentó a su cita programada el ${fechaTexto} a las ${cita.horaInicio} hrs${
+    procedimiento ? ` para ${procedimiento}` : ""
+  }.`;
+}
+
 export const inputClass =
   "w-full rounded-lg border border-edge/10 bg-field px-3 py-2 text-sm text-ink outline-none focus:border-accent/60";
 
