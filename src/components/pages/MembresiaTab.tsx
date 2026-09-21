@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { usePatientData } from "@/context/PatientDataContext";
 import { formatCurrency } from "@/lib/patientData";
 import {
@@ -11,11 +11,46 @@ import {
   type PatientMembership,
 } from "@/lib/membresias";
 
-const medicos = ["Dr. Nicolás Medina González", "Dra. Ana Paola Ríos Cervantes"];
 const formasDePago = ["Efectivo", "Tarjeta de crédito", "Tarjeta de débito", "Transferencia", "Cheque"];
 
 const inputClass =
   "w-full rounded-lg border border-edge/10 bg-field px-3 py-2 text-sm text-ink placeholder-ink/30 outline-none focus:border-accent/60";
+
+/** Mismo criterio que Pagos.tsx/ReporteCorteCaja.tsx: el médico viene de
+ * los Recursos reales de la clínica (Agenda → Recursos), nunca de una
+ * lista genérica — para que el desglose de ingresos por médico sea
+ * correcto también para membresías, no solo para pagos sueltos. */
+function useMedicosDisponibles() {
+  const { recursos } = usePatientData();
+  return recursos.filter((r) => r.tipo === "medico").map((r) => r.nombre);
+}
+
+function SelectMedico({
+  medico,
+  onChange,
+  medicosDisponibles,
+}: {
+  medico: string;
+  onChange: (m: string) => void;
+  medicosDisponibles: string[];
+}) {
+  if (medicosDisponibles.length === 0) {
+    return (
+      <p className="rounded-lg border border-warning/30 bg-warning/10 px-3 py-2 text-xs text-warning">
+        No hay médicos configurados. Ve a Agenda → Recursos → + para agregar uno.
+      </p>
+    );
+  }
+  return (
+    <select value={medico} onChange={(e) => onChange(e.target.value)} className={inputClass}>
+      {medicosDisponibles.map((m) => (
+        <option key={m} value={m}>
+          {m}
+        </option>
+      ))}
+    </select>
+  );
+}
 
 function formatFechaCorta(iso: string) {
   const d = new Date(`${iso}T00:00:00`);
@@ -34,7 +69,12 @@ function DatosPagoDialog({
   onClose: () => void;
   onConfirmar: (datos: { medico: string; formaPago: string; facturar: boolean }) => void;
 }) {
-  const [medico, setMedico] = useState(medicos[0]);
+  const medicosDisponibles = useMedicosDisponibles();
+  const [medico, setMedico] = useState(medicosDisponibles[0] ?? "");
+  useEffect(() => {
+    if (!medico && medicosDisponibles.length > 0) setMedico(medicosDisponibles[0]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [medico, medicosDisponibles.join("|")]);
   const [formaPago, setFormaPago] = useState(formasDePago[0]);
   const [facturar, setFacturar] = useState(false);
 
@@ -54,13 +94,7 @@ function DatosPagoDialog({
         <div className="space-y-3">
           <div>
             <label className="mb-1 block text-xs font-medium text-ink/60">Médico tratante</label>
-            <select value={medico} onChange={(e) => setMedico(e.target.value)} className={inputClass}>
-              {medicos.map((m) => (
-                <option key={m} value={m}>
-                  {m}
-                </option>
-              ))}
-            </select>
+            <SelectMedico medico={medico} onChange={setMedico} medicosDisponibles={medicosDisponibles} />
           </div>
           <div>
             <label className="mb-1 block text-xs font-medium text-ink/60">Forma de pago</label>
@@ -91,7 +125,8 @@ function DatosPagoDialog({
           </button>
           <button
             onClick={() => onConfirmar({ medico, formaPago, facturar })}
-            className="flex-1 rounded-lg border border-accent/60 bg-accent/15 py-2.5 text-sm font-semibold text-accent transition-opacity hover:bg-accent/25"
+            disabled={medico === ""}
+            className="flex-1 rounded-lg border border-accent/60 bg-accent/15 py-2.5 text-sm font-semibold text-accent transition-opacity hover:bg-accent/25 disabled:cursor-not-allowed disabled:opacity-40"
           >
             Confirmar pago
           </button>
@@ -193,7 +228,12 @@ function UsarBeneficioDialog({
     (b) => b.tipo === "uso" && (b.limite === null || usosDe(membresia, b.id) < b.limite)
   );
   const [beneficioId, setBeneficioId] = useState(disponibles[0]?.id ?? "");
-  const [medico, setMedico] = useState(medicos[0]);
+  const medicosDisponibles = useMedicosDisponibles();
+  const [medico, setMedico] = useState(medicosDisponibles[0] ?? "");
+  useEffect(() => {
+    if (!medico && medicosDisponibles.length > 0) setMedico(medicosDisponibles[0]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [medico, medicosDisponibles.join("|")]);
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4">
@@ -224,13 +264,7 @@ function UsarBeneficioDialog({
               </div>
               <div>
                 <label className="mb-1 block text-xs font-medium text-ink/60">Profesional que atiende</label>
-                <select value={medico} onChange={(e) => setMedico(e.target.value)} className={inputClass}>
-                  {medicos.map((m) => (
-                    <option key={m} value={m}>
-                      {m}
-                    </option>
-                  ))}
-                </select>
+                <SelectMedico medico={medico} onChange={setMedico} medicosDisponibles={medicosDisponibles} />
               </div>
             </div>
             <div className="mt-6 flex gap-3">
@@ -242,7 +276,8 @@ function UsarBeneficioDialog({
               </button>
               <button
                 onClick={() => onUsar(beneficioId, medico)}
-                className="flex-1 rounded-lg border border-accent/60 bg-accent/15 py-2.5 text-sm font-semibold text-accent transition-opacity hover:bg-accent/25"
+                disabled={medico === ""}
+                className="flex-1 rounded-lg border border-accent/60 bg-accent/15 py-2.5 text-sm font-semibold text-accent transition-opacity hover:bg-accent/25 disabled:cursor-not-allowed disabled:opacity-40"
               >
                 Registrar uso
               </button>

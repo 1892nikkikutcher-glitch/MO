@@ -21,7 +21,6 @@ import RegistrarDevolucionDialog from "@/components/RegistrarDevolucionDialog";
 import { calcularDisponibleDevolucion, resumenDesdeDevoluciones } from "@/lib/devolucionesPago";
 import { renderPlantilla, formatosWhatsAppInicial, buildProximaCitaTexto } from "@/lib/formatosWhatsapp";
 
-const medicos = ["Dr. Nicolás Medina González", "Dra. Ana Paola Ríos Cervantes"];
 const formasDePago = ["Efectivo", "Tarjeta de crédito", "Tarjeta de débito", "Transferencia", "Cheque"];
 
 const inputClass =
@@ -465,10 +464,22 @@ export function AgregarPagoDialog({
   onClose: () => void;
   onSave: (pago: Pago) => void;
 }) {
+  // Mismo criterio que ya usa Corte de Caja/Comisiones (ver
+  // ReporteCorteCaja.tsx): el médico tratante viene de los Recursos reales
+  // de la clínica (Agenda → Recursos), nunca de una lista genérica — así
+  // "Médico" en el recibo es el mismo nombre que alimenta el desglose de
+  // ingresos por médico, en vez de un valor que nadie más lee.
+  const { recursos } = usePatientData();
+  const medicosDisponibles = recursos.filter((r) => r.tipo === "medico").map((r) => r.nombre);
+
   const [paso, setPaso] = useState<"form" | "confirmacion" | "firma" | "recibo">("form");
   const [pagoGuardado, setPagoGuardado] = useState<Pago | null>(null);
 
-  const [medico, setMedico] = useState(medicos[0]);
+  const [medico, setMedico] = useState(medicosDisponibles[0] ?? "");
+  useEffect(() => {
+    if (!medico && medicosDisponibles.length > 0) setMedico(medicosDisponibles[0]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [medico, medicosDisponibles.join("|")]);
   const [formaPago, setFormaPago] = useState(formasDePago[0]);
   const [seleccionados, setSeleccionados] = useState<string[]>([]);
   const [montos, setMontos] = useState<Record<string, number>>({});
@@ -491,7 +502,7 @@ export function AgregarPagoDialog({
   const totalExtras = extras.reduce((sum, e) => sum + e.monto, 0);
   const totalAPagar = totalTratamientosSeleccionados + totalExtras;
 
-  const puedeGuardar = totalAPagar > 0;
+  const puedeGuardar = totalAPagar > 0 && medico !== "";
 
   const handleGuardar = () => {
     if (!puedeGuardar) return;
@@ -631,13 +642,19 @@ export function AgregarPagoDialog({
           <div className="grid grid-cols-2 gap-4">
             <div>
               <label className="mb-1 block text-xs font-medium text-ink/60">Médico tratante</label>
-              <select value={medico} onChange={(e) => setMedico(e.target.value)} className={inputClass}>
-                {medicos.map((m) => (
-                  <option key={m} value={m}>
-                    {m}
-                  </option>
-                ))}
-              </select>
+              {medicosDisponibles.length > 0 ? (
+                <select value={medico} onChange={(e) => setMedico(e.target.value)} className={inputClass}>
+                  {medicosDisponibles.map((m) => (
+                    <option key={m} value={m}>
+                      {m}
+                    </option>
+                  ))}
+                </select>
+              ) : (
+                <p className="rounded-lg border border-warning/30 bg-warning/10 px-3 py-2 text-xs text-warning">
+                  No hay médicos configurados. Ve a Agenda → Recursos → + para agregar uno.
+                </p>
+              )}
             </div>
             <div>
               <label className="mb-1 block text-xs font-medium text-ink/60">Forma de pago</label>
