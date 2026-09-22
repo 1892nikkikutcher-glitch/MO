@@ -28,6 +28,26 @@ function formatFechaHora(iso: string): string {
   return `${d.toLocaleDateString("es-MX")} · ${d.toLocaleTimeString("es-MX", { hour: "2-digit", minute: "2-digit" })}`;
 }
 
+/** Fecha real de GUARDADO (firma) de una nota v2 — no cuándo se empezó a
+ * escribir (creadoEn), sino cuándo quedó realmente firmada. `firmadoEn` es
+ * el único campo de toda la app que usa un Timestamp de servidor real de
+ * Firestore en vez de un ISO string (ver notasEvolucion.ts) — necesita su
+ * propio manejo: llega como un objeto del SDK cliente (con .toDate()), o
+ * momentáneamente ausente justo después de firmar mientras el servidor
+ * todavía no resuelve el sentinel (por eso el `?? null`, para caer a otro
+ * campo en vez de mostrar una fecha en blanco). */
+function formatFirmadoEn(firmadoEn: unknown): string | null {
+  if (
+    firmadoEn &&
+    typeof firmadoEn === "object" &&
+    "toDate" in firmadoEn &&
+    typeof (firmadoEn as { toDate: unknown }).toDate === "function"
+  ) {
+    return formatFechaHora((firmadoEn as { toDate: () => Date }).toDate().toISOString());
+  }
+  return null;
+}
+
 const psoapCampos = [
   { key: "presentacion" as const, letra: "P", label: "Presentación" },
   { key: "subjetivo" as const, letra: "S", label: "Subjetivo" },
@@ -71,11 +91,15 @@ function TarjetaFirmadaV2({ nota, diagnosticosCatalogo }: { nota: NotaEvolucionV
   // la narrativa guardada de fábrica.
   const narrativaTexto = nota.narrativa.texto || generarNarrativa(nota, { diagnosticosCatalogo });
   const organosDentales = nota.detalleProcedimiento?.organosDentales ?? nota.encabezado.organosDentales;
+  // Cuándo se guardó de verdad (se firmó), no cuándo se empezó a escribir —
+  // si por lo que sea `firmadoEn` todavía no resuelve, cae a la última
+  // modificación conocida en vez de dejar la fecha en blanco.
+  const fechaGuardado = formatFirmadoEn(nota.firmadoEn) ?? formatFechaHora(nota.actualizadoEn);
   return (
     <div className="rounded-2xl border border-edge/10 bg-surface p-4">
       <div className="flex flex-wrap items-center justify-between gap-2 text-xs text-ink/40">
         <span>
-          <span className="font-medium text-ink/70">{formatFechaHora(nota.creadoEn)}</span> · {nota.encabezado.medico || "Sin médico registrado"}
+          <span className="font-medium text-ink/70">{fechaGuardado}</span> · {nota.encabezado.medico || "Sin médico registrado"}
         </span>
         <span className={`rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase ${estadoBadge[nota.estado].clase}`}>
           {nota.estado === "con_aclaracion" ? "Con aclaración" : "Firmada"}
