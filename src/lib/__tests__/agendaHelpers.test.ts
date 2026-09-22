@@ -1,5 +1,11 @@
 import { describe, expect, it } from "vitest";
-import { addMonths, estaDentroDeHorario, textoNoAsistioDeCita, toISODate } from "../agendaHelpers";
+import {
+  addMonths,
+  estaDentroDeHorario,
+  medicoPreferidoDePaciente,
+  textoNoAsistioDeCita,
+  toISODate,
+} from "../agendaHelpers";
 
 describe("addMonths", () => {
   it("suma meses en un caso normal (regresión, sin desborde de mes)", () => {
@@ -72,5 +78,41 @@ describe("textoNoAsistioDeCita", () => {
   it("una fecha con formato inválido no truena — se usa tal cual", () => {
     const texto = textoNoAsistioDeCita({ fecha: "no-es-una-fecha", horaInicio: "10:00", tratamientos: [] });
     expect(texto).toContain("no-es-una-fecha");
+  });
+});
+
+describe("medicoPreferidoDePaciente", () => {
+  it("sugiere el médico de la cita más reciente del paciente", () => {
+    const citas = [
+      { patientId: "pac1", medicoId: "med-A", fecha: "2026-08-01", estatus: "Atendida" as const },
+      { patientId: "pac1", medicoId: "med-B", fecha: "2026-09-10", estatus: "Confirmada" as const },
+      { patientId: "pac2", medicoId: "med-C", fecha: "2026-09-15", estatus: "Atendida" as const },
+    ];
+    expect(medicoPreferidoDePaciente(citas, "pac1")).toBe("med-B");
+  });
+
+  it("una cita más reciente pero cancelada no cuenta — se ignora", () => {
+    const citas = [
+      { patientId: "pac1", medicoId: "med-A", fecha: "2026-08-01", estatus: "Atendida" as const },
+      { patientId: "pac1", medicoId: "med-B", fecha: "2026-09-10", estatus: "Cancelada" as const },
+    ];
+    expect(medicoPreferidoDePaciente(citas, "pac1")).toBe("med-A");
+  });
+
+  it("paciente sin ninguna cita previa con médico asignado: null, nunca inventa una sugerencia", () => {
+    const citas = [{ patientId: "pac1", medicoId: null, fecha: "2026-08-01", estatus: "Atendida" as const }];
+    expect(medicoPreferidoDePaciente(citas, "pac1")).toBeNull();
+  });
+
+  it("paciente que no aparece en absoluto en las citas: null", () => {
+    expect(medicoPreferidoDePaciente([], "pac1")).toBeNull();
+  });
+
+  it("no mezcla las citas de otro paciente", () => {
+    const citas = [
+      { patientId: "pac1", medicoId: "med-A", fecha: "2026-08-01", estatus: "Atendida" as const },
+      { patientId: "pac2", medicoId: "med-Z", fecha: "2026-09-20", estatus: "Atendida" as const },
+    ];
+    expect(medicoPreferidoDePaciente(citas, "pac1")).toBe("med-A");
   });
 });

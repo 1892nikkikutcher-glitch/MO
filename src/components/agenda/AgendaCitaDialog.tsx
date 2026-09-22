@@ -25,6 +25,7 @@ import {
   intervaloValido,
 } from "@/lib/seguimientoAutomatico";
 import { manejarCambioNombre } from "@/lib/textoNombre";
+import { medicoPreferidoDePaciente } from "@/lib/agendaHelpers";
 import { formatDuracion } from "@/lib/procedimientos";
 import GlobalAgregarPago from "@/components/GlobalAgregarPago";
 import ConfirmarEliminar from "@/components/ConfirmarEliminar";
@@ -107,12 +108,18 @@ export default function AgendaCitaDialog({
   const unidades = recursos.filter((r) => r.tipo === "unidad");
   /** Prioriza medicoId/unidadId; si la cita es legada (solo tiene
    * recursoId), resuelve el tipo del recurso apuntado para saber si era un
-   * médico o una unidad. */
+   * médico o una unidad. Para una cita NUEVA de un paciente que ya se ha
+   * atendido antes, sugiere el médico de su cita más reciente (ver
+   * medicoPreferidoDePaciente) en vez de siempre caer en el primero de la
+   * lista sin importar quién lo ha tratado — sigue siendo editable, esto
+   * es solo el punto de partida. */
   const [medicoId, setMedicoId] = useState(() => {
     if (initial.medicoId) return initial.medicoId;
     const legado = initial.recursoId ? recursos.find((r) => r.id === initial.recursoId) : undefined;
     if (legado?.tipo === "medico") return initial.recursoId ?? "";
-    return !isEditing ? medicos[0]?.id ?? "" : "";
+    if (isEditing) return "";
+    const preferido = initial.patientId ? medicoPreferidoDePaciente(citas, initial.patientId) : null;
+    return preferido ?? medicos[0]?.id ?? "";
   });
   const [unidadId, setUnidadId] = useState(() => {
     if (initial.unidadId) return initial.unidadId;
@@ -263,6 +270,13 @@ export default function AgendaCitaDialog({
     setTelefono(p.phone);
     setCorreo(p.email ?? "");
     cargarDatosPaciente(id);
+    // Solo al agendar una cita nueva (nunca al editar una ya existente) —
+    // sugiere el médico que ya ha atendido a este paciente, mismo criterio
+    // que el valor inicial de medicoId más arriba. Sigue siendo editable.
+    if (!isEditing) {
+      const preferido = medicoPreferidoDePaciente(citas, id);
+      if (preferido) setMedicoId(preferido);
+    }
   };
 
   const cambiarPaciente = () => {

@@ -235,6 +235,26 @@ export function textoNoAsistioDeCita(cita: { fecha: string; horaInicio: string; 
   }.`;
 }
 
+/** El médico asignado en la cita más reciente de este paciente (pasada o
+ * futura, la que sea más cercana a hoy en cualquier dirección del
+ * tiempo) — para sugerirlo como default al agendar una nueva cita, en vez
+ * de siempre caer en el primer médico de la lista sin importar quién ya
+ * lo ha atendido. `null` si el paciente nunca ha tenido una cita con
+ * médico asignado (nunca se inventa una sugerencia). Ignora citas
+ * canceladas — una cancelada no dice nada de a quién prefiere el
+ * paciente. */
+export function medicoPreferidoDePaciente(
+  citas: Pick<CitaAgenda, "patientId" | "medicoId" | "fecha" | "estatus">[],
+  patientId: string
+): string | null {
+  const delPaciente = citas.filter(
+    (c) => c.patientId === patientId && c.medicoId && c.estatus !== "Cancelada"
+  );
+  if (delPaciente.length === 0) return null;
+  const masReciente = [...delPaciente].sort((a, b) => b.fecha.localeCompare(a.fecha))[0];
+  return masReciente.medicoId ?? null;
+}
+
 export const inputClass =
   "w-full rounded-lg border border-edge/10 bg-field px-3 py-2 text-sm text-ink outline-none focus:border-accent/60";
 
