@@ -13,6 +13,7 @@ import {
   collection,
   deleteDoc,
   doc,
+  getDoc,
   getDocs,
   onSnapshot,
   query,
@@ -33,6 +34,7 @@ import {
   type ClinicInfo,
   type ClinicInvite,
   type ClinicMember,
+  type MembresiaConClinica,
   type HorarioAtencion,
   type Patient,
   type PerfilDoctor,
@@ -122,6 +124,7 @@ import {
 import type { PlanTratamientoItem, PresupuestoVinculado } from "@/lib/planTratamiento";
 import { actualizarFrecuencias, vocabularioNotasInicial, type VocabularioNotas } from "@/lib/vocabularioNotas";
 import type { ComparativaRehabilitacion } from "@/lib/comparativaRehabilitacion";
+import SelectorClinica from "@/components/SelectorClinica";
 
 type Updater<T> = T | ((prev: T) => T);
 
@@ -287,23 +290,97 @@ function useClinicInfo(clinicUid: string | null) {
   return [value, setValue] as const;
 }
 
+function camposDeMembresia(m: ClinicMember) {
+  return {
+    clinicUid: m.clinicId,
+    rol: m.role,
+    // null = sin restricción (ve todos los recursos/calendarios, como el
+    // dueño o un colaborador al que nunca se le configuró un límite). Un
+    // arreglo (incluso vacío se trata como sin restricción) limita la
+    // Agenda/citas a esos recursos únicamente.
+    misRecursosVisibles: m.recursosVisibles && m.recursosVisibles.length > 0 ? m.recursosVisibles : null,
+  };
+}
+
+/** Clave de localStorage donde se recuerda la última clínica elegida por
+ * este uid, para no volver a preguntar en cada login — solo importa cuando
+ * el uid pertenece a más de una clínica a la vez. Envuelto en try/catch:
+ * localStorage puede lanzar en navegación privada o con almacenamiento
+ * deshabilitado, y eso nunca debe tronar la resolución de sesión. */
+function claveClinicaRecordada(authUid: string) {
+  return `mo_clinica_activa_${authUid}`;
+}
+function leerClinicaRecordada(authUid: string): string | null {
+  try {
+    return localStorage.getItem(claveClinicaRecordada(authUid));
+  } catch {
+    return null;
+  }
+}
+function guardarClinicaRecordada(authUid: string, clinicId: string) {
+  try {
+    localStorage.setItem(claveClinicaRecordada(authUid), clinicId);
+  } catch {
+    // No crítico — si falla, simplemente se vuelve a preguntar la próxima vez.
+  }
+}
+
+/** Crea la clínica propia de un uid sin ninguna membresía (arquitectura
+ * original: la propia cuenta ES la clínica) — extraído de la resolución
+ * inicial para poder llamarse también al declinar una invitación pendiente
+ * (ver rechazarInvite) sin duplicar los tres pasos. */
+async function crearClinicaPropia(authUid: string, authEmail: string) {
+  await setDoc(doc(db, "clinics", authUid), {
+    ownerId: authUid,
+    nombre: "",
+    creadoEl: new Date().toISOString().slice(0, 10),
+  } satisfies ClinicInfo);
+  await setDoc(doc(db, "clinicMembers", `${authUid}_${authUid}`), {
+    clinicId: authUid,
+    uid: authUid,
+    nombre: "",
+    correo: authEmail,
+    role: "admin",
+    status: "active",
+  } satisfies ClinicMember);
+  // Catálogo recomendado de tratamientos — solo los 20 principales (nunca
+  // los servicios complementarios), sin precios, para que el odontólogo los
+  // configure a su manera. Ver src/lib/catalogoRecomendado.ts.
+  const ahora = new Date().toISOString();
+  const batchCatalogo = writeBatch(db);
+  catalogoRecomendado.forEach((plantilla) => {
+    const id = idDesdeCodigo(plantilla.codigo);
+    batchCatalogo.set(doc(db, `users/${authUid}/procedimientos`, id), {
+      id,
+      ...crearProcedimientoDesdeTemplate(plantilla, ahora),
+    } satisfies Procedimiento);
+  });
+  await batchCatalogo.commit();
+}
+
 /**
- * Resuelve a qué clínica pertenecen los datos que debe ver esta sesión:
- * - Si el uid tiene una membresía activa en la clínica de alguien más, usa esa.
- * - Si no, la propia cuenta ES la clínica (arquitectura original): se
- *   autocrea su documento de clínica + membresía admin la primera vez.
- * También detecta invitaciones pendientes por correo para poder unirse a otra.
+ * Resuelve a qué clínica(s) pertenece esta sesión:
+ * - Reúne TODAS las membresías activas del uid (antes se usaba una sola,
+ *   `.find()`, descartando el resto en silencio — eso era exactamente lo
+ *   que impedía que un colaborador con varias clínicas pudiera elegir).
+ * - Una sola membresía: se aplica directo, sin preguntar (caso de siempre,
+ *   sin cambio de comportamiento).
+ * - Varias: si ya hay una elegida y recordada (localStorage) para este uid
+ *   y sigue vigente, se aplica directo; si no, `necesitaSeleccion` queda en
+ *   true y el picker (SelectorClinica) decide, vía seleccionarClinica.
+ * - Ninguna: si además hay una invitación pendiente por correo, NO se
+ *   autocrea una clínica propia todavía — se espera a que el usuario acepte
+ *   o decline esa invitación primero (ver rechazarInvite), para no
+ *   regalarle una clínica vacía y desechable a alguien que en realidad solo
+ *   estaba por unirse a una real.
  */
 function useClinicResolution(authUid: string, authEmail: string) {
   const [clinicUid, setClinicUid] = useState<string | null>(null);
   const [rol, setRol] = useState<RolClinica | null>(null);
-  // null = sin restricción (ve todos los recursos/calendarios, como el
-  // dueño o un colaborador al que nunca se le configuró un límite).
-  // Un arreglo (incluso vacío se trata como sin restricción, ver abajo)
-  // limita la Agenda/citas a esos recursos únicamente.
   const [misRecursosVisibles, setMisRecursosVisibles] = useState<string[] | null>(null);
   const [pendingInvite, setPendingInvite] = useState<ClinicInvite | null>(null);
   const [resolved, setResolved] = useState(false);
+  const [membresiasDisponibles, setMembresiasDisponibles] = useState<MembresiaConClinica[]>([]);
 
   useEffect(() => {
     let cancelled = false;
@@ -323,57 +400,7 @@ function useClinicResolution(authUid: string, authEmail: string) {
         console.error("No se pudieron leer las membresías de clínica", err);
       }
 
-      const externa = membresias.find((m) => m.clinicId !== authUid);
-
-      if (externa) {
-        if (!cancelled) {
-          setClinicUid(externa.clinicId);
-          setRol(externa.role);
-          setMisRecursosVisibles(
-            externa.recursosVisibles && externa.recursosVisibles.length > 0 ? externa.recursosVisibles : null
-          );
-        }
-      } else {
-        const propia = membresias.find((m) => m.clinicId === authUid);
-        if (!propia) {
-          try {
-            await setDoc(doc(db, "clinics", authUid), {
-              ownerId: authUid,
-              nombre: "",
-              creadoEl: new Date().toISOString().slice(0, 10),
-            } satisfies ClinicInfo);
-            await setDoc(doc(db, "clinicMembers", `${authUid}_${authUid}`), {
-              clinicId: authUid,
-              uid: authUid,
-              nombre: "",
-              correo: authEmail,
-              role: "admin",
-              status: "active",
-            } satisfies ClinicMember);
-            // Catálogo recomendado de tratamientos — solo los 20 principales
-            // (nunca los servicios complementarios), sin precios, para que
-            // el odontólogo los configure a su manera. Ver
-            // src/lib/catalogoRecomendado.ts.
-            const ahora = new Date().toISOString();
-            const batchCatalogo = writeBatch(db);
-            catalogoRecomendado.forEach((plantilla) => {
-              const id = idDesdeCodigo(plantilla.codigo);
-              batchCatalogo.set(doc(db, `users/${authUid}/procedimientos`, id), {
-                id,
-                ...crearProcedimientoDesdeTemplate(plantilla, ahora),
-              } satisfies Procedimiento);
-            });
-            await batchCatalogo.commit();
-          } catch (err) {
-            console.error("No se pudo crear la clínica del usuario", err);
-          }
-        }
-        if (!cancelled) {
-          setClinicUid(authUid);
-          setRol("admin");
-        }
-      }
-
+      let invitePendiente: ClinicInvite | null = null;
       if (authEmail) {
         try {
           const qInv = query(
@@ -382,15 +409,62 @@ function useClinicResolution(authUid: string, authEmail: string) {
             where("status", "==", "pending")
           );
           const snapInv = await getDocs(qInv);
-          if (!cancelled && !snapInv.empty) {
-            setPendingInvite(snapInv.docs[0].data() as ClinicInvite);
-          }
+          if (!snapInv.empty) invitePendiente = snapInv.docs[0].data() as ClinicInvite;
         } catch (err) {
           console.error("No se pudieron leer las invitaciones pendientes", err);
         }
       }
 
-      if (!cancelled) setResolved(true);
+      if (membresias.length === 0 && !invitePendiente) {
+        try {
+          await crearClinicaPropia(authUid, authEmail);
+          membresias = [
+            { clinicId: authUid, uid: authUid, nombre: "", correo: authEmail, role: "admin", status: "active" },
+          ];
+        } catch (err) {
+          console.error("No se pudo crear la clínica del usuario", err);
+        }
+      }
+
+      const membresiasConNombre: MembresiaConClinica[] = await Promise.all(
+        membresias.map(async (m) => {
+          try {
+            const snapClinica = await getDoc(doc(db, "clinics", m.clinicId));
+            const nombreClinica = snapClinica.exists() ? (snapClinica.data() as ClinicInfo).nombre : "";
+            return { ...m, nombreClinica: nombreClinica || "Clínica sin nombre" };
+          } catch {
+            return { ...m, nombreClinica: "Clínica sin nombre" };
+          }
+        })
+      );
+
+      if (cancelled) return;
+
+      setMembresiasDisponibles(membresiasConNombre);
+      setPendingInvite(invitePendiente);
+
+      if (membresiasConNombre.length === 1) {
+        const campos = camposDeMembresia(membresiasConNombre[0]);
+        setClinicUid(campos.clinicUid);
+        setRol(campos.rol);
+        setMisRecursosVisibles(campos.misRecursosVisibles);
+        guardarClinicaRecordada(authUid, campos.clinicUid);
+      } else if (membresiasConNombre.length > 1) {
+        const recordada = leerClinicaRecordada(authUid);
+        const encontrada = recordada ? membresiasConNombre.find((m) => m.clinicId === recordada) : undefined;
+        if (encontrada) {
+          const campos = camposDeMembresia(encontrada);
+          setClinicUid(campos.clinicUid);
+          setRol(campos.rol);
+          setMisRecursosVisibles(campos.misRecursosVisibles);
+        }
+        // Si no hay ninguna recordada válida, clinicUid se queda null —
+        // necesitaSeleccion (derivado, abajo) muestra el picker.
+      }
+      // membresiasConNombre.length === 0 (solo posible con invitePendiente
+      // activo): clinicUid se queda null, InvitePrompt decide.
+
+      setResolved(true);
     })();
 
     return () => {
@@ -398,10 +472,25 @@ function useClinicResolution(authUid: string, authEmail: string) {
     };
   }, [authUid, authEmail]);
 
+  // Derivado, no estado propio, para que nunca pueda desincronizarse de
+  // clinicUid/membresiasDisponibles: solo pide elegir cuando de verdad hay
+  // más de una clínica Y todavía ninguna quedó activa.
+  const necesitaSeleccion = resolved && clinicUid === null && membresiasDisponibles.length > 1;
+
+  const seleccionarClinica = (clinicId: string) => {
+    const m = membresiasDisponibles.find((x) => x.clinicId === clinicId);
+    if (!m) return;
+    const campos = camposDeMembresia(m);
+    setClinicUid(campos.clinicUid);
+    setRol(campos.rol);
+    setMisRecursosVisibles(campos.misRecursosVisibles);
+    guardarClinicaRecordada(authUid, clinicId);
+  };
+
   const aceptarInvite = async () => {
     if (!pendingInvite) return;
     const memberId = `${pendingInvite.clinicId}_${authUid}`;
-    await setDoc(doc(db, "clinicMembers", memberId), {
+    const nuevaMembresia: ClinicMember = {
       clinicId: pendingInvite.clinicId,
       uid: authUid,
       nombre: pendingInvite.nombre,
@@ -409,7 +498,8 @@ function useClinicResolution(authUid: string, authEmail: string) {
       whatsapp: pendingInvite.whatsapp ?? "",
       role: pendingInvite.role,
       status: "active",
-    } satisfies ClinicMember);
+    };
+    await setDoc(doc(db, "clinicMembers", memberId), nuevaMembresia satisfies ClinicMember);
     // Todo colaborador que se une queda también dado de alta como recurso
     // (médico) en la Agenda, para que "el personal" y "los recursos de la
     // agenda" sean siempre la misma lista — el uid como id hace esto
@@ -428,14 +518,62 @@ function useClinicResolution(authUid: string, authEmail: string) {
       { ...pendingInvite, status: "claimed" },
       { merge: true }
     );
-    setClinicUid(pendingInvite.clinicId);
-    setRol(pendingInvite.role);
+    const nuevaConNombre: MembresiaConClinica = {
+      ...nuevaMembresia,
+      nombreClinica: pendingInvite.nombreClinica || "Clínica sin nombre",
+    };
+    setMembresiasDisponibles((prev) => [...prev.filter((m) => m.clinicId !== nuevaMembresia.clinicId), nuevaConNombre]);
+    setClinicUid(nuevaMembresia.clinicId);
+    setRol(nuevaMembresia.role);
+    setMisRecursosVisibles(null);
+    guardarClinicaRecordada(authUid, nuevaMembresia.clinicId);
     setPendingInvite(null);
   };
 
-  const rechazarInvite = () => setPendingInvite(null);
+  const rechazarInvite = async () => {
+    setPendingInvite(null);
+    // Solo si esta invitación era la única razón por la que no se le había
+    // creado todavía una clínica propia (cuenta nueva, cero membresías) —
+    // al declinar, se le crea ahora (nunca antes, ver comentario arriba de
+    // useClinicResolution).
+    if (membresiasDisponibles.length === 0) {
+      setResolved(false);
+      try {
+        await crearClinicaPropia(authUid, authEmail);
+        const propia: ClinicMember = {
+          clinicId: authUid,
+          uid: authUid,
+          nombre: "",
+          correo: authEmail,
+          role: "admin",
+          status: "active",
+        };
+        const propiaConNombre: MembresiaConClinica = { ...propia, nombreClinica: "Clínica sin nombre" };
+        setMembresiasDisponibles([propiaConNombre]);
+        setClinicUid(propia.clinicId);
+        setRol(propia.role);
+        setMisRecursosVisibles(null);
+        guardarClinicaRecordada(authUid, propia.clinicId);
+      } catch (err) {
+        console.error("No se pudo crear la clínica del usuario", err);
+      } finally {
+        setResolved(true);
+      }
+    }
+  };
 
-  return { clinicUid, rol, misRecursosVisibles, resolved, pendingInvite, aceptarInvite, rechazarInvite };
+  return {
+    clinicUid,
+    rol,
+    misRecursosVisibles,
+    resolved,
+    pendingInvite,
+    aceptarInvite,
+    rechazarInvite,
+    membresiasDisponibles,
+    necesitaSeleccion,
+    seleccionarClinica,
+  };
 }
 
 export type NavegacionExpediente = { patientId: string; tab?: string; citaId?: string } | null;
@@ -717,6 +855,11 @@ type PatientDataContextValue = {
   pendingInvite: ClinicInvite | null;
   aceptarInvite: () => Promise<void>;
   rechazarInvite: () => void;
+  /** Todas las clínicas donde este uid tiene membresía activa — más de una
+   * habilita el control "Cambiar de clínica" en el header (ver
+   * SelectorClinica). Con una sola, queda como arreglo de un elemento. */
+  membresiasDisponibles: MembresiaConClinica[];
+  seleccionarClinica: (clinicId: string) => void;
   colaboradoresActivos: ClinicMember[];
   invitacionesPendientes: ClinicInvite[];
   invitarColaborador: (data: { nombre: string; correo: string; whatsapp: string; rol: RolClinica }) => Promise<void>;
@@ -736,15 +879,31 @@ export function PatientDataProvider({
   uid,
   userEmail,
   onIrAPagina,
+  onLogout,
   children,
 }: {
   uid: string;
   userEmail: string;
   onIrAPagina?: (pageId: string) => void;
+  /** Solo se usa para la salida de emergencia del selector de clínica
+   * forzado (ver necesitaSeleccion abajo) — si un uid no reconoce ninguna
+   * de las clínicas listadas, puede cerrar sesión en vez de quedar
+   * atrapado eligiendo entre opciones que no son suyas. */
+  onLogout?: () => void;
   children: ReactNode;
 }) {
-  const { clinicUid, rol, misRecursosVisibles, resolved, pendingInvite, aceptarInvite, rechazarInvite } =
-    useClinicResolution(uid, userEmail);
+  const {
+    clinicUid,
+    rol,
+    misRecursosVisibles,
+    resolved,
+    pendingInvite,
+    aceptarInvite,
+    rechazarInvite,
+    membresiasDisponibles,
+    necesitaSeleccion,
+    seleccionarClinica,
+  } = useClinicResolution(uid, userEmail);
   const [clinicInfo, setClinicInfo] = useClinicInfo(clinicUid);
 
   const [patients, setPatients] = useFirestoreList<Patient>(clinicUid, "pacientes");
@@ -2345,6 +2504,21 @@ export function PatientDataProvider({
     );
   }
 
+  // Pertenece a varias clínicas y ninguna quedó recordada/aplicada todavía
+  // — se pide elegir ANTES de montar el resto de la app (nada bajo este
+  // provider puede depender de un clinicUid parcial o adivinado). Fuera del
+  // <PatientDataContext.Provider> a propósito: SelectorClinica no puede
+  // depender de datos de una clínica que todavía no se sabe cuál es.
+  if (necesitaSeleccion) {
+    return (
+      <SelectorClinica
+        clinicas={membresiasDisponibles}
+        onSeleccionar={seleccionarClinica}
+        onCerrarSesion={onLogout}
+      />
+    );
+  }
+
   return (
     <PatientDataContext.Provider
       value={{
@@ -2507,6 +2681,8 @@ export function PatientDataProvider({
         pendingInvite,
         aceptarInvite,
         rechazarInvite,
+        membresiasDisponibles,
+        seleccionarClinica,
         colaboradoresActivos,
         invitacionesPendientes,
         invitarColaborador,

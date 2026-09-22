@@ -61,6 +61,7 @@ import { PatientDataProvider, usePatientData } from "@/context/PatientDataContex
 import { PrivacidadProvider } from "@/context/PrivacidadContext";
 import { MoConectaProvider } from "@/context/MoConectaContext";
 import MoConecta from "./pages/MoConecta";
+import SelectorClinica from "./SelectorClinica";
 
 const paginasConstruidas = new Set([
   "inicio",
@@ -567,9 +568,10 @@ function DashboardBody({
   onLogout: () => void;
   esAdmin: boolean;
 }) {
-  const { clinicInfo, suscripcion } = usePatientData();
+  const { clinicInfo, suscripcion, membresiasDisponibles, seleccionarClinica } = usePatientData();
   const isLight = theme === "light";
   const [mostrarSugerencia, setMostrarSugerencia] = useState(false);
+  const [mostrarSelectorClinica, setMostrarSelectorClinica] = useState(false);
   // Comparten esquina: el Asistente se esconde mientras el abanico de
   // navegación está abierto, así que ambos necesitan enterarse del mismo
   // estado — vive aquí, controlado, en vez de duplicarse en cada uno.
@@ -709,6 +711,15 @@ function DashboardBody({
                 </button>
 
                 <span className="hidden shrink-0 truncate text-sm text-ink/50 sm:inline">{userEmail}</span>
+                {membresiasDisponibles.length > 1 && (
+                  <button
+                    onClick={() => setMostrarSelectorClinica(true)}
+                    title="Cambiar de clínica"
+                    className="shrink-0 rounded-lg border border-edge/10 bg-surface px-2.5 py-1.5 text-xs text-ink/70 transition-colors hover:text-ink sm:px-3"
+                  >
+                    Cambiar de clínica
+                  </button>
+                )}
                 <button
                   onClick={onLogout}
                   className="shrink-0 rounded-lg border border-edge/10 bg-surface px-2.5 py-1.5 text-xs text-ink/70 transition-colors hover:text-ink sm:px-3"
@@ -795,6 +806,23 @@ function DashboardBody({
         <GlobalNuevoPaciente onClose={() => setShowNuevoPaciente(false)} />
       )}
       {mostrarSugerencia && <SugerenciaModal onClose={() => setMostrarSugerencia(false)} />}
+      {mostrarSelectorClinica && (
+        <SelectorClinica
+          clinicas={membresiasDisponibles}
+          onSeleccionar={(clinicId) => {
+            // Recarga completa a propósito: el resto del dashboard puede
+            // tener estado local (página activa, diálogos abiertos, un
+            // paciente en el Expediente) que solo tiene sentido en la
+            // clínica anterior — un remount limpio es la forma segura de
+            // no arrastrar nada de eso a la clínica nueva. seleccionarClinica
+            // ya guardó la elección en localStorage, así que la recarga la
+            // vuelve a aplicar sola, sin preguntar de nuevo.
+            seleccionarClinica(clinicId);
+            window.location.reload();
+          }}
+          onCancelar={() => setMostrarSelectorClinica(false)}
+        />
+      )}
 
       <AsistenteFlotante activePage={activePage} activeLabel={activeLabel} oculto={fanAbierto} />
     </div>
@@ -818,7 +846,7 @@ export default function Dashboard({
   const esAdmin = uid === process.env.NEXT_PUBLIC_ADMIN_UID;
 
   return (
-    <PatientDataProvider uid={uid} userEmail={userEmail} onIrAPagina={setActivePage}>
+    <PatientDataProvider uid={uid} userEmail={userEmail} onIrAPagina={setActivePage} onLogout={onLogout}>
       <MoConectaProvider uid={uid}>
         <IndicadorSinConexion />
         <AvisoConfidencialidad />

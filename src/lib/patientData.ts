@@ -522,6 +522,11 @@ export type ClinicMember = {
   recursosVisibles?: string[];
 };
 
+/** ClinicMember + el nombre de esa clínica (de `clinics/{clinicId}.nombre`,
+ * resuelto aparte porque ClinicMember solo guarda el id) — para mostrar en
+ * el selector de clínica cuando un uid pertenece a varias a la vez. */
+export type MembresiaConClinica = ClinicMember & { nombreClinica: string };
+
 /** Documento `clinicInvites/{clinicId}_{correo}` cuando hay correo — pendiente
  * hasta que se reclama. Sin correo (solo WhatsApp) usa un id distinto, ver
  * invitarColaborador; en ese caso la invitación no puede auto-detectarse al
