@@ -157,6 +157,13 @@ export default function FondosFinancieros() {
       </div>
       <div className="mb-5 flex items-center gap-2">
         <button
+          onClick={() => setAncla(new Date())}
+          title="Volver a hoy"
+          className="shrink-0 rounded-lg border border-edge/15 px-2.5 py-1 text-[11px] font-semibold text-ink/60 transition-colors hover:bg-surface hover:text-ink"
+        >
+          Hoy
+        </button>
+        <button
           onClick={() => setAncla((prev) => navegarVistaFondos(vista, prev, -1))}
           title="Periodo anterior"
           className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg border border-success/40 text-sm text-success transition-colors hover:bg-success/10"
