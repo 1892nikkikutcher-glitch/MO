@@ -3,6 +3,7 @@ import {
   GRUPOS_EFECTIVO,
   GRUPOS_ELECTRONICO,
   calcularAsignacionFondos,
+  navegarVistaFondos,
   rangoVistaFondos,
   sumarRangoPorFormaPago,
 } from "../fondosFinancieros";
@@ -168,5 +169,72 @@ describe("rangoVistaFondos", () => {
     const { hoy, lunes, domingo } = encontrado!;
     const semana = rangoVistaFondos("semana", hoy);
     expect(semana.label).toBe(`${lunes.getDate()} ${MESES_ABR[lunes.getMonth()]} – ${domingo.getDate()} ${MESES_ABR[domingo.getMonth()]}`);
+  });
+
+  it("ancla distinta de hoy (navegado al pasado): el mes ya completo no se corta, aunque hoy sea otro mes", () => {
+    const hoyReal = new Date(2026, 8, 5); // hoy: 5 de septiembre
+    const anclaAgosto = new Date(2026, 7, 1); // navegado a agosto
+    const mes = rangoVistaFondos("mes", anclaAgosto, hoyReal);
+    expect(iso(mes.desde)).toBe("2026-08-01");
+    expect(iso(mes.hasta)).toBe("2026-08-31"); // agosto ya terminó por completo, no se corta a hoy
+    expect(mes.label).toBe("ago. 2026");
+  });
+
+  it("ancla distinta de hoy (navegado al futuro): rango invertido/vacío, pero la etiqueta muestra el periodo real", () => {
+    const hoyReal = new Date(2026, 8, 5); // hoy: 5 de septiembre
+    const anclaOctubre = new Date(2026, 9, 1); // navegado a octubre, todavía no llega
+    const mes = rangoVistaFondos("mes", anclaOctubre, hoyReal);
+    expect(iso(mes.desde)).toBe("2026-10-01");
+    expect(mes.desde.getTime()).toBeGreaterThan(mes.hasta.getTime()); // topado a hoy, antes de que arranque
+    expect(mes.label).toBe("oct. 2026"); // la etiqueta no depende del tope, muestra el mes real
+    // Como todo el rango queda invertido, la suma real da cero sin caso especial:
+    const ingresos = sumarRangoPorFormaPago({ "2026-09-05": { Efectivo: 500 } }, mes.desde, mes.hasta);
+    expect(ingresos).toEqual({ efectivo: 0, electronico: 0 });
+  });
+
+  it("sin tercer argumento, hoy = ancla (mismo comportamiento de siempre, viendo el periodo actual)", () => {
+    const hoy = new Date(2026, 8, 18);
+    expect(rangoVistaFondos("mes", hoy)).toEqual(rangoVistaFondos("mes", hoy, hoy));
+  });
+});
+
+describe("navegarVistaFondos", () => {
+  it("día: un día exacto hacia atrás o adelante", () => {
+    const ancla = new Date(2026, 8, 15);
+    expect(iso(navegarVistaFondos("dia", ancla, -1))).toBe("2026-09-14");
+    expect(iso(navegarVistaFondos("dia", ancla, 1))).toBe("2026-09-16");
+  });
+
+  it("semana: siete días exactos hacia atrás o adelante", () => {
+    const ancla = new Date(2026, 8, 15);
+    expect(iso(navegarVistaFondos("semana", ancla, -1))).toBe("2026-09-08");
+    expect(iso(navegarVistaFondos("semana", ancla, 1))).toBe("2026-09-22");
+  });
+
+  it("quincena1/quincena2/mes: un mes completo — nunca saltan a la otra quincena del mismo mes", () => {
+    const ancla = new Date(2026, 8, 15); // 15 de septiembre
+    for (const vista of ["quincena1", "quincena2", "mes"] as const) {
+      expect(navegarVistaFondos(vista, ancla, -1).getMonth()).toBe(7); // agosto
+      expect(navegarVistaFondos(vista, ancla, 1).getMonth()).toBe(9); // octubre
+    }
+  });
+
+  it("mes: cruza de año correctamente en ambas direcciones", () => {
+    const diciembre = new Date(2026, 11, 10);
+    const enero = navegarVistaFondos("mes", diciembre, 1);
+    expect(enero.getFullYear()).toBe(2027);
+    expect(enero.getMonth()).toBe(0);
+
+    const eneroSiguiente = new Date(2027, 0, 10);
+    const diciembreAnterior = navegarVistaFondos("mes", eneroSiguiente, -1);
+    expect(diciembreAnterior.getFullYear()).toBe(2026);
+    expect(diciembreAnterior.getMonth()).toBe(11);
+  });
+
+  it("navegar y volver dos veces al mismo lugar, aplicado sobre rangoVistaFondos, muestra el mes actual otra vez", () => {
+    const hoy = new Date(2026, 8, 18);
+    const unMesAtras = navegarVistaFondos("mes", hoy, -1);
+    const devuelta = navegarVistaFondos("mes", unMesAtras, 1);
+    expect(rangoVistaFondos("mes", devuelta, hoy).label).toBe(rangoVistaFondos("mes", hoy, hoy).label);
   });
 });

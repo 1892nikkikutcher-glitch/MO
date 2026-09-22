@@ -8,6 +8,7 @@ import {
   GRUPOS_EFECTIVO,
   GRUPOS_ELECTRONICO,
   calcularAsignacionFondos,
+  navegarVistaFondos,
   rangoVistaFondos,
   sumarRangoPorFormaPago,
   type GrupoConMonto,
@@ -110,10 +111,16 @@ export default function FondosFinancieros() {
   const { puedeVerFinanzas, finanzas } = usePatientData();
   const { oculto } = usePrivacidad();
   const [vista, setVista] = useState<VistaFondos>("mes");
+  // Ancla independiente de "hoy": las flechas la mueven, pero
+  // rangoVistaFondos sigue recibiendo la hora real por separado para saber
+  // qué tanto de un periodo ya "pasó" (ver su comentario). Cambiar de tipo
+  // de vista (Día/Semana/...) siempre vuelve al periodo actual de ese tipo
+  // — mismo criterio que el selector de periodo del Dashboard Principal.
+  const [ancla, setAncla] = useState<Date>(() => new Date());
 
   if (!puedeVerFinanzas) return null;
 
-  const rangoActivo = rangoVistaFondos(vista, new Date());
+  const rangoActivo = rangoVistaFondos(vista, ancla);
   const ingresos = sumarRangoPorFormaPago(finanzas.porFechaYFormaPago, rangoActivo.desde, rangoActivo.hasta);
 
   const gruposElectronico = calcularAsignacionFondos(GRUPOS_ELECTRONICO, ingresos.electronico);
@@ -133,7 +140,10 @@ export default function FondosFinancieros() {
           {OPCIONES_VISTA.map((op) => (
             <button
               key={op.id}
-              onClick={() => setVista(op.id)}
+              onClick={() => {
+                setVista(op.id);
+                setAncla(new Date());
+              }}
               className={`rounded-lg border px-2.5 py-1 text-[11px] font-semibold transition-colors ${
                 vista === op.id
                   ? "border-accent bg-accent/15 text-accent"
@@ -145,9 +155,27 @@ export default function FondosFinancieros() {
           ))}
         </div>
       </div>
-      <p className="mb-5 text-xs text-ink/40">
-        Reparto fijo de {rangoActivo.label} entre fondos, según cómo pagó el paciente.
-      </p>
+      <div className="mb-5 flex items-center gap-2">
+        <button
+          onClick={() => setAncla((prev) => navegarVistaFondos(vista, prev, -1))}
+          title="Periodo anterior"
+          className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg border border-success/40 text-sm text-success transition-colors hover:bg-success/10"
+          style={{ boxShadow: "0 0 12px -2px rgb(var(--success-rgb) / 0.5)" }}
+        >
+          ‹
+        </button>
+        <span className="min-w-0 flex-1 text-xs text-ink/40">
+          Reparto fijo de {rangoActivo.label} entre fondos, según cómo pagó el paciente.
+        </span>
+        <button
+          onClick={() => setAncla((prev) => navegarVistaFondos(vista, prev, 1))}
+          title="Periodo siguiente"
+          className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg border border-success/40 text-sm text-success transition-colors hover:bg-success/10"
+          style={{ boxShadow: "0 0 12px -2px rgb(var(--success-rgb) / 0.5)" }}
+        >
+          ›
+        </button>
+      </div>
 
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
         <CanalFondos

@@ -4,7 +4,7 @@
  * ver Inicio.tsx para dónde se muestran. */
 
 import { redondearDinero } from "./dinero";
-import { MESES_ABR } from "./agendaHelpers";
+import { MESES_ABR, addDays, addMonths } from "./agendaHelpers";
 import { inicioSemana } from "./metas";
 
 export type FondoAsignacion = { label: string; porcentaje: number };
@@ -94,19 +94,25 @@ function labelRango(desde: Date, finNatural: Date): string {
   return `${desde.getDate()} ${MESES_ABR[desde.getMonth()]} – ${finNatural.getDate()} ${MESES_ABR[finNatural.getMonth()]}`;
 }
 
-/** Rango de fechas de la vista elegida, siempre relativo a `hoy` (esta
- * sección no navega a periodos pasados, a diferencia del selector de
- * periodo general de Inicio.tsx) — semana usa el mismo corte lunes-domingo
- * que ya usa `inicioSemana` (metas.ts) para la Meta Semanal, quincena 1 =
- * días 1-15, quincena 2 = día 16 al último día del mes (mismo corte que ya
- * usa `inicioQuincena` para la Meta Quincenal). `hasta` nunca pasa de hoy —
- * un periodo que todavía no llega (ej. quincena 2 vista el día 8) da un
- * rango vacío, que `sumarRangoPorFormaPago` ya interpreta como cero sin
- * necesitar un caso especial. */
-export function rangoVistaFondos(vista: VistaFondos, hoy: Date): RangoFondos {
-  const anio = hoy.getFullYear();
-  const mes = hoy.getMonth();
-  const hoySinHora = new Date(anio, mes, hoy.getDate());
+/** Rango de fechas de la vista elegida, centrado en `ancla` — semana usa el
+ * mismo corte lunes-domingo que ya usa `inicioSemana` (metas.ts) para la
+ * Meta Semanal, quincena 1 = días 1-15, quincena 2 = día 16 al último día
+ * del mes (mismo corte que ya usa `inicioQuincena` para la Meta
+ * Quincenal). `hoy` (por default, el propio `ancla` — el caso de siempre,
+ * viendo el periodo actual) topa `hasta` para nunca proyectar más allá de
+ * hoy: si el fin natural del periodo ya pasó (navegado al pasado con las
+ * flechas — ver navegarVistaFondos) queda tal cual, sin cortar; si el fin
+ * natural todavía no llega (el periodo actual a medias, ej. quincena 2
+ * vista el día 18, o un periodo navegado al futuro que ni siquiera
+ * arrancó), `hasta` se topa a hoy — que en un periodo futuro queda ANTES
+ * que `desde`, un rango invertido/vacío a propósito: `sumarRangoPorFormaPago`
+ * ya lo suma en cero sin necesitar un caso especial, y `label` (calculado
+ * aparte, sin este tope) sigue mostrando el periodo real. */
+export function rangoVistaFondos(vista: VistaFondos, ancla: Date, hoy: Date = ancla): RangoFondos {
+  const anio = ancla.getFullYear();
+  const mes = ancla.getMonth();
+  const anclaSinHora = new Date(anio, mes, ancla.getDate());
+  const hoySinHora = new Date(hoy.getFullYear(), hoy.getMonth(), hoy.getDate());
   const ultimoDiaMes = new Date(anio, mes + 1, 0).getDate();
 
   let desde: Date;
@@ -114,11 +120,11 @@ export function rangoVistaFondos(vista: VistaFondos, hoy: Date): RangoFondos {
   let label: string;
 
   if (vista === "dia") {
-    desde = hoySinHora;
-    finNatural = hoySinHora;
-    label = `${hoySinHora.getDate()} ${MESES_ABR[mes]}`;
+    desde = anclaSinHora;
+    finNatural = anclaSinHora;
+    label = `${anclaSinHora.getDate()} ${MESES_ABR[mes]}`;
   } else if (vista === "semana") {
-    desde = inicioSemana(hoy);
+    desde = inicioSemana(ancla);
     finNatural = new Date(desde);
     finNatural.setDate(finNatural.getDate() + 6);
     label = labelRango(desde, finNatural);
@@ -138,6 +144,25 @@ export function rangoVistaFondos(vista: VistaFondos, hoy: Date): RangoFondos {
 
   const hasta = finNatural < hoySinHora ? finNatural : hoySinHora;
   return { desde, hasta, label };
+}
+
+/** Mueve `ancla` un "paso" natural de la vista activa — mismo espíritu que
+ * la navegación de PeriodSelector en el Dashboard Principal (flechas ‹ ›),
+ * adaptado a los cinco tipos de vista de Fondos. Quincena 1 y quincena 2 se
+ * navegan de un mes completo en un mes completo (nunca saltan a "la otra
+ * quincena" del mismo mes) — para eso ya están los botones de vista. */
+export function navegarVistaFondos(vista: VistaFondos, ancla: Date, direccion: -1 | 1): Date {
+  switch (vista) {
+    case "dia":
+      return addDays(ancla, direccion);
+    case "semana":
+      return addDays(ancla, direccion * 7);
+    case "quincena1":
+    case "quincena2":
+    case "mes":
+    default:
+      return addMonths(ancla, direccion);
+  }
 }
 
 export type FondoConMonto = FondoAsignacion & { monto: number };
