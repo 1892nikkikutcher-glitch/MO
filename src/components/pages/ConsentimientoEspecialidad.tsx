@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { usePatientData } from "@/context/PatientDataContext";
-import { calcularEdadDetallada, type Patient } from "@/lib/patientData";
+import { calcularEdadDetallada, cedulaProfesionalDe, type Patient } from "@/lib/patientData";
 import { manejarCambioNombre } from "@/lib/textoNombre";
 import {
   consentimientosEspecialidad,
@@ -58,6 +58,7 @@ export default function ConsentimientoEspecialidad({
       : undefined;
     return medicoSugerido || medicos[0]?.nombre || perfilDoctor.nombre || "";
   });
+  const cedula = cedulaProfesionalDe(medico, recursos, perfilDoctor);
   const [procedimiento, setProcedimiento] = useState("");
   const [nombreFirmante, setNombreFirmante] = useState(
     esMenorDeEdad ? patient.nombreTutor || "" : patient.name
@@ -195,7 +196,7 @@ export default function ConsentimientoEspecialidad({
         </h2>
         <div className="mt-3 text-center text-sm leading-snug print:mt-1.5 print:text-xs">
           <p className="font-semibold">{medico || perfilDoctor.nombre || "Consultorio dental"}</p>
-          {perfilDoctor.cedulaProfesional && <p>Cédula profesional {perfilDoctor.cedulaProfesional}</p>}
+          {cedula && <p>Cédula profesional {cedula}</p>}
           {perfilDoctor.direccionClinica && <p>{perfilDoctor.direccionClinica}</p>}
         </div>
 

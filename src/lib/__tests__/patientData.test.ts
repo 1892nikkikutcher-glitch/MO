@@ -1,11 +1,13 @@
 import { describe, expect, it } from "vitest";
 import {
+  cedulaProfesionalDe,
   computeTratamientosPendientes,
   diasRestantesDePrueba,
   DURACION_PRUEBA_DIAS,
   pruebaVencida,
   type DevolucionPago,
   type Pago,
+  type Recurso,
   type SavedBudget,
 } from "../patientData";
 
@@ -162,5 +164,34 @@ describe("computeTratamientosPendientes — con devoluciones", () => {
     const pendientes = computeTratamientosPendientes([presupuesto], [pago], [dev]);
     expect(pendientes.find((t) => t.id === "trat-A")).toBeUndefined();
     expect(pendientes.find((t) => t.id === "trat-B")?.pendiente).toBe(2500);
+  });
+});
+
+describe("cedulaProfesionalDe", () => {
+  const perfilDoctor = { nombre: "Dr. Nicolás Medina González", cedulaProfesional: "1111111" };
+  const recursos: Pick<Recurso, "nombre" | "tipo" | "cedulaProfesional">[] = [
+    { nombre: "Dr. Enrique Gómez Salas", tipo: "medico", cedulaProfesional: "2222222" },
+    { nombre: "Dra. Ana Paola Ríos Cervantes", tipo: "medico" }, // sin cédula capturada todavía
+    { nombre: "Sillón 1", tipo: "unidad", cedulaProfesional: "9999999" }, // nunca debería usarse (no es médico)
+  ];
+
+  it("un médico con su propia cédula registrada como Recurso: siempre la suya, nunca la de Perfil del Doctor", () => {
+    expect(cedulaProfesionalDe("Dr. Enrique Gómez Salas", recursos, perfilDoctor)).toBe("2222222");
+  });
+
+  it("el propio dueño de Perfil del Doctor: cae a su cédula ahí (retrocompatible con consultorios de un solo doctor)", () => {
+    expect(cedulaProfesionalDe("Dr. Nicolás Medina González", recursos, perfilDoctor)).toBe("1111111");
+  });
+
+  it("un médico SIN cédula capturada en su Recurso: nunca muestra la de otra persona, aunque exista Perfil del Doctor", () => {
+    expect(cedulaProfesionalDe("Dra. Ana Paola Ríos Cervantes", recursos, perfilDoctor)).toBe("");
+  });
+
+  it("un nombre que no corresponde a ningún médico ni a Perfil del Doctor: vacío, nunca inventa una cédula", () => {
+    expect(cedulaProfesionalDe("Dr. Alguien Más", recursos, perfilDoctor)).toBe("");
+  });
+
+  it("un recurso tipo 'unidad' con el mismo nombre nunca presta su cédula", () => {
+    expect(cedulaProfesionalDe("Sillón 1", recursos, perfilDoctor)).toBe("");
   });
 });

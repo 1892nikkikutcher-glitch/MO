@@ -578,7 +578,31 @@ export type Recurso = {
    * cobra la clínica. Solo aplica a tipo "medico"; ausente = todavía sin
    * configurar, nunca se asume un valor por defecto. */
   porcentajeComision?: number;
+  /** Cédula profesional de ESTE médico — para que Consentimiento Informado
+   * (y cualquier otro documento firmado) muestre la cédula de quien
+   * realmente atiende, no siempre la de `PerfilDoctor` (que es la de quien
+   * configuró Administración → Perfil del Doctor, típicamente el dueño de
+   * la cuenta). Solo aplica a tipo "medico"; ausente = todavía sin
+   * capturar. */
+  cedulaProfesional?: string;
 };
+
+/** Cédula profesional a mostrar en un documento firmado por `nombreMedico`
+ * — nunca la cédula de otra persona. Prioridad: (1) la cédula que ese
+ * médico tiene registrada como Recurso (Agenda → Recursos), (2) si ese
+ * médico ES quien llenó Administración → Perfil del Doctor (mismo
+ * nombre), su cédula de ahí, (3) ninguna — mostrar la cédula de alguien
+ * más en un documento legal es peor que no mostrar ninguna. */
+export function cedulaProfesionalDe(
+  nombreMedico: string,
+  recursos: Pick<Recurso, "nombre" | "tipo" | "cedulaProfesional">[],
+  perfilDoctor: Pick<PerfilDoctor, "nombre" | "cedulaProfesional">
+): string {
+  const recurso = recursos.find((r) => r.tipo === "medico" && r.nombre === nombreMedico);
+  if (recurso?.cedulaProfesional) return recurso.cedulaProfesional;
+  if (nombreMedico && nombreMedico === perfilDoctor.nombre) return perfilDoctor.cedulaProfesional;
+  return "";
+}
 
 /** Paleta neón — se usa como franja lateral, resplandor y punto de color
  * del recurso (médico/unidad) en Agenda, nunca como texto ni relleno

@@ -19,6 +19,7 @@ export default function AgendaRecursoDialog({
     tipo: "medico" | "unidad";
     color: string;
     porcentajeComision?: number;
+    cedulaProfesional?: string;
   }) => void;
 }) {
   const [nombre, setNombre] = useState(inicial?.nombre ?? "");
@@ -27,6 +28,7 @@ export default function AgendaRecursoDialog({
   const [porcentajeComision, setPorcentajeComision] = useState(
     inicial?.porcentajeComision != null ? String(inicial.porcentajeComision) : ""
   );
+  const [cedulaProfesional, setCedulaProfesional] = useState(inicial?.cedulaProfesional ?? "");
 
   const puedeGuardar = nombre.trim().length > 0;
 
@@ -80,6 +82,23 @@ export default function AgendaRecursoDialog({
           </div>
           {tipo === "medico" && (
             <div>
+              <label className="mb-1 block text-xs font-medium text-ink/60">Cédula profesional</label>
+              <p className="mb-1.5 text-[11px] text-ink/40">
+                La de este médico específicamente — Consentimiento Informado y demás documentos la
+                usan para que cada quien firme con su propia cédula, no la de Administración → Perfil
+                del Doctor.
+              </p>
+              <input
+                type="text"
+                value={cedulaProfesional}
+                onChange={(e) => setCedulaProfesional(e.target.value)}
+                placeholder="Ej. 12345678"
+                className={inputClass}
+              />
+            </div>
+          )}
+          {tipo === "medico" && (
+            <div>
               <label className="mb-1 block text-xs font-medium text-ink/60">% de comisión</label>
               <p className="mb-1.5 text-[11px] text-ink/40">
                 Qué porcentaje de lo que él mismo cobra le corresponde a él — se usa en Corte de Caja
@@ -131,17 +150,26 @@ export default function AgendaRecursoDialog({
           <button
             onClick={() => {
               if (!puedeGuardar) return;
-              const base = { nombre: nombre.trim(), tipo, color };
-              // Nunca `porcentajeComision: undefined` explícito — Firestore
-              // rechaza escribir un campo con ese valor. Si no hay nada
-              // capturado, se omite la llave por completo en vez de
-              // asignarle undefined (ver Agenda.tsx: al editar, esto deja
-              // intacto lo que ya hubiera guardado, nunca lo borra).
-              onSave(
-                tipo === "medico" && porcentajeComision.trim() !== ""
-                  ? { ...base, porcentajeComision: Math.min(100, Math.max(0, Number(porcentajeComision))) }
-                  : base
-              );
+              let datos: {
+                nombre: string;
+                tipo: "medico" | "unidad";
+                color: string;
+                porcentajeComision?: number;
+                cedulaProfesional?: string;
+              } = { nombre: nombre.trim(), tipo, color };
+              // Nunca `porcentajeComision: undefined`/`cedulaProfesional:
+              // undefined` explícitos — Firestore rechaza escribir un campo
+              // con ese valor. Si no hay nada capturado, se omite la llave
+              // por completo en vez de asignarle undefined (ver Agenda.tsx:
+              // al editar, esto deja intacto lo que ya hubiera guardado,
+              // nunca lo borra).
+              if (tipo === "medico" && porcentajeComision.trim() !== "") {
+                datos = { ...datos, porcentajeComision: Math.min(100, Math.max(0, Number(porcentajeComision))) };
+              }
+              if (tipo === "medico" && cedulaProfesional.trim() !== "") {
+                datos = { ...datos, cedulaProfesional: cedulaProfesional.trim() };
+              }
+              onSave(datos);
             }}
             disabled={!puedeGuardar}
             className="flex-1 rounded-lg border border-accent/60 bg-accent/15 py-2 text-sm font-semibold text-accent transition-opacity hover:bg-accent/25 disabled:cursor-not-allowed disabled:opacity-40"
