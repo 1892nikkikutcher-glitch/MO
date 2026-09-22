@@ -16,7 +16,7 @@ export default function GlobalAgregarPago({
   onClose: () => void;
   initialPatientId?: string;
 }) {
-  const { patients, presupuestosPorPaciente, pagosPorPaciente, setPagosPaciente, addPatient } =
+  const { patients, presupuestosPorPaciente, pagosPorPaciente, setPagosPaciente, addPatient, userEmail, setPagosRealizados } =
     usePatientData();
   const [patientId, setPatientId] = useState(initialPatientId ?? "");
   const [busqueda, setBusqueda] = useState("");
@@ -200,6 +200,17 @@ export default function GlobalAgregarPago({
         setPagosPaciente(patientId, (prev) => {
           const existe = prev.some((p) => p.id === pago.id);
           if (existe) return prev.map((p) => (p.id === pago.id ? pago : p));
+          setPagosRealizados((prevRealizados) => [
+            {
+              id: pago.id,
+              patientId,
+              patientName: patient.name,
+              pago,
+              registradoEn: new Date().toISOString(),
+              registradoPor: userEmail,
+            },
+            ...prevRealizados,
+          ]);
           return [pago, ...prev];
         });
       }}

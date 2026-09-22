@@ -357,6 +357,13 @@ service cloud.firestore {
     match /users/{ownerId}/pagosEliminados/{id} {
       allow read, write: if isClinicAdmin(ownerId);
     }
+    // Bitácora de Pagos Realizados (Reportes → Pagos) — mismo criterio que
+    // pagos/pagosEliminados: solo admin. Quien ya puede crear un pago real
+    // (users/{ownerId}/pacientes/{patientId}/pagos, arriba) es exactamente
+    // quien necesita poder escribir aquí también.
+    match /users/{ownerId}/pagosRealizados/{id} {
+      allow read, write: if isClinicAdmin(ownerId);
+    }
     match /users/{ownerId}/gastos/{id} {
       allow read, write: if isClinicAdmin(ownerId);
     }

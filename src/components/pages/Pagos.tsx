@@ -131,6 +131,7 @@ function EditarPagoDialog({
   onSave: (pago: Pago) => void;
 }) {
   const [lineas, setLineas] = useState<LineaPago[]>(() => pago.lineas.map((l) => ({ ...l })));
+  const [formaPago, setFormaPago] = useState(pago.formaPago);
   const total = lineas.reduce((sum, l) => sum + l.monto, 0);
   const puedeGuardar = total > 0;
   const tratamientosDisponibles: Tratamiento[] = tratamientosDeDisponibles(presupuestos);
@@ -171,9 +172,24 @@ function EditarPagoDialog({
           </button>
         </div>
         <p className="mb-4 text-xs text-ink/40">
-          Corrige el monto o el tratamiento de cada concepto — por ejemplo, si se anotó de menos o
-          de más, o si se ligó al tratamiento equivocado al registrar el pago.
+          Corrige el monto o el tratamiento de cada concepto, o la forma de pago — por ejemplo, si
+          se anotó de menos o de más, se ligó al tratamiento equivocado, o se registró como
+          efectivo un pago que en realidad fue con tarjeta.
         </p>
+        <div className="mb-4">
+          <label className="mb-1 block text-xs font-medium text-ink/60">Forma de pago</label>
+          <select
+            value={formaPago}
+            onChange={(e) => setFormaPago(e.target.value)}
+            className="w-full rounded-lg border border-edge/10 bg-field px-3 py-2 text-sm text-ink outline-none focus:border-accent/60"
+          >
+            {formasDePago.map((f) => (
+              <option key={f} value={f}>
+                {f}
+              </option>
+            ))}
+          </select>
+        </div>
         <div className="space-y-2">
           {lineas.map((l) => {
             const esLibre =
@@ -232,7 +248,7 @@ function EditarPagoDialog({
             Cancelar
           </button>
           <button
-            onClick={() => puedeGuardar && onSave({ ...pago, lineas, total })}
+            onClick={() => puedeGuardar && onSave({ ...pago, lineas, total, formaPago })}
             disabled={!puedeGuardar}
             className="flex-1 rounded-lg border border-accent/60 bg-accent/15 py-2.5 text-sm font-semibold text-accent transition-opacity hover:bg-accent/25 disabled:cursor-not-allowed disabled:opacity-40"
           >
@@ -820,7 +836,8 @@ export default function Pagos({
   devoluciones: DevolucionPago[];
   setPagos: Dispatch<SetStateAction<Pago[]>>;
 }) {
-  const { userEmail, setPagosEliminados, citas, patients, clinicInfo, formatosWhatsapp } = usePatientData();
+  const { userEmail, setPagosEliminados, setPagosRealizados, citas, patients, clinicInfo, formatosWhatsapp } =
+    usePatientData();
   const [showDialog, setShowDialog] = useState(false);
   const [printTarget, setPrintTarget] = useState<Pago | null>(null);
   const [pagoAEliminar, setPagoAEliminar] = useState<Pago | null>(null);
@@ -895,6 +912,14 @@ export default function Pagos({
     setPagos((prev) => {
       const existe = prev.some((p) => p.id === pago.id);
       if (existe) return prev.map((p) => (p.id === pago.id ? pago : p));
+      // Solo se registra en la bitácora de Pagos Realizados la primera vez
+      // (pago nuevo) — editar montos/tratamientos de un pago ya existente
+      // (EditarPagoDialog reusa este mismo upsertPago) no debe generar una
+      // segunda entrada para el mismo pago.
+      setPagosRealizados((prevRealizados) => [
+        { id: pago.id, patientId, patientName, pago, registradoEn: new Date().toISOString(), registradoPor: userEmail },
+        ...prevRealizados,
+      ]);
       return [pago, ...prev];
     });
   };

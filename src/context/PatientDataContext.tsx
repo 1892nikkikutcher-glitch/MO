@@ -83,6 +83,7 @@ import type { Deposito, ArticuloFaltante, ArticuloCaducidad } from "@/lib/deposi
 import type { CentroRadiodiagnostico } from "@/lib/centroRadiodiagnostico";
 import type { LaboratorioDental } from "@/lib/laboratorioDental";
 import type { PagoEliminado } from "@/lib/pagosEliminados";
+import type { PagoRealizado } from "@/lib/pagosRealizados";
 import { saldosPendientesInicial, calcularSaldoPendiente, type SaldosPendientesConfig } from "@/lib/saldosPendientes";
 import {
   completarDevolucion,
@@ -587,6 +588,8 @@ type PatientDataContextValue = {
   setLaboratoriosDentales: (updater: Updater<LaboratorioDental[]>) => void;
   pagosEliminados: PagoEliminado[];
   setPagosEliminados: (updater: Updater<PagoEliminado[]>) => void;
+  pagosRealizados: PagoRealizado[];
+  setPagosRealizados: (updater: Updater<PagoRealizado[]>) => void;
   saldosPendientes: SaldosPendientesConfig;
   laboratoriosPendientes: LaboratoriosPendientesConfig;
   presupuestosPendientesDetalle: PresupuestosPendientesDetalleConfig;
@@ -832,6 +835,10 @@ export function PatientDataProvider({
   const [pagosEliminados, setPagosEliminados] = useFirestoreList<PagoEliminado>(
     clinicUid,
     "pagosEliminados"
+  );
+  const [pagosRealizados, setPagosRealizados] = useFirestoreList<PagoRealizado>(
+    clinicUid,
+    "pagosRealizados"
   );
   const [presupuestosLog, setPresupuestosLog] = useFirestoreList<PresupuestoLogEntry>(
     clinicUid,
@@ -2182,6 +2189,7 @@ export function PatientDataProvider({
 
     setCitas((prev) => prev.map((c) => (c.patientId === perdedorId ? { ...c, patientId: sobrevivienteId } : c)));
     setPagosEliminados((prev) => prev.map((p) => (p.patientId === perdedorId ? { ...p, patientId: sobrevivienteId } : p)));
+    setPagosRealizados((prev) => prev.map((p) => (p.patientId === perdedorId ? { ...p, patientId: sobrevivienteId } : p)));
     setDomiciliaciones((prev) =>
       prev.map((d) => (d.patientId === perdedorId ? { ...d, patientId: sobrevivienteId } : d))
     );
@@ -2400,6 +2408,8 @@ export function PatientDataProvider({
         setLaboratoriosDentales,
         pagosEliminados,
         setPagosEliminados,
+        pagosRealizados,
+        setPagosRealizados,
         saldosPendientes,
         laboratoriosPendientes,
         presupuestosPendientesDetalle,
