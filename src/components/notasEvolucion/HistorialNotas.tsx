@@ -19,6 +19,15 @@ import { generarNarrativa } from "@/lib/notaNarrativa";
 import type { DiagnosticoPaciente } from "@/lib/notasEvolucion";
 import type { NotaEvolucion } from "@/lib/patientData";
 
+/** Fecha + hora de una entrada del historial — antes solo se mostraba la
+ * fecha, y dos notas del mismo día (ej. dos intentos por un conflicto de
+ * sincronización) eran indistinguibles sin abrir cada una. */
+function formatFechaHora(iso: string): string {
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return iso;
+  return `${d.toLocaleDateString("es-MX")} · ${d.toLocaleTimeString("es-MX", { hour: "2-digit", minute: "2-digit" })}`;
+}
+
 const psoapCampos = [
   { key: "presentacion" as const, letra: "P", label: "Presentación" },
   { key: "subjetivo" as const, letra: "S", label: "Subjetivo" },
@@ -66,7 +75,7 @@ function TarjetaFirmadaV2({ nota, diagnosticosCatalogo }: { nota: NotaEvolucionV
     <div className="rounded-2xl border border-edge/10 bg-surface p-4">
       <div className="flex flex-wrap items-center justify-between gap-2 text-xs text-ink/40">
         <span>
-          <span className="font-medium text-ink/70">{new Date(nota.creadoEn).toLocaleDateString("es-MX")}</span> · {nota.encabezado.medico || "Sin médico registrado"}
+          <span className="font-medium text-ink/70">{formatFechaHora(nota.creadoEn)}</span> · {nota.encabezado.medico || "Sin médico registrado"}
         </span>
         <span className={`rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase ${estadoBadge[nota.estado].clase}`}>
           {nota.estado === "con_aclaracion" ? "Con aclaración" : "Firmada"}
@@ -101,7 +110,7 @@ function TarjetaAdministrativa({ nota }: { nota: NotaEvolucionAdministrativa }) 
   return (
     <div className="rounded-2xl border border-edge/10 bg-surface p-4">
       <div className="flex flex-wrap items-center justify-between gap-2 text-xs text-ink/40">
-        <span className="font-medium text-ink/70">{new Date(nota.creadoEn).toLocaleDateString("es-MX")}</span>
+        <span className="font-medium text-ink/70">{formatFechaHora(nota.creadoEn)}</span>
         <span className="rounded-full bg-ink/10 px-2 py-0.5 text-[10px] font-semibold uppercase text-ink/50">
           Nota administrativa
         </span>
