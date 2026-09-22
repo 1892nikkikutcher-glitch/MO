@@ -5,6 +5,7 @@
 
 import { redondearDinero } from "./dinero";
 import { MESES_ABR } from "./agendaHelpers";
+import { inicioSemana } from "./metas";
 
 export type FondoAsignacion = { label: string; porcentaje: number };
 
@@ -79,18 +80,29 @@ export function sumarRangoPorFormaPago(
   return { efectivo: redondearDinero(efectivo), electronico: redondearDinero(electronico) };
 }
 
-export type VistaFondos = "quincena1" | "quincena2" | "mes";
+export type VistaFondos = "dia" | "semana" | "quincena1" | "quincena2" | "mes";
 
 export type RangoFondos = { desde: Date; hasta: Date; label: string };
 
-/** Rango de fechas de la vista elegida, siempre relativo al mes de `hoy`
- * (esta sección no navega a meses pasados, a diferencia del selector de
- * periodo general de Inicio.tsx) — quincena 1 = días 1-15, quincena 2 =
- * día 16 al último día del mes (mismo corte que ya usa `inicioQuincena` en
- * metas.ts para la Meta Quincenal). `hasta` nunca pasa de hoy — un periodo
- * que todavía no llega (ej. quincena 2 vista el día 8) da un rango vacío,
- * que `sumarRangoPorFormaPago` ya interpreta como cero sin necesitar un
- * caso especial. */
+/** Mismo estilo breve que ya usan quincena/mes (sin "de", sin año) — a
+ * diferencia de `formatRangeLabel` en agendaHelpers.ts, pensado para un
+ * lugar con más espacio (el selector de periodo general). */
+function labelRango(desde: Date, finNatural: Date): string {
+  if (desde.getMonth() === finNatural.getMonth()) {
+    return `${desde.getDate()}–${finNatural.getDate()} ${MESES_ABR[finNatural.getMonth()]}`;
+  }
+  return `${desde.getDate()} ${MESES_ABR[desde.getMonth()]} – ${finNatural.getDate()} ${MESES_ABR[finNatural.getMonth()]}`;
+}
+
+/** Rango de fechas de la vista elegida, siempre relativo a `hoy` (esta
+ * sección no navega a periodos pasados, a diferencia del selector de
+ * periodo general de Inicio.tsx) — semana usa el mismo corte lunes-domingo
+ * que ya usa `inicioSemana` (metas.ts) para la Meta Semanal, quincena 1 =
+ * días 1-15, quincena 2 = día 16 al último día del mes (mismo corte que ya
+ * usa `inicioQuincena` para la Meta Quincenal). `hasta` nunca pasa de hoy —
+ * un periodo que todavía no llega (ej. quincena 2 vista el día 8) da un
+ * rango vacío, que `sumarRangoPorFormaPago` ya interpreta como cero sin
+ * necesitar un caso especial. */
 export function rangoVistaFondos(vista: VistaFondos, hoy: Date): RangoFondos {
   const anio = hoy.getFullYear();
   const mes = hoy.getMonth();
@@ -101,7 +113,16 @@ export function rangoVistaFondos(vista: VistaFondos, hoy: Date): RangoFondos {
   let finNatural: Date;
   let label: string;
 
-  if (vista === "quincena1") {
+  if (vista === "dia") {
+    desde = hoySinHora;
+    finNatural = hoySinHora;
+    label = `${hoySinHora.getDate()} ${MESES_ABR[mes]}`;
+  } else if (vista === "semana") {
+    desde = inicioSemana(hoy);
+    finNatural = new Date(desde);
+    finNatural.setDate(finNatural.getDate() + 6);
+    label = labelRango(desde, finNatural);
+  } else if (vista === "quincena1") {
     desde = new Date(anio, mes, 1);
     finNatural = new Date(anio, mes, 15);
     label = `1–15 ${MESES_ABR[mes]}`;

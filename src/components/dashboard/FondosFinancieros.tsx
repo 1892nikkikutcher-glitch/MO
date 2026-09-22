@@ -15,6 +15,8 @@ import {
 } from "@/lib/fondosFinancieros";
 
 const OPCIONES_VISTA: { id: VistaFondos; label: string }[] = [
+  { id: "dia", label: "Día" },
+  { id: "semana", label: "Semana" },
   { id: "quincena1", label: "Quincena 1–15" },
   { id: "quincena2", label: "Quincena 16–fin" },
   { id: "mes", label: "Mes" },

@@ -6,6 +6,8 @@ import {
   rangoVistaFondos,
   sumarRangoPorFormaPago,
 } from "../fondosFinancieros";
+import { inicioSemana } from "../metas";
+import { MESES_ABR } from "../agendaHelpers";
 
 function iso(d: Date): string {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
@@ -113,5 +115,58 @@ describe("rangoVistaFondos", () => {
     expect(rangoVistaFondos("quincena1", hoy).label).toBe("1–15 sep.");
     expect(rangoVistaFondos("quincena2", hoy).label).toBe("16–30 sep.");
     expect(rangoVistaFondos("mes", hoy).label).toBe("sep. 2026");
+  });
+
+  it("día: siempre hoy mismo, sin importar la hora del reloj", () => {
+    const hoy = new Date(2026, 8, 18, 23, 45); // 18 de septiembre, casi medianoche
+    const dia = rangoVistaFondos("dia", hoy);
+    expect(iso(dia.desde)).toBe("2026-09-18");
+    expect(iso(dia.hasta)).toBe("2026-09-18");
+    expect(dia.label).toBe("18 sep.");
+  });
+
+  it("semana: arranca en lunes y corta a hoy, sin importar qué día de la semana sea hoy", () => {
+    // Se prueba con varios días de una misma semana para no depender de
+    // adivinar a mano en qué día cae una fecha real del calendario.
+    for (let offset = 0; offset < 7; offset++) {
+      const hoy = new Date(2026, 8, 14 + offset); // semana del 14-20 de sep. 2026 (lunes a domingo)
+      const semana = rangoVistaFondos("semana", hoy);
+      expect(semana.desde.getDay()).toBe(1); // siempre lunes
+      expect(iso(semana.hasta)).toBe(iso(hoy)); // nunca proyecta más allá de hoy
+      expect(semana.desde.getTime()).toBeLessThanOrEqual(hoy.getTime());
+    }
+  });
+
+  it("semana: la etiqueta usa el lunes-domingo completo, aunque hoy todavía no llegue al domingo", () => {
+    const hoy = new Date(2026, 8, 16); // miércoles de esa misma semana
+    const lunes = inicioSemana(hoy);
+    const domingo = new Date(lunes);
+    domingo.setDate(domingo.getDate() + 6);
+    const semana = rangoVistaFondos("semana", hoy);
+    expect(semana.label).toBe(`${lunes.getDate()}–${domingo.getDate()} sep.`);
+  });
+
+  it("semana que cruza de mes: la etiqueta muestra ambos meses", () => {
+    // Busca, entre los últimos días de cada mes de 2026, uno cuya semana
+    // (lunes-domingo) cruce al mes siguiente — sin depender de memorizar
+    // en qué día de la semana cae una fecha real del calendario.
+    let encontrado: { hoy: Date; lunes: Date; domingo: Date } | null = null;
+    for (let mes = 0; mes < 12 && !encontrado; mes++) {
+      for (let dia = 25; dia <= 31; dia++) {
+        const candidato = new Date(2026, mes, dia);
+        if (candidato.getMonth() !== mes) continue; // ese mes no tiene ese día
+        const lunes = inicioSemana(candidato);
+        const domingo = new Date(lunes);
+        domingo.setDate(domingo.getDate() + 6);
+        if (lunes.getMonth() !== domingo.getMonth()) {
+          encontrado = { hoy: candidato, lunes, domingo };
+          break;
+        }
+      }
+    }
+    expect(encontrado).not.toBeNull();
+    const { hoy, lunes, domingo } = encontrado!;
+    const semana = rangoVistaFondos("semana", hoy);
+    expect(semana.label).toBe(`${lunes.getDate()} ${MESES_ABR[lunes.getMonth()]} – ${domingo.getDate()} ${MESES_ABR[domingo.getMonth()]}`);
   });
 });
