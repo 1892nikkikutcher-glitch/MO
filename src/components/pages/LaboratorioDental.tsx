@@ -280,7 +280,7 @@ function OrdenTrabajoDialog({
         </div>
 
         <div className="space-y-4">
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
             <div>
               <label className="mb-1 block text-xs font-medium text-ink/60">N° de orden</label>
               <input
@@ -309,7 +309,7 @@ function OrdenTrabajoDialog({
             </div>
           </div>
 
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
             <div>
               <label className="mb-1 block text-xs font-medium text-ink/60">Fecha de ingreso</label>
               <input
@@ -475,17 +475,17 @@ export default function LaboratorioDentalPage() {
                 <p className="mt-1 text-xs text-ink/50">{l.direccion || "Sin dirección"}</p>
                 <p className="text-xs text-ink/50">{l.telefono}</p>
                 {l.notas && <p className="mt-2 text-xs text-ink/40">{l.notas}</p>}
-                <div className="mt-3 flex items-center gap-2 border-t border-edge/10 pt-3">
+                <div className="mt-3 flex flex-wrap items-center gap-2 border-t border-edge/10 pt-3">
                   <button
                     onClick={() => enviarWhatsApp(l)}
-                    className="flex items-center gap-1.5 rounded-lg border border-success/30 px-2.5 py-1.5 text-xs font-semibold text-success/80 transition-colors hover:border-success hover:text-success"
+                    className="flex shrink-0 items-center gap-1.5 whitespace-nowrap rounded-lg border border-success/30 px-2.5 py-1.5 text-xs font-semibold text-success/80 transition-colors hover:border-success hover:text-success"
                   >
                     <WhatsAppIcon />
                     Contactar
                   </button>
                   <button
                     onClick={() => setLaboratorioParaOrden(l)}
-                    className="flex items-center gap-1.5 rounded-lg border border-accent/40 px-2.5 py-1.5 text-xs font-semibold text-accent/90 transition-colors hover:border-accent hover:text-accent"
+                    className="flex shrink-0 items-center gap-1.5 whitespace-nowrap rounded-lg border border-accent/40 px-2.5 py-1.5 text-xs font-semibold text-accent/90 transition-colors hover:border-accent hover:text-accent"
                   >
                     <ClipboardIcon />
                     Enviar Orden
@@ -493,7 +493,7 @@ export default function LaboratorioDentalPage() {
                   <button
                     onClick={() => setLaboratorioAEliminar(l)}
                     title="Eliminar"
-                    className="ml-auto flex h-7 w-7 items-center justify-center rounded-full border border-danger/20 text-danger/50 transition-colors hover:border-danger/60 hover:text-danger"
+                    className="ml-auto flex h-7 w-7 shrink-0 items-center justify-center rounded-full border border-danger/20 text-danger/50 transition-colors hover:border-danger/60 hover:text-danger"
                   >
                     <TrashIcon />
                   </button>
