@@ -16,8 +16,8 @@ export default function Odontograma({
    * dentales a trabajar" en Nuevo Presupuesto), y repetirla es redundante. */
   hideSummary?: boolean;
 }) {
-  const renderFila = (teeth: number[]) => (
-    <div className="flex flex-wrap gap-1">
+  const renderFila = (teeth: number[], alinearDerecha: boolean) => (
+    <div className={`flex flex-wrap gap-1 ${alinearDerecha ? "justify-end" : ""}`}>
       {teeth.map((tooth) => {
         const isSelected = selectedTeeth.includes(tooth);
         return (
@@ -46,19 +46,30 @@ export default function Odontograma({
          mismo orden que CUADRANTES — cada cuadrante queda alineado
          verticalmente con su opuesto de la otra arcada, igual que antes. */}
       <div className="grid grid-cols-1 gap-3 lg:grid-cols-2">
-        {CUADRANTES.map((c) => (
-          <div key={c.numero} className="space-y-2 rounded-xl border border-edge/10 bg-inset p-3">
-            <span className="text-[10px] font-semibold uppercase tracking-wide text-ink/30">
-              Cuadrante {c.numero}
-            </span>
-            <div className="overflow-x-auto">
-              <div className="w-fit space-y-2">
-                {renderFila(c.permanentes)}
-                {c.temporales.length > 0 && renderFila(c.temporales)}
+        {CUADRANTES.map((c) => {
+          // Cuadrante 1 y 4 quedan en la columna izquierda — se recargan
+          // hacia la derecha (mismo criterio que Cuadrante 2/3, que ya
+          // nacen alineados a la izquierda) para que los dos lados se
+          // encuentren en la línea media y el cuadro se vea continuo.
+          const alinearDerecha = c.numero === 1 || c.numero === 4;
+          return (
+            <div key={c.numero} className="space-y-2 rounded-xl border border-edge/10 bg-inset p-3">
+              <span className="text-[10px] font-semibold uppercase tracking-wide text-ink/30">
+                Cuadrante {c.numero}
+              </span>
+              <div className="overflow-x-auto">
+                {/* ml-auto solo desde lg: para no dejar un hueco a la
+                   izquierda cuando la cuadrícula se apila a una columna en
+                   móvil (ahí no hay un cuadrante opuesto con el que
+                   "encontrarse" a la mitad). */}
+                <div className={`w-fit space-y-2 ${alinearDerecha ? "lg:ml-auto" : ""}`}>
+                  {renderFila(c.permanentes, alinearDerecha)}
+                  {c.temporales.length > 0 && renderFila(c.temporales, alinearDerecha)}
+                </div>
               </div>
             </div>
-          </div>
-        ))}
+          );
+        })}
       </div>
       {!hideSummary && selectedTeeth.length > 0 && (
         <p className="mt-4 text-center text-xs text-ink/50">
