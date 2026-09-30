@@ -1,9 +1,9 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import Odontograma from "./Odontograma";
 import ConfirmarEliminar from "@/components/ConfirmarEliminar";
 import { usePatientData } from "@/context/PatientDataContext";
+import OrdenTrabajoDialog from "@/components/laboratorios/OrdenTrabajoDialog";
 import {
   laboratorioTipoOptions,
   laboratorioEstatusOptions,
@@ -11,6 +11,13 @@ import {
   type SolicitudLaboratorio as Solicitud,
   type TipoLaboratorio,
 } from "@/lib/patientData";
+
+// "Dental" ya no se crea desde este diálogo genérico — tiene su propio
+// flujo rico ("Enviar Orden", ver OrdenTrabajoDialog) que además persiste
+// y envía por WhatsApp. Este selector solo ofrece Químico/Radiografía;
+// registros Dental ya guardados (de este diálogo, antes de este cambio, o
+// del flujo nuevo) siguen mostrándose y funcionando igual.
+const tiposSeleccionables = laboratorioTipoOptions.filter((t) => t !== "Dental");
 
 const estatusOptions = laboratorioEstatusOptions;
 
@@ -78,7 +85,7 @@ function NuevaSolicitudDialog({
   const { recursos } = usePatientData();
   const medicosDisponibles = recursos.filter((r) => r.tipo === "medico").map((r) => r.nombre);
 
-  const [tipo, setTipo] = useState<TipoLaboratorio>("Dental");
+  const [tipo, setTipo] = useState<TipoLaboratorio>("Químico");
   const [laboratorio, setLaboratorio] = useState("");
   const [medico, setMedico] = useState(medicosDisponibles[0] ?? "");
   useEffect(() => {
@@ -86,14 +93,9 @@ function NuevaSolicitudDialog({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [medico, medicosDisponibles.join("|")]);
   const [trabajo, setTrabajo] = useState("");
-  const [dientes, setDientes] = useState<number[]>([]);
   const [fechaEntrega, setFechaEntrega] = useState("");
   const [costo, setCosto] = useState("");
   const [estatus, setEstatus] = useState<Estatus>("Enviado");
-
-  const toggleDiente = (tooth: number) => {
-    setDientes((prev) => (prev.includes(tooth) ? prev.filter((t) => t !== tooth) : [...prev, tooth]));
-  };
 
   const puedeGuardar = laboratorio.trim().length > 0 && trabajo.trim().length > 0 && medico !== "";
 
@@ -105,7 +107,7 @@ function NuevaSolicitudDialog({
       laboratorio: laboratorio.trim(),
       medico,
       trabajo: trabajo.trim(),
-      dientes,
+      dientes: [],
       fechaEnvio: todayFormatted(),
       fechaEntrega,
       costo: Number(costo) || 0,
@@ -132,7 +134,7 @@ function NuevaSolicitudDialog({
               Tipo de laboratorio
             </label>
             <div className="flex gap-2">
-              {laboratorioTipoOptions.map((t) => (
+              {tiposSeleccionables.map((t) => (
                 <button
                   key={t}
                   type="button"
@@ -188,14 +190,6 @@ function NuevaSolicitudDialog({
               className={`${inputClass} resize-none`}
             />
           </div>
-
-          {tipo === "Dental" && (
-            <Odontograma
-              selectedTeeth={dientes}
-              onToggleTooth={toggleDiente}
-              title="Órganos dentales relacionados"
-            />
-          )}
 
           <div className="grid grid-cols-2 gap-4">
             <div>
@@ -260,10 +254,19 @@ function NuevaSolicitudDialog({
 }
 
 export default function Laboratorios({ patientId }: { patientId: string }) {
-  const { laboratoriosPorPaciente, setLaboratoriosPaciente } = usePatientData();
+  const { laboratoriosPorPaciente, setLaboratoriosPaciente, clinicInfo, perfilDoctor } = usePatientData();
   const [showDialog, setShowDialog] = useState(false);
+  const [mostrarNuevaOrden, setMostrarNuevaOrden] = useState(false);
   const [solicitudAEliminar, setSolicitudAEliminar] = useState<Solicitud | null>(null);
-  const solicitudes = laboratoriosPorPaciente[patientId] ?? [];
+  const todasLasSolicitudes = laboratoriosPorPaciente[patientId] ?? [];
+  // Dental tiene su propia sección más abajo (con sus campos ricos) — aquí
+  // solo quedan Químico/Radiografía, para no mostrar el mismo registro dos
+  // veces. Un registro Dental legado (creado antes de este cambio, desde
+  // este mismo diálogo genérico) ya trae dientes/costo pero no los campos
+  // nuevos — se sigue mostrando igual en la sección de abajo.
+  const solicitudes = todasLasSolicitudes.filter((s) => s.tipo !== "Dental");
+  const ordenesDentales = todasLasSolicitudes.filter((s) => s.tipo === "Dental");
+  const clinicaNombre = clinicInfo?.nombre || perfilDoctor.nombre || "";
 
   const cambiarEstatus = (id: string, estatus: Estatus) => {
     setLaboratoriosPaciente(patientId, (prev) =>
@@ -276,90 +279,171 @@ export default function Laboratorios({ patientId }: { patientId: string }) {
   };
 
   return (
-    <div className="space-y-4">
-      <div className="flex items-center justify-between">
-        <h3 className="text-sm font-semibold uppercase tracking-wide text-ink/60">Laboratorios</h3>
-        <button
-          onClick={() => setShowDialog(true)}
-          className="rounded-lg border border-accent/50 bg-accent/10 px-4 py-2 text-xs font-semibold text-accent transition-colors hover:bg-accent/20"
-          style={{ boxShadow: "0 0 12px -2px rgb(var(--accent-rgb) / 0.5)" }}
-        >
-          + Nueva Solicitud
-        </button>
+    <div className="space-y-8">
+      <div className="space-y-4">
+        <div className="flex items-center justify-between">
+          <h3 className="text-sm font-semibold uppercase tracking-wide text-ink/60">Laboratorios</h3>
+          <button
+            onClick={() => setShowDialog(true)}
+            className="rounded-lg border border-accent/50 bg-accent/10 px-4 py-2 text-xs font-semibold text-accent transition-colors hover:bg-accent/20"
+            style={{ boxShadow: "0 0 12px -2px rgb(var(--accent-rgb) / 0.5)" }}
+          >
+            + Nueva Solicitud
+          </button>
+        </div>
+
+        {solicitudes.length === 0 ? (
+          <div className="rounded-2xl border border-dashed border-edge/15 bg-surface p-10 text-center text-sm text-ink/40">
+            No hay solicitudes de laboratorio registradas
+          </div>
+        ) : (
+          <div className="overflow-x-auto rounded-2xl border border-edge/10 bg-surface">
+            <table className="w-full text-left text-sm">
+              <thead>
+                <tr className="border-b border-edge/10 text-xs uppercase tracking-wide text-ink/40">
+                  <th className="px-6 py-3 font-medium">Tipo</th>
+                  <th className="px-6 py-3 font-medium">Laboratorio</th>
+                  <th className="px-6 py-3 font-medium">Trabajo solicitado</th>
+                  <th className="px-6 py-3 font-medium">Médico</th>
+                  <th className="px-6 py-3 font-medium">Envío</th>
+                  <th className="px-6 py-3 font-medium">Entrega estimada</th>
+                  <th className="px-6 py-3 font-medium">Estatus</th>
+                  <th className="px-6 py-3 text-right font-medium">Costo</th>
+                  <th className="px-6 py-3 text-right font-medium">Quitar</th>
+                </tr>
+              </thead>
+              <tbody>
+                {solicitudes.map((s) => (
+                  <tr key={s.id} className="border-b border-edge/5 last:border-0">
+                    <td className="px-6 py-3">
+                      <span
+                        className={`rounded-full px-2 py-0.5 text-[11px] font-semibold uppercase tracking-wide ${tipoColor[s.tipo]}`}
+                      >
+                        {s.tipo}
+                      </span>
+                    </td>
+                    <td className="px-6 py-3 text-ink/80">{s.laboratorio}</td>
+                    <td className="px-6 py-3 text-ink/70">{s.trabajo}</td>
+                    <td className="px-6 py-3 text-ink/70">{s.medico}</td>
+                    <td className="px-6 py-3 whitespace-nowrap text-ink/70">{s.fechaEnvio}</td>
+                    <td className="px-6 py-3 whitespace-nowrap text-ink/70">{s.fechaEntrega || "—"}</td>
+                    <td className="px-6 py-3">
+                      <select
+                        value={s.estatus}
+                        onChange={(e) => cambiarEstatus(s.id, e.target.value as Estatus)}
+                        className={`rounded-full border-0 px-2 py-0.5 text-[11px] font-semibold uppercase tracking-wide outline-none ${estatusColor[s.estatus]}`}
+                      >
+                        {estatusOptions.map((op) => (
+                          <option key={op} value={op}>
+                            {op}
+                          </option>
+                        ))}
+                      </select>
+                    </td>
+                    <td className="px-6 py-3 text-right font-semibold text-accent">
+                      {formatCurrency(s.costo)}
+                    </td>
+                    <td className="px-6 py-3 text-right">
+                      <button
+                        onClick={() => setSolicitudAEliminar(s)}
+                        className="text-xs font-semibold text-danger hover:text-danger"
+                      >
+                        Eliminar
+                      </button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
       </div>
 
-      {solicitudes.length === 0 ? (
-        <div className="rounded-2xl border border-dashed border-edge/15 bg-surface p-10 text-center text-sm text-ink/40">
-          No hay solicitudes de laboratorio registradas
+      <div className="space-y-4">
+        <div className="flex items-center justify-between">
+          <h3 className="text-sm font-semibold uppercase tracking-wide text-ink/60">
+            Órdenes de Laboratorio Dental
+          </h3>
+          <button
+            onClick={() => setMostrarNuevaOrden(true)}
+            className="rounded-lg border border-accent/50 bg-accent/10 px-4 py-2 text-xs font-semibold text-accent transition-colors hover:bg-accent/20"
+            style={{ boxShadow: "0 0 12px -2px rgb(var(--accent-rgb) / 0.5)" }}
+          >
+            + Enviar Orden
+          </button>
         </div>
-      ) : (
-        <div className="overflow-x-auto rounded-2xl border border-edge/10 bg-surface">
-          <table className="w-full text-left text-sm">
-            <thead>
-              <tr className="border-b border-edge/10 text-xs uppercase tracking-wide text-ink/40">
-                <th className="px-6 py-3 font-medium">Tipo</th>
-                <th className="px-6 py-3 font-medium">Laboratorio</th>
-                <th className="px-6 py-3 font-medium">Trabajo solicitado</th>
-                <th className="px-6 py-3 font-medium">Médico</th>
-                <th className="px-6 py-3 font-medium">Envío</th>
-                <th className="px-6 py-3 font-medium">Entrega estimada</th>
-                <th className="px-6 py-3 font-medium">Estatus</th>
-                <th className="px-6 py-3 text-right font-medium">Costo</th>
-                <th className="px-6 py-3 text-right font-medium">Quitar</th>
-              </tr>
-            </thead>
-            <tbody>
-              {solicitudes.map((s) => (
-                <tr key={s.id} className="border-b border-edge/5 last:border-0">
-                  <td className="px-6 py-3">
-                    <span
-                      className={`rounded-full px-2 py-0.5 text-[11px] font-semibold uppercase tracking-wide ${tipoColor[s.tipo]}`}
-                    >
-                      {s.tipo}
-                    </span>
-                  </td>
-                  <td className="px-6 py-3 text-ink/80">{s.laboratorio}</td>
-                  <td className="px-6 py-3 text-ink/70">
-                    {s.trabajo}
-                    {s.dientes.length > 0 && (
-                      <span className="ml-1 text-xs text-ink/40">
-                        (OD {[...s.dientes].sort((a, b) => a - b).join(", ")})
-                      </span>
-                    )}
-                  </td>
-                  <td className="px-6 py-3 text-ink/70">{s.medico}</td>
-                  <td className="px-6 py-3 whitespace-nowrap text-ink/70">{s.fechaEnvio}</td>
-                  <td className="px-6 py-3 whitespace-nowrap text-ink/70">{s.fechaEntrega || "—"}</td>
-                  <td className="px-6 py-3">
-                    <select
-                      value={s.estatus}
-                      onChange={(e) => cambiarEstatus(s.id, e.target.value as Estatus)}
-                      className={`rounded-full border-0 px-2 py-0.5 text-[11px] font-semibold uppercase tracking-wide outline-none ${estatusColor[s.estatus]}`}
-                    >
-                      {estatusOptions.map((op) => (
-                        <option key={op} value={op}>
-                          {op}
-                        </option>
-                      ))}
-                    </select>
-                  </td>
-                  <td className="px-6 py-3 text-right font-semibold text-accent">
-                    {formatCurrency(s.costo)}
-                  </td>
-                  <td className="px-6 py-3 text-right">
-                    <button
-                      onClick={() => setSolicitudAEliminar(s)}
-                      className="text-xs font-semibold text-danger hover:text-danger"
-                    >
-                      Eliminar
-                    </button>
-                  </td>
+
+        {ordenesDentales.length === 0 ? (
+          <div className="rounded-2xl border border-dashed border-edge/15 bg-surface p-10 text-center text-sm text-ink/40">
+            No se ha enviado ninguna orden de laboratorio dental para este paciente
+          </div>
+        ) : (
+          <div className="overflow-x-auto rounded-2xl border border-edge/10 bg-surface">
+            <table className="w-full text-left text-sm">
+              <thead>
+                <tr className="border-b border-edge/10 text-xs uppercase tracking-wide text-ink/40">
+                  <th className="px-6 py-3 font-medium">N° orden</th>
+                  <th className="px-6 py-3 font-medium">Laboratorio</th>
+                  <th className="px-6 py-3 font-medium">Trabajo</th>
+                  <th className="px-6 py-3 font-medium">Médico</th>
+                  <th className="px-6 py-3 font-medium">Ingreso</th>
+                  <th className="px-6 py-3 font-medium">Entrega</th>
+                  <th className="px-6 py-3 font-medium">Estatus</th>
+                  <th className="px-6 py-3 text-right font-medium">Quitar</th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      )}
+              </thead>
+              <tbody>
+                {ordenesDentales.map((s) => (
+                  <tr key={s.id} className="border-b border-edge/5 last:border-0">
+                    <td className="px-6 py-3 text-ink/70">{s.numeroOrden || "—"}</td>
+                    <td className="px-6 py-3 text-ink/80">{s.laboratorio}</td>
+                    <td className="px-6 py-3 text-ink/70">
+                      {s.trabajo}
+                      {s.dientes.length > 0 && (
+                        <span className="ml-1 text-xs text-ink/40">
+                          (OD {[...s.dientes].sort((a, b) => a - b).join(", ")})
+                        </span>
+                      )}
+                      {s.especificaciones && (
+                        <div className="mt-0.5 text-xs text-ink/40">{s.especificaciones}</div>
+                      )}
+                      {((s.entregaItems?.length ?? 0) > 0 || (s.etapaItems?.length ?? 0) > 0) && (
+                        <div className="mt-0.5 text-xs text-ink/40">
+                          {[...(s.entregaItems ?? []), ...(s.etapaItems ?? [])].join(" · ")}
+                        </div>
+                      )}
+                    </td>
+                    <td className="px-6 py-3 text-ink/70">{s.medico}</td>
+                    <td className="px-6 py-3 whitespace-nowrap text-ink/70">{s.fechaIngreso || s.fechaEnvio}</td>
+                    <td className="px-6 py-3 whitespace-nowrap text-ink/70">{s.fechaEntrega || "—"}</td>
+                    <td className="px-6 py-3">
+                      <select
+                        value={s.estatus}
+                        onChange={(e) => cambiarEstatus(s.id, e.target.value as Estatus)}
+                        className={`rounded-full border-0 px-2 py-0.5 text-[11px] font-semibold uppercase tracking-wide outline-none ${estatusColor[s.estatus]}`}
+                      >
+                        {estatusOptions.map((op) => (
+                          <option key={op} value={op}>
+                            {op}
+                          </option>
+                        ))}
+                      </select>
+                    </td>
+                    <td className="px-6 py-3 text-right">
+                      <button
+                        onClick={() => setSolicitudAEliminar(s)}
+                        className="text-xs font-semibold text-danger hover:text-danger"
+                      >
+                        Eliminar
+                      </button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </div>
 
       {showDialog && (
         <NuevaSolicitudDialog
@@ -368,6 +452,14 @@ export default function Laboratorios({ patientId }: { patientId: string }) {
             setLaboratoriosPaciente(patientId, (prev) => [solicitud, ...prev]);
             setShowDialog(false);
           }}
+        />
+      )}
+
+      {mostrarNuevaOrden && (
+        <OrdenTrabajoDialog
+          patientIdFijo={patientId}
+          clinicaNombre={clinicaNombre}
+          onClose={() => setMostrarNuevaOrden(false)}
         />
       )}
 

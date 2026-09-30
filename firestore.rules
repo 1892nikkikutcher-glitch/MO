@@ -231,6 +231,17 @@ service cloud.firestore {
     match /users/{ownerId}/pacientes/{patientId}/presupuestos/{budgetId} {
       allow read, write: if isActiveMember(ownerId);
     }
+    // Corrige un hueco pre-existente: esta subcolección nunca tuvo su
+    // propio bloque, así que solo el dueño de la cuenta podía usar la
+    // pestaña Laboratorios del Expediente — cualquier colaborador/admin
+    // activo quedaba en silencio sin acceso (sin error visible: el
+    // onSnapshot de lectura no tiene manejador de error, y la escritura
+    // solo hace console.error). No es una subcolección clínica bloqueada
+    // por migración (no está en escrituraClinicaLocalPermitida) — es
+    // administrativa/logística, mismo criterio que presupuestos arriba.
+    match /users/{ownerId}/pacientes/{patientId}/laboratorios/{solicitudId} {
+      allow read, write: if isActiveMember(ownerId);
+    }
     match /users/{ownerId}/pacientes/{patientId}/recetas/{recetaId} {
       allow read: if isActiveMember(ownerId);
       allow write: if isActiveMember(ownerId) && escrituraClinicaLocalPermitida(ownerId, patientId);

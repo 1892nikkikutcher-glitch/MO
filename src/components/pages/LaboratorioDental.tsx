@@ -1,17 +1,10 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { usePatientData } from "@/context/PatientDataContext";
-import {
-  limpiarTelefono,
-  buildMensajeLaboratorioDental,
-  buildMensajeOrdenTrabajo,
-  ENTREGA_OPCIONES,
-  ETAPA_OPCIONES,
-  type LaboratorioDental,
-} from "@/lib/laboratorioDental";
+import { limpiarTelefono, buildMensajeLaboratorioDental, type LaboratorioDental } from "@/lib/laboratorioDental";
 import ConfirmarEliminar from "@/components/ConfirmarEliminar";
-import Odontograma from "./Odontograma";
+import OrdenTrabajoDialog from "@/components/laboratorios/OrdenTrabajoDialog";
 
 const inputClass =
   "w-full rounded-lg border border-edge/10 bg-field px-3 py-2 text-sm text-ink placeholder-ink/30 outline-none focus:border-accent/60";
@@ -186,253 +179,22 @@ function AgregarLaboratorioDialog({
   );
 }
 
-function todayFormatted() {
-  return new Date().toLocaleDateString("es-MX", { day: "2-digit", month: "2-digit", year: "numeric" });
-}
-
-const chipClass = (activo: boolean) =>
-  `rounded-lg border px-3 py-1.5 text-xs font-semibold transition-colors ${
-    activo
-      ? "border-accent bg-accent/15 text-accent"
-      : "border-edge/15 text-ink/50 hover:border-accent/40 hover:text-ink"
-  }`;
-
-function OrdenTrabajoDialog({
-  laboratorio,
-  clinicaNombre,
-  onClose,
-}: {
-  laboratorio: LaboratorioDental;
-  clinicaNombre: string;
-  onClose: () => void;
-}) {
-  // Mismo criterio que Laboratorios.tsx/Pagos.tsx: el médico solicitante
-  // viene de los Recursos reales de la clínica, nunca de texto libre.
-  const { recursos, patients } = usePatientData();
-  const medicosDisponibles = recursos.filter((r) => r.tipo === "medico").map((r) => r.nombre);
-
-  const [numeroOrden, setNumeroOrden] = useState("");
-  const [fechaIngreso, setFechaIngreso] = useState(todayFormatted());
-  const [fechaEntrega, setFechaEntrega] = useState("");
-  const [medico, setMedico] = useState(medicosDisponibles[0] ?? "");
-  useEffect(() => {
-    if (!medico && medicosDisponibles.length > 0) setMedico(medicosDisponibles[0]);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [medico, medicosDisponibles.join("|")]);
-  const [paciente, setPaciente] = useState("");
-  const [trabajo, setTrabajo] = useState("");
-  const [dientes, setDientes] = useState<number[]>([]);
-  const [especificaciones, setEspecificaciones] = useState("");
-  const [entregaSeleccion, setEntregaSeleccion] = useState<string[]>([]);
-  const [entregaOtroTexto, setEntregaOtroTexto] = useState("");
-  const [etapaSeleccion, setEtapaSeleccion] = useState<string[]>([]);
-
-  const toggleDiente = (tooth: number) =>
-    setDientes((prev) => (prev.includes(tooth) ? prev.filter((t) => t !== tooth) : [...prev, tooth]));
-  const toggleEntrega = (op: string) =>
-    setEntregaSeleccion((prev) => (prev.includes(op) ? prev.filter((x) => x !== op) : [...prev, op]));
-  const toggleEtapa = (op: string) =>
-    setEtapaSeleccion((prev) => (prev.includes(op) ? prev.filter((x) => x !== op) : [...prev, op]));
-
-  const puedeEnviar = paciente.trim().length > 0 && trabajo.trim().length > 0 && medico !== "";
-
-  const handleEnviar = () => {
-    if (!puedeEnviar) return;
-    // "Otro" se resuelve aquí a su propio texto libre (o se queda como
-    // "Otro" a secas si no se especificó nada) — buildMensajeOrdenTrabajo
-    // solo une la lista final, nunca conoce este caso especial.
-    const entregaFinal = entregaSeleccion.includes("Otro")
-      ? [
-          ...entregaSeleccion.filter((x) => x !== "Otro"),
-          entregaOtroTexto.trim() ? `Otro (${entregaOtroTexto.trim()})` : "Otro",
-        ]
-      : entregaSeleccion;
-    const texto = buildMensajeOrdenTrabajo(clinicaNombre, {
-      numeroOrden,
-      fechaIngreso,
-      fechaEntrega,
-      medico,
-      paciente: paciente.trim(),
-      trabajo: trabajo.trim(),
-      dientes,
-      especificaciones,
-      entregaItems: entregaFinal,
-      etapaItems: etapaSeleccion,
-    });
-    window.open(`https://wa.me/${limpiarTelefono(laboratorio.telefono)}?text=${encodeURIComponent(texto)}`, "_blank");
-    onClose();
-  };
-
-  return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4">
-      <div className="max-h-[90vh] w-full max-w-2xl overflow-y-auto rounded-2xl border border-edge/10 bg-modal p-6">
-        <div className="mb-4 flex items-center justify-between">
-          <div>
-            <h2 className="text-lg font-semibold text-ink">Orden de Trabajo</h2>
-            <p className="text-xs text-ink/40">Para {laboratorio.nombre}</p>
-          </div>
-          <button
-            onClick={onClose}
-            className="flex h-7 w-7 items-center justify-center rounded-full text-ink/50 hover:bg-surface hover:text-ink"
-          >
-            ✕
-          </button>
-        </div>
-
-        <div className="space-y-4">
-          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-            <div>
-              <label className="mb-1 block text-xs font-medium text-ink/60">N° de orden</label>
-              <input
-                type="text"
-                value={numeroOrden}
-                onChange={(e) => setNumeroOrden(e.target.value)}
-                placeholder="Opcional"
-                className={inputClass}
-              />
-            </div>
-            <div>
-              <label className="mb-1 block text-xs font-medium text-ink/60">Médico solicitante</label>
-              {medicosDisponibles.length > 0 ? (
-                <select value={medico} onChange={(e) => setMedico(e.target.value)} className={inputClass}>
-                  {medicosDisponibles.map((m) => (
-                    <option key={m} value={m}>
-                      {m}
-                    </option>
-                  ))}
-                </select>
-              ) : (
-                <p className="rounded-lg border border-warning/30 bg-warning/10 px-3 py-2 text-xs text-warning">
-                  No hay médicos configurados. Ve a Agenda → Recursos → + para agregar uno.
-                </p>
-              )}
-            </div>
-          </div>
-
-          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-            <div>
-              <label className="mb-1 block text-xs font-medium text-ink/60">Fecha de ingreso</label>
-              <input
-                type="text"
-                value={fechaIngreso}
-                onChange={(e) => setFechaIngreso(e.target.value)}
-                placeholder="dd/mm/aaaa"
-                className={inputClass}
-              />
-            </div>
-            <div>
-              <label className="mb-1 block text-xs font-medium text-ink/60">Fecha de entrega</label>
-              <input
-                type="text"
-                value={fechaEntrega}
-                onChange={(e) => setFechaEntrega(e.target.value)}
-                placeholder="dd/mm/aaaa"
-                className={inputClass}
-              />
-            </div>
-          </div>
-
-          <div>
-            <label className="mb-1 block text-xs font-medium text-ink/60">Nombre del paciente</label>
-            <input
-              type="text"
-              list="mo-pacientes-orden-lab"
-              value={paciente}
-              onChange={(e) => setPaciente(e.target.value)}
-              placeholder="Ej. Juan Pérez"
-              className={inputClass}
-            />
-            <datalist id="mo-pacientes-orden-lab">
-              {patients.map((p) => (
-                <option key={p.id} value={p.name} />
-              ))}
-            </datalist>
-          </div>
-
-          <div>
-            <label className="mb-1 block text-xs font-medium text-ink/60">Trabajo a realizar</label>
-            <textarea
-              value={trabajo}
-              onChange={(e) => setTrabajo(e.target.value)}
-              placeholder="Ej. Corona de zirconia OD 16"
-              rows={2}
-              className={`${inputClass} resize-none`}
-            />
-          </div>
-
-          <Odontograma selectedTeeth={dientes} onToggleTooth={toggleDiente} title="Órgano(s) dental(es) a trabajar" />
-
-          <div>
-            <label className="mb-1 block text-xs font-medium text-ink/60">Especificaciones</label>
-            <textarea
-              value={especificaciones}
-              onChange={(e) => setEspecificaciones(e.target.value)}
-              placeholder="Color, material, técnica, indicaciones especiales..."
-              rows={2}
-              className={`${inputClass} resize-none`}
-            />
-          </div>
-
-          <div>
-            <label className="mb-2 block text-xs font-medium text-ink/60">Se entrega junto con el trabajo</label>
-            <div className="flex flex-wrap gap-2">
-              {ENTREGA_OPCIONES.map((op) => (
-                <button key={op} type="button" onClick={() => toggleEntrega(op)} className={chipClass(entregaSeleccion.includes(op))}>
-                  {op}
-                </button>
-              ))}
-            </div>
-            {entregaSeleccion.includes("Otro") && (
-              <input
-                type="text"
-                value={entregaOtroTexto}
-                onChange={(e) => setEntregaOtroTexto(e.target.value)}
-                placeholder="Especifica qué otro material se entrega"
-                className={`${inputClass} mt-2`}
-              />
-            )}
-          </div>
-
-          <div>
-            <label className="mb-2 block text-xs font-medium text-ink/60">Etapa que se entrega o solicita</label>
-            <div className="flex flex-wrap gap-2">
-              {ETAPA_OPCIONES.map((op) => (
-                <button key={op} type="button" onClick={() => toggleEtapa(op)} className={chipClass(etapaSeleccion.includes(op))}>
-                  {op}
-                </button>
-              ))}
-            </div>
-          </div>
-        </div>
-
-        <div className="mt-6 flex gap-3">
-          <button
-            onClick={onClose}
-            className="flex-1 rounded-lg border border-edge/15 py-2.5 text-sm font-semibold text-ink/80 transition-colors hover:bg-surface"
-          >
-            Cerrar
-          </button>
-          <button
-            onClick={handleEnviar}
-            disabled={!puedeEnviar}
-            className="flex flex-1 items-center justify-center gap-1.5 rounded-lg border border-success/60 bg-success/15 py-2.5 text-sm font-semibold text-success transition-opacity hover:bg-success/25 disabled:cursor-not-allowed disabled:opacity-40"
-          >
-            <WhatsAppIcon />
-            Enviar por WhatsApp
-          </button>
-        </div>
-      </div>
-    </div>
-  );
-}
-
 export default function LaboratorioDentalPage() {
   const {
     laboratoriosDentales,
     setLaboratoriosDentales,
     clinicInfo,
     perfilDoctor,
+    otsLog,
   } = usePatientData();
+
+  // otsLog ya es la bitácora plana y clínica-completa de toda solicitud de
+  // laboratorio nueva (ver registrarLogOts en PatientDataContext.tsx) — se
+  // reutiliza tal cual para esta vista de solo lectura, sin persistir nada
+  // aparte. Es una bitácora de creación (nunca refleja cambios de estatus
+  // posteriores); ese detalle vivo se consulta desde el Expediente de cada
+  // paciente, donde vive el registro completo.
+  const ordenesEnviadas = otsLog.filter((o) => o.tipo === "Dental");
 
   const [showLaboratorio, setShowLaboratorio] = useState(false);
   const [laboratorioAEliminar, setLaboratorioAEliminar] = useState<LaboratorioDental | null>(null);
@@ -500,6 +262,40 @@ export default function LaboratorioDentalPage() {
                 </div>
               </div>
             ))}
+          </div>
+        )}
+      </CardShell>
+
+      <CardShell
+        title="Órdenes enviadas"
+        subtitle="Órdenes de trabajo dental enviadas a tus laboratorios, desde Proveedores o desde el Expediente de cada paciente."
+      >
+        {ordenesEnviadas.length === 0 ? (
+          <div className="rounded-xl border border-dashed border-edge/15 p-8 text-center text-sm text-ink/30">
+            Aún no se ha enviado ninguna orden de trabajo.
+          </div>
+        ) : (
+          <div className="overflow-x-auto rounded-xl border border-edge/10">
+            <table className="w-full text-left text-sm">
+              <thead>
+                <tr className="border-b border-edge/10 text-xs uppercase tracking-wide text-ink/40">
+                  <th className="px-4 py-2.5 font-medium">Fecha</th>
+                  <th className="px-4 py-2.5 font-medium">Paciente</th>
+                  <th className="px-4 py-2.5 font-medium">Laboratorio</th>
+                  <th className="px-4 py-2.5 font-medium">Trabajo</th>
+                </tr>
+              </thead>
+              <tbody>
+                {ordenesEnviadas.map((o) => (
+                  <tr key={o.id} className="border-b border-edge/5 last:border-0">
+                    <td className="whitespace-nowrap px-4 py-2.5 text-ink/70">{o.fechaEnvio}</td>
+                    <td className="px-4 py-2.5 text-ink/80">{o.patientName || "—"}</td>
+                    <td className="px-4 py-2.5 text-ink/80">{o.laboratorio}</td>
+                    <td className="px-4 py-2.5 text-ink/70">{o.trabajo}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
           </div>
         )}
       </CardShell>

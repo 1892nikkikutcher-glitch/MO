@@ -720,6 +720,15 @@ export type SolicitudLaboratorio = {
   trabajo: string;
   dientes: number[];
   fechaEnvio: string;
+  /** Detalle rico, solo presente en órdenes Dental creadas desde el flujo de
+   * "Enviar Orden" (Proveedores → Laboratorio Dental o Expediente →
+   * Laboratorios) — ausente en Químico/Radiografía y en Dental legado, que
+   * siguen funcionando igual sin estos campos. */
+  numeroOrden?: string;
+  fechaIngreso?: string;
+  especificaciones?: string;
+  entregaItems?: string[];
+  etapaItems?: string[];
   fechaEntrega: string;
   costo: number;
   estatus: LaboratorioEstatus;
