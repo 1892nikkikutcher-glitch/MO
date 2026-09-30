@@ -3,6 +3,8 @@
  * separado del seguimiento de órdenes de trabajo por paciente (ver
  * SolicitudLaboratorio en patientData.ts). */
 
+import { ordenarDientes } from "./odontograma";
+
 export type LaboratorioDental = {
   id: string;
   nombre: string;
@@ -69,7 +71,7 @@ export function buildMensajeOrdenTrabajo(clinicaNombre: string, orden: OrdenTrab
   lineas.push(`Trabajo a realizar: ${orden.trabajo.trim()}`);
 
   if (orden.dientes.length > 0) {
-    lineas.push(`Órgano(s) dental(es): OD ${[...orden.dientes].sort((a, b) => a - b).join(", ")}`);
+    lineas.push(`Órgano(s) dental(es): OD ${ordenarDientes(orden.dientes).join(", ")}`);
   }
   if (orden.especificaciones.trim()) lineas.push(`Especificaciones: ${orden.especificaciones.trim()}`);
   if (orden.entregaItems.length > 0) lineas.push(`Se entrega: ${orden.entregaItems.join(", ")}`);

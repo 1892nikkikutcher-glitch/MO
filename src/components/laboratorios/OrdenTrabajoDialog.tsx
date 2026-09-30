@@ -70,6 +70,12 @@ export default function OrdenTrabajoDialog({
   const [laboratorioElegidoId, setLaboratorioElegidoId] = useState(
     laboratorio ? "" : (laboratoriosDentales[0]?.id ?? "")
   );
+  useEffect(() => {
+    if (!laboratorio && !laboratorioElegidoId && laboratoriosDentales.length > 0) {
+      setLaboratorioElegidoId(laboratoriosDentales[0].id);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [laboratorio, laboratorioElegidoId, laboratoriosDentales.map((l) => l.id).join("|")]);
   const laboratorioResuelto = laboratorio ?? laboratoriosDentales.find((l) => l.id === laboratorioElegidoId) ?? null;
 
   // Buscador de paciente — mismo patrón que AgendaCitaDialog.tsx (texto +

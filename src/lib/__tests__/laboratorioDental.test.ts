@@ -41,7 +41,7 @@ describe("buildMensajeOrdenTrabajo", () => {
         "Doctor(a): Dr. Enrique Torres",
         "Paciente: Juan Pérez",
         "Trabajo a realizar: Corona de zirconia",
-        "Órgano(s) dental(es): OD 11, 16",
+        "Órgano(s) dental(es): OD 16, 11",
         "Especificaciones: Color A2, terminado brillante",
         "Se entrega: Antagonista, Registro oclusal",
         "Etapa: Color, Terminado",

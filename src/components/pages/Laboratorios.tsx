@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import ConfirmarEliminar from "@/components/ConfirmarEliminar";
 import { usePatientData } from "@/context/PatientDataContext";
 import OrdenTrabajoDialog from "@/components/laboratorios/OrdenTrabajoDialog";
+import { formatearDientes } from "@/lib/odontograma";
 import {
   laboratorioTipoOptions,
   laboratorioEstatusOptions,
@@ -400,9 +401,7 @@ export default function Laboratorios({ patientId }: { patientId: string }) {
                     <td className="px-6 py-3 text-ink/70">
                       {s.trabajo}
                       {s.dientes.length > 0 && (
-                        <span className="ml-1 text-xs text-ink/40">
-                          (OD {[...s.dientes].sort((a, b) => a - b).join(", ")})
-                        </span>
+                        <span className="ml-1 text-xs text-ink/40">({formatearDientes(s.dientes)})</span>
                       )}
                       {s.especificaciones && (
                         <div className="mt-0.5 text-xs text-ink/40">{s.especificaciones}</div>
