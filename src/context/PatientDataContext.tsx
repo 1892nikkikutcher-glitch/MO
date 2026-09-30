@@ -12,6 +12,7 @@ import {
   arrayUnion,
   collection,
   deleteDoc,
+  deleteField,
   doc,
   getDoc,
   getDocs,
@@ -619,6 +620,17 @@ type PatientDataContextValue = {
   setRecetasPaciente: (patientId: string, updater: Updater<Receta[]>) => void;
   laboratoriosPorPaciente: Record<string, SolicitudLaboratorio[]>;
   setLaboratoriosPaciente: (patientId: string, updater: Updater<SolicitudLaboratorio[]>) => void;
+  /** Variantes de solo-Firestore para editar/eliminar una orden de
+   * laboratorio dental sin que el paciente tenga su Expediente cargado en
+   * esta sesión — usadas desde Proveedores → Laboratorio Dental →
+   * "Órdenes enviadas". */
+  obtenerSolicitudLaboratorio: (patientId: string, id: string) => Promise<SolicitudLaboratorio | null>;
+  actualizarSolicitudLaboratorioDirecta: (
+    patientId: string,
+    id: string,
+    cambios: Partial<Omit<SolicitudLaboratorio, "id">>
+  ) => Promise<void>;
+  eliminarSolicitudLaboratorioDirecta: (patientId: string, id: string) => Promise<void>;
   /** v1 (PSOAP crudo) y v2 ("Registrar atención de hoy") conviven como
    * documentos hermanos — ver `esNotaV2` en notasEvolucion.ts para
    * distinguirlos. `setNotasEvolucionPaciente` solo escribe v1 (ver su
@@ -1978,8 +1990,33 @@ export function PatientDataProvider({
       fechaEnvio: s.fechaEnvio,
       costo: s.costo,
       creadoEn: new Date().toISOString(),
+      dientes: s.dientes.length > 0 ? s.dientes : undefined,
     }));
     setOtsLog((prev) => [...entradas, ...prev]);
+  };
+
+  /** Refleja en `otsLog` los campos visibles en Proveedores → Laboratorio
+   * Dental → "Órdenes enviadas" cuando una solicitud existente cambia (no
+   * cuando se crea — eso ya lo cubre registrarLogOts) — para que editar
+   * desde cualquiera de los dos paneles se vea igual en el otro. Si la
+   * solicitud no tiene entrada en otsLog (legado, de antes de que
+   * existiera esta bitácora), no hay nada que reflejar — no es un error. */
+  const reflejarEnOtsLog = async (id: string, siguiente: SolicitudLaboratorio) => {
+    if (!clinicUid || !otsLog.some((o) => o.id === id)) return;
+    await updateDoc(doc(db, `users/${clinicUid}/otsLog/${id}`), {
+      laboratorio: siguiente.laboratorio,
+      trabajo: siguiente.trabajo,
+      medico: siguiente.medico,
+      costo: siguiente.costo,
+      dientes: siguiente.dientes.length > 0 ? siguiente.dientes : deleteField(),
+    }).catch((err) => console.error(`No se pudo reflejar en otsLog/${id}`, err));
+  };
+
+  const eliminarDeOtsLog = async (id: string) => {
+    if (!clinicUid || !otsLog.some((o) => o.id === id)) return;
+    await deleteDoc(doc(db, `users/${clinicUid}/otsLog/${id}`)).catch((err) =>
+      console.error(`No se pudo eliminar otsLog/${id}`, err)
+    );
   };
 
   /** Refleja en `config/laboratoriosPendientes` el detalle (no solo el
@@ -2025,10 +2062,20 @@ export function PatientDataProvider({
     });
   };
 
-  const setLaboratoriosPaciente = (patientId: string, updater: Updater<SolicitudLaboratorio[]>) => {
+  /** Núcleo compartido: persiste el arreglo completo de un paciente y
+   * dispara todos los efectos derivados (estadísticas pendientes, panel
+   * del Dashboard, otsLog) a partir de prevArr/next explícitos — nunca lee
+   * el estado local directamente, así que sirve tanto para el caso normal
+   * (setLaboratoriosPaciente, partiendo de laboratoriosPorPaciente ya
+   * cargado) como para el caso donde el paciente no tiene su Expediente
+   * abierto en esta sesión (ver *Directa más abajo, que primero leen el
+   * arreglo real de Firestore). */
+  const aplicarCambiosLaboratorios = (
+    patientId: string,
+    prevArr: SolicitudLaboratorio[],
+    next: SolicitudLaboratorio[]
+  ) => {
     if (!clinicUid) return;
-    const prevArr = laboratoriosPorPaciente[patientId] ?? [];
-    const next = resolveUpdater(updater, prevArr);
     syncFirestoreList(`users/${clinicUid}/pacientes/${patientId}/laboratorios`, prevArr, next);
     const contarPendientes = (arr: SolicitudLaboratorio[]) =>
       arr.filter((s) => s.estatus !== "Recibido").length;
@@ -2041,7 +2088,69 @@ export function PatientDataProvider({
     }
     registrarLaboratoriosPendientes(patientId, prevArr, next);
     registrarLogOts(patientId, prevArr, next);
+
+    // registrarLogOts de arriba solo cubre altas nuevas — aquí se reflejan
+    // en otsLog las solicitudes que ya existían y cambiaron, y se quitan
+    // las que se eliminaron, para que "Órdenes enviadas" en Proveedores
+    // nunca se desactualice sin importar desde dónde se edite/elimine.
+    const prevById = new Map(prevArr.map((s) => [s.id, s]));
+    const nextIds = new Set(next.map((s) => s.id));
+    next.forEach((s) => {
+      const antes = prevById.get(s.id);
+      if (antes && JSON.stringify(antes) !== JSON.stringify(s)) void reflejarEnOtsLog(s.id, s);
+    });
+    prevArr.forEach((s) => {
+      if (!nextIds.has(s.id)) void eliminarDeOtsLog(s.id);
+    });
+
     setLaboratoriosPorPacienteState((prev) => ({ ...prev, [patientId]: next }));
+  };
+
+  const setLaboratoriosPaciente = (patientId: string, updater: Updater<SolicitudLaboratorio[]>) => {
+    if (!clinicUid) return;
+    const prevArr = laboratoriosPorPaciente[patientId] ?? [];
+    const next = resolveUpdater(updater, prevArr);
+    aplicarCambiosLaboratorios(patientId, prevArr, next);
+  };
+
+  /** Lee una sola solicitud directo de Firestore, sin suscribirse — para
+   * precargar el formulario de edición desde Proveedores → Laboratorio
+   * Dental → "Órdenes enviadas", donde el paciente puede no tener su
+   * Expediente abierto en esta sesión (y por lo tanto `laboratoriosPorPaciente`
+   * no tiene su arreglo todavía). */
+  const obtenerSolicitudLaboratorio = async (
+    patientId: string,
+    id: string
+  ): Promise<SolicitudLaboratorio | null> => {
+    if (!clinicUid) return null;
+    const snap = await getDoc(doc(db, `users/${clinicUid}/pacientes/${patientId}/laboratorios/${id}`));
+    if (!snap.exists()) return null;
+    return { ...(snap.data() as SolicitudLaboratorio), id: snap.id };
+  };
+
+  /** Variantes de setLaboratoriosPaciente para cuando no se puede partir
+   * del estado local ya cargado (mismo caso que obtenerSolicitudLaboratorio
+   * arriba) — leen el arreglo real de Firestore primero, para que
+   * aplicarCambiosLaboratorios calcule los deltas de pendientes/otsLog
+   * contra el estado real y no contra un arreglo vacío. */
+  const actualizarSolicitudLaboratorioDirecta = async (
+    patientId: string,
+    id: string,
+    cambios: Partial<Omit<SolicitudLaboratorio, "id">>
+  ) => {
+    if (!clinicUid) return;
+    const snap = await getDocs(collection(db, `users/${clinicUid}/pacientes/${patientId}/laboratorios`));
+    const prevArr = snap.docs.map((d) => ({ ...(d.data() as SolicitudLaboratorio), id: d.id }));
+    const next = prevArr.map((s) => (s.id === id ? { ...s, ...cambios } : s));
+    aplicarCambiosLaboratorios(patientId, prevArr, next);
+  };
+
+  const eliminarSolicitudLaboratorioDirecta = async (patientId: string, id: string) => {
+    if (!clinicUid) return;
+    const snap = await getDocs(collection(db, `users/${clinicUid}/pacientes/${patientId}/laboratorios`));
+    const prevArr = snap.docs.map((d) => ({ ...(d.data() as SolicitudLaboratorio), id: d.id }));
+    const next = prevArr.filter((s) => s.id !== id);
+    aplicarCambiosLaboratorios(patientId, prevArr, next);
   };
 
   // Solo escribe notas v1 (PSOAP legado) — nunca debe tocar documentos v2
@@ -2541,6 +2650,9 @@ export function PatientDataProvider({
         setRecetasPaciente,
         laboratoriosPorPaciente,
         setLaboratoriosPaciente,
+        obtenerSolicitudLaboratorio,
+        actualizarSolicitudLaboratorioDirecta,
+        eliminarSolicitudLaboratorioDirecta,
         miUid: uid,
         notasEvolucionPorPaciente,
         estadoCargaNotasPorPaciente,

@@ -112,6 +112,7 @@ export default function OrdenTrabajoDialog({
   const [trabajo, setTrabajo] = useState("");
   const [dientes, setDientes] = useState<number[]>([]);
   const [especificaciones, setEspecificaciones] = useState("");
+  const [costo, setCosto] = useState("");
   const [entregaSeleccion, setEntregaSeleccion] = useState<string[]>([]);
   const [entregaOtroTexto, setEntregaOtroTexto] = useState("");
   const [etapaSeleccion, setEtapaSeleccion] = useState<string[]>([]);
@@ -155,7 +156,7 @@ export default function OrdenTrabajoDialog({
       dientes,
       fechaEnvio: todayFormatted(),
       fechaEntrega,
-      costo: 0,
+      costo: Number(costo) || 0,
       estatus: "Enviado",
       numeroOrden,
       fechaIngreso,
@@ -290,7 +291,7 @@ export default function OrdenTrabajoDialog({
 
               <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                 <div>
-                  <label className="mb-1 block text-xs font-medium text-ink/60">Fecha de ingreso</label>
+                  <label className="mb-1 block text-xs font-medium text-ink/60">Fecha de toma de impresión</label>
                   <input
                     type="text"
                     value={fechaIngreso}
@@ -300,7 +301,7 @@ export default function OrdenTrabajoDialog({
                   />
                 </div>
                 <div>
-                  <label className="mb-1 block text-xs font-medium text-ink/60">Fecha de entrega</label>
+                  <label className="mb-1 block text-xs font-medium text-ink/60">Fecha de colocación</label>
                   <input
                     type="text"
                     value={fechaEntrega}
@@ -371,6 +372,20 @@ export default function OrdenTrabajoDialog({
                   placeholder="Color, material, técnica, indicaciones especiales..."
                   rows={2}
                   className={`${inputClass} resize-none`}
+                />
+              </div>
+
+              <div>
+                <label className="mb-1 block text-xs font-medium text-ink/60">
+                  Costo a pagar al laboratorio
+                </label>
+                <input
+                  type="number"
+                  min={0}
+                  value={costo}
+                  onChange={(e) => setCosto(e.target.value)}
+                  placeholder="Opcional — si el laboratorio ya te lo confirmó"
+                  className={inputClass}
                 />
               </div>
 

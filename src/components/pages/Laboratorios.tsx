@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import ConfirmarEliminar from "@/components/ConfirmarEliminar";
 import { usePatientData } from "@/context/PatientDataContext";
 import OrdenTrabajoDialog from "@/components/laboratorios/OrdenTrabajoDialog";
+import EditarOrdenLaboratorioDialog from "@/components/laboratorios/EditarOrdenLaboratorioDialog";
 import { formatearDientes } from "@/lib/odontograma";
 import {
   laboratorioTipoOptions,
@@ -259,6 +260,7 @@ export default function Laboratorios({ patientId }: { patientId: string }) {
   const [showDialog, setShowDialog] = useState(false);
   const [mostrarNuevaOrden, setMostrarNuevaOrden] = useState(false);
   const [solicitudAEliminar, setSolicitudAEliminar] = useState<Solicitud | null>(null);
+  const [ordenDentalAEditar, setOrdenDentalAEditar] = useState<Solicitud | null>(null);
   const todasLasSolicitudes = laboratoriosPorPaciente[patientId] ?? [];
   // Dental tiene su propia sección más abajo (con sus campos ricos) — aquí
   // solo quedan Químico/Radiografía, para no mostrar el mismo registro dos
@@ -390,7 +392,8 @@ export default function Laboratorios({ patientId }: { patientId: string }) {
                   <th className="px-6 py-3 font-medium">Ingreso</th>
                   <th className="px-6 py-3 font-medium">Entrega</th>
                   <th className="px-6 py-3 font-medium">Estatus</th>
-                  <th className="px-6 py-3 text-right font-medium">Quitar</th>
+                  <th className="px-6 py-3 text-right font-medium">Costo</th>
+                  <th className="px-6 py-3 text-right font-medium">Acciones</th>
                 </tr>
               </thead>
               <tbody>
@@ -428,13 +431,24 @@ export default function Laboratorios({ patientId }: { patientId: string }) {
                         ))}
                       </select>
                     </td>
+                    <td className="px-6 py-3 text-right font-semibold text-accent">
+                      {formatCurrency(s.costo)}
+                    </td>
                     <td className="px-6 py-3 text-right">
-                      <button
-                        onClick={() => setSolicitudAEliminar(s)}
-                        className="text-xs font-semibold text-danger hover:text-danger"
-                      >
-                        Eliminar
-                      </button>
+                      <div className="flex justify-end gap-3">
+                        <button
+                          onClick={() => setOrdenDentalAEditar(s)}
+                          className="text-xs font-semibold text-accent hover:text-accent"
+                        >
+                          Editar
+                        </button>
+                        <button
+                          onClick={() => setSolicitudAEliminar(s)}
+                          className="text-xs font-semibold text-danger hover:text-danger"
+                        >
+                          Eliminar
+                        </button>
+                      </div>
                     </td>
                   </tr>
                 ))}
@@ -459,6 +473,20 @@ export default function Laboratorios({ patientId }: { patientId: string }) {
           patientIdFijo={patientId}
           clinicaNombre={clinicaNombre}
           onClose={() => setMostrarNuevaOrden(false)}
+        />
+      )}
+
+      {ordenDentalAEditar && (
+        <EditarOrdenLaboratorioDialog
+          solicitud={ordenDentalAEditar}
+          nombreLaboratorio={ordenDentalAEditar.laboratorio}
+          onClose={() => setOrdenDentalAEditar(null)}
+          onGuardar={(cambios) => {
+            setLaboratoriosPaciente(patientId, (prev) =>
+              prev.map((x) => (x.id === ordenDentalAEditar.id ? { ...x, ...cambios } : x))
+            );
+            setOrdenDentalAEditar(null);
+          }}
         />
       )}
 

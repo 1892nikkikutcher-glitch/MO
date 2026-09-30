@@ -3,8 +3,12 @@
 import { useState } from "react";
 import { usePatientData } from "@/context/PatientDataContext";
 import { limpiarTelefono, buildMensajeLaboratorioDental, type LaboratorioDental } from "@/lib/laboratorioDental";
+import { formatCurrency, type SolicitudLaboratorio } from "@/lib/patientData";
+import { formatearDientes } from "@/lib/odontograma";
+import type { OtLogEntry } from "@/lib/otsLog";
 import ConfirmarEliminar from "@/components/ConfirmarEliminar";
 import OrdenTrabajoDialog from "@/components/laboratorios/OrdenTrabajoDialog";
+import EditarOrdenLaboratorioDialog from "@/components/laboratorios/EditarOrdenLaboratorioDialog";
 
 const inputClass =
   "w-full rounded-lg border border-edge/10 bg-field px-3 py-2 text-sm text-ink placeholder-ink/30 outline-none focus:border-accent/60";
@@ -186,6 +190,9 @@ export default function LaboratorioDentalPage() {
     clinicInfo,
     perfilDoctor,
     otsLog,
+    obtenerSolicitudLaboratorio,
+    actualizarSolicitudLaboratorioDirecta,
+    eliminarSolicitudLaboratorioDirecta,
   } = usePatientData();
 
   // otsLog ya es la bitácora plana y clínica-completa de toda solicitud de
@@ -199,6 +206,26 @@ export default function LaboratorioDentalPage() {
   const [showLaboratorio, setShowLaboratorio] = useState(false);
   const [laboratorioAEliminar, setLaboratorioAEliminar] = useState<LaboratorioDental | null>(null);
   const [laboratorioParaOrden, setLaboratorioParaOrden] = useState<LaboratorioDental | null>(null);
+  const [ordenAEliminar, setOrdenAEliminar] = useState<OtLogEntry | null>(null);
+  const [ordenAEditar, setOrdenAEditar] = useState<{ patientId: string; solicitud: SolicitudLaboratorio } | null>(
+    null
+  );
+  const [cargandoEdicionId, setCargandoEdicionId] = useState<string | null>(null);
+  const [avisoEdicion, setAvisoEdicion] = useState<string | null>(null);
+
+  const abrirEdicion = async (o: OtLogEntry) => {
+    setAvisoEdicion(null);
+    setCargandoEdicionId(o.id);
+    const solicitud = await obtenerSolicitudLaboratorio(o.patientId, o.id);
+    setCargandoEdicionId(null);
+    if (!solicitud) {
+      setAvisoEdicion(
+        "No se encontró esta orden — es posible que ya se haya eliminado desde el Expediente del paciente."
+      );
+      return;
+    }
+    setOrdenAEditar({ patientId: o.patientId, solicitud });
+  };
 
   const clinicaNombre = clinicInfo?.nombre || perfilDoctor.nombre || "";
 
@@ -270,6 +297,17 @@ export default function LaboratorioDentalPage() {
         title="Órdenes enviadas"
         subtitle="Órdenes de trabajo dental enviadas a tus laboratorios, desde Proveedores o desde el Expediente de cada paciente."
       >
+        {avisoEdicion && (
+          <div className="flex items-center justify-between gap-3 rounded-lg border border-warning/30 bg-warning/10 px-3 py-2 text-xs text-warning">
+            <span>{avisoEdicion}</span>
+            <button
+              onClick={() => setAvisoEdicion(null)}
+              className="shrink-0 font-semibold hover:opacity-70"
+            >
+              ✕
+            </button>
+          </div>
+        )}
         {ordenesEnviadas.length === 0 ? (
           <div className="rounded-xl border border-dashed border-edge/15 p-8 text-center text-sm text-ink/30">
             Aún no se ha enviado ninguna orden de trabajo.
@@ -283,6 +321,9 @@ export default function LaboratorioDentalPage() {
                   <th className="px-4 py-2.5 font-medium">Paciente</th>
                   <th className="px-4 py-2.5 font-medium">Laboratorio</th>
                   <th className="px-4 py-2.5 font-medium">Trabajo</th>
+                  <th className="px-4 py-2.5 font-medium">Dientes</th>
+                  <th className="px-4 py-2.5 text-right font-medium">Costo</th>
+                  <th className="px-4 py-2.5 text-right font-medium">Acciones</th>
                 </tr>
               </thead>
               <tbody>
@@ -292,6 +333,29 @@ export default function LaboratorioDentalPage() {
                     <td className="px-4 py-2.5 text-ink/80">{o.patientName || "—"}</td>
                     <td className="px-4 py-2.5 text-ink/80">{o.laboratorio}</td>
                     <td className="px-4 py-2.5 text-ink/70">{o.trabajo}</td>
+                    <td className="px-4 py-2.5 text-ink/60">
+                      {o.dientes && o.dientes.length > 0 ? formatearDientes(o.dientes) : "—"}
+                    </td>
+                    <td className="px-4 py-2.5 text-right font-semibold text-accent">
+                      {formatCurrency(o.costo)}
+                    </td>
+                    <td className="px-4 py-2.5 text-right">
+                      <div className="flex justify-end gap-3">
+                        <button
+                          onClick={() => abrirEdicion(o)}
+                          disabled={cargandoEdicionId === o.id}
+                          className="text-xs font-semibold text-accent hover:text-accent disabled:opacity-40"
+                        >
+                          {cargandoEdicionId === o.id ? "Cargando…" : "Editar"}
+                        </button>
+                        <button
+                          onClick={() => setOrdenAEliminar(o)}
+                          className="text-xs font-semibold text-danger hover:text-danger"
+                        >
+                          Eliminar
+                        </button>
+                      </div>
+                    </td>
                   </tr>
                 ))}
               </tbody>
@@ -328,6 +392,32 @@ export default function LaboratorioDentalPage() {
           laboratorio={laboratorioParaOrden}
           clinicaNombre={clinicaNombre}
           onClose={() => setLaboratorioParaOrden(null)}
+        />
+      )}
+
+      {ordenAEditar && (
+        <EditarOrdenLaboratorioDialog
+          solicitud={ordenAEditar.solicitud}
+          nombreLaboratorio={ordenAEditar.solicitud.laboratorio}
+          onClose={() => setOrdenAEditar(null)}
+          onGuardar={(cambios) => {
+            void actualizarSolicitudLaboratorioDirecta(ordenAEditar.patientId, ordenAEditar.solicitud.id, cambios);
+            setOrdenAEditar(null);
+          }}
+        />
+      )}
+
+      {ordenAEliminar && (
+        <ConfirmarEliminar
+          titulo="¿Eliminar esta orden de laboratorio?"
+          mensaje={`Vas a eliminar la orden de "${ordenAEliminar.trabajo}" con ${ordenAEliminar.laboratorio}${
+            ordenAEliminar.patientName ? ` para ${ordenAEliminar.patientName}` : ""
+          }. Esta acción no se puede deshacer.`}
+          onCancel={() => setOrdenAEliminar(null)}
+          onConfirm={() => {
+            void eliminarSolicitudLaboratorioDirecta(ordenAEliminar.patientId, ordenAEliminar.id);
+            setOrdenAEliminar(null);
+          }}
         />
       )}
     </div>

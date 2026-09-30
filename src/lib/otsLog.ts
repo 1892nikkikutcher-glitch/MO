@@ -17,4 +17,7 @@ export type OtLogEntry = {
   fechaEnvio: string;
   costo: number;
   creadoEn: string;
+  /** Solo lo llenan las órdenes Dental del flujo "Enviar Orden" — ausente
+   * en Químico/Radiografía y en Dental legado. */
+  dientes?: number[];
 };
