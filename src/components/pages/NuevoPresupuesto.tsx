@@ -137,14 +137,25 @@ export default function NuevoPresupuesto({
   const [items, setItems] = useState<LineItem[]>(
     () =>
       initialBudget?.items ??
-      (prefillItems ?? []).map((p) => ({
-        id: `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
-        procedure: p.procedure,
-        price: p.precioConfirmado ?? 0,
-        teeth: p.teeth,
-        note: p.note,
-        origenClinico: { diagnosticoId: p.diagnosticoId, planTratamientoItemId: p.planTratamientoItemId, prioridad: p.prioridad },
-      }))
+      // Mismo criterio que agregarItem/actualizarItem más abajo: el precio
+      // del catálogo es SIEMPRE por diente, así que se multiplica por la
+      // cantidad de dientes del diagnóstico (ej. resina en OD 45,43,41 =
+      // 3 × precio unitario) — antes este renglón nacía con el precio de
+      // un solo diente sin importar cuántos venían marcados.
+      (prefillItems ?? []).map((p) => {
+        const cantidad = Math.max(p.teeth.length, 1);
+        const precioUnitario = p.precioConfirmado ?? 0;
+        return {
+          id: `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+          procedure: p.procedure,
+          price: Math.round(precioUnitario * cantidad * 100) / 100,
+          precioUnitario,
+          cantidad,
+          teeth: p.teeth,
+          note: p.note,
+          origenClinico: { diagnosticoId: p.diagnosticoId, planTratamientoItemId: p.planTratamientoItemId, prioridad: p.prioridad },
+        };
+      })
   );
   /** Id del renglón que se está editando (null = capturando uno nuevo). La
    * edición reutiliza el mismo formulario de "procedimiento no catalogado"
