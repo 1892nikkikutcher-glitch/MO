@@ -5,6 +5,7 @@ import Odontograma from "./Odontograma";
 import { usePatientData } from "@/context/PatientDataContext";
 import ConfirmarEliminar from "@/components/ConfirmarEliminar";
 import { sonEquivalentes } from "@/lib/deepEqual";
+import { CUADRANTES, cuadrantePrincipal, ordenarDientes } from "@/lib/odontograma";
 import {
   claveDetalleSiNo,
   esNegacionExplicita,
@@ -765,6 +766,112 @@ function OdontogramaDiagnostico({
     onChange(entries.map((e) => (e.id === entryId ? { ...e, estado: nuevoEstado } : e)));
   };
 
+  // Agrupado por cuadrante (como la hoja clínica física) en vez de un
+  // historial cronológico plano — cuadrantePrincipal ya filtra dientes no
+  // reconocidos antes de decidir, así que un solo valor heredado inválido
+  // en una entrada por lo demás válida nunca la manda a "Sin cuadrante".
+  // Una entrada con dientes de varios cuadrantes se archiva una sola vez,
+  // bajo su cuadrante principal, pero sigue mostrando TODOS sus dientes
+  // (ver renderEntrada / formatearDientes-equivalente más abajo).
+  const gruposPorCuadrante = CUADRANTES.map((c) => ({
+    numero: c.numero,
+    entradas: entries.filter((e) => cuadrantePrincipal(e.dientes) === c.numero),
+  }));
+  const entradasSinCuadrante = entries.filter((e) => cuadrantePrincipal(e.dientes) === null);
+
+  const renderEntrada = (entry: DiagnosticoOdontograma) => {
+    const folioLigado = entry.presupuestoId
+      ? presupuestos.find((p) => p.id === entry.presupuestoId)?.folio
+      : undefined;
+    const planesDeEsteDiagnostico = planesTratamiento.filter((p) => p.diagnosticoId === entry.id);
+    return (
+      <div
+        key={entry.id}
+        className="flex items-start justify-between gap-3 rounded-lg border border-edge/10 bg-inset px-3 py-2 text-sm"
+      >
+        <div className="min-w-0 flex-1">
+          <p className="text-xs font-semibold text-accent">OD {ordenarDientes(entry.dientes).join(", ")}</p>
+          <p className="text-ink">
+            {entry.diagnostico || (
+              <span className="italic text-ink/40">Sin diagnóstico anotado — edítalo para agregarlo</span>
+            )}
+          </p>
+          {entry.tratamientoSugerido && (
+            <p className="text-xs text-ink/50">Tratamiento sugerido: {entry.tratamientoSugerido}</p>
+          )}
+          {(entry.fecha || entry.fechaPresupuesto) && (
+            <p className="text-xs text-ink/30">
+              {entry.fecha && `Diagnosticado ${formatFechaCorta(entry.fecha)}`}
+              {entry.fecha && entry.fechaPresupuesto && " · "}
+              {entry.fechaPresupuesto && `Presupuestado ${formatFechaCorta(entry.fechaPresupuesto)}`}
+            </p>
+          )}
+          {entry.presupuestoId && (
+            <button
+              type="button"
+              onClick={onVerPresupuestos}
+              className="text-xs font-semibold text-accent hover:underline"
+            >
+              Ya en presupuesto{folioLigado ? ` #${folioLigado}` : ""} — ver
+            </button>
+          )}
+
+          <EstadoDiagnosticoSelector estado={entry.estado} onChange={(nuevo) => cambiarEstado(entry.id, nuevo)} />
+
+          {planesDeEsteDiagnostico.length > 0 && (
+            <div className="mt-2 space-y-1.5">
+              {planesDeEsteDiagnostico.map((plan) => (
+                <PlanTratamientoRow key={plan.id} plan={plan} patientId={patientId} onCotizar={(_, prefill) => onCrearCotizacion(prefill)} />
+              ))}
+            </div>
+          )}
+
+          {planEnCreacionParaId === entry.id ? (
+            <CrearPlanTratamientoPanel
+              entry={entry}
+              patientId={patientId}
+              preguntaId={preguntaId}
+              miUid={miUid}
+              onConfirmarEstado={(nuevo) => cambiarEstado(entry.id, nuevo)}
+              onGuardarPlan={(plan, prefill) => {
+                onGuardarPlan(plan);
+                if (prefill) onCrearCotizacion(prefill);
+                setPlanEnCreacionParaId(null);
+              }}
+              onCancelar={() => setPlanEnCreacionParaId(null)}
+            />
+          ) : (
+            <button
+              type="button"
+              onClick={() => setPlanEnCreacionParaId(entry.id)}
+              className="mt-2 rounded-lg border border-accent/40 px-2.5 py-1 text-xs font-semibold text-accent transition-colors hover:bg-accent/10"
+            >
+              Crear plan de tratamiento
+            </button>
+          )}
+        </div>
+        <div className="flex shrink-0 items-center gap-2">
+          <button
+            type="button"
+            onClick={() => iniciarEdicion(entry)}
+            title="Editar"
+            className="text-ink/30 transition-colors hover:text-accent"
+          >
+            ✎
+          </button>
+          <button
+            type="button"
+            onClick={() => setEntradaAEliminar(entry)}
+            title="Quitar"
+            className="text-ink/30 transition-colors hover:text-danger"
+          >
+            ✕
+          </button>
+        </div>
+      </div>
+    );
+  };
+
   return (
     <div className="space-y-4">
       <Odontograma selectedTeeth={selectedTeeth} onToggleTooth={toggleTooth} title="" hideSummary />
@@ -776,9 +883,7 @@ function OdontogramaDiagnostico({
           editarlo aquí, no olvides guardar el historial completo con el botón de hasta abajo.
         </p>
         {selectedTeeth.length > 0 && (
-          <p className="text-xs font-semibold text-accent">
-            OD {[...selectedTeeth].sort((a, b) => a - b).join(", ")}
-          </p>
+          <p className="text-xs font-semibold text-accent">OD {ordenarDientes(selectedTeeth).join(", ")}</p>
         )}
         <div>
           <label className="mb-1 block text-xs font-medium text-ink/60">Diagnóstico</label>
@@ -830,108 +935,31 @@ function OdontogramaDiagnostico({
       </div>
 
       {entries.length > 0 && (
-        <div className="space-y-2">
-          {entries.map((entry) => {
-            const folioLigado = entry.presupuestoId
-              ? presupuestos.find((p) => p.id === entry.presupuestoId)?.folio
-              : undefined;
-            const planesDeEsteDiagnostico = planesTratamiento.filter((p) => p.diagnosticoId === entry.id);
-            return (
-              <div
-                key={entry.id}
-                className="flex items-start justify-between gap-3 rounded-lg border border-edge/10 bg-inset px-3 py-2 text-sm"
-              >
-                <div className="min-w-0 flex-1">
-                  <p className="text-xs font-semibold text-accent">
-                    OD {[...entry.dientes].sort((a, b) => a - b).join(", ")}
-                  </p>
-                  <p className="text-ink">
-                    {entry.diagnostico || (
-                      <span className="italic text-ink/40">Sin diagnóstico anotado — edítalo para agregarlo</span>
-                    )}
-                  </p>
-                  {entry.tratamientoSugerido && (
-                    <p className="text-xs text-ink/50">Tratamiento sugerido: {entry.tratamientoSugerido}</p>
-                  )}
-                  {(entry.fecha || entry.fechaPresupuesto) && (
-                    <p className="text-xs text-ink/30">
-                      {entry.fecha && `Diagnosticado ${formatFechaCorta(entry.fecha)}`}
-                      {entry.fecha && entry.fechaPresupuesto && " · "}
-                      {entry.fechaPresupuesto && `Presupuestado ${formatFechaCorta(entry.fechaPresupuesto)}`}
-                    </p>
-                  )}
-                  {entry.presupuestoId && (
-                    <button
-                      type="button"
-                      onClick={onVerPresupuestos}
-                      className="text-xs font-semibold text-accent hover:underline"
-                    >
-                      Ya en presupuesto{folioLigado ? ` #${folioLigado}` : ""} — ver
-                    </button>
-                  )}
-
-                  <EstadoDiagnosticoSelector estado={entry.estado} onChange={(nuevo) => cambiarEstado(entry.id, nuevo)} />
-
-                  {planesDeEsteDiagnostico.length > 0 && (
-                    <div className="mt-2 space-y-1.5">
-                      {planesDeEsteDiagnostico.map((plan) => (
-                        <PlanTratamientoRow key={plan.id} plan={plan} patientId={patientId} onCotizar={(_, prefill) => onCrearCotizacion(prefill)} />
-                      ))}
-                    </div>
-                  )}
-
-                  {planEnCreacionParaId === entry.id ? (
-                    <CrearPlanTratamientoPanel
-                      entry={entry}
-                      patientId={patientId}
-                      preguntaId={preguntaId}
-                      miUid={miUid}
-                      onConfirmarEstado={(nuevo) => cambiarEstado(entry.id, nuevo)}
-                      onGuardarPlan={(plan, prefill) => {
-                        onGuardarPlan(plan);
-                        if (prefill) onCrearCotizacion(prefill);
-                        setPlanEnCreacionParaId(null);
-                      }}
-                      onCancelar={() => setPlanEnCreacionParaId(null)}
-                    />
-                  ) : (
-                    <button
-                      type="button"
-                      onClick={() => setPlanEnCreacionParaId(entry.id)}
-                      className="mt-2 rounded-lg border border-accent/40 px-2.5 py-1 text-xs font-semibold text-accent transition-colors hover:bg-accent/10"
-                    >
-                      Crear plan de tratamiento
-                    </button>
-                  )}
+        <div className="space-y-5">
+          {gruposPorCuadrante.map(
+            (grupo) =>
+              grupo.entradas.length > 0 && (
+                <div key={grupo.numero} className="space-y-2">
+                  <h4 className="text-xs font-semibold uppercase tracking-wide text-ink/40">
+                    Cuadrante {grupo.numero}
+                  </h4>
+                  <div className="space-y-2">{grupo.entradas.map(renderEntrada)}</div>
                 </div>
-                <div className="flex shrink-0 items-center gap-2">
-                  <button
-                    type="button"
-                    onClick={() => iniciarEdicion(entry)}
-                    title="Editar"
-                    className="text-ink/30 transition-colors hover:text-accent"
-                  >
-                    ✎
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setEntradaAEliminar(entry)}
-                    title="Quitar"
-                    className="text-ink/30 transition-colors hover:text-danger"
-                  >
-                    ✕
-                  </button>
-                </div>
-              </div>
-            );
-          })}
+              )
+          )}
+          {entradasSinCuadrante.length > 0 && (
+            <div className="space-y-2">
+              <h4 className="text-xs font-semibold uppercase tracking-wide text-ink/40">Sin cuadrante</h4>
+              <div className="space-y-2">{entradasSinCuadrante.map(renderEntrada)}</div>
+            </div>
+          )}
         </div>
       )}
 
       {entradaAEliminar && (
         <ConfirmarEliminar
           titulo="¿Quitar este diagnóstico?"
-          mensaje={`OD ${[...entradaAEliminar.dientes].sort((a, b) => a - b).join(", ")} — "${
+          mensaje={`OD ${ordenarDientes(entradaAEliminar.dientes).join(", ")} — "${
             entradaAEliminar.diagnostico || "Sin diagnóstico anotado"
           }". Esta acción no se puede deshacer.`}
           confirmLabel="Quitar"
