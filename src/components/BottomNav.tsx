@@ -194,6 +194,7 @@ export const navItems = [
       { id: "administracion-metas", label: "Metas" },
       { id: "administracion-perfil", label: "Perfil del Doctor" },
       { id: "administracion-colaboradores", label: "Colaboradores" },
+      { id: "administracion-contrato-ortodoncia", label: "Contrato de Ortodoncia" },
     ],
   },
   {

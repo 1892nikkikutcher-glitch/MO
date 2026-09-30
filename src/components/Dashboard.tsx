@@ -17,6 +17,7 @@ import Procedimientos from "./pages/Procedimientos";
 import HistorialClinicoAdmin from "./pages/HistorialClinicoAdmin";
 import Medicamentos from "./pages/Medicamentos";
 import FormatosWhatsApp from "./pages/FormatosWhatsApp";
+import AdministracionContratoOrtodoncia from "./pages/AdministracionContratoOrtodoncia";
 import Planes from "./pages/Planes";
 import Documentos from "./pages/Documentos";
 import Gastos from "./pages/Gastos";
@@ -72,6 +73,7 @@ const paginasConstruidas = new Set([
   "administracion-colaboradores",
   "administracion-metas",
   "administracion-formatos-whatsapp",
+  "administracion-contrato-ortodoncia",
   "membresias",
   "asistencia",
   "administracion-procedimientos",
@@ -748,6 +750,7 @@ function DashboardBody({
           {activePage === "administracion-colaboradores" && <Colaboradores />}
           {activePage === "administracion-metas" && <Metas />}
           {activePage === "administracion-formatos-whatsapp" && <FormatosWhatsApp />}
+          {activePage === "administracion-contrato-ortodoncia" && <AdministracionContratoOrtodoncia />}
           {activePage === "membresias" && <Membresias />}
           {activePage === "asistencia" && <Asistencia />}
           {activePage === "administracion-procedimientos" && <Procedimientos />}

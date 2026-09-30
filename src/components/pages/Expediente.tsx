@@ -12,6 +12,7 @@ import ListadoCitas from "./ListadoCitas";
 import Fotografias from "./Fotografias";
 import Pagos from "./Pagos";
 import ConsentimientoInformado from "./ConsentimientoInformado";
+import ContratoOrtodoncia from "./ContratoOrtodoncia";
 import Laboratorios from "./Laboratorios";
 import NotasEvolucionTab from "@/components/notasEvolucion/NotasEvolucionTab";
 import InterconsultasPaciente from "./InterconsultasPaciente";
@@ -1076,6 +1077,7 @@ export default function Expediente({
   // de pestaña — PresupuestosTab lo consume para abrir Nuevo Presupuesto ya
   // prellenado, y lo limpia (onConsumirPrefillPresupuesto) al guardar.
   const [prefillPresupuesto, setPrefillPresupuesto] = useState<PresupuestoPrefillItem[] | null>(null);
+  const [tipoDocumentoFirma, setTipoDocumentoFirma] = useState<"general" | "ortodoncia">("general");
   const {
     presupuestosPorPaciente,
     setPresupuestosPaciente,
@@ -1507,7 +1509,37 @@ export default function Expediente({
             />
           )}
           {activeTab === "Consentimientos Informados" && (
-            <ConsentimientoInformado patient={patient} />
+            <div className="space-y-4">
+              <div className="flex flex-wrap gap-1.5 print:hidden">
+                <button
+                  type="button"
+                  onClick={() => setTipoDocumentoFirma("general")}
+                  className={`rounded-full border px-3 py-1.5 text-xs font-semibold transition-colors ${
+                    tipoDocumentoFirma === "general"
+                      ? "border-accent/60 bg-accent/15 text-accent"
+                      : "border-edge/15 text-ink/60 hover:bg-surface"
+                  }`}
+                >
+                  Consentimiento Informado General
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setTipoDocumentoFirma("ortodoncia")}
+                  className={`rounded-full border px-3 py-1.5 text-xs font-semibold transition-colors ${
+                    tipoDocumentoFirma === "ortodoncia"
+                      ? "border-accent/60 bg-accent/15 text-accent"
+                      : "border-edge/15 text-ink/60 hover:bg-surface"
+                  }`}
+                >
+                  Contrato de Servicios — Ortodoncia
+                </button>
+              </div>
+              {tipoDocumentoFirma === "general" ? (
+                <ConsentimientoInformado patient={patient} />
+              ) : (
+                <ContratoOrtodoncia patient={patient} />
+              )}
+            </div>
           )}
           {activeTab === "Laboratorios" && <Laboratorios patientId={patient.id} />}
           {activeTab === "Notas de Evolución y Seguimiento" && (
