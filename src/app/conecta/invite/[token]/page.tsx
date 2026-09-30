@@ -19,9 +19,9 @@ import { auth } from "@/lib/firebase";
 import { obtenerInvitacionPublicaApi, reclamarInvitacionApi } from "@/lib/conectaApi";
 
 const inputClass =
-  "w-full rounded-lg border border-white/15 bg-black/30 px-3 py-2 text-sm text-white outline-none focus:border-amber-400/60";
+  "w-full rounded-lg border border-edge/10 bg-field px-3 py-2 text-sm text-ink outline-none focus:border-accent/60";
 const botonPrimario =
-  "rounded-lg bg-amber-400 px-4 py-2 text-sm font-semibold text-black transition-opacity hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50";
+  "rounded-lg bg-accent px-4 py-2 text-sm font-semibold text-black transition-opacity hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50";
 
 type InvitacionPublica = {
   remitenteNombre: string;
@@ -72,11 +72,11 @@ export default function InvitePage({ params }: { params: Promise<{ token: string
 
   return (
     <Shell>
-      <p className="text-white/70">
-        <strong className="text-white">{invitacion.remitenteNombre}</strong> te envió una interconsulta odontológica
+      <p className="text-ink/70">
+        <strong className="text-ink">{invitacion.remitenteNombre}</strong> te envió una interconsulta odontológica
         segura mediante MO.
       </p>
-      <p className="mt-1 text-xs text-white/40">
+      <p className="mt-1 text-xs text-ink/40">
         Por privacidad, la información clínica solo estará disponible después de identificarte.
       </p>
 
@@ -91,10 +91,10 @@ export default function InvitePage({ params }: { params: Promise<{ token: string
 
 function Shell({ children, error }: { children: React.ReactNode; error?: boolean }) {
   return (
-    <div className="flex min-h-screen items-center justify-center bg-[#0b0d12] p-4">
-      <div className="w-full max-w-md rounded-2xl border border-white/10 bg-white/5 p-6">
-        <h1 className="mb-4 text-lg font-semibold text-white">MO Conecta</h1>
-        {error ? <p className="text-sm text-red-400">{children}</p> : children}
+    <div className="flex min-h-screen items-center justify-center bg-app p-4">
+      <div className="w-full max-w-md rounded-2xl border border-edge/10 bg-modal p-6">
+        <h1 className="mb-4 text-lg font-semibold text-ink">MO Conecta</h1>
+        {error ? <p className="text-sm text-danger">{children}</p> : children}
       </div>
     </div>
   );
@@ -126,7 +126,7 @@ function AutenticacionInline() {
 
   return (
     <form onSubmit={enviar} className="space-y-3">
-      <p className="text-sm text-white/70">
+      <p className="text-sm text-ink/70">
         {modo === "login" ? "Inicia sesión en MO para continuar." : "Crea tu cuenta en MO para continuar."}
       </p>
       <input
@@ -145,14 +145,14 @@ function AutenticacionInline() {
         value={password}
         onChange={(e) => setPassword(e.target.value)}
       />
-      {error && <p className="text-sm text-red-400">{error}</p>}
+      {error && <p className="text-sm text-danger">{error}</p>}
       <button type="submit" disabled={enviando} className={`${botonPrimario} w-full`}>
         {enviando ? "Un momento…" : modo === "login" ? "Iniciar sesión" : "Crear cuenta"}
       </button>
       <button
         type="button"
         onClick={() => setModo(modo === "login" ? "registro" : "login")}
-        className="w-full text-center text-xs text-white/50 hover:text-white/80"
+        className="w-full text-center text-xs text-ink/50 hover:text-ink/80"
       >
         {modo === "login" ? "¿No tienes cuenta? Créala" : "¿Ya tienes cuenta? Inicia sesión"}
       </button>
@@ -195,24 +195,24 @@ function VerificarCorreo({ user, token }: { user: User; token: string }) {
 
   return (
     <div className="space-y-3">
-      <p className="text-sm text-white/70">
+      <p className="text-sm text-ink/70">
         Para reclamar esta invitación primero verifica tu correo ({user.email}).
       </p>
       <button onClick={enviarVerificacion} className={`${botonPrimario} w-full`}>
         {enviado ? "Reenviar correo de verificación" : "Enviar correo de verificación"}
       </button>
-      {enviado && <p className="text-xs text-white/50">Revisa tu correo, haz clic en el enlace y vuelve aquí.</p>}
-      {error && <p className="text-xs text-red-400">{error}</p>}
+      {enviado && <p className="text-xs text-ink/50">Revisa tu correo, haz clic en el enlace y vuelve aquí.</p>}
+      {error && <p className="text-xs text-danger">{error}</p>}
       <button
         onClick={yaVerifique}
         disabled={verificando}
-        className="w-full rounded-lg border border-white/15 px-4 py-2 text-sm text-white/80 hover:bg-white/5"
+        className="w-full rounded-lg border border-edge/15 px-4 py-2 text-sm text-ink/80 hover:bg-surface"
       >
         {verificando ? "Comprobando…" : "Ya verifiqué, continuar"}
       </button>
       <button
         onClick={() => signOut(auth)}
-        className="w-full text-center text-xs text-white/50 hover:text-white/80"
+        className="w-full text-center text-xs text-ink/50 hover:text-ink/80"
       >
         ¿Este correo está equivocado? Cierra sesión e identifícate de nuevo
       </button>
@@ -241,7 +241,7 @@ function ReclamarInvitacion({ token }: { token: string }) {
   if (resultado?.tipo === "acceso_otorgado") {
     return (
       <div className="space-y-2">
-        <p className="text-sm text-emerald-400">Acceso otorgado — ya puedes ver este caso en MO.</p>
+        <p className="text-sm text-success">Acceso otorgado — ya puedes ver este caso en MO.</p>
         <a href="/" className={`${botonPrimario} block w-full text-center`}>
           Ir a MO Conecta
         </a>
@@ -251,11 +251,11 @@ function ReclamarInvitacion({ token }: { token: string }) {
   if (resultado?.tipo === "solicitud_creada") {
     return (
       <div className="space-y-3">
-        <p className="text-sm text-amber-300">
+        <p className="text-sm text-warning">
           Tu identidad no coincide exactamente con la que el remitente registró — se envió una solicitud de acceso.
           Espera su aprobación.
         </p>
-        <p className="text-xs text-white/50">
+        <p className="text-xs text-ink/50">
           Mientras esperas, puedes entrar a MO para completar tu perfil profesional u otras cosas — el acceso a
           este caso en particular aparecerá solo, en cuanto el remitente lo apruebe.
         </p>
@@ -264,7 +264,7 @@ function ReclamarInvitacion({ token }: { token: string }) {
         </a>
         <button
           onClick={() => signOut(auth)}
-          className="w-full text-center text-xs text-white/50 hover:text-white/80"
+          className="w-full text-center text-xs text-ink/50 hover:text-ink/80"
         >
           ¿Esta invitación era para otra cuenta tuya? Cierra sesión e identifícate de nuevo
         </button>
@@ -274,7 +274,7 @@ function ReclamarInvitacion({ token }: { token: string }) {
 
   return (
     <div className="space-y-2">
-      {error && <p className="text-sm text-red-400">{error}</p>}
+      {error && <p className="text-sm text-danger">{error}</p>}
       <button onClick={reclamar} disabled={reclamando} className={`${botonPrimario} w-full`}>
         {reclamando ? "Reclamando…" : "Reclamar interconsulta"}
       </button>

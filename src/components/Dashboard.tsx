@@ -59,6 +59,7 @@ import GlobalNuevoPaciente from "./GlobalNuevoPaciente";
 import PanelAdministrador from "./pages/PanelAdministrador";
 import AsistenteFlotante from "./AsistenteFlotante";
 import { PatientDataProvider, usePatientData } from "@/context/PatientDataContext";
+import { useTheme, type TemaPreferencia } from "@/context/ThemeContext";
 import { PrivacidadProvider } from "@/context/PrivacidadContext";
 import { MoConectaProvider } from "@/context/MoConectaContext";
 import MoConecta from "./pages/MoConecta";
@@ -243,6 +244,20 @@ function MoonIcon() {
     <svg width="20" height="20" viewBox="0 0 24 24" fill="none" className="shrink-0">
       <path
         d="M20 14.5A8.5 8.5 0 1 1 9.5 4a7 7 0 0 0 10.5 10.5Z"
+        stroke="currentColor"
+        strokeWidth="1.8"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+    </svg>
+  );
+}
+
+function SistemaIcon() {
+  return (
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" className="shrink-0">
+      <path
+        d="M4 4h16a1 1 0 0 1 1 1v11a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V5a1 1 0 0 1 1-1ZM9 21h6M12 17v4"
         stroke="currentColor"
         strokeWidth="1.8"
         strokeLinecap="round"
@@ -468,8 +483,8 @@ function QuickActionsBar({
                 : {
                     textShadow:
                       action.color === "green"
-                        ? "0 0 8px rgba(52,211,153,0.4)"
-                        : "0 0 8px rgba(251,146,60,0.4)",
+                        ? "0 0 8px rgba(74,222,128,0.4)"
+                        : "0 0 8px rgba(73,184,174,0.4)",
                   }
             }
           >
@@ -478,8 +493,8 @@ function QuickActionsBar({
             </svg>
             {badge && (
               <span
-                className="absolute right-1 top-1 flex h-4 w-4 items-center justify-center rounded-full bg-amber-400 text-[10px] font-bold leading-none text-black"
-                style={{ boxShadow: "0 0 6px rgba(251,146,60,0.7)" }}
+                className="absolute right-1 top-1 flex h-4 w-4 items-center justify-center rounded-full bg-accent text-[10px] font-bold leading-none text-white"
+                style={{ boxShadow: "0 0 6px rgba(73,184,174,0.7)" }}
               >
                 {badge}
               </span>
@@ -545,11 +560,59 @@ function PruebaVencida({ onVerPlanes, onLogout }: { onVerPlanes: () => void; onL
   );
 }
 
+function SelectorTemaModal({
+  preferencia,
+  onSeleccionar,
+  onClose,
+}: {
+  preferencia: TemaPreferencia;
+  onSeleccionar: (valor: TemaPreferencia) => void;
+  onClose: () => void;
+}) {
+  const opciones: { valor: TemaPreferencia; label: string; icon: React.ReactNode }[] = [
+    { valor: "light", label: "Claro", icon: <SunIcon /> },
+    { valor: "dark", label: "Oscuro", icon: <MoonIcon /> },
+    { valor: "system", label: "Sistema", icon: <SistemaIcon /> },
+  ];
+
+  return (
+    <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/70 p-4">
+      <div className="w-full max-w-sm rounded-2xl border border-edge/10 bg-modal p-6">
+        <h3 className="text-base font-semibold text-ink">Apariencia</h3>
+        <p className="mt-1 text-xs text-ink/50">Elige cómo se ve MO en este dispositivo.</p>
+        <div className="mt-4 space-y-2">
+          {opciones.map((op) => (
+            <button
+              key={op.valor}
+              onClick={() => {
+                onSeleccionar(op.valor);
+                onClose();
+              }}
+              className={`flex w-full items-center gap-3 rounded-lg border px-4 py-2.5 text-sm font-semibold transition-colors ${
+                preferencia === op.valor
+                  ? "border-accent/60 bg-accent/15 text-accent"
+                  : "border-edge/15 text-ink/70 hover:bg-surface"
+              }`}
+            >
+              {op.icon}
+              {op.label}
+            </button>
+          ))}
+        </div>
+        <button
+          onClick={onClose}
+          className="mt-4 w-full rounded-lg border border-edge/15 py-2.5 text-sm font-semibold text-ink/70 transition-colors hover:bg-surface"
+        >
+          Cerrar
+        </button>
+      </div>
+    </div>
+  );
+}
+
 function DashboardBody({
   activePage,
   setActivePage,
-  theme,
-  setTheme,
   showRegistrarPago,
   setShowRegistrarPago,
   showNuevoPaciente,
@@ -560,8 +623,6 @@ function DashboardBody({
 }: {
   activePage: string;
   setActivePage: (id: string) => void;
-  theme: "dark" | "light";
-  setTheme: (updater: (t: "dark" | "light") => "dark" | "light") => void;
   showRegistrarPago: boolean;
   setShowRegistrarPago: (open: boolean) => void;
   showNuevoPaciente: boolean;
@@ -571,9 +632,11 @@ function DashboardBody({
   esAdmin: boolean;
 }) {
   const { clinicInfo, suscripcion, membresiasDisponibles, seleccionarClinica } = usePatientData();
-  const isLight = theme === "light";
+  const { resuelto: temaResuelto, preferencia: temaPreferencia, setPreferencia: setTemaPreferencia } = useTheme();
+  const isLight = temaResuelto === "light";
   const [mostrarSugerencia, setMostrarSugerencia] = useState(false);
   const [mostrarSelectorClinica, setMostrarSelectorClinica] = useState(false);
+  const [mostrarSelectorTema, setMostrarSelectorTema] = useState(false);
   // Comparten esquina: el Asistente se esconde mientras el abanico de
   // navegación está abierto, así que ambos necesitan enterarse del mismo
   // estado — vive aquí, controlado, en vez de duplicarse en cada uno.
@@ -655,9 +718,9 @@ function DashboardBody({
 
   return (
     <PrivacidadProvider>
-    <div data-theme={theme} className="min-h-screen bg-app text-ink">
+    <div className="min-h-screen bg-app text-ink">
       <main className="min-w-0">
-        <header className="relative flex h-16 items-center border-b border-edge/10 px-3 print:hidden sm:px-6">
+        <header className="relative flex h-16 items-center border-b border-edge/10 bg-nav px-3 text-ink print:hidden sm:px-6">
           {/* Un solo carrusel horizontal para TODO el header — antes las
              acciones rápidas tenían su propio scroll y el resto (panel de
              administrador, sugerencia, tema, sesión) vivía afuera, cramped
@@ -705,11 +768,11 @@ function DashboardBody({
                   <MessageIcon />
                 </button>
                 <button
-                  onClick={() => setTheme((t) => (t === "dark" ? "light" : "dark"))}
-                  title={isLight ? "Cambiar a modo oscuro" : "Cambiar a modo claro"}
+                  onClick={() => setMostrarSelectorTema(true)}
+                  title="Apariencia: Claro, Oscuro o Sistema"
                   className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg text-ink/60 transition-colors hover:bg-surface hover:text-ink"
                 >
-                  {isLight ? <SunIcon /> : <MoonIcon />}
+                  <span suppressHydrationWarning>{isLight ? <SunIcon /> : <MoonIcon />}</span>
                 </button>
 
                 <span className="hidden shrink-0 truncate text-sm text-ink/50 sm:inline">{userEmail}</span>
@@ -809,6 +872,13 @@ function DashboardBody({
         <GlobalNuevoPaciente onClose={() => setShowNuevoPaciente(false)} />
       )}
       {mostrarSugerencia && <SugerenciaModal onClose={() => setMostrarSugerencia(false)} />}
+      {mostrarSelectorTema && (
+        <SelectorTemaModal
+          preferencia={temaPreferencia}
+          onSeleccionar={setTemaPreferencia}
+          onClose={() => setMostrarSelectorTema(false)}
+        />
+      )}
       {mostrarSelectorClinica && (
         <SelectorClinica
           clinicas={membresiasDisponibles}
@@ -845,7 +915,6 @@ export default function Dashboard({
   const [activePage, setActivePage] = useState("inicio");
   const [showRegistrarPago, setShowRegistrarPago] = useState(false);
   const [showNuevoPaciente, setShowNuevoPaciente] = useState(false);
-  const [theme, setTheme] = useState<"dark" | "light">("dark");
   const esAdmin = uid === process.env.NEXT_PUBLIC_ADMIN_UID;
 
   return (
@@ -857,8 +926,6 @@ export default function Dashboard({
         <DashboardBody
           activePage={activePage}
           setActivePage={setActivePage}
-          theme={theme}
-          setTheme={setTheme}
           showRegistrarPago={showRegistrarPago}
           setShowRegistrarPago={setShowRegistrarPago}
           showNuevoPaciente={showNuevoPaciente}

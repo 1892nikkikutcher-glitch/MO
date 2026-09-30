@@ -3,24 +3,34 @@
 @tailwind utilities;
 
 :root {
-  /* Liquid glass — oscuro: paneles translúcidos con blur sobre un fondo
-     ambiental de resplandores azul/violeta, como vidrio esmerilado. */
-  --app: #05070e;
-  --surface: rgba(255, 255, 255, 0.055);
-  --surface2: rgba(255, 255, 255, 0.095);
-  --field: rgba(255, 255, 255, 0.06);
-  --inset: rgba(0, 0, 0, 0.32);
-  --modal: rgba(11, 14, 24, 0.74);
-  --modal-solid: #0b0e18;
-  /* Fondo de tarjeta de cita en Agenda — sólido (no glass, hay muchas
-     tarjetas pequeñas a la vez) y ligeramente más claro que --app. */
-  --cita-card-bg: #141826;
+  /* MO — identidad "Salud Bucal Universal": superficies planas (sin vidrio
+     ni resplandores), azul carbón de fondo, verde azulado como acción
+     principal, dorado suave solo como acento puntual. Oscuro por default;
+     [data-theme="light"] abajo define el modo claro. */
+  --app: #101820;
+  --surface: #1b2936;
+  /* Superficie elevada/seleccionada — un tono más clara que --surface, para
+     tarjetas activas, filas seleccionadas, hover de paneles. */
+  --surface2: #243747;
+  --field: #1b2936;
+  --inset: rgba(0, 0, 0, 0.24);
+  --modal: #1b2936;
+  --modal-solid: #1b2936;
+  --cita-card-bg: #1b2936;
+  /* Fondo de navegación/encabezados — distinto de las tarjetas, a
+     propósito: es la franja de identidad de marca (header, BottomNav). */
+  --nav-bg: #142536;
+  /* Texto sobre --nav-bg: siempre claro en los dos temas, porque el azul
+     petróleo/carbón de nav es oscuro incluso en modo claro. */
+  --nav-ink-rgb: 244 246 248;
 
   /* Color de estatus de cita (badges, píldoras) — independiente del color
      de recurso. Tonos vivos pensados para leerse sobre fondo oscuro; ver
      el bloque [data-theme="light"] para las variantes de modo claro
      (mismo tono, ajustado a más saturación/oscuridad para contraste sobre
-     blanco en vez de solo aclarar). */
+     blanco en vez de solo aclarar). Sin cambios en esta retunada de
+     paleta — ya tenían contraste verificado y el usuario pidió
+     mantenerlos consistentes. */
   --status-confirmada: #3b82f6;
   --status-en-espera: #fbbf24;
   --status-atendida: #2dd4bf;
@@ -30,42 +40,42 @@
   --status-neutro: #94a3b8;
 
   --edge-rgb: 255 255 255;
-  --ink-rgb: 255 255 255;
-  --accent-rgb: 251 191 36;
-  /* Segundo color del gradiente de botones primarios (from-accent
-     to-accent-2) — en oscuro es el mismo naranja de siempre (orange-500),
-     sin cambio visual. */
-  --accent-2-rgb: 249 115 22;
-  /* Verde neón vivo (green-400) — deliberadamente más brillante que el
-     success-rgb anterior para que el resplandor alrededor de botones tipo
-     "Enviar resumen al paciente" contraste bien sobre el fondo oscuro. */
+  --ink-rgb: 244 246 248;
+  /* Verde azulado claro — acciones principales y elementos activos. */
+  --accent-rgb: 73 184 174;
+  /* Antes el segundo color de un degradado (from-accent to-accent-2); la
+     paleta nueva no pide degradados, así que queda igual al acento para
+     que los botones "primarios" se vean de un verde azulado sólido. */
+  --accent-2-rgb: 73 184 174;
+  /* Dorado suave — acento premium, solo para detalles puntuales (insignias
+     de plan/membresía) — nunca botones ni texto de cuerpo. */
+  --premium-rgb: 214 187 131;
   --success-rgb: 74 222 128;
   --danger-rgb: 248 113 113;
   --info-rgb: 96 165 250;
   --warning-rgb: 192 132 252;
 
-  --shadow-card: inset 0 1px 0 0 rgba(255, 255, 255, 0.07), 0 8px 30px -14px rgba(0, 0, 0, 0.65);
-  --shadow-modal: inset 0 1px 0 0 rgba(255, 255, 255, 0.09), 0 30px 70px -20px rgba(0, 0, 0, 0.75);
-  --glass-blur: 22px;
-  --glass-blur-modal: 28px;
+  --shadow-card: 0 8px 24px -14px rgba(0, 0, 0, 0.55);
+  --shadow-modal: 0 30px 60px -18px rgba(0, 0, 0, 0.6);
 }
 
 [data-theme="light"] {
-  /* Liquid glass — claro: mismo vidrio esmerilado, sobre gris Oxford con
-     resplandores suaves; naranja Longhorn como acento. */
-  --app: #eef1f7;
-  --surface: rgba(255, 255, 255, 0.58);
-  --surface2: rgba(255, 255, 255, 0.78);
-  --field: rgba(255, 255, 255, 0.62);
-  --inset: rgba(20, 23, 32, 0.05);
-  --modal: rgba(255, 255, 255, 0.8);
+  --app: #f7f6f2;
+  --surface: #ffffff;
+  --surface2: #ffffff;
+  --field: #ffffff;
+  --inset: rgba(37, 42, 49, 0.045);
+  --modal: #ffffff;
   --modal-solid: #ffffff;
   --cita-card-bg: #ffffff;
+  --nav-bg: #17324d;
+  --nav-ink-rgb: 244 246 248;
 
   /* Mismas familias de color que el modo oscuro, pero más oscuras/
      saturadas — se usan como texto sobre fondo claro (tarjetas, píldoras),
      así que necesitan suficiente contraste contra blanco, no solo verse
-     "bonitas". Verificado ≥4.5:1 contra blanco y contra --app claro. */
+     "bonitas". Verificado ≥4.5:1 contra blanco y contra --app claro. Sin
+     cambios en esta retunada — mismo criterio que --status-* arriba. */
   --status-confirmada: #1d4ed8;
   --status-en-espera: #b45309;
   --status-atendida: #047857;
@@ -75,32 +85,22 @@
   --status-neutro: #475569;
 
   --edge-rgb: 64 67 76;
-  /* Negro puro (antes 28 29 34) — pedido explícito de que el negro se vea
-     más marcado en modo claro; combinado con los overrides de opacidad de
-     .text-ink/XX más abajo. */
-  --ink-rgb: 0 0 0;
-  /* #bf360c — más rojizo/oscuro que el naranja Longhorns puro (#bf5700),
-     probando si se aprecia mejor sobre el fondo claro. Fácil de revertir a
-     191 87 0 si al verlo en vivo se prefiere el tono original. */
-  --accent-rgb: 191 54 12;
-  /* En modo claro el acento ya es un naranja quemado — combinarlo con
-     orange-500 (muy brillante) hacía que los botones se vieran "todo
-     naranja". Ámbar más profundo, para que el degradado se note sin
-     saturar de naranja. */
-  --accent-2-rgb: 180 83 9;
-  /* Verde militar (army green) en vez de la familia esmeralda — se ve más
-     "apagado" a propósito para modo claro, mientras que oscuro usa un
-     verde neón brillante (ver :root). Contraste verificado: 8.2:1 contra
-     blanco, 7.3:1 contra --app claro. */
+  /* Carbón, no negro puro — pedido explícito de la paleta nueva. */
+  --ink-rgb: 37 42 49;
+  /* Verde azulado — acciones principales y elementos activos. */
+  --accent-rgb: 22 140 135;
+  --accent-2-rgb: 22 140 135;
+  /* Dorado champán — acento premium, mismo uso puntual que en oscuro. */
+  --premium-rgb: 197 166 106;
+  /* Sin cambios en esta retunada — ya tenían contraste verificado contra
+     blanco y no fueron parte de la paleta que pidió el usuario. */
   --success-rgb: 75 83 32;
   --danger-rgb: 185 28 28;
   --info-rgb: 29 78 216;
   --warning-rgb: 126 34 206;
 
-  --shadow-card: inset 0 1px 0 0 rgba(255, 255, 255, 0.7), 0 10px 26px -10px rgba(30, 31, 36, 0.16);
-  --shadow-modal: inset 0 1px 0 0 rgba(255, 255, 255, 0.8), 0 30px 60px -18px rgba(30, 31, 36, 0.24);
-  --glass-blur: 20px;
-  --glass-blur-modal: 24px;
+  --shadow-card: 0 10px 24px -12px rgba(23, 50, 77, 0.12);
+  --shadow-modal: 0 30px 60px -18px rgba(23, 50, 77, 0.22);
 }
 
 html,
@@ -111,37 +111,20 @@ body {
   background: var(--app);
 }
 
-/* Fondo ambiental: resplandores difusos detrás de los paneles de vidrio,
-   como las luces de ciudad desenfocadas de una foto nocturna. */
 .bg-app {
   background-color: var(--app);
-  background-image:
-    radial-gradient(680px circle at 12% 18%, rgba(59, 130, 246, 0.20), transparent 60%),
-    radial-gradient(560px circle at 88% 12%, rgba(168, 85, 247, 0.16), transparent 58%),
-    radial-gradient(760px circle at 55% 105%, rgba(34, 211, 238, 0.12), transparent 62%);
-  background-attachment: fixed;
 }
 
-[data-theme="light"] .bg-app {
-  background-image:
-    radial-gradient(680px circle at 12% 18%, rgba(59, 130, 246, 0.10), transparent 60%),
-    radial-gradient(560px circle at 88% 12%, rgba(168, 85, 247, 0.08), transparent 58%),
-    radial-gradient(760px circle at 55% 105%, rgba(14, 165, 233, 0.07), transparent 62%);
-}
-
-/* Paneles de vidrio: blur + saturación + un brillo sutil arriba, simulando
-   la refracción de vidrio esmerilado. */
-.bg-surface,
-.bg-surface2,
-.bg-modal {
-  backdrop-filter: blur(var(--glass-blur)) saturate(160%);
-  -webkit-backdrop-filter: blur(var(--glass-blur)) saturate(160%);
-  background-image: linear-gradient(180deg, rgba(255, 255, 255, 0.07), rgba(255, 255, 255, 0) 45%);
-}
-
-.bg-modal {
-  backdrop-filter: blur(var(--glass-blur-modal)) saturate(160%);
-  -webkit-backdrop-filter: blur(var(--glass-blur-modal)) saturate(160%);
+/* Fondo de navegación/encabezados (header de Dashboard, panel de
+   BottomNav) — franja de identidad de marca, distinta de las tarjetas. El
+   azul petróleo/carbón de nav es oscuro incluso en modo claro, así que
+   --ink-rgb/--edge-rgb se redefinen SOLO dentro de este alcance — todos los
+   botones e íconos ya existentes que usan text-ink/NN, border-edge/NN,
+   hover:text-ink, etc. se adaptan solos, sin tocar cada uno por separado. */
+.bg-nav {
+  background-color: var(--nav-bg);
+  --ink-rgb: var(--nav-ink-rgb);
+  --edge-rgb: 244 246 248;
 }
 
 .bg-surface.rounded-2xl,
@@ -172,8 +155,8 @@ select {
 }
 
 select option {
-  background-color: #161a26;
-  color: #f5f6fa;
+  background-color: #1b2936;
+  color: #f4f6f8;
 }
 
 [data-theme="light"] select {
@@ -182,27 +165,29 @@ select option {
 
 [data-theme="light"] select option {
   background-color: #ffffff;
-  color: #1c1d22;
+  color: #252a31;
 }
 
 /* Las utilidades de opacidad de Tailwind (text-ink/40, bg-accent/15, etc.)
-   aplican la misma fracción alfa en los dos temas, pero --ink es casi negro
-   sobre fondo claro (no casi blanco sobre fondo oscuro) — la misma fracción
-   que en oscuro se ve perfectamente legible (blanco aclarado sobre negro) en
-   claro se ve deslavada (negro aclarado hacia blanco pierde contraste mucho
-   más rápido). Se sube el alfa efectivo solo en modo claro, manteniendo el
-   mismo orden relativo entre niveles (40 sigue más tenue que 60, etc.) —
-   nada cambia en modo oscuro. Mismo problema con --accent (naranja
-   Longhorns, #bf5700): los fondos/bordes translúcidos de baja opacidad se
-   veían casi imperceptibles sobre el fondo claro. */
-[data-theme="light"] .text-ink\/20 { color: rgb(var(--ink-rgb) / 0.55); }
-[data-theme="light"] .text-ink\/30 { color: rgb(var(--ink-rgb) / 0.65); }
-[data-theme="light"] .text-ink\/35 { color: rgb(var(--ink-rgb) / 0.7); }
-[data-theme="light"] .text-ink\/40 { color: rgb(var(--ink-rgb) / 0.75); }
-[data-theme="light"] .text-ink\/50 { color: rgb(var(--ink-rgb) / 0.82); }
-[data-theme="light"] .text-ink\/60 { color: rgb(var(--ink-rgb) / 0.88); }
-[data-theme="light"] .text-ink\/70 { color: rgb(var(--ink-rgb) / 0.93); }
-[data-theme="light"] .text-ink\/80 { color: rgb(var(--ink-rgb) / 0.97); }
+   aplican la misma fracción alfa en los dos temas, pero --ink es carbón
+   (#252A31) sobre fondo claro, no casi-blanco sobre fondo oscuro — la misma
+   fracción que en oscuro se ve perfectamente legible (claro aclarado sobre
+   oscuro) en claro se ve deslavada mucho más rápido. Se sube el alfa
+   efectivo solo en modo claro. Valores recalculados para el carbón nuevo —
+   verificado con la fórmula de luminancia relativa WCAG: /50 y superiores
+   dan ≥4.5:1 contra blanco (ej. /60 ≈ 6.1:1, /50 ≈ 5.8:1); /20-/40 son
+   niveles decorativos/de apoyo, no texto principal, por lo que no se exige
+   el mismo mínimo. Mismo problema con --accent (antes naranja, ahora verde
+   azulado): los fondos/bordes translúcidos de baja opacidad se veían casi
+   imperceptibles sobre el fondo claro — se conserva el mismo mecanismo. */
+[data-theme="light"] .text-ink\/20 { color: rgb(var(--ink-rgb) / 0.5); }
+[data-theme="light"] .text-ink\/30 { color: rgb(var(--ink-rgb) / 0.58); }
+[data-theme="light"] .text-ink\/35 { color: rgb(var(--ink-rgb) / 0.62); }
+[data-theme="light"] .text-ink\/40 { color: rgb(var(--ink-rgb) / 0.66); }
+[data-theme="light"] .text-ink\/50 { color: rgb(var(--ink-rgb) / 0.72); }
+[data-theme="light"] .text-ink\/60 { color: rgb(var(--ink-rgb) / 0.78); }
+[data-theme="light"] .text-ink\/70 { color: rgb(var(--ink-rgb) / 0.85); }
+[data-theme="light"] .text-ink\/80 { color: rgb(var(--ink-rgb) / 0.92); }
 
 [data-theme="light"] .bg-accent\/5 { background-color: rgb(var(--accent-rgb) / 0.08); }
 [data-theme="light"] .bg-accent\/10 { background-color: rgb(var(--accent-rgb) / 0.16); }

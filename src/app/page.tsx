@@ -138,26 +138,20 @@ export default function Home() {
 
   return (
     <main className="bg-app flex min-h-screen flex-col items-center justify-center px-4">
-      <h1 className="bg-gradient-to-r from-red-600 to-blue-600 bg-clip-text text-8xl font-bold text-transparent">
+      <h1 className="bg-gradient-to-r from-accent to-nav bg-clip-text text-8xl font-bold text-transparent">
         MO
       </h1>
-      <p className="mt-2 bg-gradient-to-r from-red-600 to-blue-600 bg-clip-text text-lg font-medium uppercase tracking-widest text-transparent">
-        Gestión Odontológica
+      <p className="mt-2 text-lg font-medium uppercase tracking-widest text-ink/50">
+        Salud Bucal Universal
       </p>
 
-      <div
-        className="mt-12 w-full max-w-sm rounded-2xl border border-amber-400/40 bg-modal p-8"
-        style={{
-          boxShadow:
-            "0 0 15px 2px rgba(251,146,60,0.55), 0 0 40px 10px rgba(251,146,60,0.3), 0 0 80px 20px rgba(251,146,60,0.12)",
-        }}
-      >
+      <div className="mt-12 w-full max-w-sm rounded-2xl border border-edge/10 bg-modal p-8">
         {view !== "forgot" && (
-          <div className="mb-6 flex rounded-lg bg-white/5 p-1 text-sm font-medium">
+          <div className="mb-6 flex rounded-lg bg-inset p-1 text-sm font-medium">
             <button
               onClick={() => switchView("login")}
               className={`flex-1 rounded-md py-2 transition-colors ${
-                view === "login" ? "bg-white/10 text-white" : "text-white/50"
+                view === "login" ? "bg-accent/15 text-accent" : "text-ink/50"
               }`}
             >
               Iniciar Sesión
@@ -165,7 +159,7 @@ export default function Home() {
             <button
               onClick={() => switchView("register")}
               className={`flex-1 rounded-md py-2 transition-colors ${
-                view === "register" ? "bg-white/10 text-white" : "text-white/50"
+                view === "register" ? "bg-accent/15 text-accent" : "text-ink/50"
               }`}
             >
               Registrarse
@@ -176,9 +170,7 @@ export default function Home() {
         {(error || success) && (
           <div
             className={`mb-4 rounded-lg px-3 py-2 text-xs ${
-              error
-                ? "bg-red-500/10 text-red-300"
-                : "bg-emerald-500/10 text-emerald-300"
+              error ? "bg-danger/10 text-danger" : "bg-success/10 text-success"
             }`}
           >
             {error || success}
@@ -188,7 +180,7 @@ export default function Home() {
         {view === "login" && (
           <form onSubmit={handleLogin} className="space-y-4">
             <div>
-              <label className="mb-1 block text-xs font-medium text-white/60">
+              <label className="mb-1 block text-xs font-medium text-ink/60">
                 Correo electrónico
               </label>
               <input
@@ -197,18 +189,18 @@ export default function Home() {
                 onChange={(e) => setEmail(e.target.value)}
                 placeholder="tu@email.com"
                 required
-                className="w-full rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-sm text-white placeholder-white/30 outline-none focus:border-amber-400/60"
+                className="w-full rounded-lg border border-edge/10 bg-field px-3 py-2 text-sm text-ink placeholder-ink/30 outline-none focus:border-accent/60"
               />
             </div>
             <div>
               <div className="mb-1 flex items-center justify-between">
-                <label className="block text-xs font-medium text-white/60">
+                <label className="block text-xs font-medium text-ink/60">
                   Contraseña
                 </label>
                 <button
                   type="button"
                   onClick={() => switchView("forgot")}
-                  className="text-xs font-medium text-amber-400 hover:text-amber-300"
+                  className="text-xs font-medium text-accent hover:text-accent/80"
                 >
                   ¿Olvidé mi contraseña?
                 </button>
@@ -219,14 +211,14 @@ export default function Home() {
                 onChange={(e) => setPassword(e.target.value)}
                 placeholder="••••••••"
                 required
-                className="w-full rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-sm text-white placeholder-white/30 outline-none focus:border-amber-400/60"
+                className="w-full rounded-lg border border-edge/10 bg-field px-3 py-2 text-sm text-ink placeholder-ink/30 outline-none focus:border-accent/60"
               />
             </div>
 
             <button
               type="submit"
               disabled={isLoading}
-              className="mt-2 w-full rounded-lg bg-gradient-to-r from-amber-400 to-accent-2 py-2.5 text-sm font-semibold text-black disabled:opacity-60"
+              className="mt-2 w-full rounded-lg bg-accent py-2.5 text-sm font-semibold text-black transition-opacity hover:opacity-90 disabled:opacity-60"
             >
               {isLoading ? "Ingresando..." : "Iniciar Sesión"}
             </button>
@@ -236,7 +228,7 @@ export default function Home() {
         {view === "register" && (
           <form onSubmit={handleRegister} className="space-y-4">
             <div>
-              <label className="mb-1 block text-xs font-medium text-white/60">
+              <label className="mb-1 block text-xs font-medium text-ink/60">
                 Correo electrónico
               </label>
               <input
@@ -245,11 +237,11 @@ export default function Home() {
                 onChange={(e) => setEmail(e.target.value)}
                 placeholder="tu@email.com"
                 required
-                className="w-full rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-sm text-white placeholder-white/30 outline-none focus:border-amber-400/60"
+                className="w-full rounded-lg border border-edge/10 bg-field px-3 py-2 text-sm text-ink placeholder-ink/30 outline-none focus:border-accent/60"
               />
             </div>
             <div>
-              <label className="mb-1 block text-xs font-medium text-white/60">
+              <label className="mb-1 block text-xs font-medium text-ink/60">
                 Contraseña
               </label>
               <input
@@ -258,14 +250,14 @@ export default function Home() {
                 onChange={(e) => setPassword(e.target.value)}
                 placeholder="••••••••"
                 required
-                className="w-full rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-sm text-white placeholder-white/30 outline-none focus:border-amber-400/60"
+                className="w-full rounded-lg border border-edge/10 bg-field px-3 py-2 text-sm text-ink placeholder-ink/30 outline-none focus:border-accent/60"
               />
             </div>
 
             <button
               type="submit"
               disabled={isLoading}
-              className="mt-2 w-full rounded-lg bg-gradient-to-r from-amber-400 to-accent-2 py-2.5 text-sm font-semibold text-black disabled:opacity-60"
+              className="mt-2 w-full rounded-lg bg-accent py-2.5 text-sm font-semibold text-black transition-opacity hover:opacity-90 disabled:opacity-60"
             >
               {isLoading ? "Creando cuenta..." : "Crear Cuenta"}
             </button>
@@ -275,16 +267,16 @@ export default function Home() {
         {view === "forgot" && (
           <form onSubmit={handleForgotPassword} className="space-y-4">
             <div>
-              <h2 className="text-sm font-semibold text-white">
+              <h2 className="text-sm font-semibold text-ink">
                 Restablecer contraseña
               </h2>
-              <p className="mt-1 text-xs text-white/50">
+              <p className="mt-1 text-xs text-ink/50">
                 Ingresa tu correo y te enviaremos instrucciones para
                 restablecer tu contraseña.
               </p>
             </div>
             <div>
-              <label className="mb-1 block text-xs font-medium text-white/60">
+              <label className="mb-1 block text-xs font-medium text-ink/60">
                 Correo electrónico
               </label>
               <input
@@ -293,14 +285,14 @@ export default function Home() {
                 onChange={(e) => setEmail(e.target.value)}
                 placeholder="tu@email.com"
                 required
-                className="w-full rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-sm text-white placeholder-white/30 outline-none focus:border-amber-400/60"
+                className="w-full rounded-lg border border-edge/10 bg-field px-3 py-2 text-sm text-ink placeholder-ink/30 outline-none focus:border-accent/60"
               />
             </div>
 
             <button
               type="submit"
               disabled={isLoading}
-              className="mt-2 w-full rounded-lg bg-gradient-to-r from-amber-400 to-accent-2 py-2.5 text-sm font-semibold text-black disabled:opacity-60"
+              className="mt-2 w-full rounded-lg bg-accent py-2.5 text-sm font-semibold text-black transition-opacity hover:opacity-90 disabled:opacity-60"
             >
               {isLoading ? "Enviando..." : "Enviar Instrucciones"}
             </button>
@@ -308,7 +300,7 @@ export default function Home() {
             <button
               type="button"
               onClick={() => switchView("login")}
-              className="w-full text-center text-xs font-medium text-white/50 hover:text-white"
+              className="w-full text-center text-xs font-medium text-ink/50 hover:text-ink"
             >
               Volver a Iniciar Sesión
             </button>
