@@ -138,9 +138,14 @@ export default function Home() {
 
   return (
     <main className="bg-app flex min-h-screen flex-col items-center justify-center px-4">
-      <h1 className="bg-gradient-to-r from-accent to-nav bg-clip-text text-8xl font-bold text-transparent">
-        MO
-      </h1>
+      <div
+        className="flex h-60 w-60 items-center justify-center rounded-full border-2 border-premium"
+        style={{ boxShadow: "0 0 28px 2px rgb(var(--premium-rgb) / 0.5)" }}
+      >
+        <h1 className="bg-gradient-to-r from-[#FF5757] via-[#D946EF] to-[#3B82F6] bg-clip-text text-7xl font-bold text-transparent">
+          MO
+        </h1>
+      </div>
       <p className="mt-2 text-lg font-medium uppercase tracking-widest text-ink/50">
         Salud Bucal Universal
       </p>
