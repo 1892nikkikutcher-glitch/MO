@@ -41,14 +41,14 @@
 
   --edge-rgb: 255 255 255;
   --ink-rgb: 244 246 248;
-  /* Azul — acciones principales y elementos activos. Antes verde azulado;
-     el usuario lo veía como "verde" y pidió explícitamente cambiar el
-     acento de marca de toda la app a azul. Mismo tono que
-     --status-confirmada, a propósito: así el badge de "Confirmada" queda
-     coherente con el resto de la marca en vez de competir con ella. */
-  --accent-rgb: 59 130 246;
+  /* Amarillo — acciones principales y elementos activos. Antes azul; el
+     usuario pidió que los botones usen "el amarillo que ya teníamos" para
+     que toda la plataforma sea congruente. Mismo tono que
+     --status-en-espera, a propósito, en vez de inventar un amarillo
+     nuevo. */
+  --accent-rgb: 251 191 36;
   /* Sin degradado (igual al acento), mismo criterio que antes. */
-  --accent-2-rgb: 59 130 246;
+  --accent-2-rgb: 251 191 36;
   /* Dorado suave — acento premium, solo para detalles puntuales (insignias
      de plan/membresía) — nunca botones ni texto de cuerpo. */
   --premium-rgb: 214 187 131;
@@ -89,10 +89,10 @@
   --edge-rgb: 64 67 76;
   /* Carbón, no negro puro — pedido explícito de la paleta nueva. */
   --ink-rgb: 37 42 49;
-  /* Azul — acciones principales y elementos activos. Mismo tono que
-     --status-confirmada claro, mismo motivo que en oscuro. */
-  --accent-rgb: 29 78 216;
-  --accent-2-rgb: 29 78 216;
+  /* Amarillo — acciones principales y elementos activos. Mismo tono que
+     --status-en-espera claro, mismo motivo que en oscuro. */
+  --accent-rgb: 180 83 9;
+  --accent-2-rgb: 180 83 9;
   /* Dorado champán — acento premium, mismo uso puntual que en oscuro. */
   --premium-rgb: 197 166 106;
   /* Sin cambios en esta retunada — ya tenían contraste verificado contra
@@ -180,9 +180,10 @@ select option {
    verificado con la fórmula de luminancia relativa WCAG: /50 y superiores
    dan ≥4.5:1 contra blanco (ej. /60 ≈ 6.1:1, /50 ≈ 5.8:1); /20-/40 son
    niveles decorativos/de apoyo, no texto principal, por lo que no se exige
-   el mismo mínimo. Mismo problema con --accent (antes naranja, ahora verde
-   azulado): los fondos/bordes translúcidos de baja opacidad se veían casi
-   imperceptibles sobre el fondo claro — se conserva el mismo mecanismo. */
+   el mismo mínimo. Mismo problema con --accent (ha cambiado de tono varias
+   veces: naranja, verde azulado, azul, ahora amarillo): los fondos/bordes
+   translúcidos de baja opacidad se veían casi imperceptibles sobre el
+   fondo claro — se conserva el mismo mecanismo sin importar el tono. */
 [data-theme="light"] .text-ink\/20 { color: rgb(var(--ink-rgb) / 0.5); }
 [data-theme="light"] .text-ink\/30 { color: rgb(var(--ink-rgb) / 0.58); }
 [data-theme="light"] .text-ink\/35 { color: rgb(var(--ink-rgb) / 0.62); }
