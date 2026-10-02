@@ -39,12 +39,12 @@ export function Chip({
   );
 }
 
-const iconoEstadoSeccion: Record<EstadoSeccion, string> = {
+export const iconoEstadoSeccion: Record<EstadoSeccion, string> = {
   pendiente: "○",
   completa: "✓",
   atencion: "⚠",
 };
-const colorEstadoSeccion: Record<EstadoSeccion, string> = {
+export const colorEstadoSeccion: Record<EstadoSeccion, string> = {
   pendiente: "text-ink/30",
   completa: "text-success",
   atencion: "text-warning",

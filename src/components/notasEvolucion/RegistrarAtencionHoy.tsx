@@ -25,7 +25,14 @@ import {
   type SeccionNota,
 } from "@/lib/notasEvolucion";
 import { useAutoguardadoNota, type EstadoSincronizacionInicial } from "./useAutoguardadoNota";
-import { botonPrimario, botonSecundario, EstadoGuardadoIndicador, SeccionAcordeon } from "./NotaUI";
+import {
+  botonPrimario,
+  botonSecundario,
+  colorEstadoSeccion,
+  EstadoGuardadoIndicador,
+  iconoEstadoSeccion,
+  SeccionAcordeon,
+} from "./NotaUI";
 import NotaAdministrativaRapida from "./NotaAdministrativaRapida";
 import SeccionComoLlega from "./SeccionComoLlega";
 import SeccionQueEncontraste from "./SeccionQueEncontraste";
@@ -609,18 +616,23 @@ function FormularioNota({
       </div>
 
       <div className="sticky bottom-24 z-10 rounded-2xl border border-edge/10 bg-modal p-4 shadow-card">
-        {faltantes.length > 0 && !confirmando && (
-          <div className="mb-3 text-xs text-ink/60">
-            <p className="mb-1 font-medium text-ink/80">Tu nota está casi lista — falta confirmar:</p>
-            <ul className="space-y-0.5">
-              {faltantes.map((f, i) => (
-                <li key={i}>
-                  <button onClick={() => irASeccion(f.seccion)} className="text-accent hover:underline">
-                    {f.mensaje}
-                  </button>
-                </li>
-              ))}
-            </ul>
+        {!confirmando && (
+          <div className="mb-3 space-y-1">
+            <p className="mb-1 text-xs font-medium text-ink/80">Progreso de la nota</p>
+            {seccionesOrden.map((s) => {
+              const estado = estadoSeccion(nota, s.id);
+              return (
+                <button
+                  key={s.id}
+                  type="button"
+                  onClick={() => irASeccion(s.id)}
+                  className="flex w-full items-center gap-2 text-left text-xs hover:underline"
+                >
+                  <span className={colorEstadoSeccion[estado]}>{iconoEstadoSeccion[estado]}</span>
+                  <span className={estado === "completa" ? "text-ink/40" : "text-ink/80"}>{s.titulo}</span>
+                </button>
+              );
+            })}
           </div>
         )}
         {errorFirma && <p className="mb-2 text-xs text-danger">{errorFirma} Tu información sigue protegida — puedes volver a intentar.</p>}
@@ -637,7 +649,7 @@ function FormularioNota({
         )}
         {!confirmando ? (
           <div className="flex flex-col gap-2 sm:flex-row">
-            <button onClick={onGuardarYSalir} disabled={guardando} className={`${botonSecundario} sm:w-auto`}>
+            <button onClick={onGuardarYSalir} disabled={guardando} className={`${botonSecundario} flex-1`}>
               {guardando ? "Guardando…" : "Guardar y continuar después"}
             </button>
             <button
