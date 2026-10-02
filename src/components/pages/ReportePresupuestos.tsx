@@ -67,7 +67,7 @@ export default function ReportePresupuestos() {
                   <td className="px-6 py-3 text-ink/60">{p.folio}</td>
                   <td className="px-6 py-3">
                     <button
-                      onClick={() => irAExpediente(p.patientId, "Presupuestos")}
+                      onClick={() => irAExpediente(p.patientId, "Plan de Tratamiento y Presupuesto")}
                       className="font-medium text-ink underline decoration-ink/20 underline-offset-2 hover:text-accent hover:decoration-accent/50"
                     >
                       {p.patientName}

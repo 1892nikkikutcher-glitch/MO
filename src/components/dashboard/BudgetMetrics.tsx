@@ -49,7 +49,7 @@ export default function BudgetMetrics({ rango }: { rango: RangoPeriodo }) {
       value: formatCurrency(e.total),
       onSelect: () => {
         setDetallePresupuestado(null);
-        irAExpediente(e.patientId, "Presupuestos");
+        irAExpediente(e.patientId, "Plan de Tratamiento y Presupuesto");
       },
     }));
 

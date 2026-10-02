@@ -75,7 +75,7 @@ const expedienteTabs = [
   "Datos del Paciente",
   "Consentimientos Informados",
   "Historia Clínica",
-  "Presupuestos",
+  "Plan de Tratamiento y Presupuesto",
   "Pagos",
   "Membresía",
   "Fotografías",
@@ -514,7 +514,7 @@ function PresupuestosTab({
     <div className="space-y-4">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <h3 className="text-sm font-semibold uppercase tracking-wide text-ink/60">
-          Presupuestos
+          Plan de Tratamiento y Presupuesto
         </h3>
         <div className="flex flex-wrap items-center gap-2">
           {presupuestos.length > 0 && (
@@ -1472,7 +1472,7 @@ export default function Expediente({
         }`}
       >
         <div className="min-w-0">
-          {activeTab === "Presupuestos" && (
+          {activeTab === "Plan de Tratamiento y Presupuesto" && (
             <PresupuestosTab
               patient={patient}
               presupuestos={presupuestos}
@@ -1490,9 +1490,9 @@ export default function Expediente({
               patientId={patient.id}
               onAgregarAPresupuesto={(items) => {
                 setPrefillPresupuesto(items);
-                setActiveTab("Presupuestos");
+                setActiveTab("Plan de Tratamiento y Presupuesto");
               }}
-              onVerPresupuestos={() => setActiveTab("Presupuestos")}
+              onVerPresupuestos={() => setActiveTab("Plan de Tratamiento y Presupuesto")}
               onVerFotografias={() => setActiveTab("Fotografías")}
             />
           )}
@@ -1561,7 +1561,7 @@ export default function Expediente({
           {activeTab === "Membresía" && (
             <MembresiaTab patientId={patient.id} patientName={patient.name} />
           )}
-          {activeTab !== "Presupuestos" &&
+          {activeTab !== "Plan de Tratamiento y Presupuesto" &&
             activeTab !== "Datos del Paciente" &&
             activeTab !== "Historia Clínica" &&
             activeTab !== "Listado de Citas" &&

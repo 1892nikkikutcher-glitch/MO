@@ -11,7 +11,7 @@ export default function PresupuestosPendientesPanel({ onClose }: { onClose: () =
 
   const seleccionar = (patientId: string) => {
     onClose();
-    irAExpediente(patientId, "Presupuestos");
+    irAExpediente(patientId, "Plan de Tratamiento y Presupuesto");
   };
 
   const totalConDetalle = entradas.length;
