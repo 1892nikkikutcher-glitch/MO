@@ -11,6 +11,7 @@ import Recetas from "./pages/Recetas";
 import PerfilDoctor from "./pages/PerfilDoctor";
 import Colaboradores from "./pages/Colaboradores";
 import Metas from "./pages/Metas";
+import PresupuestoGastos from "./pages/PresupuestoGastos";
 import Membresias from "./pages/Membresias";
 import Asistencia from "./pages/Asistencia";
 import Procedimientos from "./pages/Procedimientos";
@@ -73,6 +74,7 @@ const paginasConstruidas = new Set([
   "administracion-perfil",
   "administracion-colaboradores",
   "administracion-metas",
+  "administracion-presupuesto-gastos",
   "administracion-formatos-whatsapp",
   "administracion-contrato-ortodoncia",
   "membresias",
@@ -812,6 +814,7 @@ function DashboardBody({
           {activePage === "administracion-perfil" && <PerfilDoctor />}
           {activePage === "administracion-colaboradores" && <Colaboradores />}
           {activePage === "administracion-metas" && <Metas />}
+          {activePage === "administracion-presupuesto-gastos" && <PresupuestoGastos />}
           {activePage === "administracion-formatos-whatsapp" && <FormatosWhatsApp />}
           {activePage === "administracion-contrato-ortodoncia" && <AdministracionContratoOrtodoncia />}
           {activePage === "membresias" && <Membresias />}

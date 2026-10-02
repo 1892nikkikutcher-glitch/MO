@@ -77,7 +77,7 @@ import {
   type FinanzasConfig,
   type EstadisticasGlobales,
 } from "@/lib/metas";
-import type { Gasto } from "@/lib/gastos";
+import { presupuestoGastosInicial, type Gasto, type PresupuestoGastosConfig } from "@/lib/gastos";
 import { estadoRegulacionInicial, type EstadoRegulacionSanitaria } from "@/lib/regulacionSanitaria";
 import { formatosWhatsAppInicial, type FormatosWhatsApp } from "@/lib/formatosWhatsapp";
 import { contratoOrtodonciaInicial, type ContratoOrtodonciaConfig } from "@/lib/contratoOrtodoncia";
@@ -827,6 +827,8 @@ type PatientDataContextValue = {
   setSuscripcion: (updater: Updater<SuscripcionPlan>) => void;
   metas: MetaConfig;
   setMetas: (updater: Updater<MetaConfig>) => void;
+  presupuestoGastos: PresupuestoGastosConfig;
+  setPresupuestoGastos: (updater: Updater<PresupuestoGastosConfig>) => void;
   finanzas: FinanzasConfig;
   estadisticas: EstadisticasGlobales;
   regulacionSanitaria: EstadoRegulacionSanitaria;
@@ -946,6 +948,11 @@ export function PatientDataProvider({
     suscripcionInicial
   );
   const [metas, setMetas] = useFirestoreDoc<MetaConfig>(clinicUid, "metas", metaConfigInicial);
+  const [presupuestoGastos, setPresupuestoGastos] = useFirestoreDoc<PresupuestoGastosConfig>(
+    clinicUid,
+    "presupuestoGastos",
+    presupuestoGastosInicial
+  );
   const [finanzas, setFinanzas] = useFirestoreDoc<FinanzasConfig>(clinicUid, "finanzas", finanzasInicial);
   const [estadisticas, setEstadisticas] = useFirestoreDoc<EstadisticasGlobales>(
     clinicUid,
@@ -2770,6 +2777,8 @@ export function PatientDataProvider({
         setSuscripcion,
         metas,
         setMetas,
+        presupuestoGastos,
+        setPresupuestoGastos,
         finanzas,
         estadisticas,
         regulacionSanitaria,

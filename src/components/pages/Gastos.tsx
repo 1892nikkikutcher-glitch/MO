@@ -2,10 +2,48 @@
 
 import { useState } from "react";
 import { usePatientData } from "@/context/PatientDataContext";
-import { gastoCategoriaOptions, type GastoCategoria, type Gasto } from "@/lib/gastos";
+import {
+  calcularGastosPorCategoria,
+  calcularSobresGasto,
+  gastoCategoriaOptions,
+  type GastoCategoria,
+  type Gasto,
+  type SobreGasto,
+} from "@/lib/gastos";
 import { formatCurrency } from "@/lib/patientData";
 import { inicioMes, sumarRango } from "@/lib/metas";
 import ConfirmarEliminar from "@/components/ConfirmarEliminar";
+
+function colorBarraSobre(sobre: SobreGasto): string {
+  if (sobre.sinConfigurar) return "bg-ink/10";
+  if (sobre.porcentajeUsado >= 100) return "bg-danger";
+  if (sobre.porcentajeUsado >= 80) return "bg-warning";
+  return "bg-gradient-to-r from-accent to-accent-2";
+}
+
+function FilaSobre({ sobre }: { sobre: SobreGasto }) {
+  return (
+    <div>
+      <div className="mb-1.5 flex items-center justify-between text-sm">
+        <span className="font-medium text-ink">{sobre.categoria}</span>
+        <span className="text-ink/50">
+          {sobre.sinConfigurar
+            ? `${formatCurrency(sobre.gastado)} · sin presupuesto definido`
+            : `${formatCurrency(sobre.gastado)} / ${formatCurrency(sobre.limite)} · ${sobre.porcentajeUsado}%`}
+        </span>
+      </div>
+      <div className="h-2.5 w-full overflow-hidden rounded-full bg-inset">
+        <div
+          className={`h-full rounded-full transition-all ${colorBarraSobre(sobre)}`}
+          style={{ width: `${sobre.sinConfigurar ? 0 : sobre.porcentajeUsado}%` }}
+        />
+      </div>
+      {!sobre.sinConfigurar && sobre.restante < 0 && (
+        <p className="mt-1 text-[11px] font-semibold text-danger">Excedido por {formatCurrency(Math.abs(sobre.restante))}</p>
+      )}
+    </div>
+  );
+}
 
 const inputClass =
   "w-full rounded-lg border border-edge/10 bg-field px-3 py-2 text-sm text-ink outline-none focus:border-accent/60";
@@ -24,7 +62,7 @@ function formatFecha(iso: string) {
 }
 
 export default function Gastos() {
-  const { gastos, setGastos, finanzas, puedeVerFinanzas } = usePatientData();
+  const { gastos, setGastos, finanzas, puedeVerFinanzas, presupuestoGastos } = usePatientData();
   const [concepto, setConcepto] = useState("");
   const [categoria, setCategoria] = useState<GastoCategoria>(gastoCategoriaOptions[0]);
   const [monto, setMonto] = useState("");
@@ -62,6 +100,11 @@ export default function Gastos() {
   const ingresosDelMes = sumarRango(finanzas.porFecha, inicioDelMes, hoy);
   const utilidadDelMes = ingresosDelMes - gastosDelMes;
 
+  const gastosPorCategoria = calcularGastosPorCategoria(gastos, inicioDelMes, hoy);
+  const sobres = calcularSobresGasto(presupuestoGastos.porCategoria, gastosPorCategoria, ingresosDelMes);
+  const sobresFijos = sobres.filter((s) => s.clasificacion === "fijo");
+  const sobresVariables = sobres.filter((s) => s.clasificacion === "variable");
+
   return (
     <div className="space-y-6">
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
@@ -91,6 +134,32 @@ export default function Gastos() {
           </>
         )}
       </div>
+
+      {puedeVerFinanzas && (
+        <div className="space-y-4 rounded-2xl border border-edge/10 bg-surface p-6">
+          <div>
+            <h3 className="text-sm font-semibold uppercase tracking-wide text-ink/60">Sobres de Gasto</h3>
+            <p className="text-xs text-ink/40">
+              Cuánto llevas gastado de cada categoría este mes, según el presupuesto que definiste en
+              Administración → Presupuesto de Gastos.
+            </p>
+          </div>
+          <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
+            <div className="space-y-3">
+              <h4 className="text-xs font-semibold uppercase tracking-wide text-ink/40">Gastos Fijos</h4>
+              {sobresFijos.map((s) => (
+                <FilaSobre key={s.categoria} sobre={s} />
+              ))}
+            </div>
+            <div className="space-y-3">
+              <h4 className="text-xs font-semibold uppercase tracking-wide text-ink/40">Gastos Variables</h4>
+              {sobresVariables.map((s) => (
+                <FilaSobre key={s.categoria} sobre={s} />
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
 
       <div className="space-y-3 rounded-2xl border border-edge/10 bg-surface p-6">
         <h3 className="text-sm font-semibold uppercase tracking-wide text-ink/60">Registrar Gasto</h3>
