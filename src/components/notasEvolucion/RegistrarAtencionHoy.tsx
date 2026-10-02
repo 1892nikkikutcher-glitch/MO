@@ -664,6 +664,11 @@ function FormularioNota({
           </div>
         )}
       </div>
+      {/* La barra de arriba es sticky bottom-24 — sin este espacio vacío
+         después, al bajar el scroll no hay suficiente recorrido para que
+         el contenido (ej. el textarea de indicaciones) termine de pasar
+         por detrás de la barra; se quedaba "atorado" empalmado con ella. */}
+      <div aria-hidden className="h-56" />
     </div>
   );
 }
