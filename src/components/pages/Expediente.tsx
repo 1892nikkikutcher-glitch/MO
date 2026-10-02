@@ -1280,12 +1280,17 @@ export default function Expediente({
 
   return (
     <div className="space-y-6">
-      <button
-        onClick={volverAPacientes}
-        className="flex items-center gap-2 text-sm font-medium text-accent hover:text-accent print:hidden"
-      >
-        ← Volver a pacientes
-      </button>
+      <div className="print:hidden">
+        <p className="text-xs font-semibold uppercase tracking-wide text-ink/40">
+          Expediente de {patient.name}
+        </p>
+        <button
+          onClick={volverAPacientes}
+          className="mt-1 flex items-center gap-2 text-sm font-medium text-accent hover:text-accent"
+        >
+          ← Volver a pacientes
+        </button>
+      </div>
 
       {/* Orden pedido: flecha — información del paciente — enviar resumen —
           flecha. Las flechas quedan fijas en los extremos (justify-between)

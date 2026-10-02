@@ -1106,7 +1106,7 @@ function NuevaInterconsultaDialog({
             className={inputClass}
             placeholder="Buscar por nombre o especialidad…"
             value={busquedaColega}
-            onChange={(e) => setBusquedaColega(e.target.value)}
+            onChange={(e) => manejarCambioNombre(e, setBusquedaColega)}
             autoFocus
           />
 
