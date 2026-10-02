@@ -60,3 +60,38 @@ export function ordenarDientes(dientes: number[]): number[] {
 export function formatearDientes(dientes: number[]): string {
   return `OD ${ordenarDientes(dientes).join(", ")}`;
 }
+
+/** Las 5 superficies del símbolo de odontograma de diagnóstico (ver
+ * OdontogramaSuperficies.tsx) — círculo central (oclusal/incisal) + anillo
+ * de 4 cuadrantes. Usado SOLO ahí; los otros 4 usos de Odontograma.tsx
+ * (laboratorios, presupuesto, nota de evolución) siguen siendo selección
+ * de diente completo, sin superficie. */
+export const SUPERFICIES_DENTALES = ["vestibular", "lingual", "mesial", "distal", "oclusal"] as const;
+export type SuperficieDental = (typeof SUPERFICIES_DENTALES)[number];
+
+/** true = anterior (incisivos/caninos, posición 1-3 dentro de su
+ * cuadrante) — el centro del símbolo se rotula "Incisal". false =
+ * posterior (premolares/molares, posición 4-8) — se rotula "Oclusal".
+ * `null` si tooth no es un diente reconocido (ver cuadranteDeDiente) —
+ * mismo criterio defensivo que el resto del módulo, nunca adivina sobre
+ * un valor no reconocido. La posición (tooth % 10) usa el mismo rango
+ * 1-8 tanto en permanentes como en temporales (1-5), así que no hace
+ * falta distinguir dentición. */
+export function esDienteAnterior(tooth: number): boolean | null {
+  if (cuadranteDeDiente(tooth) === null) return null;
+  const posicion = tooth % 10;
+  return posicion >= 1 && posicion <= 3;
+}
+
+/** true si, para el cuadrante de este diente, "Mesial" (hacia la línea
+ * media) queda del lado DERECHO del símbolo. Cuadrante 1 y 4 son las
+ * cajas de la columna izquierda de la cuadrícula 2×2 — igual que la
+ * simetría visual ya aplicada en Odontograma.tsx (se recargan hacia la
+ * derecha para "encontrarse" con 2/3 en la línea media), su diente mesial
+ * también queda del lado derecho del símbolo. Cuadrante 2 y 3 → mesial a
+ * la izquierda. `null` si tooth no es un diente reconocido. */
+export function ladoMesialDerecha(tooth: number): boolean | null {
+  const cuadrante = cuadranteDeDiente(tooth);
+  if (cuadrante === null) return null;
+  return cuadrante === 1 || cuadrante === 4;
+}

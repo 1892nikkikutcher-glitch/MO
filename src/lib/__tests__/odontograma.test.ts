@@ -3,7 +3,9 @@ import {
   CUADRANTES,
   cuadranteDeDiente,
   cuadrantePrincipal,
+  esDienteAnterior,
   formatearDientes,
+  ladoMesialDerecha,
   ordenarDientes,
 } from "../odontograma";
 
@@ -123,5 +125,55 @@ describe("formatearDientes", () => {
 
   it("incluye valores no reconocidos al final", () => {
     expect(formatearDientes([36, 11, 0])).toBe("OD 11, 36, 0");
+  });
+});
+
+describe("esDienteAnterior", () => {
+  it("incisivos y caninos (posición 1-3) son anteriores, en cualquier cuadrante", () => {
+    expect(esDienteAnterior(11)).toBe(true);
+    expect(esDienteAnterior(13)).toBe(true);
+    expect(esDienteAnterior(23)).toBe(true);
+    expect(esDienteAnterior(41)).toBe(true);
+    expect(esDienteAnterior(33)).toBe(true);
+  });
+
+  it("premolares y molares (posición 4-8) son posteriores", () => {
+    expect(esDienteAnterior(14)).toBe(false);
+    expect(esDienteAnterior(16)).toBe(false);
+    expect(esDienteAnterior(18)).toBe(false);
+    expect(esDienteAnterior(48)).toBe(false);
+  });
+
+  it("temporales usan el mismo criterio de posición (1-3 anterior, 4-5 posterior)", () => {
+    expect(esDienteAnterior(51)).toBe(true);
+    expect(esDienteAnterior(53)).toBe(true);
+    expect(esDienteAnterior(54)).toBe(false);
+    expect(esDienteAnterior(85)).toBe(false);
+  });
+
+  it("diente no reconocido da null, nunca lanza", () => {
+    expect(esDienteAnterior(0)).toBeNull();
+    expect(esDienteAnterior(99)).toBeNull();
+  });
+});
+
+describe("ladoMesialDerecha", () => {
+  it("Cuadrante 1 y 4 (columna izquierda de la cuadrícula): mesial a la derecha", () => {
+    expect(ladoMesialDerecha(11)).toBe(true);
+    expect(ladoMesialDerecha(18)).toBe(true);
+    expect(ladoMesialDerecha(41)).toBe(true);
+    expect(ladoMesialDerecha(55)).toBe(true);
+  });
+
+  it("Cuadrante 2 y 3 (columna derecha de la cuadrícula): mesial a la izquierda", () => {
+    expect(ladoMesialDerecha(21)).toBe(false);
+    expect(ladoMesialDerecha(28)).toBe(false);
+    expect(ladoMesialDerecha(31)).toBe(false);
+    expect(ladoMesialDerecha(65)).toBe(false);
+  });
+
+  it("diente no reconocido da null, nunca lanza", () => {
+    expect(ladoMesialDerecha(0)).toBeNull();
+    expect(ladoMesialDerecha(-5)).toBeNull();
   });
 });

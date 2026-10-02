@@ -4,6 +4,7 @@
  * inmediato en la pestaña "Historia Clínica" de cada paciente. */
 
 import type { PrioridadTratamiento } from "./planTratamiento";
+import type { SuperficieDental } from "./odontograma";
 
 export type TipoPregunta = "sino" | "texto" | "textarea" | "chips" | "odontograma" | "listaPrioridad";
 
@@ -314,6 +315,12 @@ export type DiagnosticoOdontograma = {
   fechaPresupuesto?: string;
   /** @deprecated ver fechaPresupuesto arriba. */
   presupuestoId?: string;
+  /** Superficies específicas marcadas por diente (símbolo de odontograma
+   * de 5 caras) — ausente, o un diente de `dientes` sin entrada aquí,
+   * significa "todo el diente, sin superficie específica anotada", el
+   * comportamiento de siempre. Puramente aditivo: ningún diagnóstico
+   * guardado antes de este campo necesita migración. */
+  superficiesPorDiente?: Record<number, SuperficieDental[]>;
 };
 
 /** `entry.estado` para mostrar en UI — nunca inventa "confirmado" para un

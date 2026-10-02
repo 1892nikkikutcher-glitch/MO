@@ -1,11 +1,11 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
-import Odontograma from "./Odontograma";
+import OdontogramaSuperficies from "./OdontogramaSuperficies";
 import { usePatientData } from "@/context/PatientDataContext";
 import ConfirmarEliminar from "@/components/ConfirmarEliminar";
 import { sonEquivalentes } from "@/lib/deepEqual";
-import { CUADRANTES, cuadrantePrincipal, ordenarDientes } from "@/lib/odontograma";
+import { CUADRANTES, cuadrantePrincipal, esDienteAnterior, ordenarDientes, type SuperficieDental } from "@/lib/odontograma";
 import {
   claveDetalleSiNo,
   esNegacionExplicita,
@@ -655,13 +655,45 @@ function PlanTratamientoRow({
   );
 }
 
+const SUPERFICIE_LABEL: Record<SuperficieDental, string> = {
+  vestibular: "Vestibular",
+  lingual: "Lingual/Palatino",
+  mesial: "Mesial",
+  distal: "Distal",
+  oclusal: "Oclusal",
+};
+
+/** "Oclusal" en posteriores, "Incisal" en anteriores (ver esDienteAnterior)
+ * — misma distinción que ya hace el símbolo interactivo, aquí solo para el
+ * resumen de texto de un diagnóstico ya guardado. */
+function etiquetaSuperficie(superficie: SuperficieDental, diente: number): string {
+  if (superficie === "oclusal" && esDienteAnterior(diente)) return "Incisal";
+  return SUPERFICIE_LABEL[superficie];
+}
+
+/** Quita del mapa de superficies cualquier diente con arreglo vacío, y
+ * regresa undefined si no queda ningún diente con superficie específica
+ * — así un diagnóstico sin ninguna superficie marcada se guarda exactamente
+ * igual que antes de que existiera este campo (sin superficiesPorDiente en
+ * absoluto), nunca con un objeto vacío. */
+function superficiesParaGuardar(
+  mapa: Record<number, SuperficieDental[]>
+): Record<number, SuperficieDental[]> | undefined {
+  const limpio = Object.fromEntries(Object.entries(mapa).filter(([, lista]) => lista.length > 0));
+  return Object.keys(limpio).length > 0 ? limpio : undefined;
+}
+
 /** Odontograma para anotar diagnósticos por diente (uno o varios a la
  * vez) — marcar dientes arriba deja una selección "en borrador" que se
  * convierte en un renglón guardado al capturar el diagnóstico, igual que
  * el flujo de agregar procedimientos en Nuevo Presupuesto. El tratamiento
  * sugerido es criterio del médico (no un cálculo), y sirve después para
  * prellenar el tratamiento de un PlanTratamientoItem para este mismo
- * diagnóstico (ver "Crear plan de tratamiento" en cada renglón). */
+ * diagnóstico (ver "Crear plan de tratamiento" en cada renglón). Cada
+ * diente se anota con el símbolo de 5 superficies de la hoja clínica en
+ * papel (ver OdontogramaSuperficies.tsx) — marcar una superficie
+ * específica es opcional, un diente sin ninguna marcada sigue
+ * significando "todo el diente", igual que siempre. */
 function OdontogramaDiagnostico({
   entries,
   onChange,
@@ -687,6 +719,7 @@ function OdontogramaDiagnostico({
 }) {
   const { procedimientos } = usePatientData();
   const [selectedTeeth, setSelectedTeeth] = useState<number[]>([]);
+  const [selectedSurfaces, setSelectedSurfaces] = useState<Record<number, SuperficieDental[]>>({});
   const [diagnosticoTexto, setDiagnosticoTexto] = useState("");
   const [tratamientoSugerido, setTratamientoSugerido] = useState("");
   const [editandoId, setEditandoId] = useState<string | null>(null);
@@ -696,8 +729,20 @@ function OdontogramaDiagnostico({
   const toggleTooth = (t: number) =>
     setSelectedTeeth((prev) => (prev.includes(t) ? prev.filter((x) => x !== t) : [...prev, t]));
 
+  const toggleSurface = (t: number, superficie: SuperficieDental) => {
+    setSelectedTeeth((prev) => (prev.includes(t) ? prev : [...prev, t]));
+    setSelectedSurfaces((prev) => {
+      const actuales = prev[t] ?? [];
+      const siguiente = actuales.includes(superficie)
+        ? actuales.filter((s) => s !== superficie)
+        : [...actuales, superficie];
+      return { ...prev, [t]: siguiente };
+    });
+  };
+
   const limpiarFormulario = () => {
     setSelectedTeeth([]);
+    setSelectedSurfaces({});
     setDiagnosticoTexto("");
     setTratamientoSugerido("");
     setEditandoId(null);
@@ -706,6 +751,7 @@ function OdontogramaDiagnostico({
   const iniciarEdicion = (entry: DiagnosticoOdontograma) => {
     setEditandoId(entry.id);
     setSelectedTeeth(entry.dientes);
+    setSelectedSurfaces(entry.superficiesPorDiente ?? {});
     setDiagnosticoTexto(entry.diagnostico);
     setTratamientoSugerido(entry.tratamientoSugerido ?? "");
   };
@@ -726,6 +772,7 @@ function OdontogramaDiagnostico({
         const derivado: DiagnosticoOdontograma = {
           id: `diag${Date.now()}`,
           dientes: selectedTeeth,
+          superficiesPorDiente: superficiesParaGuardar(selectedSurfaces),
           diagnostico,
           tratamientoSugerido: tratamientoSugerido.trim() || undefined,
           fecha: todayISO(),
@@ -739,6 +786,7 @@ function OdontogramaDiagnostico({
               ? {
                   ...e,
                   dientes: selectedTeeth,
+                  superficiesPorDiente: superficiesParaGuardar(selectedSurfaces),
                   diagnostico,
                   tratamientoSugerido: tratamientoSugerido.trim() || undefined,
                   fecha: e.fecha || todayISO(),
@@ -751,6 +799,7 @@ function OdontogramaDiagnostico({
       const nuevo: DiagnosticoOdontograma = {
         id: `diag${Date.now()}`,
         dientes: selectedTeeth,
+        superficiesPorDiente: superficiesParaGuardar(selectedSurfaces),
         diagnostico,
         tratamientoSugerido: tratamientoSugerido.trim() || undefined,
         fecha: todayISO(),
@@ -790,7 +839,24 @@ function OdontogramaDiagnostico({
         className="flex items-start justify-between gap-3 rounded-lg border border-edge/10 bg-inset px-3 py-2 text-sm"
       >
         <div className="min-w-0 flex-1">
-          <p className="text-xs font-semibold text-accent">OD {ordenarDientes(entry.dientes).join(", ")}</p>
+          <p className="text-xs font-semibold text-accent">
+            OD{" "}
+            {ordenarDientes(entry.dientes).map((d, i) => {
+              const superficies = entry.superficiesPorDiente?.[d];
+              return (
+                <span key={d}>
+                  {i > 0 && ", "}
+                  {d}
+                  {superficies && superficies.length > 0 && (
+                    <span className="font-normal text-accent/70">
+                      {" "}
+                      ({superficies.map((s) => etiquetaSuperficie(s, d)).join(", ")})
+                    </span>
+                  )}
+                </span>
+              );
+            })}
+          </p>
           <p className="text-ink">
             {entry.diagnostico || (
               <span className="italic text-ink/40">Sin diagnóstico anotado — edítalo para agregarlo</span>
@@ -874,7 +940,13 @@ function OdontogramaDiagnostico({
 
   return (
     <div className="space-y-4">
-      <Odontograma selectedTeeth={selectedTeeth} onToggleTooth={toggleTooth} title="" hideSummary />
+      <OdontogramaSuperficies
+        selectedTeeth={selectedTeeth}
+        selectedSurfaces={selectedSurfaces}
+        onToggleTooth={toggleTooth}
+        onToggleSurface={toggleSurface}
+        title=""
+      />
 
       <div className="space-y-3 rounded-lg border border-dashed border-edge/15 p-3">
         <p className="text-xs text-ink/40">
@@ -882,9 +954,6 @@ function OdontogramaDiagnostico({
           aplicar a varios dientes a la vez (ej. caries clase I en 3 piezas). Después de agregarlo o
           editarlo aquí, no olvides guardar el historial completo con el botón de hasta abajo.
         </p>
-        {selectedTeeth.length > 0 && (
-          <p className="text-xs font-semibold text-accent">OD {ordenarDientes(selectedTeeth).join(", ")}</p>
-        )}
         <div>
           <label className="mb-1 block text-xs font-medium text-ink/60">Diagnóstico</label>
           <input
