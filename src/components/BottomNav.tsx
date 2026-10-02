@@ -181,7 +181,7 @@ export const navItems = [
       />
     ),
     children: [
-      { id: "administracion-procedimientos", label: "Procedimientos" },
+      { id: "administracion-procedimientos", label: "Procedimientos y costos" },
       { id: "administracion-historial-clinico", label: "Historial Clínico" },
       { id: "administracion-borrar-citas", label: "Borrar citas" },
       { id: "administracion-consultorio", label: "Consultorio" },
