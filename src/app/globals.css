@@ -41,12 +41,14 @@
 
   --edge-rgb: 255 255 255;
   --ink-rgb: 244 246 248;
-  /* Verde azulado claro — acciones principales y elementos activos. */
-  --accent-rgb: 73 184 174;
-  /* Antes el segundo color de un degradado (from-accent to-accent-2); la
-     paleta nueva no pide degradados, así que queda igual al acento para
-     que los botones "primarios" se vean de un verde azulado sólido. */
-  --accent-2-rgb: 73 184 174;
+  /* Azul — acciones principales y elementos activos. Antes verde azulado;
+     el usuario lo veía como "verde" y pidió explícitamente cambiar el
+     acento de marca de toda la app a azul. Mismo tono que
+     --status-confirmada, a propósito: así el badge de "Confirmada" queda
+     coherente con el resto de la marca en vez de competir con ella. */
+  --accent-rgb: 59 130 246;
+  /* Sin degradado (igual al acento), mismo criterio que antes. */
+  --accent-2-rgb: 59 130 246;
   /* Dorado suave — acento premium, solo para detalles puntuales (insignias
      de plan/membresía) — nunca botones ni texto de cuerpo. */
   --premium-rgb: 214 187 131;
@@ -87,9 +89,10 @@
   --edge-rgb: 64 67 76;
   /* Carbón, no negro puro — pedido explícito de la paleta nueva. */
   --ink-rgb: 37 42 49;
-  /* Verde azulado — acciones principales y elementos activos. */
-  --accent-rgb: 22 140 135;
-  --accent-2-rgb: 22 140 135;
+  /* Azul — acciones principales y elementos activos. Mismo tono que
+     --status-confirmada claro, mismo motivo que en oscuro. */
+  --accent-rgb: 29 78 216;
+  --accent-2-rgb: 29 78 216;
   /* Dorado champán — acento premium, mismo uso puntual que en oscuro. */
   --premium-rgb: 197 166 106;
   /* Sin cambios en esta retunada — ya tenían contraste verificado contra
