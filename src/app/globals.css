@@ -3,75 +3,60 @@
 @tailwind utilities;
 
 :root {
-  /* MO — identidad "oscuro premium": azul casi negro de fondo, familia de
-     tonos vivos diferenciados por estatus (azul eléctrico, turquesa,
-     coral, naranja, violeta), dorado suave solo como acento puntual.
-     Ninguna versión anterior en git (ni "liquid glass" ni la que hubo
-     antes de esa) coincide con esta paleta — valores dados directamente
-     por el usuario sobre una captura de referencia. Oscuro por default;
+  /* MO — identidad "Salud Bucal Universal": superficies planas (sin vidrio
+     ni resplandores), azul carbón de fondo, verde azulado como acción
+     principal, dorado suave solo como acento puntual. Oscuro por default;
      [data-theme="light"] abajo define el modo claro. */
-  --app: #07111f;
-  /* Tarjetas — a propósito muy cerca de --app (misma familia "casi
-     negro"): la separación visible viene de --shadow-card de abajo
-     (resplandor + contacto), no de un salto grande de luminosidad. */
-  --surface: #0b1625;
+  --app: #101820;
+  --surface: #1b2936;
   /* Superficie elevada/seleccionada — un tono más clara que --surface, para
      tarjetas activas, filas seleccionadas, hover de paneles. */
-  --surface2: #10192c;
-  --field: #0b1625;
+  --surface2: #243747;
+  --field: #1b2936;
   --inset: rgba(0, 0, 0, 0.24);
-  --modal: #0b1625;
-  --modal-solid: #0b1625;
-  --cita-card-bg: #0b1625;
+  --modal: #1b2936;
+  --modal-solid: #1b2936;
+  --cita-card-bg: #1b2936;
   /* Fondo de navegación/encabezados — distinto de las tarjetas, a
      propósito: es la franja de identidad de marca (header, BottomNav). */
-  --nav-bg: #09182a;
-  /* Texto sobre --nav-bg: siempre claro en los dos temas, porque el fondo
-     de nav es oscuro incluso en modo claro. */
+  --nav-bg: #142536;
+  /* Texto sobre --nav-bg: siempre claro en los dos temas, porque el azul
+     petróleo/carbón de nav es oscuro incluso en modo claro. */
   --nav-ink-rgb: 244 246 248;
 
   /* Color de estatus de cita (badges, píldoras) — independiente del color
-     de recurso. Pedido explícito del usuario: cada estatus con su propio
-     tono, nada de un solo color para todos. "En espera" y "neutro" quedan
-     igual — no se dio un hex nuevo para ninguno de los dos. */
-  --status-confirmada: #19b5fe;
+     de recurso. Tonos vivos pensados para leerse sobre fondo oscuro; ver
+     el bloque [data-theme="light"] para las variantes de modo claro
+     (mismo tono, ajustado a más saturación/oscuridad para contraste sobre
+     blanco en vez de solo aclarar). Sin cambios en esta retunada de
+     paleta — ya tenían contraste verificado y el usuario pidió
+     mantenerlos consistentes. */
+  --status-confirmada: #3b82f6;
   --status-en-espera: #fbbf24;
-  --status-atendida: #36d9d7;
-  --status-reagendada: #945dff;
-  --status-cancelada: #ff4b4b;
-  --status-no-asistio: #ff9a56;
+  --status-atendida: #2dd4bf;
+  --status-reagendada: #a78bfa;
+  --status-cancelada: #fb7185;
+  --status-no-asistio: #fb923c;
   --status-neutro: #94a3b8;
 
   --edge-rgb: 255 255 255;
-  --ink-rgb: 247 250 252;
-  /* Turquesa — acciones principales y elementos activos (nav, pills
-     seleccionados). El azul eléctrico que pidió el usuario vive en
-     --info-rgb y --status-confirmada en vez de reemplazar el acento de
-     marca ya establecido. */
-  --accent-rgb: 54 217 215;
-  --accent-2-rgb: 54 217 215;
+  --ink-rgb: 244 246 248;
+  /* Verde azulado claro — acciones principales y elementos activos. */
+  --accent-rgb: 73 184 174;
+  /* Antes el segundo color de un degradado (from-accent to-accent-2); la
+     paleta nueva no pide degradados, así que queda igual al acento para
+     que los botones "primarios" se vean de un verde azulado sólido. */
+  --accent-2-rgb: 73 184 174;
   /* Dorado suave — acento premium, solo para detalles puntuales (insignias
-     de plan/membresía) — nunca botones ni texto de cuerpo. Sin cambios: no
-     se dio un hex nuevo para este tono. */
+     de plan/membresía) — nunca botones ni texto de cuerpo. */
   --premium-rgb: 214 187 131;
-  /* Sin cambios: no se dio un hex nuevo para este tono. */
   --success-rgb: 74 222 128;
-  /* Coral — alertas/eliminar en general, misma familia que
-     --status-cancelada. */
-  --danger-rgb: 255 75 75;
-  /* Azul eléctrico. */
-  --info-rgb: 25 181 254;
-  /* Naranja — pendientes/atención en general, misma familia que
-     --status-no-asistio. */
-  --warning-rgb: 255 154 86;
+  --danger-rgb: 248 113 113;
+  --info-rgb: 96 165 250;
+  --warning-rgb: 192 132 252;
 
-  /* Resplandor superior sutil (borde de "vidrio premium") + sombra de dos
-     capas (contacto + ambiental) — con --surface tan cerca de --app, esto
-     es lo que hace que la tarjeta se sienta "levantada" en vez de fundida
-     con el fondo. */
-  --shadow-card: inset 0 1px 0 0 rgba(255, 255, 255, 0.04), 0 1px 2px rgba(0, 0, 0, 0.4),
-    0 16px 32px -12px rgba(0, 0, 0, 0.7);
-  --shadow-modal: inset 0 1px 0 0 rgba(255, 255, 255, 0.05), 0 30px 70px -18px rgba(0, 0, 0, 0.75);
+  --shadow-card: 0 8px 24px -14px rgba(0, 0, 0, 0.55);
+  --shadow-modal: 0 30px 60px -18px rgba(0, 0, 0, 0.6);
 }
 
 [data-theme="light"] {
