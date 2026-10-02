@@ -64,7 +64,7 @@
   --surface: #ffffff;
   --surface2: #ffffff;
   --field: #ffffff;
-  --inset: rgba(37, 42, 49, 0.045);
+  --inset: rgba(23, 40, 58, 0.04);
   --modal: #ffffff;
   --modal-solid: #ffffff;
   --cita-card-bg: #ffffff;
@@ -85,21 +85,44 @@
   --status-neutro: #475569;
 
   --edge-rgb: 64 67 76;
-  /* Carbón, no negro puro — pedido explícito de la paleta nueva. */
-  --ink-rgb: 37 42 49;
+  /* Azul marino oscuro (antes carbón 37 42 49) — pedido explícito del
+     usuario para texto principal, con captura real de referencia. El texto
+     secundario (--text-ink/40, etc.) sigue siendo el mismo tono aclarado
+     por opacidad, no un color aparte — a ~0.66 de alfa sobre blanco esto da
+     ≈ rgb(102 113 125), prácticamente el gris azulado que pidió para texto
+     secundario. */
+  --ink-rgb: 23 40 58;
   /* Verde azulado — acciones principales y elementos activos. */
   --accent-rgb: 22 140 135;
   --accent-2-rgb: 22 140 135;
-  /* Dorado champán — acento premium, mismo uso puntual que en oscuro. */
-  --premium-rgb: 197 166 106;
+  /* Dorado discreto (antes champán 197 166 106) — mismo uso puntual que en
+     oscuro; hoy no lo consume ningún componente todavía. */
+  --premium-rgb: 154 135 49;
   /* Sin cambios en esta retunada — ya tenían contraste verificado contra
      blanco y no fueron parte de la paleta que pidió el usuario. */
   --success-rgb: 75 83 32;
-  --danger-rgb: 185 28 28;
+  /* Coral (antes rojo 185 28 28) — pedido explícito del usuario. Nota: a
+     ~4.3:1 contra blanco queda un poco debajo del 4.5:1 de WCAG AA para
+     texto normal (sí cumple para texto grande/elementos de UI, ≥3:1) —
+     aceptado tal cual porque el usuario dio este hex exacto como fuente de
+     verdad; serían ~2-3 puntos más oscuro si se quisiera el 4.5:1 estricto
+     en texto pequeño. */
+  --danger-rgb: 232 62 90;
   --info-rgb: 29 78 216;
-  --warning-rgb: 126 34 206;
+  /* Naranja (antes morado 126 34 206) — pedido explícito del usuario
+     ("naranja para pendientes"). Nota: contra blanco da ~2.7:1, por debajo
+     de WCAG AA incluso para elementos de UI (3:1) — este tono se usa en
+     varios lugares como texto plano (insignias de "Borrador", avisos),
+     donde se verá claro/suave más que "naranja vivo". Aceptado igual que
+     --danger-rgb, mismo motivo: hex exacto dado por el usuario. */
+  --warning-rgb: 255 116 72;
 
-  --shadow-card: 0 10px 24px -12px rgba(23, 50, 77, 0.12);
+  /* Sombra de dos capas (contacto + ambiental) en vez de un solo blur
+     suave — con el fondo ya más distinguible de --surface, una sombra más
+     tangible es lo que hace que la tarjeta se sienta "levantada" en vez de
+     solo "dibujada". Mismo tinte azul marino que --nav-bg, por consistencia
+     de marca. */
+  --shadow-card: 0 1px 2px rgba(23, 50, 77, 0.06), 0 16px 32px -14px rgba(23, 50, 77, 0.22);
   --shadow-modal: 0 30px 60px -18px rgba(23, 50, 77, 0.22);
 }
 
@@ -169,13 +192,14 @@ select option {
 }
 
 /* Las utilidades de opacidad de Tailwind (text-ink/40, bg-accent/15, etc.)
-   aplican la misma fracción alfa en los dos temas, pero --ink es carbón
-   (#252A31) sobre fondo claro, no casi-blanco sobre fondo oscuro — la misma
-   fracción que en oscuro se ve perfectamente legible (claro aclarado sobre
-   oscuro) en claro se ve deslavada mucho más rápido. Se sube el alfa
-   efectivo solo en modo claro. Valores recalculados para el carbón nuevo —
-   verificado con la fórmula de luminancia relativa WCAG: /50 y superiores
-   dan ≥4.5:1 contra blanco (ej. /60 ≈ 6.1:1, /50 ≈ 5.8:1); /20-/40 son
+   aplican la misma fracción alfa en los dos temas, pero --ink es oscuro
+   (azul marino #17283A) sobre fondo claro, no casi-blanco sobre fondo
+   oscuro — la misma fracción que en oscuro se ve perfectamente legible
+   (claro aclarado sobre oscuro) en claro se ve deslavada mucho más rápido.
+   Se sube el alfa efectivo solo en modo claro. Valores verificados con la
+   fórmula de luminancia relativa WCAG: /50 y superiores dan ≥4.5:1 contra
+   blanco (el azul marino es incluso un poco más oscuro que el carbón
+   anterior, así que el margen de contraste solo mejora); /20-/40 son
    niveles decorativos/de apoyo, no texto principal, por lo que no se exige
    el mismo mínimo. Mismo problema con --accent (antes naranja, ahora verde
    azulado): los fondos/bordes translúcidos de baja opacidad se veían casi
@@ -191,7 +215,12 @@ select option {
 
 [data-theme="light"] .bg-accent\/5 { background-color: rgb(var(--accent-rgb) / 0.08); }
 [data-theme="light"] .bg-accent\/10 { background-color: rgb(var(--accent-rgb) / 0.16); }
-[data-theme="light"] .bg-accent\/15 { background-color: rgb(var(--accent-rgb) / 0.22); }
+/* bg-accent/15 es específicamente el fondo de "seleccionado/activo" (pills
+   de periodo, pestañas, iconos de nav activos) — el usuario dio un hex
+   exacto para ese estado ("turquesa suave seleccionado" #D8EFED), que
+   corresponde a ~0.15 de alfa del turquesa sobre blanco (antes 0.22,
+   visualmente más saturado de lo pedido). */
+[data-theme="light"] .bg-accent\/15 { background-color: rgb(var(--accent-rgb) / 0.15); }
 [data-theme="light"] .bg-accent\/20 { background-color: rgb(var(--accent-rgb) / 0.3); }
 [data-theme="light"] .bg-accent\/25 { background-color: rgb(var(--accent-rgb) / 0.36); }
 [data-theme="light"] .border-accent\/25 { border-color: rgb(var(--accent-rgb) / 0.35); }
@@ -204,6 +233,16 @@ select option {
 [data-theme="light"] .text-accent\/60 { color: rgb(var(--accent-rgb) / 0.68); }
 [data-theme="light"] .text-accent\/70 { color: rgb(var(--accent-rgb) / 0.78); }
 [data-theme="light"] .text-accent\/80 { color: rgb(var(--accent-rgb) / 0.88); }
+
+/* border-edge/10 es el borde de tarjetas, campos y separadores — al 0.1 de
+   alfa original se perdía casi por completo contra --app. El usuario dio
+   un hex exacto para este borde ("bordes muy suaves" #E1E5E9), que
+   corresponde a ~0.14 de alfa de --edge-rgb sobre blanco. Mismo mecanismo
+   que los overrides de --text-ink de arriba: se sube el alfa efectivo solo
+   en modo claro, en un único lugar, para que cada tarjeta y campo que ya
+   usa border-edge/10 se vea más definido sin tocar className por
+   className. */
+[data-theme="light"] .border-edge\/10 { border-color: rgb(var(--edge-rgb) / 0.14); }
 
 /* Márgenes de impresión más chicos que los ~1" que pone Chrome por
    default — sin esto, documentos que sí caben en una hoja (ej.
