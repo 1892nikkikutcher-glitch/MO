@@ -1281,9 +1281,7 @@ export default function Expediente({
   return (
     <div className="space-y-6">
       <div className="print:hidden">
-        <p className="text-xs font-semibold uppercase tracking-wide text-ink/40">
-          Expediente de {patient.name}
-        </p>
+        <p className="text-sm font-semibold uppercase tracking-wide text-ink/40">Expediente</p>
         <button
           onClick={volverAPacientes}
           className="mt-1 flex items-center gap-2 text-sm font-medium text-accent hover:text-accent"
