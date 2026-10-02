@@ -6,6 +6,7 @@ import ConsentimientoInformado from "./ConsentimientoInformado";
 import ConsentimientoEspecialidad from "./ConsentimientoEspecialidad";
 import ConstanciaPermanencia from "./ConstanciaPermanencia";
 import HojaIndicaciones from "./HojaIndicaciones";
+import AvisoPrivacidad from "./AvisoPrivacidad";
 import { formatNombreConEdad } from "@/lib/patientData";
 import type { TipoHojaIndicaciones } from "@/lib/hojasIndicaciones";
 import {
@@ -16,7 +17,12 @@ import {
 const inputClass =
   "w-full rounded-lg border border-edge/10 bg-field px-3 py-2 text-sm text-ink outline-none focus:border-accent/60";
 
-type TipoDocumento = "consentimiento" | "constancia" | TipoHojaIndicaciones | TipoConsentimientoEspecialidad;
+type TipoDocumento =
+  | "consentimiento"
+  | "constancia"
+  | "avisoPrivacidad"
+  | TipoHojaIndicaciones
+  | TipoConsentimientoEspecialidad;
 
 function esConsentimientoEspecialidad(tipo: TipoDocumento): tipo is TipoConsentimientoEspecialidad {
   return tipo in consentimientosEspecialidad;
@@ -32,6 +38,16 @@ const documentosDisponibles: { tipo: TipoDocumento; titulo: string; descripcion:
     tipo: "constancia",
     titulo: "Constancia de Permanencia",
     descripcion: "Certifica la presencia del paciente en el consultorio, para escuela o trabajo.",
+  },
+  {
+    tipo: "avisoPrivacidad",
+    titulo: "Aviso de Privacidad",
+    descripcion: "Documento legal sobre el tratamiento de datos personales, conforme a la LFPDPPP.",
+  },
+  {
+    tipo: "consentimientoUsoImagen",
+    titulo: "Consentimiento Informado — Uso de Imagen",
+    descripcion: "Autoriza el uso de fotografías o videos del paciente en redes sociales y materiales de difusión.",
   },
   {
     tipo: "protesis",
@@ -110,6 +126,9 @@ export default function Documentos() {
     }
     if (documentoActivo === "constancia") {
       return <ConstanciaPermanencia patient={patient} onVolver={onVolver} />;
+    }
+    if (documentoActivo === "avisoPrivacidad") {
+      return <AvisoPrivacidad onVolver={onVolver} />;
     }
     if (esConsentimientoEspecialidad(documentoActivo)) {
       return <ConsentimientoEspecialidad patient={patient} tipo={documentoActivo} onVolver={onVolver} />;

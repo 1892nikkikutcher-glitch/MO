@@ -12,7 +12,8 @@ export type TipoConsentimientoEspecialidad =
   | "consentimientoOdontopediatria"
   | "consentimientoProtesisDental"
   | "consentimientoConclusionOrtodoncia"
-  | "consentimientoConformidadProtesis";
+  | "consentimientoConformidadProtesis"
+  | "consentimientoUsoImagen";
 
 export type ConsentimientoEspecialidad = {
   titulo: string;
@@ -90,5 +91,15 @@ Entiendo que el no usar los retenedores como se me indique, o el no acudir a mis
 Manifiesto que se me han explicado las indicaciones de cuidado, limpieza y uso de la prótesis, así como que es normal requerir un periodo de adaptación y, en su caso, citas de ajuste posteriores a la entrega, mismas que no se consideran defectos de fabricación sino parte natural del proceso de adaptación.`,
     aceptacion: (nombreDoctor: string) =>
       `Manifiesto mi conformidad con la prótesis dental recibida y acepto haber sido informado(a) sobre su cuidado, mantenimiento y vida útil esperada. Me comprometo a acudir a mis citas de revisión y a informar oportunamente cualquier molestia o desajuste que presente. Doy por satisfactoriamente concluida esta etapa del tratamiento y libero a ${nombreDoctor || "el profesional que me atiende"} y a su equipo de responsabilidad por el desgaste normal derivado del uso de la prótesis.`,
+  },
+  consentimientoUsoImagen: {
+    titulo: "Carta de Consentimiento Informado — Uso de Imagen en Plataformas Digitales",
+    procedimientoLabel: "Material o contexto en el que se usará la imagen",
+    procedimientoPlaceholder: "Ej. Fotografías de antes y después de blanqueamiento para Instagram y Facebook...",
+    declaracion: `Declaro que autorizo de manera libre, expresa e informada a este consultorio para captar, utilizar y difundir fotografías, videos y/o grabaciones de mi persona (o de mi hijo(a) o representado(a), en su caso) tomadas antes, durante y/o después de mis tratamientos dentales, con fines de difusión en redes sociales, sitio web, materiales impresos o digitales de promoción, y/o fines educativos o de capacitación del personal clínico.
+Comprendo que dichas imágenes podrán mostrar mi rostro y/o cavidad bucal, y que el consultorio se compromete a no divulgar junto con ellas datos personales adicionales (como mi nombre completo, domicilio o información de contacto) sin mi autorización expresa por separado.
+Entiendo que esta autorización es de carácter voluntario, no implica compensación económica alguna, y que puedo revocarla en cualquier momento mediante solicitud por escrito, sin que ello afecte la atención clínica que recibo ni las imágenes que ya hayan sido publicadas antes de dicha revocación.`,
+    aceptacion: (nombreDoctor: string) =>
+      `Autorizo a ${nombreDoctor || "el consultorio"} y a su equipo a hacer uso de mi imagen en los términos aquí descritos, y confirmo que esta autorización es voluntaria y puede ser revocada por mí en cualquier momento mediante solicitud por escrito.`,
   },
 };

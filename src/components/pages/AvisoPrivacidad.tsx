@@ -2,7 +2,7 @@
 
 import { usePatientData } from "@/context/PatientDataContext";
 
-export default function AvisoPrivacidad() {
+export default function AvisoPrivacidad({ onVolver }: { onVolver?: () => void } = {}) {
   const { perfilDoctor, clinicInfo } = usePatientData();
   const nombreResponsable = perfilDoctor.nombre || clinicInfo?.nombre || "el consultorio";
   const domicilio = perfilDoctor.direccionClinica || clinicInfo?.direccion || "";
@@ -34,19 +34,28 @@ export default function AvisoPrivacidad() {
 
   return (
     <div className="space-y-6">
-      <div className="flex justify-end gap-3 print:hidden">
-        <button
-          onClick={() => window.print()}
-          className="rounded-lg border border-edge/15 px-4 py-2 text-sm font-semibold text-ink/80 transition-colors hover:bg-surface"
-        >
-          Imprimir
-        </button>
-        <button
-          onClick={enviarPorWhatsApp}
-          className="rounded-lg border border-success/40 px-4 py-2 text-sm font-semibold text-success transition-colors hover:bg-success/10"
-        >
-          Enviar por WhatsApp
-        </button>
+      <div className="flex items-center justify-between print:hidden">
+        {onVolver ? (
+          <button onClick={onVolver} className="flex items-center gap-2 text-sm font-medium text-accent hover:text-accent">
+            ← Volver a Documentos
+          </button>
+        ) : (
+          <span />
+        )}
+        <div className="flex gap-3">
+          <button
+            onClick={() => window.print()}
+            className="rounded-lg border border-edge/15 px-4 py-2 text-sm font-semibold text-ink/80 transition-colors hover:bg-surface"
+          >
+            Imprimir
+          </button>
+          <button
+            onClick={enviarPorWhatsApp}
+            className="rounded-lg border border-success/40 px-4 py-2 text-sm font-semibold text-success transition-colors hover:bg-success/10"
+          >
+            Enviar por WhatsApp
+          </button>
+        </div>
       </div>
 
       <div className="rounded-2xl bg-white p-8 text-black shadow-lg print:rounded-none print:p-0 print:shadow-none">
