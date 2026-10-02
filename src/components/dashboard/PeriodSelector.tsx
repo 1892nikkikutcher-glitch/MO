@@ -1,12 +1,6 @@
 "use client";
 
 import type { PeriodoId, RangoPeriodo } from "@/lib/dashboardMetrics";
-import { statusAlpha } from "@/lib/agendaHelpers";
-
-/** Mismo amarillo que ya usa el estatus de cita "En espera" — reutilizado
- * aquí en vez de --success-rgb (que se veía como un verde neón en la
- * navegación, pedido explícito del usuario quitarlo). */
-const COLOR_NAV_PERIODO = "var(--status-en-espera)";
 
 const OPCIONES: { id: PeriodoId; label: string }[] = [
   { id: "hoy", label: "Hoy" },
@@ -80,14 +74,8 @@ export default function PeriodSelector({
         <button
           onClick={() => onNavigate(-1)}
           title="Periodo anterior"
-          className="flex h-8 w-8 items-center justify-center rounded-lg border text-sm transition-colors"
-          style={{
-            color: COLOR_NAV_PERIODO,
-            borderColor: statusAlpha(COLOR_NAV_PERIODO, 0.4),
-            boxShadow: `0 0 12px -2px ${statusAlpha(COLOR_NAV_PERIODO, 0.5)}`,
-          }}
-          onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = statusAlpha(COLOR_NAV_PERIODO, 0.1))}
-          onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = "transparent")}
+          className="flex h-8 w-8 items-center justify-center rounded-lg border border-success/40 text-sm text-success transition-colors hover:bg-success/10"
+          style={{ boxShadow: "0 0 12px -2px rgb(var(--success-rgb) / 0.5)" }}
         >
           ‹
         </button>
@@ -95,14 +83,8 @@ export default function PeriodSelector({
         <button
           onClick={() => onNavigate(1)}
           title="Periodo siguiente"
-          className="flex h-8 w-8 items-center justify-center rounded-lg border text-sm transition-colors"
-          style={{
-            color: COLOR_NAV_PERIODO,
-            borderColor: statusAlpha(COLOR_NAV_PERIODO, 0.4),
-            boxShadow: `0 0 12px -2px ${statusAlpha(COLOR_NAV_PERIODO, 0.5)}`,
-          }}
-          onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = statusAlpha(COLOR_NAV_PERIODO, 0.1))}
-          onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = "transparent")}
+          className="flex h-8 w-8 items-center justify-center rounded-lg border border-success/40 text-sm text-success transition-colors hover:bg-success/10"
+          style={{ boxShadow: "0 0 12px -2px rgb(var(--success-rgb) / 0.5)" }}
         >
           ›
         </button>
