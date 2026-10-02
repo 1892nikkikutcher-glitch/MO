@@ -78,6 +78,7 @@ import {
   type EstadisticasGlobales,
 } from "@/lib/metas";
 import { presupuestoGastosInicial, type Gasto, type PresupuestoGastosConfig } from "@/lib/gastos";
+import { migrarIdentidadDoctor } from "@/lib/migracionIdentidadDoctor";
 import { estadoRegulacionInicial, type EstadoRegulacionSanitaria } from "@/lib/regulacionSanitaria";
 import { formatosWhatsAppInicial, type FormatosWhatsApp } from "@/lib/formatosWhatsapp";
 import { contratoOrtodonciaInicial, type ContratoOrtodonciaConfig } from "@/lib/contratoOrtodoncia";
@@ -938,6 +939,20 @@ export function PatientDataProvider({
     "perfilDoctor",
     perfilDoctorInicial
   );
+  // Migración de identidad de receta (PerfilDoctor único → Recurso por
+  // médico) — una sola vez por clinicUid resuelto, idempotente por campo
+  // dentro de la función misma (ver migracionIdentidadDoctor.ts). El ref
+  // solo evita repetir la llamada en re-renders de la MISMA sesión; la
+  // corrección ante recargas la da la condición de datos, no este ref.
+  const migracionIdentidadIntentada = useRef<string | null>(null);
+  useEffect(() => {
+    if (!clinicUid) return;
+    if (migracionIdentidadIntentada.current === clinicUid) return;
+    migracionIdentidadIntentada.current = clinicUid;
+    migrarIdentidadDoctor(db, clinicUid).catch((err) =>
+      console.error("No se pudo migrar la identidad de receta a Recurso", err)
+    );
+  }, [clinicUid]);
   const [suscripcionInicial] = useState<SuscripcionPlan>(() => ({
     planActivo: "prueba",
     pruebaIniciadaEl: new Date().toISOString().slice(0, 10),

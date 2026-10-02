@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   cedulaProfesionalDe,
+  identidadDoctorDe,
   computeTratamientosPendientes,
   diasRestantesDePrueba,
   DURACION_PRUEBA_DIAS,
@@ -193,5 +194,73 @@ describe("cedulaProfesionalDe", () => {
 
   it("un recurso tipo 'unidad' con el mismo nombre nunca presta su cédula", () => {
     expect(cedulaProfesionalDe("Sillón 1", recursos, perfilDoctor)).toBe("");
+  });
+});
+
+describe("identidadDoctorDe", () => {
+  const recursosIdentidad: Pick<
+    Recurso,
+    "nombre" | "tipo" | "cedulaProfesional" | "especialidad" | "correo" | "telefono" | "escuelaEgreso" | "logoEscuelaUrl" | "firmaDigitalUrl"
+  >[] = [
+    {
+      nombre: "Dr. Enrique Gómez Salas",
+      tipo: "medico",
+      cedulaProfesional: "2222222",
+      especialidad: "Endodoncia",
+      correo: "enrique@clinica.mx",
+      telefono: "5551234567",
+      escuelaEgreso: "UNAM",
+      logoEscuelaUrl: "https://ejemplo.com/unam.png",
+      firmaDigitalUrl: "https://ejemplo.com/firma-enrique.png",
+    },
+    {
+      nombre: "Dra. Ana Paola Ríos Cervantes",
+      tipo: "medico",
+      cedulaProfesional: "3333333",
+      // el resto de los campos nunca se capturó — deben resolver a "" cada uno por separado, no "todo o nada"
+    },
+    { nombre: "Sillón 1", tipo: "unidad", cedulaProfesional: "9999999", especialidad: "no debería usarse" },
+  ];
+
+  it("un médico con todo capturado: devuelve los 7 campos de identidad, no solo la cédula", () => {
+    expect(identidadDoctorDe("Dr. Enrique Gómez Salas", recursosIdentidad)).toEqual({
+      cedulaProfesional: "2222222",
+      especialidad: "Endodoncia",
+      correo: "enrique@clinica.mx",
+      telefono: "5551234567",
+      escuelaEgreso: "UNAM",
+      logoEscuelaUrl: "https://ejemplo.com/unam.png",
+      firmaDigitalUrl: "https://ejemplo.com/firma-enrique.png",
+    });
+  });
+
+  it("un médico con solo algunos campos capturados: cada campo se resuelve independiente, nunca todo o nada", () => {
+    const identidad = identidadDoctorDe("Dra. Ana Paola Ríos Cervantes", recursosIdentidad);
+    expect(identidad.cedulaProfesional).toBe("3333333");
+    expect(identidad.especialidad).toBe("");
+    expect(identidad.correo).toBe("");
+  });
+
+  it("un nombre que no corresponde a ningún médico: los 7 campos vacíos, nunca inventa nada", () => {
+    expect(identidadDoctorDe("Dr. Alguien Más", recursosIdentidad)).toEqual({
+      cedulaProfesional: "",
+      especialidad: "",
+      correo: "",
+      telefono: "",
+      escuelaEgreso: "",
+      logoEscuelaUrl: "",
+      firmaDigitalUrl: "",
+    });
+  });
+
+  it("un recurso tipo 'unidad' con el mismo nombre nunca presta su identidad", () => {
+    expect(identidadDoctorDe("Sillón 1", recursosIdentidad).especialidad).toBe("");
+  });
+
+  it("dos médicos distintos nunca se mezclan entre sí", () => {
+    const enrique = identidadDoctorDe("Dr. Enrique Gómez Salas", recursosIdentidad);
+    const ana = identidadDoctorDe("Dra. Ana Paola Ríos Cervantes", recursosIdentidad);
+    expect(enrique.cedulaProfesional).not.toBe(ana.cedulaProfesional);
+    expect(enrique.especialidad).not.toBe(ana.especialidad);
   });
 });

@@ -590,6 +590,20 @@ export type Recurso = {
    * la cuenta). Solo aplica a tipo "medico"; ausente = todavía sin
    * capturar. */
   cedulaProfesional?: string;
+  /** Identidad de receta de ESTE médico — mismo espíritu que
+   * `cedulaProfesional` de arriba, extendido a todo lo que antes vivía en
+   * `PerfilDoctor` y que en realidad es "del doctor", no "de la clínica"
+   * (ver identidadDoctorDe). Solo aplica a tipo "medico"; todos opcionales,
+   * ausente = todavía sin capturar. */
+  especialidad?: string;
+  correo?: string;
+  telefono?: string;
+  /** Escuela de egreso, para el logotipo institucional en recetas. */
+  escuelaEgreso?: string;
+  /** Link a una imagen del escudo/logo de la escuela (el usuario debe tener derecho de uso). */
+  logoEscuelaUrl?: string;
+  /** Imagen de la firma del doctor, para recetas enviadas por medios digitales (PDF/WhatsApp). */
+  firmaDigitalUrl?: string;
 };
 
 /** Cédula profesional a mostrar en un documento firmado por `nombreMedico`
@@ -607,6 +621,54 @@ export function cedulaProfesionalDe(
   if (recurso?.cedulaProfesional) return recurso.cedulaProfesional;
   if (nombreMedico && nombreMedico === perfilDoctor.nombre) return perfilDoctor.cedulaProfesional;
   return "";
+}
+
+const CAMPOS_IDENTIDAD_DOCTOR = [
+  "cedulaProfesional",
+  "especialidad",
+  "correo",
+  "telefono",
+  "escuelaEgreso",
+  "logoEscuelaUrl",
+  "firmaDigitalUrl",
+] as const;
+
+export type IdentidadDoctor = {
+  cedulaProfesional: string;
+  especialidad: string;
+  correo: string;
+  telefono: string;
+  escuelaEgreso: string;
+  logoEscuelaUrl: string;
+  firmaDigitalUrl: string;
+};
+
+const identidadDoctorVacia: IdentidadDoctor = {
+  cedulaProfesional: "",
+  especialidad: "",
+  correo: "",
+  telefono: "",
+  escuelaEgreso: "",
+  logoEscuelaUrl: "",
+  firmaDigitalUrl: "",
+};
+
+/** Identidad de receta a mostrar en un documento firmado por `nombreMedico`
+ * — nunca la de otra persona. Reemplaza a `cedulaProfesionalDe` (ahora
+ * generaliza los 7 campos de identidad, no solo la cédula). Sin médico que
+ * coincida por nombre → todo vacío: mostrar la identidad de alguien más en
+ * un documento legal es peor que no mostrar ninguna. */
+export function identidadDoctorDe(
+  nombreMedico: string,
+  recursos: Pick<Recurso, "nombre" | "tipo" | (typeof CAMPOS_IDENTIDAD_DOCTOR)[number]>[]
+): IdentidadDoctor {
+  const recurso = recursos.find((r) => r.tipo === "medico" && r.nombre === nombreMedico);
+  if (!recurso) return identidadDoctorVacia;
+  const resultado = { ...identidadDoctorVacia };
+  CAMPOS_IDENTIDAD_DOCTOR.forEach((campo) => {
+    if (recurso[campo]) resultado[campo] = recurso[campo]!;
+  });
+  return resultado;
 }
 
 /** Paleta neón — se usa como franja lateral, resplandor y punto de color
