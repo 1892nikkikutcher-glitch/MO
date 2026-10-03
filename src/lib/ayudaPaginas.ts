@@ -199,10 +199,11 @@ export const ayudaPaginas: Record<string, AyudaPagina> = {
     ],
   },
   "administracion-perfil": {
-    titulo: "Administración — Perfil del Doctor",
-    resumen: "Datos que aparecen en documentos impresos: nombre, cédula profesional, logos y dirección de la clínica.",
+    titulo: "Administración — Médicos y Recetas",
+    resumen: "Datos que aparecen en documentos impresos: la identidad de receta de cada médico (cédula, especialidad, escuela, firma) y los datos de la clínica (logo, dirección).",
     puntos: [
-      "Lo que captures aquí se usa automáticamente en presupuestos, recetas, consentimientos y hojas de indicaciones.",
+      "Elige un médico para editar su propia identidad — cada receta y consentimiento usa la del médico que lo firma, nunca la de otro.",
+      "El nombre y el color de cada médico se editan desde Agenda → Recursos.",
     ],
   },
   "administracion-consultorio": {

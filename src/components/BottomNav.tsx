@@ -193,7 +193,7 @@ export const navItems = [
       { id: "administracion-catalogos", label: "Catálogos" },
       { id: "administracion-metas", label: "Metas" },
       { id: "administracion-presupuesto-gastos", label: "Presupuesto de Gastos" },
-      { id: "administracion-perfil", label: "Perfil del Doctor" },
+      { id: "administracion-perfil", label: "Médicos y Recetas" },
       { id: "administracion-colaboradores", label: "Colaboradores" },
       { id: "administracion-contrato-ortodoncia", label: "Contrato de Ortodoncia" },
     ],
