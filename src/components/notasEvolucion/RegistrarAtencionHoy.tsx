@@ -10,17 +10,20 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { usePatientData } from "@/context/PatientDataContext";
-import type { Recurso } from "@/lib/patientData";
+import { formatFechaCita, type Recurso } from "@/lib/patientData";
+import { toISODate } from "@/lib/agendaHelpers";
 import { buscarBorradorLocalPorCita, buscarBorradorLocalPorPaciente } from "@/lib/borradorLocalNota";
 import { detectarConflictoBorrador, type RegistroBorradorLocal } from "@/lib/borradorLocalNotaPuro";
 import {
   citaIdDeNota,
+  citasPendientesDelPaciente,
   esNotaV2,
   estadoSeccion,
   normalizarRevision,
   notaEvolucionV2Inicial,
   obtenerFaltantesNota,
   type EncabezadoNota,
+  type MotivoNotaAdministrativa,
   type NotaEvolucionV2,
   type SeccionNota,
 } from "@/lib/notasEvolucion";
@@ -423,6 +426,20 @@ function FormularioNota({
   const [resolviendoConflicto, setResolviendoConflicto] = useState(false);
   const [errorConflicto, setErrorConflicto] = useState<string | null>(null);
 
+  const { citas } = usePatientData();
+  const [motivoNoSePresento, setMotivoNoSePresento] = useState<MotivoNotaAdministrativa | null>(null);
+  const [citaNoSePresentoId, setCitaNoSePresentoId] = useState<string | null>(null);
+
+  // A qué cita(s) puede aplicar "No llega / Reagenda / Cancela". Si la nota ya
+  // está ligada a una cita, solo a esa (y solo mientras siga pendiente); si
+  // no, a las pendientes del paciente, la de hoy primero.
+  const hoyISO = toISODate(new Date());
+  const citasCandidatas = useMemo(() => {
+    const pendientes = citasPendientesDelPaciente(citas, patientId, hoyISO);
+    return citaId ? pendientes.filter((c) => c.id === citaId) : pendientes;
+  }, [citas, patientId, citaId, hoyISO]);
+  const citaObjetivo = citasCandidatas.find((c) => c.id === citaNoSePresentoId) ?? citasCandidatas[0] ?? null;
+
   const faltantes = obtenerFaltantesNota(nota);
 
   // El médico que atiende SIEMPRE queda editable — el valor inicial es solo
@@ -466,6 +483,25 @@ function FormularioNota({
     setResolviendoConflicto(false);
     if (!resultado.ok) setErrorConflicto(resultado.error);
     else setRevisandoConflicto(false);
+  }
+
+  // El paciente no se presentó / reagenda / cancela: se cambia a la nota
+  // corta, pero ESTE componente sigue montado (es un return anticipado, no
+  // un desmontaje) — así lo ya escrito en el formulario, y su autoguardado,
+  // siguen vivos si el usuario regresa con «Volver a la nota completa».
+  if (motivoNoSePresento && citaObjetivo) {
+    return (
+      <NotaAdministrativaRapida
+        patientId={patientId}
+        citaId={citaObjetivo.id}
+        cita={citaObjetivo}
+        notaLibreSugerida={nota.comoLlegaHoy.textoLibre}
+        motivoInicial={motivoNoSePresento}
+        aplicarEstatusAlGuardar
+        onGuardado={onGuardado}
+        onQuiereNotaCompleta={() => setMotivoNoSePresento(null)}
+      />
+    );
   }
 
   return (
@@ -542,7 +578,22 @@ function FormularioNota({
           activa={seccionActiva === "como_llega"}
           onSeleccionar={irASeccion}
         >
-          <SeccionComoLlega valor={nota.comoLlegaHoy} onChange={registrarCambio} onBlurTexto={flushInmediato} />
+          <SeccionComoLlega
+            valor={nota.comoLlegaHoy}
+            onChange={registrarCambio}
+            onBlurTexto={flushInmediato}
+            noSePresento={{
+              citas: citasCandidatas.map((c) => ({
+                id: c.id,
+                etiqueta: `${c.fecha === hoyISO ? "Hoy" : formatFechaCita(c.fecha)} ${c.horaInicio} hrs${
+                  c.tratamientos.filter(Boolean).length > 0 ? ` · ${c.tratamientos.filter(Boolean).join(", ")}` : ""
+                }`,
+              })),
+              citaId: citaObjetivo?.id ?? null,
+              onCambiarCita: setCitaNoSePresentoId,
+              onElegir: setMotivoNoSePresento,
+            }}
+          />
         </SeccionAcordeon>
 
         <SeccionAcordeon

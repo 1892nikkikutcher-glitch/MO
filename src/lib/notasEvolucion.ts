@@ -9,7 +9,7 @@
  * v2). Ver el plan de rediseño para el contexto completo de decisiones. */
 
 import type { Procedimiento } from "./procedimientos";
-import type { NotaEvolucion } from "./patientData";
+import type { CitaAgenda, CitaEstatus, NotaEvolucion } from "./patientData";
 import { plantillaCamposPorTipo, type DetalleProcedimiento } from "./procedimientoNotaPlantillas";
 
 export const FORMATO_NOTA_VERSION_ACTUAL = 2 as const;
@@ -509,6 +509,57 @@ export const motivoNotaAdministrativaLabel: Record<MotivoNotaAdministrativa, str
   reagenda_paciente: "Paciente reagenda su cita",
   otro: "Otro",
 };
+
+/** Estatus de cita que corresponde a cada motivo — se usa cuando la nota
+ * rápida se abre desde "¿Cómo llega hoy?" (el paciente no se presentó,
+ * reagenda o cancela) y la cita todavía está Agendada/Confirmada/En espera:
+ * al guardar la nota, la cita queda con este estatus. "otro" no tiene un
+ * estatus único que le corresponda (puede ser cualquier cosa), así que no
+ * toca la cita — solo deja la nota. */
+export function estatusCitaDeMotivo(
+  motivo: MotivoNotaAdministrativa
+): Extract<CitaEstatus, "No Asistió" | "Cancelada" | "Reagendada"> | null {
+  switch (motivo) {
+    case "no_asistio":
+      return "No Asistió";
+    case "cancela_paciente":
+      return "Cancelada";
+    case "reagenda_paciente":
+      return "Reagendada";
+    case "otro":
+      return null;
+  }
+}
+
+const ESTATUS_CITA_PENDIENTE: readonly CitaEstatus[] = ["Agendada", "Confirmada", "En espera"];
+
+/** Citas de un paciente a las que tiene sentido aplicar "No llega /
+ * Reagenda / Cancela" desde la nota: solo las que siguen pendientes
+ * (Agendada, Confirmada, En espera — nunca una ya Atendida, Cancelada,
+ * Reagendada o No Asistió), de hace `diasAtras` días en adelante, para poder
+ * marcar también una de ayer que nadie cerró sin que se acumulen citas
+ * viejísimas. Orden: la de hoy primero, luego las próximas (la más cercana
+ * antes), luego las pasadas (la más reciente antes) — así la primera es
+ * casi siempre la que el usuario espera. */
+export function citasPendientesDelPaciente<T extends Pick<CitaAgenda, "patientId" | "fecha" | "horaInicio" | "estatus">>(
+  citas: T[],
+  patientId: string,
+  hoyISO: string,
+  diasAtras = 7
+): T[] {
+  const desde = new Date(`${hoyISO}T00:00:00`);
+  desde.setDate(desde.getDate() - diasAtras);
+  const desdeISO = `${desde.getFullYear()}-${String(desde.getMonth() + 1).padStart(2, "0")}-${String(desde.getDate()).padStart(2, "0")}`;
+  const grupo = (c: T) => (c.fecha === hoyISO ? 0 : c.fecha > hoyISO ? 1 : 2);
+  return citas
+    .filter((c) => c.patientId === patientId && ESTATUS_CITA_PENDIENTE.includes(c.estatus) && c.fecha >= desdeISO)
+    .sort((a, b) => {
+      const g = grupo(a) - grupo(b);
+      if (g !== 0) return g;
+      const porFecha = a.fecha.localeCompare(b.fecha) || a.horaInicio.localeCompare(b.horaInicio);
+      return grupo(a) === 2 ? -porFecha : porFecha;
+    });
+}
 
 /** PSOAP libre y opcional — a diferencia del formulario guiado v2 (chips,
  * secciones obligatorias, checklist de firma), ningún campo aquí bloquea

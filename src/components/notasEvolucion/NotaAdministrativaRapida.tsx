@@ -8,9 +8,10 @@
 
 import { useState } from "react";
 import { usePatientData } from "@/context/PatientDataContext";
-import type { CitaAgenda } from "@/lib/patientData";
+import { formatFechaCita, type CitaAgenda } from "@/lib/patientData";
 import { textoNoAsistioDeCita } from "@/lib/agendaHelpers";
 import {
+  estatusCitaDeMotivo,
   motivoNotaAdministrativaLabel,
   motivosNotaAdministrativa,
   notaAdministrativaInicial,
@@ -46,6 +47,8 @@ export default function NotaAdministrativaRapida({
   citaId,
   cita,
   notaLibreSugerida,
+  motivoInicial,
+  aplicarEstatusAlGuardar = false,
   onGuardado,
   onQuiereNotaCompleta,
 }: {
@@ -56,12 +59,23 @@ export default function NotaAdministrativaRapida({
    * completo que se abandona a favor de esta nota rápida — para no hacer
    * que el usuario lo vuelva a escribir. */
   notaLibreSugerida?: string;
+  /** Motivo ya elegido (ej. el chip "No llega" de "¿Cómo llega hoy?") — si no
+   * viene, se sugiere según el estatus que ya tiene la cita. */
+  motivoInicial?: MotivoNotaAdministrativa;
+  /** true cuando se llegó aquí desde la propia nota (la cita sigue
+   * Agendada/Confirmada/En espera): al guardar, la cita pasa al estatus que
+   * corresponde al motivo elegido (ver estatusCitaDeMotivo). Nada cambia en
+   * la cita mientras no se guarde — volver a la nota completa lo deja todo
+   * como estaba. */
+  aplicarEstatusAlGuardar?: boolean;
   onGuardado: () => void;
   onQuiereNotaCompleta: () => void;
 }) {
-  const { miUid, patients, crearNotaAdministrativa } = usePatientData();
+  const { miUid, patients, crearNotaAdministrativa, marcarEstatusCita } = usePatientData();
   const paciente = patients.find((p) => p.id === patientId);
-  const [motivo, setMotivo] = useState<MotivoNotaAdministrativa | null>(motivoSugeridoPorEstatus(cita.estatus));
+  const [motivo, setMotivo] = useState<MotivoNotaAdministrativa | null>(
+    motivoInicial ?? motivoSugeridoPorEstatus(cita.estatus)
+  );
   const [notaLibre, setNotaLibre] = useState(notaLibreSugerida ?? "");
   const [mostrarPsoap, setMostrarPsoap] = useState(false);
   const [psoap, setPsoap] = useState<PsoapOpcional>(psoapVacio);
@@ -69,6 +83,7 @@ export default function NotaAdministrativaRapida({
   const [error, setError] = useState("");
 
   const puedeGuardar = motivo !== null && (motivo !== "otro" || notaLibre.trim().length > 0);
+  const estatusDestino = aplicarEstatusAlGuardar && motivo ? estatusCitaDeMotivo(motivo) : null;
 
   const psoapConContenido = Object.values(psoap).some((v) => v.trim());
 
@@ -97,6 +112,9 @@ export default function NotaAdministrativaRapida({
           registradoPorUid: miUid,
         })
       );
+      // Primero la nota, después el estatus: si guardar la nota falla, la
+      // cita queda tal cual estaba en vez de cambiar sin dejar registro.
+      if (estatusDestino) marcarEstatusCita(citaId, estatusDestino);
       onGuardado();
     } catch (err) {
       console.error("No se pudo guardar la nota administrativa", err);
@@ -108,10 +126,28 @@ export default function NotaAdministrativaRapida({
 
   return (
     <div className="rounded-2xl border border-edge/10 bg-surface p-5">
-      <h3 className="text-sm font-semibold text-ink">Esta cita no se atendió</h3>
-      <p className="mt-1 text-xs text-ink/50">
-        Estatus actual: {cita.estatus}. En vez del formulario clínico completo, registra un motivo breve.
-      </p>
+      <h3 className="text-sm font-semibold text-ink">
+        {aplicarEstatusAlGuardar ? "Esta cita no se va a atender" : "Esta cita no se atendió"}
+      </h3>
+      {aplicarEstatusAlGuardar ? (
+        <p className="mt-1 text-xs text-ink/50">
+          Cita del {formatFechaCita(cita.fecha)} a las {cita.horaInicio} hrs
+          {cita.tratamientos.filter(Boolean).length > 0 && <> · {cita.tratamientos.filter(Boolean).join(", ")}</>}. En
+          vez del formulario clínico completo, registra un motivo breve.{" "}
+          {estatusDestino ? (
+            <>
+              Al guardar, la cita quedará como{" "}
+              <span className="font-semibold text-ink/70">{estatusDestino}</span>.
+            </>
+          ) : (
+            <>La cita conservará su estatus actual ({cita.estatus}).</>
+          )}
+        </p>
+      ) : (
+        <p className="mt-1 text-xs text-ink/50">
+          Estatus actual: {cita.estatus}. En vez del formulario clínico completo, registra un motivo breve.
+        </p>
+      )}
 
       <div className="mt-4 flex flex-wrap gap-2">
         {motivosNotaAdministrativa.map((m) => (
@@ -201,7 +237,9 @@ export default function NotaAdministrativaRapida({
           onClick={onQuiereNotaCompleta}
           className="text-xs font-medium text-ink/40 hover:text-accent"
         >
-          Necesito registrar una nota clínica completa en su lugar →
+          {aplicarEstatusAlGuardar
+            ? "← Volver a la nota clínica completa"
+            : "Necesito registrar una nota clínica completa en su lugar →"}
         </button>
       </div>
     </div>

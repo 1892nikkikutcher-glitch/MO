@@ -1,9 +1,11 @@
 import { describe, expect, it } from "vitest";
 import {
   citaIdDeNota,
+  citasPendientesDelPaciente,
   esNotaAdministrativa,
   esNotaV2,
   estadoSeccion,
+  estatusCitaDeMotivo,
   normalizarRevision,
   notaAdministrativaInicial,
   notaEvolucionV2Inicial,
@@ -15,7 +17,7 @@ import {
   type NotaEvolucionV2,
 } from "../notasEvolucion";
 import type { Procedimiento } from "../procedimientos";
-import type { NotaEvolucion } from "../patientData";
+import type { CitaEstatus, NotaEvolucion } from "../patientData";
 
 const encabezado: EncabezadoNota = {
   patientId: "pac1",
@@ -349,5 +351,74 @@ describe("recomendacionSignosVitales", () => {
 
   it("no recomienda para una limpieza de rutina", () => {
     expect(recomendacionSignosVitales("limpieza")).toBe(false);
+  });
+});
+
+describe("estatusCitaDeMotivo", () => {
+  it("cada motivo con estatus propio lo devuelve tal cual lo usa Agenda", () => {
+    expect(estatusCitaDeMotivo("no_asistio")).toBe("No Asistió");
+    expect(estatusCitaDeMotivo("cancela_paciente")).toBe("Cancelada");
+    expect(estatusCitaDeMotivo("reagenda_paciente")).toBe("Reagendada");
+  });
+
+  it("'otro' no tiene un estatus único: devuelve null para no tocar la cita", () => {
+    expect(estatusCitaDeMotivo("otro")).toBeNull();
+  });
+});
+
+describe("citasPendientesDelPaciente", () => {
+  type CitaMin = { id: string; patientId: string; fecha: string; horaInicio: string; estatus: CitaEstatus };
+  const c = (id: string, fecha: string, estatus: CitaEstatus, patientId = "p1", horaInicio = "10:00"): CitaMin => ({
+    id,
+    patientId,
+    fecha,
+    horaInicio,
+    estatus,
+  });
+  const ids = (lista: CitaMin[]) => lista.map((x) => x.id);
+
+  it("solo devuelve citas pendientes (Agendada, Confirmada, En espera) del paciente", () => {
+    const citas = [
+      c("a", "2026-10-02", "Agendada"),
+      c("b", "2026-10-02", "Confirmada"),
+      c("c", "2026-10-02", "En espera"),
+      c("d", "2026-10-02", "Atendida"),
+      c("e", "2026-10-02", "Cancelada"),
+      c("f", "2026-10-02", "Reagendada"),
+      c("g", "2026-10-02", "No Asistió"),
+      c("h", "2026-10-02", "Agendada", "otro-paciente"),
+    ];
+    expect(ids(citasPendientesDelPaciente(citas, "p1", "2026-10-02"))).toEqual(["a", "b", "c"]);
+  });
+
+  it("ordena: la de hoy primero, luego las próximas (la más cercana antes), luego las pasadas (la más reciente antes)", () => {
+    const citas = [
+      c("pasada-vieja", "2026-09-28", "Agendada"),
+      c("futura-lejana", "2026-10-20", "Agendada"),
+      c("pasada-reciente", "2026-10-01", "Agendada"),
+      c("hoy", "2026-10-02", "Agendada"),
+      c("futura-cercana", "2026-10-09", "Agendada"),
+    ];
+    expect(ids(citasPendientesDelPaciente(citas, "p1", "2026-10-02"))).toEqual([
+      "hoy",
+      "futura-cercana",
+      "futura-lejana",
+      "pasada-reciente",
+      "pasada-vieja",
+    ]);
+  });
+
+  it("deja fuera citas pendientes de hace más de 7 días (incluye el borde de exactamente 7)", () => {
+    const citas = [c("hace-7", "2026-09-25", "Agendada"), c("hace-8", "2026-09-24", "Agendada")];
+    expect(ids(citasPendientesDelPaciente(citas, "p1", "2026-10-02"))).toEqual(["hace-7"]);
+  });
+
+  it("dos citas el mismo día se ordenan por hora", () => {
+    const citas = [c("tarde", "2026-10-02", "Agendada", "p1", "17:00"), c("manana", "2026-10-02", "Agendada", "p1", "09:00")];
+    expect(ids(citasPendientesDelPaciente(citas, "p1", "2026-10-02"))).toEqual(["manana", "tarde"]);
+  });
+
+  it("sin citas pendientes: arreglo vacío", () => {
+    expect(citasPendientesDelPaciente([c("x", "2026-10-02", "Atendida")], "p1", "2026-10-02")).toEqual([]);
   });
 });

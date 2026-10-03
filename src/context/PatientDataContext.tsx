@@ -50,6 +50,7 @@ import {
   type Recurso,
   type SuscripcionPlan,
   type CitaAgenda,
+  type CitaEstatus,
   type SolicitudLaboratorio,
   fotosVacias,
   type FotosPaciente,
@@ -784,6 +785,10 @@ type PatientDataContextValue = {
   registrosAsistencia: RegistroAsistencia[];
   marcarAsistencia: (personalId: string, fecha: string, campo: "entrada" | "salida", hora: string | null) => void;
   marcarLlegadaCita: (citaId: string, hora: string | null) => void;
+  /** Cambia solo el estatus de una cita — para registrar desde la nota de
+   * evolución que el paciente no llegó, canceló o reagendó, sin tener que
+   * salir a Agenda a cambiarlo a mano. */
+  marcarEstatusCita: (citaId: string, estatus: CitaEstatus) => void;
   procedimientos: Procedimiento[];
   setProcedimientos: (updater: Updater<Procedimiento[]>) => void;
   importarCatalogoProcedimientos: (nuevos: Procedimiento[]) => Promise<void>;
@@ -2531,6 +2536,10 @@ export function PatientDataProvider({
     setCitas((prev) => prev.map((c) => (c.id === citaId ? { ...c, horaLlegada: hora } : c)));
   };
 
+  const marcarEstatusCita = (citaId: string, estatus: CitaEstatus) => {
+    setCitas((prev) => prev.map((c) => (c.id === citaId ? { ...c, estatus } : c)));
+  };
+
   const invitarColaborador = async (data: {
     nombre: string;
     correo: string;
@@ -2760,6 +2769,7 @@ export function PatientDataProvider({
         registrosAsistencia,
         marcarAsistencia,
         marcarLlegadaCita,
+        marcarEstatusCita,
         procedimientos,
         setProcedimientos,
         importarCatalogoProcedimientos,
