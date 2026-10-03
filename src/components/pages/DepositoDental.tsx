@@ -392,7 +392,7 @@ export default function DepositoDental() {
   const [faltanteAEliminar, setFaltanteAEliminar] = useState<ArticuloFaltante | null>(null);
   const [caducidadAEliminar, setCaducidadAEliminar] = useState<ArticuloCaducidad | null>(null);
 
-  const clinicaNombre = clinicInfo?.nombre || perfilDoctor.nombre || "";
+  const clinicaNombre = clinicInfo?.nombre || "";
 
   const enviarWhatsAppDeposito = (deposito: Deposito) => {
     const pendientes = articulosFaltantes.filter(

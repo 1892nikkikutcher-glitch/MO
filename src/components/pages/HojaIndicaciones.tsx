@@ -18,7 +18,7 @@ export default function HojaIndicaciones({
   tipo: TipoHojaIndicaciones;
   onVolver: () => void;
 }) {
-  const { perfilDoctor } = usePatientData();
+  const { perfilDoctor, clinicInfo } = usePatientData();
   const hoja = hojasIndicaciones[tipo];
 
   const handleImprimir = () => window.print();
@@ -60,15 +60,12 @@ export default function HojaIndicaciones({
 
       <div className="rounded-2xl bg-white p-8 text-black shadow-lg print:rounded-none print:p-0 print:shadow-none">
         <div className="flex items-start justify-between">
-          <div className="w-16 shrink-0">
-            {perfilDoctor.logoEscuelaUrl && (
-              // eslint-disable-next-line @next/next/no-img-element
-              <img src={perfilDoctor.logoEscuelaUrl} alt="" className="h-16 w-16 object-contain" />
-            )}
-          </div>
+          {/* Antes mostraba el logo de escuela del médico único de
+              perfilDoctor — esta hoja es de la clínica, no lleva un médico
+              seleccionado. Espaciador vacío para mantener el centro. */}
+          <div className="w-16 shrink-0" />
           <div className="flex-1 text-center">
-            <p className="text-lg font-bold">{perfilDoctor.nombre || "Consultorio dental"}</p>
-            {perfilDoctor.cedulaProfesional && <p className="text-sm">Ced. Prof. {perfilDoctor.cedulaProfesional}</p>}
+            <p className="text-lg font-bold">{clinicInfo?.nombre || "Consultorio dental"}</p>
           </div>
           <div className="w-16 shrink-0 text-right">
             {perfilDoctor.logoClinicaUrl && (

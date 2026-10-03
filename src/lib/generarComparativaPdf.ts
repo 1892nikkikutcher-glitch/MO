@@ -39,10 +39,11 @@ export async function generarComparativaPdf(datos: DatosComparativaPdf): Promise
   const xIzq = marginX;
   const xDer = pageWidth - marginX;
 
-  const [logoEscuela, logoClinica] = await Promise.all([
-    cargarImagen(datos.perfilDoctor.logoEscuelaUrl),
-    cargarImagen(datos.perfilDoctor.logoClinicaUrl),
-  ]);
+  // Solo logo de clínica aquí — una comparativa puede incluir presupuestos
+  // de médicos distintos, así que no hay un único "logo de escuela" al que
+  // atribuirla (antes tomaba el de perfilDoctor sin condición; se quitó al
+  // unificar la identidad de receta por médico, ver identidadDoctorDe).
+  const logoClinica = await cargarImagen(datos.perfilDoctor.logoClinicaUrl);
   const dibujarLogo = (logo: ImagenCargada | null, x: number, yPos: number, ladoMax: number) => {
     if (!logo) return;
     const escala = ladoMax / Math.max(logo.ancho, logo.alto);
@@ -54,7 +55,6 @@ export async function generarComparativaPdf(datos: DatosComparativaPdf): Promise
   };
 
   let y = 16;
-  dibujarLogo(logoEscuela, xIzq, y, 18);
   dibujarLogo(logoClinica, xDer - 18, y, 18);
 
   doc.setFont("helvetica", "bold");

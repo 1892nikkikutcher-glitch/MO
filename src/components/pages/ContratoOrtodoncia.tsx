@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { usePatientData } from "@/context/PatientDataContext";
-import { calcularEdadDetallada, cedulaProfesionalDe, formatCurrency, type Patient } from "@/lib/patientData";
+import { calcularEdadDetallada, identidadDoctorDe, formatCurrency, type Patient } from "@/lib/patientData";
 import { manejarCambioNombre } from "@/lib/textoNombre";
 import { renderPlantilla } from "@/lib/formatosWhatsapp";
 
@@ -26,7 +26,7 @@ export default function ContratoOrtodoncia({
 }) {
   const { perfilDoctor, clinicInfo, recursos, citas, contratoOrtodoncia } = usePatientData();
   const medicos = recursos.filter((r) => r.tipo === "medico");
-  const clinicaNombre = clinicInfo?.nombre || perfilDoctor.nombre || "";
+  const clinicaNombre = clinicInfo?.nombre || "";
   const esMenorDeEdad = (calcularEdadDetallada(patient.birthDate)?.years ?? 18) < 18;
   const fechaInicial = todayFormatted();
   const [dia, setDia] = useState(fechaInicial.dia);
@@ -45,9 +45,9 @@ export default function ContratoOrtodoncia({
     const medicoSugerido = citaRelevante?.medicoId
       ? recursos.find((r) => r.id === citaRelevante.medicoId)?.nombre
       : undefined;
-    return medicoSugerido || medicos[0]?.nombre || perfilDoctor.nombre || "";
+    return medicoSugerido || medicos[0]?.nombre || "";
   });
-  const cedula = cedulaProfesionalDe(medico, recursos, perfilDoctor);
+  const cedula = identidadDoctorDe(medico, recursos).cedulaProfesional;
 
   const [duracionMeses, setDuracionMeses] = useState("");
   const [pagoInicial, setPagoInicial] = useState("");

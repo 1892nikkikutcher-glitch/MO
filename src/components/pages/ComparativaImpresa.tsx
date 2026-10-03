@@ -44,12 +44,11 @@ export default function ComparativaImpresa({
   return (
     <div className="hidden border-4 border-black bg-white p-8 text-black print:block">
       <div className="flex items-start justify-between">
-        <div className="w-16 shrink-0">
-          {perfilDoctor.logoEscuelaUrl && (
-            // eslint-disable-next-line @next/next/no-img-element
-            <img src={perfilDoctor.logoEscuelaUrl} alt="" className="h-16 w-16 object-contain" />
-          )}
-        </div>
+        {/* Antes mostraba el logo de escuela de perfilDoctor — una
+            comparativa puede incluir presupuestos de médicos distintos, sin
+            un único médico al que atribuirlo (ver generarComparativaPdf.ts).
+            Se deja el espaciador vacío para mantener el título centrado. */}
+        <div className="w-16 shrink-0" />
         <div className="flex-1 text-center">
           <p className="text-xl font-bold">{comparativa.titulo.toUpperCase()}</p>
           <p className="text-xs">Comparativa de Rehabilitación</p>

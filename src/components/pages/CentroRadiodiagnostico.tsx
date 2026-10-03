@@ -171,7 +171,7 @@ export default function CentroRadiodiagnosticoPage() {
   const [showCentro, setShowCentro] = useState(false);
   const [centroAEliminar, setCentroAEliminar] = useState<CentroRadiodiagnostico | null>(null);
 
-  const clinicaNombre = clinicInfo?.nombre || perfilDoctor.nombre || "";
+  const clinicaNombre = clinicInfo?.nombre || "";
 
   const enviarWhatsApp = (centro: CentroRadiodiagnostico) => {
     const texto = buildMensajeCentroRadiodiagnostico(clinicaNombre, centro);

@@ -19,7 +19,7 @@ export default function ConstanciaPermanencia({
   patient: Patient;
   onVolver: () => void;
 }) {
-  const { perfilDoctor } = usePatientData();
+  const { perfilDoctor, clinicInfo } = usePatientData();
   const [horaEntrada, setHoraEntrada] = useState("");
   const [horaSalida, setHoraSalida] = useState("");
   const [motivo, setMotivo] = useState("tratamiento dental");
@@ -36,7 +36,7 @@ export default function ConstanciaPermanencia({
         horaEntrada ? `, de las ${horaEntrada}` : ""
       }${horaSalida ? ` a las ${horaSalida} hrs` : ""}, por motivo de ${motivo}.`,
       "",
-      perfilDoctor.nombre ? `${perfilDoctor.nombre}${perfilDoctor.cedulaProfesional ? ` · Ced. Prof. ${perfilDoctor.cedulaProfesional}` : ""}` : "",
+      clinicInfo?.nombre ?? "",
     ].filter(Boolean);
     const telefono = patient.phone.replace(/\D/g, "");
     window.open(`https://wa.me/${telefono}?text=${encodeURIComponent(lineas.join("\n"))}`, "_blank");
@@ -85,15 +85,12 @@ export default function ConstanciaPermanencia({
 
       <div className="rounded-2xl bg-white p-8 text-black shadow-lg print:rounded-none print:p-0 print:shadow-none">
         <div className="flex items-start justify-between">
-          <div className="w-16 shrink-0">
-            {perfilDoctor.logoEscuelaUrl && (
-              // eslint-disable-next-line @next/next/no-img-element
-              <img src={perfilDoctor.logoEscuelaUrl} alt="" className="h-16 w-16 object-contain" />
-            )}
-          </div>
+          {/* Antes mostraba el logo de escuela del médico único de
+              perfilDoctor — este documento es de la clínica, no lleva un
+              médico seleccionado. Espaciador vacío para mantener el centro. */}
+          <div className="w-16 shrink-0" />
           <div className="flex-1 text-center">
-            <p className="text-lg font-bold">{perfilDoctor.nombre || "Consultorio dental"}</p>
-            {perfilDoctor.cedulaProfesional && <p className="text-sm">Ced. Prof. {perfilDoctor.cedulaProfesional}</p>}
+            <p className="text-lg font-bold">{clinicInfo?.nombre || "Consultorio dental"}</p>
           </div>
           <div className="w-16 shrink-0 text-right">
             {perfilDoctor.logoClinicaUrl && (
@@ -128,8 +125,7 @@ export default function ConstanciaPermanencia({
         <div className="mt-16 flex justify-center">
           <div className="text-center text-xs">
             <div className="mb-1 w-56 border-b border-black" />
-            <p className="font-medium">{perfilDoctor.nombre}</p>
-            {perfilDoctor.cedulaProfesional && <p>Ced. Prof. {perfilDoctor.cedulaProfesional}</p>}
+            <p className="font-medium">{clinicInfo?.nombre}</p>
           </div>
         </div>
 

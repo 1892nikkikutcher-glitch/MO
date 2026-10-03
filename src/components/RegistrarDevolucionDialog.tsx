@@ -222,7 +222,13 @@ export default function RegistrarDevolucionDialog({
         pagoOrigen: pago,
         pacienteNombre: patientName,
         clinicaNombre: clinicInfo?.nombre || "",
-        registradoPorNombre: perfilDoctor?.nombre || "",
+        // Antes usaba perfilDoctor?.nombre (el médico único de la cuenta) —
+        // conceptualmente esto es "qué colaborador registró la devolución",
+        // no un médico; resolverlo bien requiere una suscripción nueva al
+        // colaborador en sesión (fuera de alcance de esta unificación, ver
+        // plan). generarComprobanteDevolucionPdf ya maneja vacío con
+        // gracia (cae a "—").
+        registradoPorNombre: "",
       });
       if (accion === "imprimir") {
         const url = URL.createObjectURL(blob);

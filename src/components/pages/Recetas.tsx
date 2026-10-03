@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { usePatientData } from "@/context/PatientDataContext";
-import { formatNombreConEdad, type MedicamentoRecetado, type Receta } from "@/lib/patientData";
+import { formatNombreConEdad, identidadDoctorDe, type MedicamentoRecetado, type Receta } from "@/lib/patientData";
 import { calcularDosisPediatrica, type MedicamentoCatalogo } from "@/lib/medicamentos";
 import { generarRecetaPdf } from "@/lib/generarRecetaPdf";
 import { enviarPdfPorWhatsapp } from "@/lib/enviarPdfWhatsapp";
@@ -290,6 +290,7 @@ export default function Recetas() {
         alergias,
         medicamentos: medicamentosRecetados,
         notas,
+        identidadDoctor: identidadDoctorDe(medico, recursos),
         perfilDoctor,
       });
       const resultado = await enviarPdfPorWhatsapp({
@@ -657,22 +658,24 @@ export default function Recetas() {
       </div>
 
       {/* Receta imprimible — formato tipo COPRISEM */}
-      {patient && medicamentosRecetados.length > 0 && (
+      {patient && medicamentosRecetados.length > 0 && (() => {
+        const identidadDoctor = identidadDoctorDe(medico, recursos);
+        return (
         <div className="hidden flex-col border-4 border-black bg-white p-8 text-black print:flex">
           <div className="flex items-start justify-between">
             <div className="w-24 shrink-0 text-center">
-              {perfilDoctor.logoEscuelaUrl && (
+              {identidadDoctor.logoEscuelaUrl && (
                 // eslint-disable-next-line @next/next/no-img-element
-                <img src={perfilDoctor.logoEscuelaUrl} alt="" className="mx-auto h-20 w-20 object-contain" />
+                <img src={identidadDoctor.logoEscuelaUrl} alt="" className="mx-auto h-20 w-20 object-contain" />
               )}
-              {perfilDoctor.escuelaEgreso && (
-                <p className="mt-1 text-[9px] font-semibold leading-tight">{perfilDoctor.escuelaEgreso}</p>
+              {identidadDoctor.escuelaEgreso && (
+                <p className="mt-1 text-[9px] font-semibold leading-tight">{identidadDoctor.escuelaEgreso}</p>
               )}
             </div>
             <div className="flex-1 text-center">
-              <p className="text-xl font-bold">{medico || perfilDoctor.nombre}</p>
-              {perfilDoctor.cedulaProfesional && <p className="text-sm">Ced. Prof. {perfilDoctor.cedulaProfesional}</p>}
-              {perfilDoctor.especialidad && <p className="text-sm">{perfilDoctor.especialidad}</p>}
+              <p className="text-xl font-bold">{medico}</p>
+              {identidadDoctor.cedulaProfesional && <p className="text-sm">Ced. Prof. {identidadDoctor.cedulaProfesional}</p>}
+              {identidadDoctor.especialidad && <p className="text-sm">{identidadDoctor.especialidad}</p>}
             </div>
             <div className="w-24 shrink-0 text-right text-xs">
               {perfilDoctor.logoClinicaUrl && (
@@ -724,9 +727,9 @@ export default function Recetas() {
               <p className="text-sm underline">{perfilDoctor.textoValidezReceta}</p>
             )}
             <div className="text-center text-xs">
-              {perfilDoctor.firmaDigitalUrl && (
+              {identidadDoctor.firmaDigitalUrl && (
                 // eslint-disable-next-line @next/next/no-img-element
-                <img src={perfilDoctor.firmaDigitalUrl} alt="" className="mx-auto h-10 object-contain" />
+                <img src={identidadDoctor.firmaDigitalUrl} alt="" className="mx-auto h-10 object-contain" />
               )}
               <div className="mb-1 w-40 border-b border-black" />
               Firma médico
@@ -737,7 +740,8 @@ export default function Recetas() {
             <p className="mt-8 text-center text-xs">{perfilDoctor.direccionClinica}</p>
           )}
         </div>
-      )}
+        );
+      })()}
 
       {medicamentoParaConfirmar && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4 print:hidden">

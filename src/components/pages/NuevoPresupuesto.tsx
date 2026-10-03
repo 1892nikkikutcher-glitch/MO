@@ -20,7 +20,7 @@ import { slugify } from "@/lib/textoNombre";
 import { calcularFechaVigencia } from "@/lib/presupuestoVigencia";
 import { prioridadTratamientoLabel } from "@/lib/planTratamiento";
 import type { PresupuestoPrefillItem } from "@/lib/historiaClinica";
-import type { BudgetData, LineItem, Patient } from "@/lib/patientData";
+import { identidadDoctorDe, type BudgetData, type LineItem, type Patient } from "@/lib/patientData";
 
 const VIGENCIA_DIAS_DEFECTO = 30;
 
@@ -437,6 +437,7 @@ export default function NuevoPresupuesto({
         diagnostico,
         items,
         total,
+        identidadDoctor: identidadDoctorDe(medico, recursos),
         perfilDoctor,
       });
       const resultado = await enviarPdfPorWhatsapp({

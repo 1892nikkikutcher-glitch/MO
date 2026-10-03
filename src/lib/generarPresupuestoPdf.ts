@@ -1,6 +1,6 @@
 import jsPDF from "jspdf";
 import { cargarImagen, type ImagenCargada } from "./imagenesPdf";
-import type { LineItem, PerfilDoctor } from "./patientData";
+import type { IdentidadDoctor, LineItem, PerfilDoctor } from "./patientData";
 
 export type DatosPresupuestoPdf = {
   folio: string;
@@ -12,6 +12,9 @@ export type DatosPresupuestoPdf = {
   diagnostico: string;
   items: LineItem[];
   total: number;
+  /** Solo se usa logoEscuelaUrl de aquí — el presupuesto nunca mostró
+   * cédula/especialidad del médico, y eso no cambia con esta unificación. */
+  identidadDoctor: IdentidadDoctor;
   perfilDoctor: PerfilDoctor;
 };
 
@@ -38,7 +41,7 @@ export async function generarPresupuestoPdf(datos: DatosPresupuestoPdf): Promise
   const anchoNombre = xUnitario - xNombre - 4;
 
   const [logoEscuela, logoClinica] = await Promise.all([
-    cargarImagen(datos.perfilDoctor.logoEscuelaUrl),
+    cargarImagen(datos.identidadDoctor.logoEscuelaUrl),
     cargarImagen(datos.perfilDoctor.logoClinicaUrl),
   ]);
 
@@ -76,7 +79,7 @@ export async function generarPresupuestoPdf(datos: DatosPresupuestoPdf): Promise
   y += 5;
   doc.setFontSize(10);
   doc.text(`Paciente: ${datos.pacienteNombre}`, xNombre, y);
-  doc.text(datos.medico || datos.perfilDoctor.nombre, xTotal, y, { align: "right" });
+  doc.text(datos.medico, xTotal, y, { align: "right" });
   y += 5;
   doc.text(`Correo electrónico: ${datos.pacienteCorreo || "Sin registro"}`, xNombre, y);
   doc.text(datos.fechaLarga, xTotal, y, { align: "right" });

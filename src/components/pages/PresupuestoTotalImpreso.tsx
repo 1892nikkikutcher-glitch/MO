@@ -33,12 +33,11 @@ export default function PresupuestoTotalImpreso({
       className={`border-4 border-black bg-white p-8 text-black ${modoVistaPrevia ? "block" : "hidden print:block"}`}
     >
       <div className="flex items-start justify-between">
-        <div className="w-16 shrink-0">
-          {perfilDoctor.logoEscuelaUrl && (
-            // eslint-disable-next-line @next/next/no-img-element
-            <img src={perfilDoctor.logoEscuelaUrl} alt="" className="h-16 w-16 object-contain" />
-          )}
-        </div>
+        {/* Antes mostraba el logo de escuela de perfilDoctor — este
+            documento puede incluir folios de médicos distintos, sin un
+            único médico al que atribuirlo. Espaciador vacío para mantener
+            el título centrado. */}
+        <div className="w-16 shrink-0" />
         <div className="flex-1 text-center">
           <p className="text-xl font-bold">PLAN DE TRATAMIENTO COMPLETO</p>
         </div>

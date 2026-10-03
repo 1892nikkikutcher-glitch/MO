@@ -269,7 +269,7 @@ export default function Laboratorios({ patientId }: { patientId: string }) {
   // nuevos — se sigue mostrando igual en la sección de abajo.
   const solicitudes = todasLasSolicitudes.filter((s) => s.tipo !== "Dental");
   const ordenesDentales = todasLasSolicitudes.filter((s) => s.tipo === "Dental");
-  const clinicaNombre = clinicInfo?.nombre || perfilDoctor.nombre || "";
+  const clinicaNombre = clinicInfo?.nombre || "";
 
   const cambiarEstatus = (id: string, estatus: Estatus) => {
     setLaboratoriosPaciente(patientId, (prev) =>

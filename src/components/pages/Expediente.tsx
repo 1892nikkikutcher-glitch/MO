@@ -31,6 +31,7 @@ import {
   formatEdad,
   formatFechaCita,
   formatNombreConEdad,
+  identidadDoctorDe,
   presupuestoEstadoOptions,
   type CitaAgenda,
   type EstadoPresupuesto,
@@ -248,6 +249,7 @@ function PresupuestosTab({
 }) {
   const {
     perfilDoctor,
+    recursos,
     historiaClinicaPorPaciente,
     setRespuestasHistoriaClinica,
     comparativasPorPaciente,
@@ -357,6 +359,7 @@ function PresupuestosTab({
         diagnostico: budget.diagnostico,
         items: budget.items,
         total: budget.total,
+        identidadDoctor: identidadDoctorDe(budget.medico, recursos),
         perfilDoctor,
       });
       const resultado = await enviarPdfPorWhatsapp({

@@ -338,35 +338,20 @@ export const horarioInicial: HorarioAtencion = {
   cierre: "19:00",
 };
 
+/** Documento único de CONFIGURACIÓN DE CLÍNICA para recetas — ya NO es el
+ * perfil de un doctor único (para eso ver Recurso.tipo === "medico" e
+ * identidadDoctorDe). Estos 3 campos son los mismos sin importar qué
+ * médico de la clínica receta. */
 export type PerfilDoctor = {
-  nombre: string;
-  cedulaProfesional: string;
-  especialidad: string;
-  correo: string;
-  telefono: string;
-  /** Escuela de egreso, para el logotipo institucional en recetas. */
-  escuelaEgreso: string;
-  /** Link a una imagen del escudo/logo de la escuela (el usuario debe tener derecho de uso). */
-  logoEscuelaUrl: string;
-  /** Logo propio de la clínica o consultorio, opcional — se usa junto al de la escuela en recetas. */
+  /** Logo propio de la clínica o consultorio, opcional — se usa junto al del médico en recetas. */
   logoClinicaUrl: string;
-  /** Imagen de la firma del doctor, para recetas enviadas por medios digitales (PDF/WhatsApp). */
-  firmaDigitalUrl: string;
   direccionClinica: string;
   /** Ej. "Esta receta es válida durante 48h" — se imprime en cada receta. */
   textoValidezReceta: string;
 };
 
 export const perfilDoctorInicial: PerfilDoctor = {
-  nombre: "",
-  cedulaProfesional: "",
-  especialidad: "",
-  correo: "",
-  telefono: "",
-  escuelaEgreso: "",
-  logoEscuelaUrl: "",
   logoClinicaUrl: "",
-  firmaDigitalUrl: "",
   direccionClinica: "",
   textoValidezReceta: "Esta receta es válida durante 48h",
 };
@@ -583,12 +568,11 @@ export type Recurso = {
    * cobra la clínica. Solo aplica a tipo "medico"; ausente = todavía sin
    * configurar, nunca se asume un valor por defecto. */
   porcentajeComision?: number;
-  /** Cédula profesional de ESTE médico — para que Consentimiento Informado
-   * (y cualquier otro documento firmado) muestre la cédula de quien
-   * realmente atiende, no siempre la de `PerfilDoctor` (que es la de quien
-   * configuró Administración → Perfil del Doctor, típicamente el dueño de
-   * la cuenta). Solo aplica a tipo "medico"; ausente = todavía sin
-   * capturar. */
+  /** Cédula profesional de ESTE médico — para que Consentimiento Informado,
+   * recetas y cualquier otro documento firmado muestren la cédula de quien
+   * realmente atiende (ver identidadDoctorDe). Se edita en Administración →
+   * Médicos y Recetas, o rápido desde Agenda → Recursos. Solo aplica a tipo
+   * "medico"; ausente = todavía sin capturar. */
   cedulaProfesional?: string;
   /** Identidad de receta de ESTE médico — mismo espíritu que
    * `cedulaProfesional` de arriba, extendido a todo lo que antes vivía en
@@ -605,23 +589,6 @@ export type Recurso = {
   /** Imagen de la firma del doctor, para recetas enviadas por medios digitales (PDF/WhatsApp). */
   firmaDigitalUrl?: string;
 };
-
-/** Cédula profesional a mostrar en un documento firmado por `nombreMedico`
- * — nunca la cédula de otra persona. Prioridad: (1) la cédula que ese
- * médico tiene registrada como Recurso (Agenda → Recursos), (2) si ese
- * médico ES quien llenó Administración → Perfil del Doctor (mismo
- * nombre), su cédula de ahí, (3) ninguna — mostrar la cédula de alguien
- * más en un documento legal es peor que no mostrar ninguna. */
-export function cedulaProfesionalDe(
-  nombreMedico: string,
-  recursos: Pick<Recurso, "nombre" | "tipo" | "cedulaProfesional">[],
-  perfilDoctor: Pick<PerfilDoctor, "nombre" | "cedulaProfesional">
-): string {
-  const recurso = recursos.find((r) => r.tipo === "medico" && r.nombre === nombreMedico);
-  if (recurso?.cedulaProfesional) return recurso.cedulaProfesional;
-  if (nombreMedico && nombreMedico === perfilDoctor.nombre) return perfilDoctor.cedulaProfesional;
-  return "";
-}
 
 const CAMPOS_IDENTIDAD_DOCTOR = [
   "cedulaProfesional",

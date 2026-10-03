@@ -4,7 +4,7 @@ import { usePatientData } from "@/context/PatientDataContext";
 
 export default function AvisoPrivacidad({ onVolver }: { onVolver?: () => void } = {}) {
   const { perfilDoctor, clinicInfo } = usePatientData();
-  const nombreResponsable = perfilDoctor.nombre || clinicInfo?.nombre || "el consultorio";
+  const nombreResponsable = clinicInfo?.nombre || "el consultorio";
   const domicilio = perfilDoctor.direccionClinica || clinicInfo?.direccion || "";
   const actualizado = new Date().toLocaleDateString("es-MX", { day: "numeric", month: "long", year: "numeric" });
 

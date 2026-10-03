@@ -1,6 +1,6 @@
 import jsPDF from "jspdf";
 import { cargarImagen, type ImagenCargada } from "./imagenesPdf";
-import type { MedicamentoRecetado, PerfilDoctor } from "./patientData";
+import type { IdentidadDoctor, MedicamentoRecetado, PerfilDoctor } from "./patientData";
 
 export type DatosRecetaPdf = {
   folio: string;
@@ -18,6 +18,14 @@ export type DatosRecetaPdf = {
   alergias: string;
   medicamentos: MedicamentoRecetado[];
   notas: string;
+  /** Identidad de receta del médico elegido (identidadDoctorDe) — nombre
+   * viene de `medico` arriba, no de aquí, para que nunca haya dos fuentes
+   * compitiendo por cuál mostrar (ver bug corregido: el PDF llegó a
+   * mostrar el nombre/cédula de otra persona que el médico seleccionado
+   * en pantalla). */
+  identidadDoctor: IdentidadDoctor;
+  /** Solo lo que sigue siendo de la clínica (logoClinicaUrl,
+   * direccionClinica, textoValidezReceta) — ya no trae nombre/cédula/etc. */
   perfilDoctor: PerfilDoctor;
 };
 
@@ -31,9 +39,9 @@ export async function generarRecetaPdf(datos: DatosRecetaPdf): Promise<Blob> {
   const yHeader = 16;
 
   const [logoEscuela, logoClinica, firma] = await Promise.all([
-    cargarImagen(datos.perfilDoctor.logoEscuelaUrl),
+    cargarImagen(datos.identidadDoctor.logoEscuelaUrl),
     cargarImagen(datos.perfilDoctor.logoClinicaUrl),
-    cargarImagen(datos.perfilDoctor.firmaDigitalUrl),
+    cargarImagen(datos.identidadDoctor.firmaDigitalUrl),
   ]);
 
   const dibujarLogo = (logo: ImagenCargada | null, x: number, ladoMax: number) => {
@@ -51,25 +59,25 @@ export async function generarRecetaPdf(datos: DatosRecetaPdf): Promise<Blob> {
   dibujarLogo(logoEscuela, marginX, 22);
   dibujarLogo(logoClinica, pageWidth - marginX - 22, 22);
 
-  if (datos.perfilDoctor.escuelaEgreso) {
+  if (datos.identidadDoctor.escuelaEgreso) {
     doc.setFont("helvetica", "normal");
     doc.setFontSize(7);
-    const lineasEscuela = doc.splitTextToSize(datos.perfilDoctor.escuelaEgreso, 26);
+    const lineasEscuela = doc.splitTextToSize(datos.identidadDoctor.escuelaEgreso, 26);
     doc.text(lineasEscuela, marginX + 11, yHeader + 25, { align: "center" });
   }
 
   doc.setFont("helvetica", "bold");
   doc.setFontSize(14);
-  doc.text(datos.perfilDoctor.nombre || datos.medico, pageWidth / 2, yHeader + 6, { align: "center" });
+  doc.text(datos.medico, pageWidth / 2, yHeader + 6, { align: "center" });
   doc.setFont("helvetica", "normal");
   doc.setFontSize(10);
   let ySub = yHeader + 12;
-  if (datos.perfilDoctor.cedulaProfesional) {
-    doc.text(`Ced. Prof. ${datos.perfilDoctor.cedulaProfesional}`, pageWidth / 2, ySub, { align: "center" });
+  if (datos.identidadDoctor.cedulaProfesional) {
+    doc.text(`Ced. Prof. ${datos.identidadDoctor.cedulaProfesional}`, pageWidth / 2, ySub, { align: "center" });
     ySub += 5;
   }
-  if (datos.perfilDoctor.especialidad) {
-    doc.text(datos.perfilDoctor.especialidad, pageWidth / 2, ySub, { align: "center" });
+  if (datos.identidadDoctor.especialidad) {
+    doc.text(datos.identidadDoctor.especialidad, pageWidth / 2, ySub, { align: "center" });
   }
 
   doc.setFontSize(9);

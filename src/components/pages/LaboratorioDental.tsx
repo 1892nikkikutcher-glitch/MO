@@ -227,7 +227,7 @@ export default function LaboratorioDentalPage() {
     setOrdenAEditar({ patientId: o.patientId, solicitud });
   };
 
-  const clinicaNombre = clinicInfo?.nombre || perfilDoctor.nombre || "";
+  const clinicaNombre = clinicInfo?.nombre || "";
 
   const enviarWhatsApp = (laboratorio: LaboratorioDental) => {
     const texto = buildMensajeLaboratorioDental(clinicaNombre, laboratorio);

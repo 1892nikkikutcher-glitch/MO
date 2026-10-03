@@ -64,8 +64,7 @@ export default function AttentionAlerts({ rango }: { rango: RangoPeriodo }) {
     presupuestosPendientesDetalle,
     laboratoriosPendientes,
     irAPagina,
-    perfilDoctor,
-    perfilDoctorCargado,
+    recursos,
     horario,
     horarioCargado,
     articulosFaltantes,
@@ -252,11 +251,15 @@ export default function AttentionAlerts({ rango }: { rango: RangoPeriodo }) {
     });
   }
 
-  if (perfilDoctorCargado && !perfilDoctor.firmaDigitalUrl) {
+  const medicosSinFirma = recursos.filter((r) => r.tipo === "medico" && !r.firmaDigitalUrl);
+  if (medicosSinFirma.length > 0) {
     alertas.push({
       key: "firma",
       emoji: "🟡",
-      texto: "Aún no subes tu firma digital para las recetas",
+      texto:
+        medicosSinFirma.length === 1
+          ? `${medicosSinFirma[0].nombre} todavía no tiene firma digital para las recetas`
+          : `${medicosSinFirma.length} médicos todavía no tienen firma digital para las recetas`,
       prioridad: "baja",
       categoria: "perfil",
       onClick: () => irAPagina("administracion-perfil"),

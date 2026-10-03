@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { usePatientData } from "@/context/PatientDataContext";
-import { calcularEdadDetallada, cedulaProfesionalDe } from "@/lib/patientData";
+import { calcularEdadDetallada, identidadDoctorDe } from "@/lib/patientData";
 import { manejarCambioNombre } from "@/lib/textoNombre";
 
 type Patient = {
@@ -53,12 +53,11 @@ export default function ConsentimientoInformado({
   const [mes, setMes] = useState(fechaInicial.mes);
   const [anio, setAnio] = useState(fechaInicial.anio);
   const [hora, setHora] = useState(nowFormatted());
-  // El consentimiento debe llevar el nombre de quien REALMENTE va a atender
-  // al paciente, no siempre el de Administración → Perfil del Doctor (esa
-  // es la cédula/dirección de la clínica, no necesariamente quien trata a
-  // este paciente en particular). Se sugiere el médico de la cita más
-  // cercana del paciente (la próxima si tiene una agendada, si no la más
-  // reciente pasada) y siempre queda editable.
+  // El consentimiento debe llevar el nombre y la cédula de quien REALMENTE
+  // va a atender al paciente (identidadDoctorDe), no los de otro médico de
+  // la clínica. Se sugiere el médico de la cita más cercana del paciente
+  // (la próxima si tiene una agendada, si no la más reciente pasada) y
+  // siempre queda editable.
   const [medico, setMedico] = useState(() => {
     const hoyISO = new Date().toISOString().slice(0, 10);
     const citasPaciente = citas.filter((c) => c.patientId === patient.id && c.estatus !== "Cancelada");
@@ -70,9 +69,9 @@ export default function ConsentimientoInformado({
     const medicoSugerido = citaRelevante?.medicoId
       ? recursos.find((r) => r.id === citaRelevante.medicoId)?.nombre
       : undefined;
-    return medicoSugerido || medicos[0]?.nombre || perfilDoctor.nombre || "";
+    return medicoSugerido || medicos[0]?.nombre || "";
   });
-  const cedula = cedulaProfesionalDe(medico, recursos, perfilDoctor);
+  const cedula = identidadDoctorDe(medico, recursos).cedulaProfesional;
   const [procedimiento, setProcedimiento] = useState("");
   const [nombreFirmante, setNombreFirmante] = useState(
     esMenorDeEdad ? patient.nombreTutor || "" : patient.name
@@ -211,7 +210,7 @@ export default function ConsentimientoInformado({
           Carta de Consentimiento Informado General
         </h2>
         <div className="mt-3 text-center text-sm leading-snug print:mt-1.5 print:text-xs">
-          <p className="font-semibold">{medico || perfilDoctor.nombre || "Consultorio dental"}</p>
+          <p className="font-semibold">{medico || "Consultorio dental"}</p>
           {cedula && <p>Cédula profesional {cedula}</p>}
           {perfilDoctor.direccionClinica && <p>{perfilDoctor.direccionClinica}</p>}
         </div>

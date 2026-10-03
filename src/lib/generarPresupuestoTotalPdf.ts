@@ -30,10 +30,10 @@ export async function generarPresupuestoTotalPdf(datos: DatosPresupuestoTotalPdf
   const xNombre = marginX;
   const anchoNombre = xTotal - xNombre - 26;
 
-  const [logoEscuela, logoClinica] = await Promise.all([
-    cargarImagen(datos.perfilDoctor.logoEscuelaUrl),
-    cargarImagen(datos.perfilDoctor.logoClinicaUrl),
-  ]);
+  // Solo logo de clínica — un presupuesto completo puede incluir folios de
+  // médicos distintos, sin un único logo de escuela al que atribuirlo (ver
+  // generarComparativaPdf.ts, mismo criterio).
+  const logoClinica = await cargarImagen(datos.perfilDoctor.logoClinicaUrl);
 
   const dibujarLogo = (logo: ImagenCargada | null, x: number, yPos: number, ladoMax: number) => {
     if (!logo) return;
@@ -48,7 +48,6 @@ export async function generarPresupuestoTotalPdf(datos: DatosPresupuestoTotalPdf
   };
 
   let y = 16;
-  dibujarLogo(logoEscuela, marginX, y, 18);
   dibujarLogo(logoClinica, xTotal - 18, y, 18);
 
   doc.setFont("helvetica", "bold");

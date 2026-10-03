@@ -2548,7 +2548,7 @@ export function PatientDataProvider({
     const inviteId = correo ? `${clinicUid}_${correo}` : `${clinicUid}_pendiente_${Date.now()}`;
     await setDoc(doc(db, "clinicInvites", inviteId), {
       clinicId: clinicUid,
-      nombreClinica: clinicInfo?.nombre || perfilDoctor.nombre || "",
+      nombreClinica: clinicInfo?.nombre || "",
       email: correo,
       nombre: data.nombre.trim(),
       whatsapp: data.whatsapp.trim(),

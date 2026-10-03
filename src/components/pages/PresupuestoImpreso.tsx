@@ -1,7 +1,7 @@
 "use client";
 
 import { usePatientData } from "@/context/PatientDataContext";
-import { formatCurrency, type LineItem } from "@/lib/patientData";
+import { formatCurrency, identidadDoctorDe, type LineItem } from "@/lib/patientData";
 
 export default function PresupuestoImpreso({
   folio,
@@ -24,15 +24,16 @@ export default function PresupuestoImpreso({
   items: LineItem[];
   total: number;
 }) {
-  const { perfilDoctor } = usePatientData();
+  const { perfilDoctor, recursos } = usePatientData();
+  const identidadDoctor = identidadDoctorDe(medico, recursos);
 
   return (
     <div className="hidden border-4 border-black bg-white p-8 text-black print:block">
       <div className="flex items-start justify-between">
         <div className="w-16 shrink-0">
-          {perfilDoctor.logoEscuelaUrl && (
+          {identidadDoctor.logoEscuelaUrl && (
             // eslint-disable-next-line @next/next/no-img-element
-            <img src={perfilDoctor.logoEscuelaUrl} alt="" className="h-16 w-16 object-contain" />
+            <img src={identidadDoctor.logoEscuelaUrl} alt="" className="h-16 w-16 object-contain" />
           )}
         </div>
         <div className="flex-1 text-center">
@@ -58,7 +59,7 @@ export default function PresupuestoImpreso({
           <p>Teléfono: {pacienteTelefono || "Sin registro"}</p>
         </div>
         <div className="text-right">
-          <p>{medico || perfilDoctor.nombre}</p>
+          <p>{medico}</p>
           <p>{fechaLarga}</p>
         </div>
       </div>
