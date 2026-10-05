@@ -62,16 +62,20 @@
 }
 
 [data-theme="light"] {
-  --app: #f7f6f2;
-  --surface: #ffffff;
-  --surface2: #ffffff;
-  --field: #ffffff;
-  --inset: rgba(37, 42, 49, 0.045);
-  --modal: #ffffff;
+  /* Liquid glass — claro (restaurado a como era antes del 30-sep): vidrio
+     esmerilado sobre gris Oxford con resplandores suaves; naranja quemado
+     como acento. El modo oscuro NO usa vidrio (ver :root). */
+  --app: #eef1f7;
+  --surface: rgba(255, 255, 255, 0.58);
+  --surface2: rgba(255, 255, 255, 0.78);
+  --field: rgba(255, 255, 255, 0.62);
+  --inset: rgba(20, 23, 32, 0.05);
+  --modal: rgba(255, 255, 255, 0.8);
   --modal-solid: #ffffff;
   --cita-card-bg: #ffffff;
-  --nav-bg: #17324d;
-  --nav-ink-rgb: 244 246 248;
+  /* Barra superior / panel de navegación: vidrio claro, ya no azul marino. */
+  --nav-bg: rgba(255, 255, 255, 0.58);
+  --nav-ink-rgb: 0 0 0;
 
   /* Mismas familias de color que el modo oscuro, pero más oscuras/
      saturadas — se usan como texto sobre fondo claro (tarjetas, píldoras),
@@ -87,11 +91,11 @@
   --status-neutro: #475569;
 
   --edge-rgb: 64 67 76;
-  /* Carbón, no negro puro — pedido explícito de la paleta nueva. */
-  --ink-rgb: 37 42 49;
-  /* Amarillo — acciones principales y elementos activos. Mismo tono que
-     --status-en-espera claro, mismo motivo que en oscuro. */
-  --accent-rgb: 180 83 9;
+  /* Negro puro — pedido explícito de que el negro se vea más marcado. */
+  --ink-rgb: 0 0 0;
+  /* #bf360c naranja quemado + ámbar profundo para el degradado de botones
+     primarios (from-accent to-accent-2), como era antes. */
+  --accent-rgb: 191 54 12;
   --accent-2-rgb: 180 83 9;
   /* Dorado champán — acento premium, mismo uso puntual que en oscuro. */
   --premium-rgb: 197 166 106;
@@ -102,8 +106,10 @@
   --info-rgb: 29 78 216;
   --warning-rgb: 126 34 206;
 
-  --shadow-card: 0 10px 24px -12px rgba(23, 50, 77, 0.12);
-  --shadow-modal: 0 30px 60px -18px rgba(23, 50, 77, 0.22);
+  --shadow-card: inset 0 1px 0 0 rgba(255, 255, 255, 0.7), 0 10px 26px -10px rgba(30, 31, 36, 0.16);
+  --shadow-modal: inset 0 1px 0 0 rgba(255, 255, 255, 0.8), 0 30px 60px -18px rgba(30, 31, 36, 0.24);
+  --glass-blur: 20px;
+  --glass-blur-modal: 24px;
 }
 
 html,
@@ -116,6 +122,35 @@ body {
 
 .bg-app {
   background-color: var(--app);
+}
+
+/* Liquid glass SOLO en modo claro: resplandores difusos detrás de paneles de
+   vidrio esmerilado (blur + saturación + brillo sutil arriba). */
+[data-theme="light"] .bg-app {
+  background-image:
+    radial-gradient(680px circle at 12% 18%, rgba(59, 130, 246, 0.10), transparent 60%),
+    radial-gradient(560px circle at 88% 12%, rgba(168, 85, 247, 0.08), transparent 58%),
+    radial-gradient(760px circle at 55% 105%, rgba(14, 165, 233, 0.07), transparent 62%);
+  background-attachment: fixed;
+}
+
+[data-theme="light"] .bg-surface,
+[data-theme="light"] .bg-surface2,
+[data-theme="light"] .bg-modal,
+[data-theme="light"] .bg-nav {
+  backdrop-filter: blur(var(--glass-blur)) saturate(160%);
+  -webkit-backdrop-filter: blur(var(--glass-blur)) saturate(160%);
+  background-image: linear-gradient(180deg, rgba(255, 255, 255, 0.07), rgba(255, 255, 255, 0) 45%);
+}
+
+[data-theme="light"] .bg-modal {
+  backdrop-filter: blur(var(--glass-blur-modal)) saturate(160%);
+  -webkit-backdrop-filter: blur(var(--glass-blur-modal)) saturate(160%);
+}
+
+/* En claro la barra es vidrio claro: bordes oscuros (la tinta ya es negra). */
+[data-theme="light"] .bg-nav {
+  --edge-rgb: 64 67 76;
 }
 
 /* Fondo de navegación/encabezados (header de Dashboard, panel de
@@ -184,14 +219,14 @@ select option {
    veces: naranja, verde azulado, azul, ahora amarillo): los fondos/bordes
    translúcidos de baja opacidad se veían casi imperceptibles sobre el
    fondo claro — se conserva el mismo mecanismo sin importar el tono. */
-[data-theme="light"] .text-ink\/20 { color: rgb(var(--ink-rgb) / 0.5); }
-[data-theme="light"] .text-ink\/30 { color: rgb(var(--ink-rgb) / 0.58); }
-[data-theme="light"] .text-ink\/35 { color: rgb(var(--ink-rgb) / 0.62); }
-[data-theme="light"] .text-ink\/40 { color: rgb(var(--ink-rgb) / 0.66); }
-[data-theme="light"] .text-ink\/50 { color: rgb(var(--ink-rgb) / 0.72); }
-[data-theme="light"] .text-ink\/60 { color: rgb(var(--ink-rgb) / 0.78); }
-[data-theme="light"] .text-ink\/70 { color: rgb(var(--ink-rgb) / 0.85); }
-[data-theme="light"] .text-ink\/80 { color: rgb(var(--ink-rgb) / 0.92); }
+[data-theme="light"] .text-ink\/20 { color: rgb(var(--ink-rgb) / 0.55); }
+[data-theme="light"] .text-ink\/30 { color: rgb(var(--ink-rgb) / 0.65); }
+[data-theme="light"] .text-ink\/35 { color: rgb(var(--ink-rgb) / 0.7); }
+[data-theme="light"] .text-ink\/40 { color: rgb(var(--ink-rgb) / 0.75); }
+[data-theme="light"] .text-ink\/50 { color: rgb(var(--ink-rgb) / 0.82); }
+[data-theme="light"] .text-ink\/60 { color: rgb(var(--ink-rgb) / 0.88); }
+[data-theme="light"] .text-ink\/70 { color: rgb(var(--ink-rgb) / 0.93); }
+[data-theme="light"] .text-ink\/80 { color: rgb(var(--ink-rgb) / 0.97); }
 
 [data-theme="light"] .bg-accent\/5 { background-color: rgb(var(--accent-rgb) / 0.08); }
 [data-theme="light"] .bg-accent\/10 { background-color: rgb(var(--accent-rgb) / 0.16); }
