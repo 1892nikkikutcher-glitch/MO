@@ -382,6 +382,21 @@ service cloud.firestore {
       allow read, write: if isClinicAdmin(ownerId);
     }
 
+    // Papelera — copia exacta de TODO lo que se elimina desde la app (ver
+    // src/lib/papelera.ts). Toda eliminación escribe aquí y borra el original
+    // en el mismo batch, así que cualquier miembro activo que ya pueda
+    // eliminar algo necesita poder CREAR su copia — si no, su eliminación
+    // completa se rechaza (el registro se queda donde estaba). Solo se
+    // permite crear: un colaborador nunca puede modificar ni borrar entradas
+    // ya guardadas (la papelera es la red de seguridad, no debe poder
+    // vaciarse desde un rol operativo). Leer y marcar como restaurado
+    // (update) es solo de administradores: guarda copias de datos de todos
+    // los módulos, incluidos los financieros, que un colaborador no ve.
+    match /users/{ownerId}/papelera/{id} {
+      allow create: if isActiveMember(ownerId);
+      allow read, update: if isClinicAdmin(ownerId);
+    }
+
     // ============================================================
     // PANEL DE ADMINISTRADOR (cross-clínica, solo para el dueño de la
     // plataforma) — nunca se abre lectura/escritura de cliente aquí; todo

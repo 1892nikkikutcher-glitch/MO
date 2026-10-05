@@ -80,6 +80,7 @@ import {
 } from "@/lib/metas";
 import { presupuestoGastosInicial, type Gasto, type PresupuestoGastosConfig } from "@/lib/gastos";
 import { migrarIdentidadDoctor } from "@/lib/migracionIdentidadDoctor";
+import { archivarYEliminar } from "@/lib/papeleraFirestore";
 import { estadoRegulacionInicial, type EstadoRegulacionSanitaria } from "@/lib/regulacionSanitaria";
 import { formatosWhatsAppInicial, type FormatosWhatsApp } from "@/lib/formatosWhatsapp";
 import { contratoOrtodonciaInicial, type ContratoOrtodonciaConfig } from "@/lib/contratoOrtodoncia";
@@ -137,7 +138,6 @@ function resolveUpdater<T>(updater: Updater<T>, prev: T): T {
 }
 
 function syncFirestoreList<T extends { id: string }>(path: string, prev: T[], next: T[]) {
-  const prevIds = new Set(prev.map((p) => p.id));
   const nextIds = new Set(next.map((n) => n.id));
 
   next.forEach((item) => {
@@ -149,13 +149,14 @@ function syncFirestoreList<T extends { id: string }>(path: string, prev: T[], ne
     }
   });
 
-  prevIds.forEach((id) => {
-    if (!nextIds.has(id)) {
-      deleteDoc(doc(db, path, id)).catch((err) =>
-        console.error(`No se pudo eliminar ${path}/${id}`, err)
-      );
-    }
-  });
+  // Lo que ya no está en `next` se elimina de Firestore — pero NUNCA a secas:
+  // `archivarYEliminar` guarda antes una copia exacta en la Papelera
+  // (users/{clinicUid}/papelera), en el mismo batch que el borrado. Este es
+  // el único punto por el que pasa toda eliminación de registros de la app
+  // (listas de primer nivel y subcolecciones de paciente), así que cubrirlo
+  // aquí cubre todo; ver src/lib/papelera.ts.
+  const eliminados = [...new Map(prev.filter((p) => !nextIds.has(p.id)).map((p) => [p.id, p])).values()];
+  archivarYEliminar(path, eliminados as unknown as ({ id: string } & Record<string, unknown>)[]);
 }
 
 /** Colección de nivel superior sincronizada en tiempo real con `users/{clinicUid}/<name>`. */

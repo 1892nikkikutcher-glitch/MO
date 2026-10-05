@@ -4,7 +4,9 @@ import { useRef, useState } from "react";
 import ConfirmarEliminar from "@/components/ConfirmarEliminar";
 import { usePatientData } from "@/context/PatientDataContext";
 import { fotosVacias, type FotoPaciente } from "@/lib/patientData";
-import { subirFotoPaciente, borrarFotoPaciente } from "@/lib/fotosPaciente";
+import { subirFotoPaciente } from "@/lib/fotosPaciente";
+import { archivarYQuitarFoto } from "@/lib/papeleraFirestore";
+import type { CampoFoto } from "@/lib/papelera";
 
 function UploadIcon() {
   return (
@@ -283,6 +285,20 @@ export default function Fotografias({ patientId }: { patientId: string }) {
     guardar(foto);
   };
 
+  /** Quitar una foto ya NO borra el archivo de Storage (antes sí, para
+   * siempre): su registro se guarda en la Papelera y, en el mismo batch, se
+   * quita del expediente (ver archivarYQuitarFoto). Si la copia no se puede
+   * guardar, la foto se queda donde estaba. */
+  const quitarFoto = (campo: CampoFoto, foto: FotoPaciente) => {
+    if (!clinicUid) return;
+    archivarYQuitarFoto(clinicUid, patientId, campo, foto).catch((err) => {
+      console.error("No se pudo quitar la foto", err);
+      alert(
+        "No se pudo quitar la foto: antes de quitarla MO guarda una copia en la Papelera y esa copia no se pudo guardar. La foto sigue en el expediente."
+      );
+    });
+  };
+
   return (
     <div className="space-y-6">
       <div className="rounded-2xl border border-edge/10 bg-surface p-6">
@@ -298,8 +314,7 @@ export default function Fotografias({ patientId }: { patientId: string }) {
             , { maxLado: 600 })
           }
           onRemove={() => {
-            if (fotos.perfil) borrarFotoPaciente(fotos.perfil);
-            setFotosPaciente(patientId, (prev) => ({ ...prev, perfil: null }));
+            if (fotos.perfil) quitarFoto("perfil", fotos.perfil);
           }}
         />
       </div>
@@ -322,8 +337,7 @@ export default function Fotografias({ patientId }: { patientId: string }) {
               )
             }
             onRemove={() => {
-              if (fotos.ineFrente) borrarFotoPaciente(fotos.ineFrente);
-              setFotosPaciente(patientId, (prev) => ({ ...prev, ineFrente: null }));
+              if (fotos.ineFrente) quitarFoto("ineFrente", fotos.ineFrente);
             }}
           />
           <SingleUploadCard
@@ -336,8 +350,7 @@ export default function Fotografias({ patientId }: { patientId: string }) {
               )
             }
             onRemove={() => {
-              if (fotos.ineReverso) borrarFotoPaciente(fotos.ineReverso);
-              setFotosPaciente(patientId, (prev) => ({ ...prev, ineReverso: null }));
+              if (fotos.ineReverso) quitarFoto("ineReverso", fotos.ineReverso);
             }}
           />
         </div>
@@ -352,13 +365,7 @@ export default function Fotografias({ patientId }: { patientId: string }) {
           );
           setFotosPaciente(patientId, (prev) => ({ ...prev, extraorales: [...prev.extraorales, ...nuevas] }));
         }}
-        onRemove={(foto) => {
-          borrarFotoPaciente(foto);
-          setFotosPaciente(patientId, (prev) => ({
-            ...prev,
-            extraorales: prev.extraorales.filter((f) => f.id !== foto.id),
-          }));
-        }}
+        onRemove={(foto) => quitarFoto("extraorales", foto)}
       />
 
       <GalleryUploadCard
@@ -370,13 +377,7 @@ export default function Fotografias({ patientId }: { patientId: string }) {
           );
           setFotosPaciente(patientId, (prev) => ({ ...prev, intraorales: [...prev.intraorales, ...nuevas] }));
         }}
-        onRemove={(foto) => {
-          borrarFotoPaciente(foto);
-          setFotosPaciente(patientId, (prev) => ({
-            ...prev,
-            intraorales: prev.intraorales.filter((f) => f.id !== foto.id),
-          }));
-        }}
+        onRemove={(foto) => quitarFoto("intraorales", foto)}
       />
     </div>
   );

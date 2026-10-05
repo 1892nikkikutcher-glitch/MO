@@ -18,5 +18,12 @@ export default defineConfig({
       "src/lib/__tests__/integracion/**/*.test.ts",
     ],
     testTimeout: 20000,
+    // Todos los archivos comparten UN emulador y un mismo projectId, y casi
+    // todos hacen `clearFirestore()` entre pruebas: en paralelo, el
+    // `clearFirestore` de un archivo borra los datos que otro acaba de
+    // sembrar y aparecen fallas de "evaluation error" que no son de las
+    // reglas. Archivos en serie (las pruebas dentro de cada archivo ya
+    // corrían en serie).
+    fileParallelism: false,
   },
 });

@@ -80,7 +80,12 @@ export async function subirFotoPaciente(
 }
 
 /** Borra el archivo del Storage — si ya no existe (ej. doble clic) no
- * truena, para que la limpieza del registro en Firestore siga adelante. */
+ * truena, para que la limpieza del registro en Firestore siga adelante.
+ *
+ * YA NO SE LLAMA al quitar una foto del expediente: ese flujo conserva el
+ * archivo y manda el registro a la Papelera (ver archivarYQuitarFoto en
+ * papeleraFirestore.ts). Se deja reservada para una eventual purga
+ * definitiva de la Papelera, que hoy no existe a propósito. */
 export async function borrarFotoPaciente(foto: FotoPaciente): Promise<void> {
   try {
     await deleteObject(ref(storage, foto.path));

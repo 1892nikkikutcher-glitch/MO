@@ -1,13 +1,17 @@
 /** Pruebas de reglas de Firestore para MO Conecta (grupo A del plan, §8).
  *
- * PENDIENTE DE EJECUCIÓN EN ESTA MÁQUINA: el emulador de Firestore/Storage
- * (basado en Java) no arranca en este entorno de desarrollo — Java 21 falla
- * al crear su socket de loopback interno (AF_UNIX) por una restricción de
- * red de Windows en esta máquina, confirmado tras probar tres banderas de
- * JVM distintas. No es un problema del código ni de estas pruebas. Quedan
- * escritas y listas para correr en cuanto haya un entorno compatible (otra
- * máquina, o CI con Linux) con:
+ * Se corren con:
  *   firebase emulators:exec --only auth,firestore,storage "npm run test:emulator"
+ *
+ * EN LA MÁQUINA DE DESARROLLO (Windows, usuario con espacio en el nombre) el
+ * emulador de Firestore, que es Java, no arrancaba: fallaba al abrir su
+ * socket interno de loopback (AF_UNIX, "Unable to establish loopback
+ * connection"). Se arregla dándole a la JVM una carpeta temporal corta y sin
+ * espacios antes de correr el comando de arriba:
+ *   mkdir C:\jtmp
+ *   set JAVA_TOOL_OPTIONS=-Djava.io.tmpdir=C:\jtmp -Djdk.net.unixdomain.tmpdir=C:\jtmp
+ * (en Git Bash: export JAVA_TOOL_OPTIONS="-Djava.io.tmpdir=C:\\jtmp -Djdk.net.unixdomain.tmpdir=C:\\jtmp").
+ * En CI (Linux) no hace falta.
  *
  * Nunca corren contra el proyecto de producción — `setup.ts` apunta
  * explícitamente a 127.0.0.1. */
