@@ -86,3 +86,34 @@ describe("calcularSaldoPendiente", () => {
     expect(resultado.saldo).toBe(0);
   });
 });
+
+import { calcularSaldosGlobales } from "../saldosPendientes";
+
+describe("calcularSaldosGlobales", () => {
+  const presupuesto = (id: string, total: number) =>
+    ({ id, folio: id, fecha: "01/10/2026", medico: "", tipoDePrecio: "", especialidad: "", diagnostico: "", items: [{ id: `${id}-i`, procedure: "x", price: total, teeth: [], note: "" }], total }) as never;
+  const pago = (id: string, lineas: { tratamientoId: string | null; monto: number }[]) =>
+    ({ id, fecha: "02/10/2026", medico: "", formaPago: "Efectivo", lineas: lineas.map((l, i) => ({ id: `${id}-${i}`, folio: null, label: "x", ...l })), total: lineas.reduce((s, l) => s + l.monto, 0), facturar: false, firma: null }) as never;
+
+  it("solo incluye a quien aún debe y descuenta pagos ligados", () => {
+    const r = calcularSaldosGlobales(
+      [
+        { patientId: "a", patientName: "A", presupuestos: [presupuesto("b1", 1000)], pagos: [pago("p1", [{ tratamientoId: "b1-i", monto: 400 }])], devoluciones: [] },
+        { patientId: "b", patientName: "B", presupuestos: [presupuesto("b2", 500)], pagos: [pago("p2", [{ tratamientoId: "b2-i", monto: 500 }])], devoluciones: [] },
+      ],
+      "2026-10-05T00:00:00Z"
+    );
+    expect(Object.keys(r.porPaciente)).toEqual(["a"]);
+    expect(r.porPaciente.a).toMatchObject({ totalPresupuestado: 1000, totalPagado: 400 });
+    expect(r.sinLigar).toEqual([]);
+  });
+
+  it("detecta pagos sin ligar a un tratamiento: no bajan el saldo pero se reportan", () => {
+    const r = calcularSaldosGlobales(
+      [{ patientId: "a", patientName: "A", presupuestos: [presupuesto("b1", 1000)], pagos: [pago("p1", [{ tratamientoId: null, monto: 700 }])], devoluciones: [] }],
+      "2026-10-05T00:00:00Z"
+    );
+    expect(r.porPaciente.a.totalPagado).toBe(0);
+    expect(r.sinLigar).toEqual([{ patientId: "a", patientName: "A", monto: 700, cantidad: 1 }]);
+  });
+});

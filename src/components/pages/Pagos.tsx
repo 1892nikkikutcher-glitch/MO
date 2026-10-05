@@ -224,6 +224,11 @@ function EditarPagoDialog({
                   </span>
                 </div>
                 {esLibre && (
+                  <p className="text-[11px] text-warning">
+                    Este concepto NO descuenta de ningún presupuesto: el paciente seguirá apareciendo con saldo.
+                  </p>
+                )}
+                {esLibre && (
                   <input
                     type="text"
                     value={l.label}
@@ -897,6 +902,12 @@ export default function Pagos({
   );
 
   const totalPresupuestado = presupuestos.reduce((sum, p) => sum + p.total, 0);
+  /** Dinero cobrado en líneas sin tratamiento: entra a caja pero no descuenta
+   * de ningún presupuesto (ver calcularSaldoPendiente). */
+  const montoSinLigar = pagos.reduce(
+    (sum, p) => sum + p.lineas.reduce((ls, l) => ls + (!l.tratamientoId ? l.monto : 0), 0),
+    0
+  );
   const saldoPendienteTratamientos = tratamientosPendientes.reduce(
     (sum, t) => sum + t.pendiente,
     0
@@ -945,6 +956,15 @@ export default function Pagos({
           </button>
         </div>
       </div>
+
+      {montoSinLigar > 0 && (
+        <div className="rounded-xl border border-warning/40 bg-warning/10 p-3 text-xs text-ink/80">
+          <span className="font-semibold text-warning">{formatCurrency(montoSinLigar)} cobrados no están ligados a ningún tratamiento.</span>{" "}
+          Ese dinero entró a caja pero NO baja el saldo del presupuesto, por eso puede verse como si el
+          paciente no hubiera pagado. Edita el pago (✎) y elige el tratamiento que se pagó, en lugar de
+          «Otro concepto».
+        </div>
+      )}
 
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
         <div className="rounded-xl border border-edge/10 bg-surface p-4">

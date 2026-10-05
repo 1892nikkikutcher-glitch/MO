@@ -92,7 +92,14 @@ import type { CentroRadiodiagnostico } from "@/lib/centroRadiodiagnostico";
 import type { LaboratorioDental } from "@/lib/laboratorioDental";
 import type { PagoEliminado } from "@/lib/pagosEliminados";
 import type { PagoRealizado } from "@/lib/pagosRealizados";
-import { saldosPendientesInicial, calcularSaldoPendiente, type SaldosPendientesConfig } from "@/lib/saldosPendientes";
+import {
+  saldosPendientesInicial,
+  calcularSaldoPendiente,
+  calcularSaldosGlobales,
+  type EntradaRecalculo,
+  type PagosSinLigar,
+  type SaldosPendientesConfig,
+} from "@/lib/saldosPendientes";
 import {
   completarDevolucion,
   cancelarDevolucionBorrador,
@@ -206,6 +213,34 @@ function useFirestoreList<T extends { id: string }>(
   return [items, setItems] as const;
 }
 
+/** Documentos de resumen cuyo contenido es un mapa de entradas por paciente/
+ * orden/presupuesto que SE QUITAN al resolverse (el paciente liquida su
+ * saldo, la orden se recibe...). `setDoc(..., { merge: true })` hace merge
+ * profundo de mapas: una entrada que solo se omite del objeto nuevo NUNCA se
+ * borra de Firestore — reaparecía al recargar con su saldo viejo, y el
+ * reporte seguía mostrando como deudor a quien ya había pagado. Para estos
+ * documentos las entradas que desaparecieron se mandan como deleteField(). */
+const MAPA_CON_BAJAS: Record<string, string> = {
+  saldosPendientes: "porPaciente",
+  laboratoriosPendientes: "porOrden",
+  presupuestosPendientesDetalle: "porPresupuesto",
+  presupuestosCreadosDetalle: "porPresupuesto",
+};
+
+function conBajasPersistentes<T extends object>(name: string, prev: T, next: T): T {
+  const clave = MAPA_CON_BAJAS[name];
+  if (!clave) return next;
+  const mapaPrev = (prev as Record<string, unknown>)[clave] as Record<string, unknown> | undefined;
+  const mapaNext = (next as Record<string, unknown>)[clave] as Record<string, unknown> | undefined;
+  if (!mapaPrev || !mapaNext || typeof mapaPrev !== "object" || typeof mapaNext !== "object") return next;
+  const quitadas = Object.keys(mapaPrev).filter((k) => !(k in mapaNext));
+  if (quitadas.length === 0) return next;
+  return {
+    ...next,
+    [clave]: { ...mapaNext, ...Object.fromEntries(quitadas.map((k) => [k, deleteField()])) },
+  };
+}
+
 /** Documento único sincronizado en tiempo real en `users/{clinicUid}/config/<name>`. */
 function useFirestoreDoc<T extends object>(clinicUid: string | null, name: string, defaultValue: T) {
   const [value, setValueState] = useState<T>(defaultValue);
@@ -256,7 +291,7 @@ function useFirestoreDoc<T extends object>(clinicUid: string | null, name: strin
       // a todos ellos a la vez contra un guardado que reemplace el
       // documento completo con datos incompletos.
       const next = resolveUpdater(updater, prev);
-      setDoc(doc(db, path, name), next, { merge: true }).catch((err) =>
+      setDoc(doc(db, path, name), conBajasPersistentes(name, prev, next), { merge: true }).catch((err) =>
         console.error(`No se pudo guardar ${path}/${name}`, err)
       );
       return next;
@@ -712,6 +747,10 @@ type PatientDataContextValue = {
    * expuesto para el botón "Reintentar sincronización" cuando
    * registrarDevolucion devuelve saldoSincronizado: false. */
   reconciliarSaldoPendiente: (patientId: string) => void;
+  /** Recalcula los saldos de todos los pacientes desde sus datos reales. */
+  recalcularSaldosPendientes: (
+    onProgreso?: (hechos: number, total: number) => void
+  ) => Promise<{ pacientes: number; conSaldo: number; sinLigar: PagosSinLigar[] }>;
   /** Adjunta la firma de recepción (ya subida a Storage) a una devolución
    * completada — no transaccional, nunca sugiere que la devolución falló. */
   agregarFirmaRecepcionDevolucion: (
@@ -1913,6 +1952,42 @@ export function PatientDataProvider({
     );
   };
 
+  /** Recalcula desde cero los saldos de TODOS los pacientes leyendo sus
+   * presupuestos, pagos y devoluciones reales de Firestore (no el resumen
+   * incremental, que puede haberse desfasado), y reemplaza por completo
+   * `config/saldosPendientes`. Además devuelve qué pacientes tienen pagos sin
+   * ligar a un tratamiento (el dinero entró pero el saldo no baja). */
+  const recalcularSaldosPendientes = async (onProgreso?: (hechos: number, total: number) => void) => {
+    if (!clinicUid) throw new Error("Sin clínica activa.");
+    const lista = patients.filter((p) => !p.fusionadoEnId);
+    const entradas: EntradaRecalculo[] = [];
+    let hechos = 0;
+    const base = `users/${clinicUid}/pacientes`;
+    const leer = async <T,>(ruta: string) =>
+      (await getDocs(collection(db, ruta))).docs.map((d) => ({ ...(d.data() as T), id: d.id }));
+    const concurrencia = 8;
+    for (let i = 0; i < lista.length; i += concurrencia) {
+      const grupo = lista.slice(i, i + concurrencia);
+      const leidos = await Promise.all(
+        grupo.map(async (p) => {
+          const [presupuestos, pagos, devoluciones] = await Promise.all([
+            leer<SavedBudget>(`${base}/${p.id}/presupuestos`),
+            leer<Pago>(`${base}/${p.id}/pagos`),
+            leer<DevolucionPago>(`${base}/${p.id}/devoluciones`),
+          ]);
+          return { patientId: p.id, patientName: p.name, presupuestos, pagos, devoluciones };
+        })
+      );
+      entradas.push(...leidos);
+      hechos += grupo.length;
+      onProgreso?.(hechos, lista.length);
+    }
+    const { porPaciente, sinLigar } = calcularSaldosGlobales(entradas, new Date().toISOString());
+    // Sin merge: reemplaza el documento completo (también quita lo obsoleto).
+    await setDoc(doc(db, `users/${clinicUid}/config/saldosPendientes`), { porPaciente });
+    return { pacientes: lista.length, conSaldo: Object.keys(porPaciente).length, sinLigar };
+  };
+
   const registrarDevolucion = async (devolucionId: string, input: DevolucionInput, patientName: string) => {
     if (!clinicUid) throw new Error("Sin clínica activa.");
     // Atómico y garantizado: si esto no lanza, el dinero ya quedó
@@ -2716,6 +2791,7 @@ export function PatientDataProvider({
         cancelarDevolucion,
         corregirDevolucion,
         reconciliarSaldoPendiente,
+        recalcularSaldosPendientes,
         agregarFirmaRecepcionDevolucion,
         comparativasPorPaciente,
         setComparativasPaciente,
