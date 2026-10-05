@@ -4,6 +4,8 @@
   "private": true,
   "scripts": {
     "dev": "next dev --turbopack",
+    "emuladores": "node scripts/emuladores.mjs",
+    "dev:emulador": "node scripts/dev-emulador.mjs",
     "build": "next build",
     "start": "next start",
     "typecheck": "tsc --noEmit",

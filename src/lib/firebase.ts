@@ -1,12 +1,23 @@
 import { initializeApp, getApps, getApp } from "firebase/app";
-import { getAuth } from "firebase/auth";
+import { connectAuthEmulator, getAuth } from "firebase/auth";
 import {
+  connectFirestoreEmulator,
   getFirestore,
   initializeFirestore,
   persistentLocalCache,
   persistentMultipleTabManager,
 } from "firebase/firestore";
-import { getStorage } from "firebase/storage";
+import { connectStorageEmulator, getStorage } from "firebase/storage";
+
+/** SOLO DESARROLLO: con NEXT_PUBLIC_USAR_EMULADORES=1 (lo pone
+ * `npm run dev:emulador`, ver scripts/dev-emulador.mjs) la app habla con los
+ * emuladores LOCALES de Firebase (Auth 9099, Firestore 8080, Storage 9199,
+ * levantados con `npm run emuladores`) en vez de con el proyecto real — así
+ * se pueden crear cuentas y datos de prueba, y probar de punta a punta
+ * flujos que borran o modifican datos, sin tocar jamás producción. Next
+ * sustituye esta variable al compilar: en Vercel no existe, el bloque queda
+ * como código muerto. */
+const usarEmuladores = process.env.NEXT_PUBLIC_USAR_EMULADORES === "1";
 
 const firebaseConfig = {
   projectId: "studio-6139822035-f2e85",
@@ -17,8 +28,22 @@ const firebaseConfig = {
   storageBucket: "studio-6139822035-f2e85.firebasestorage.app",
 };
 
-export const app = getApps().length ? getApp() : initializeApp(firebaseConfig);
+// En modo emuladores se usa un proyecto "demo-": ni siquiera por error puede
+// hablar con servicios reales de Firebase (el emulador y el cliente coinciden
+// en este id, que también usa scripts/sembrar-emulador.mjs).
+export const PROYECTO_EMULADORES = "demo-mo-local";
+export const app = getApps().length
+  ? getApp()
+  : initializeApp(usarEmuladores ? { ...firebaseConfig, projectId: PROYECTO_EMULADORES, apiKey: "demo-local" } : firebaseConfig);
 export const auth = getAuth(app);
+if (usarEmuladores && typeof window !== "undefined") {
+  try {
+    connectAuthEmulator(auth, "http://127.0.0.1:9099", { disableWarnings: true });
+    console.info("[MO] Modo emuladores: Auth, Firestore y Storage apuntan a 127.0.0.1 (no a producción).");
+  } catch {
+    // Ya conectado (recarga en caliente del módulo) — nada que hacer.
+  }
+}
 
 /** Modo sin conexión: Firestore guarda en IndexedDB lo último que se leyó y
  * pone en cola los cambios hechos sin internet, sincronizándolos solos al
@@ -48,6 +73,17 @@ export const auth = getAuth(app);
  * opcional de cada tipo. */
 function crearFirestore() {
   if (typeof window === "undefined") return initializeFirestore(app, { ignoreUndefinedProperties: true });
+  if (usarEmuladores) {
+    // Sin caché persistente: el IndexedDB del navegador sobreviviría a los
+    // reinicios del emulador y mostraría datos de una sesión anterior.
+    try {
+      const emulado = initializeFirestore(app, { ignoreUndefinedProperties: true });
+      connectFirestoreEmulator(emulado, "127.0.0.1", 8080);
+      return emulado;
+    } catch {
+      return getFirestore(app); // ya inicializado y conectado (recarga en caliente)
+    }
+  }
   try {
     return initializeFirestore(app, {
       localCache: persistentLocalCache({ tabManager: persistentMultipleTabManager() }),
@@ -76,3 +112,10 @@ function crearFirestore() {
 
 export const db = crearFirestore();
 export const storage = getStorage(app);
+if (usarEmuladores && typeof window !== "undefined") {
+  try {
+    connectStorageEmulator(storage, "127.0.0.1", 9199);
+  } catch {
+    // Ya conectado (recarga en caliente del módulo).
+  }
+}
