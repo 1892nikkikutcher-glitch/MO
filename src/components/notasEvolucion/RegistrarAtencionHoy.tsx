@@ -420,6 +420,7 @@ function FormularioNota({
   } = useAutoguardadoNota(patientId, citaId, notaInicial, arranqueSincronizacion);
   const [errorFirma, setErrorFirma] = useState<string | null>(null);
   const [confirmando, setConfirmando] = useState(false);
+  const [verProgreso, setVerProgreso] = useState(false);
   const [guardando, setGuardando] = useState(false);
   const [errorGuardado, setErrorGuardado] = useState<string | null>(null);
   const [revisandoConflicto, setRevisandoConflicto] = useState(false);
@@ -666,24 +667,54 @@ function FormularioNota({
         </SeccionAcordeon>
       </div>
 
-      <div className="sticky bottom-24 z-10 rounded-2xl border border-edge/10 bg-modal p-4 shadow-card">
+      <div className="sticky bottom-24 z-10 rounded-2xl border border-edge/10 bg-modal p-3 shadow-card">
         {!confirmando && (
-          <div className="mb-3 space-y-1">
-            <p className="mb-1 text-xs font-medium text-ink/80">Progreso de la nota</p>
-            {seccionesOrden.map((s) => {
-              const estado = estadoSeccion(nota, s.id);
-              return (
-                <button
-                  key={s.id}
-                  type="button"
-                  onClick={() => irASeccion(s.id)}
-                  className="flex w-full items-center gap-2 text-left text-xs hover:underline"
-                >
-                  <span className={colorEstadoSeccion[estado]}>{iconoEstadoSeccion[estado]}</span>
-                  <span className={estado === "completa" ? "text-ink/40" : "text-ink/80"}>{s.titulo}</span>
-                </button>
-              );
-            })}
+          <div className="mb-2">
+            {/* Resumen de una línea + barra: la lista completa de secciones
+               está plegada por defecto para que la barra fija no tape la
+               nota; se despliega solo si se pide. */}
+            <button
+              type="button"
+              onClick={() => setVerProgreso((v) => !v)}
+              aria-expanded={verProgreso}
+              className="flex w-full items-center justify-between gap-2 pr-14 text-xs sm:pr-0"
+            >
+              <span className="font-medium text-ink/80">
+                Progreso de la nota · {seccionesOrden.filter((s) => estadoSeccion(nota, s.id) === "completa").length} de{" "}
+                {seccionesOrden.length}
+              </span>
+              <span className="text-ink/50">{verProgreso ? "Ocultar ▾" : "Ver pendientes ▴"}</span>
+            </button>
+            <div className="mt-1.5 h-1.5 overflow-hidden rounded-full bg-inset">
+              <div
+                className="h-full rounded-full bg-accent transition-all"
+                style={{
+                  width: `${
+                    (seccionesOrden.filter((s) => estadoSeccion(nota, s.id) === "completa").length /
+                      seccionesOrden.length) *
+                    100
+                  }%`,
+                }}
+              />
+            </div>
+            {verProgreso && (
+              <div className="mt-2 grid grid-cols-1 gap-x-4 gap-y-1 sm:grid-cols-2">
+                {seccionesOrden.map((s) => {
+                  const estado = estadoSeccion(nota, s.id);
+                  return (
+                    <button
+                      key={s.id}
+                      type="button"
+                      onClick={() => irASeccion(s.id)}
+                      className="flex items-center gap-2 text-left text-xs hover:underline"
+                    >
+                      <span className={colorEstadoSeccion[estado]}>{iconoEstadoSeccion[estado]}</span>
+                      <span className={estado === "completa" ? "text-ink/40" : "text-ink/80"}>{s.titulo}</span>
+                    </button>
+                  );
+                })}
+              </div>
+            )}
           </div>
         )}
         {errorFirma && <p className="mb-2 text-xs text-danger">{errorFirma} Tu información sigue protegida — puedes volver a intentar.</p>}
@@ -699,16 +730,24 @@ function FormularioNota({
           </div>
         )}
         {!confirmando ? (
-          <div className="flex flex-col gap-2 sm:flex-row">
+          <div className="flex gap-2">
             <button onClick={onGuardarYSalir} disabled={guardando} className={`${botonSecundario} flex-1`}>
-              {guardando ? "Guardando…" : "Guardar y continuar después"}
+              {guardando ? (
+                "Guardando…"
+              ) : (
+                <>
+                  <span className="sm:hidden">Guardar y salir</span>
+                  <span className="hidden sm:inline">Guardar y continuar después</span>
+                </>
+              )}
             </button>
             <button
               onClick={() => setConfirmando(true)}
               disabled={faltantes.length > 0 || !!conflictoRemoto}
               className={`${botonPrimario} flex-1`}
             >
-              Firmar y finalizar nota
+              <span className="sm:hidden">Firmar nota</span>
+              <span className="hidden sm:inline">Firmar y finalizar nota</span>
             </button>
           </div>
         ) : (
@@ -731,7 +770,7 @@ function FormularioNota({
          después, al bajar el scroll no hay suficiente recorrido para que
          el contenido (ej. el textarea de indicaciones) termine de pasar
          por detrás de la barra; se quedaba "atorado" empalmado con ella. */}
-      <div aria-hidden className="h-56" />
+      <div aria-hidden className="h-44" />
     </div>
   );
 }
