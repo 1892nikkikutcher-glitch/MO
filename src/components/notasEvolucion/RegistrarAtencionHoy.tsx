@@ -37,7 +37,7 @@ import {
   SeccionAcordeon,
 } from "./NotaUI";
 import NotaAdministrativaRapida from "./NotaAdministrativaRapida";
-import SeccionComoLlega from "./SeccionComoLlega";
+import SeccionComoLlega, { FilaNoSePresento } from "./SeccionComoLlega";
 import SeccionQueEncontraste from "./SeccionQueEncontraste";
 import SeccionDiagnostico from "./SeccionDiagnostico";
 import SeccionProcedimiento from "./SeccionProcedimiento";
@@ -571,6 +571,23 @@ function FormularioNota({
         </div>
       )}
 
+      {/* Al INICIO: si el paciente no llegó no hay nada clínico que documentar,
+         así que "No llega / Reagenda / Cancela" se ofrece antes de las
+         secciones de la nota. */}
+      <FilaNoSePresento
+        noSePresento={{
+          citas: citasCandidatas.map((c) => ({
+            id: c.id,
+            etiqueta: `${c.fecha === hoyISO ? "Hoy" : formatFechaCita(c.fecha)} ${c.horaInicio} hrs${
+              c.tratamientos.filter(Boolean).length > 0 ? ` · ${c.tratamientos.filter(Boolean).join(", ")}` : ""
+            }`,
+          })),
+          citaId: citaObjetivo?.id ?? null,
+          onCambiarCita: setCitaNoSePresentoId,
+          onElegir: setMotivoNoSePresento,
+        }}
+      />
+
       <div className="space-y-2.5">
         <SeccionAcordeon
           id="como_llega"
@@ -583,17 +600,6 @@ function FormularioNota({
             valor={nota.comoLlegaHoy}
             onChange={registrarCambio}
             onBlurTexto={flushInmediato}
-            noSePresento={{
-              citas: citasCandidatas.map((c) => ({
-                id: c.id,
-                etiqueta: `${c.fecha === hoyISO ? "Hoy" : formatFechaCita(c.fecha)} ${c.horaInicio} hrs${
-                  c.tratamientos.filter(Boolean).length > 0 ? ` · ${c.tratamientos.filter(Boolean).join(", ")}` : ""
-                }`,
-              })),
-              citaId: citaObjetivo?.id ?? null,
-              onCambiarCita: setCitaNoSePresentoId,
-              onElegir: setMotivoNoSePresento,
-            }}
           />
         </SeccionAcordeon>
 

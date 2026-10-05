@@ -10,6 +10,7 @@
 
 import type { Procedimiento } from "./procedimientos";
 import type { CitaAgenda, CitaEstatus, NotaEvolucion } from "./patientData";
+import type { RazonNoAsistencia } from "./noAsistencia";
 import { plantillaCamposPorTipo, type DetalleProcedimiento } from "./procedimientoNotaPlantillas";
 
 export const FORMATO_NOTA_VERSION_ACTUAL = 2 as const;
@@ -582,6 +583,8 @@ export type NotaEvolucionAdministrativa = {
   pacienteNombreSnapshot: string;
   citaId: string;
   motivo: MotivoNotaAdministrativa;
+  /** Por qué (olvido, enfermedad, económico...) — opcional, ver noAsistencia.ts. */
+  razon?: RazonNoAsistencia;
   notaLibre?: string;
   psoap?: PsoapOpcional;
   registradoPorUid: string;
@@ -593,6 +596,7 @@ export function notaAdministrativaInicial(args: {
   pacienteNombreSnapshot: string;
   citaId: string;
   motivo: MotivoNotaAdministrativa;
+  razon?: RazonNoAsistencia;
   notaLibre?: string;
   psoap?: PsoapOpcional;
   registradoPorUid: string;

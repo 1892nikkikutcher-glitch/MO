@@ -40,6 +40,7 @@ import {
   type Pago,
   type LineItem,
 } from "@/lib/patientData";
+import { textoMotivoNoAsistencia } from "@/lib/noAsistencia";
 import {
   condicionesSistemicasPositivas,
   esNegacionAlergia,
@@ -1020,6 +1021,9 @@ function ExpedienteSidePanel({
                   </span>
                 </div>
                 <p className="mt-1 text-xs text-ink/50">{cita.tratamientos.join(", ") || "—"}</p>
+                {textoMotivoNoAsistencia(cita) && (
+                  <p className="mt-0.5 text-xs text-ink/60">Motivo: {textoMotivoNoAsistencia(cita)}</p>
+                )}
               </div>
             ))}
           </div>

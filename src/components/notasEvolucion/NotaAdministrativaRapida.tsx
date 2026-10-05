@@ -18,6 +18,12 @@ import {
   type MotivoNotaAdministrativa,
   type PsoapOpcional,
 } from "@/lib/notasEvolucion";
+import {
+  estatusAdmiteMotivo,
+  razonesNoAsistencia,
+  razonNoAsistenciaLabel,
+  type RazonNoAsistencia,
+} from "@/lib/noAsistencia";
 import { botonPrimario, Chip, inputClass, labelClass } from "./NotaUI";
 
 function motivoSugeridoPorEstatus(estatus: CitaAgenda["estatus"]): MotivoNotaAdministrativa | null {
@@ -76,6 +82,7 @@ export default function NotaAdministrativaRapida({
   const [motivo, setMotivo] = useState<MotivoNotaAdministrativa | null>(
     motivoInicial ?? motivoSugeridoPorEstatus(cita.estatus)
   );
+  const [razon, setRazon] = useState<RazonNoAsistencia | null>(cita.razonNoAsistencia ?? null);
   const [notaLibre, setNotaLibre] = useState(notaLibreSugerida ?? "");
   const [mostrarPsoap, setMostrarPsoap] = useState(false);
   const [psoap, setPsoap] = useState<PsoapOpcional>(psoapVacio);
@@ -99,6 +106,7 @@ export default function NotaAdministrativaRapida({
           pacienteNombreSnapshot: paciente?.name ?? "",
           citaId,
           motivo,
+          ...(razon ? { razon } : {}),
           notaLibre: notaLibre.trim() || undefined,
           psoap: psoapConContenido
             ? {
@@ -114,7 +122,11 @@ export default function NotaAdministrativaRapida({
       );
       // Primero la nota, después el estatus: si guardar la nota falla, la
       // cita queda tal cual estaba en vez de cambiar sin dejar registro.
-      if (estatusDestino) marcarEstatusCita(citaId, estatusDestino);
+      // El motivo (razón) también queda en la propia cita, para verlo en
+      // Agenda y reportes sin abrir la nota.
+      const estatusFinal = estatusDestino ?? cita.estatus;
+      if (razon && estatusAdmiteMotivo(estatusFinal)) marcarEstatusCita(citaId, estatusFinal, { razon });
+      else if (estatusDestino) marcarEstatusCita(citaId, estatusDestino);
       onGuardado();
     } catch (err) {
       console.error("No se pudo guardar la nota administrativa", err);
@@ -155,6 +167,17 @@ export default function NotaAdministrativaRapida({
             {motivoNotaAdministrativaLabel[m]}
           </Chip>
         ))}
+      </div>
+
+      <div className="mt-4">
+        <label className={labelClass}>¿Por qué? (opcional, ayuda a ver por qué se pierden citas)</label>
+        <div className="flex flex-wrap gap-2">
+          {razonesNoAsistencia.map((r) => (
+            <Chip key={r} seleccionado={razon === r} onClick={() => setRazon(razon === r ? null : r)}>
+              {razonNoAsistenciaLabel[r]}
+            </Chip>
+          ))}
+        </div>
       </div>
 
       <div className="mt-4">

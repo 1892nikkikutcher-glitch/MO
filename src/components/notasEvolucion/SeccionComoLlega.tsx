@@ -48,7 +48,6 @@ export default function SeccionComoLlega({
   valor,
   onChange,
   onBlurTexto,
-  noSePresento,
 }: {
   valor: ComoLlegaHoy;
   onChange: (updater: (prev: NotaEvolucionV2) => NotaEvolucionV2, opts?: { inmediato?: boolean }) => void;
@@ -56,7 +55,6 @@ export default function SeccionComoLlega({
    * libre — ver §7.2.1 del plan (persistencia continua + flush best-effort
    * al perder el foco, nunca dependiente de eventos de cierre de página). */
   onBlurTexto?: () => void;
-  noSePresento?: OpcionesNoSePresento;
 }) {
   function toggleChip(chip: ChipLlegada) {
     // Selección estructurada (clic, no tecleo) — persistencia inmediata.
@@ -127,49 +125,57 @@ export default function SeccionComoLlega({
         />
       </div>
 
-      {noSePresento && (
-        <div className="space-y-2 border-t border-edge/10 pt-3">
-          <p className="text-xs font-medium text-ink/60">¿El paciente no se presentó?</p>
-          {noSePresento.citas.length === 0 ? (
-            <p className="text-xs text-ink/40">
-              Este paciente no tiene una cita pendiente en Agenda, así que no hay una cita que marcar como «No
-              llega», «Reagenda» o «Cancela».
-            </p>
+    </div>
+  );
+}
+
+/** Fila "¿El paciente no se presentó?" — va al INICIO de la nota (antes de las
+ * secciones clínicas), porque si el paciente no llegó no hay nada que
+ * documentar clínicamente. */
+export function FilaNoSePresento({ noSePresento }: { noSePresento: OpcionesNoSePresento }) {
+  return (
+    <div className="rounded-2xl border border-edge/10 bg-surface p-3">
+      <div className="space-y-2">
+      <p className="text-xs font-medium text-ink/60">¿El paciente no se presentó?</p>
+      {noSePresento.citas.length === 0 ? (
+        <p className="text-xs text-ink/40">
+          Este paciente no tiene una cita pendiente en Agenda, así que no hay una cita que marcar como «No
+          llega», «Reagenda» o «Cancela».
+        </p>
+      ) : (
+        <>
+          <div className="flex flex-wrap gap-2">
+            {opcionesNoSePresento.map((o) => (
+              <Chip key={o.motivo} seleccionado={false} onClick={() => noSePresento.onElegir(o.motivo)}>
+                {o.etiqueta}
+              </Chip>
+            ))}
+          </div>
+          {noSePresento.citas.length === 1 ? (
+            <p className="text-xs text-ink/40">Aplica a la cita: {noSePresento.citas[0].etiqueta}</p>
           ) : (
-            <>
-              <div className="flex flex-wrap gap-2">
-                {opcionesNoSePresento.map((o) => (
-                  <Chip key={o.motivo} seleccionado={false} onClick={() => noSePresento.onElegir(o.motivo)}>
-                    {o.etiqueta}
-                  </Chip>
+            <div className="flex flex-wrap items-center gap-2 text-xs text-ink/40">
+              <label htmlFor="cita-no-se-presento">Aplica a la cita:</label>
+              <select
+                id="cita-no-se-presento"
+                value={noSePresento.citaId ?? ""}
+                onChange={(e) => noSePresento.onCambiarCita(e.target.value)}
+                className="rounded-lg border border-edge/10 bg-field px-2 py-1 text-xs text-ink outline-none focus:border-accent/60"
+              >
+                {noSePresento.citas.map((c) => (
+                  <option key={c.id} value={c.id}>
+                    {c.etiqueta}
+                  </option>
                 ))}
-              </div>
-              {noSePresento.citas.length === 1 ? (
-                <p className="text-xs text-ink/40">Aplica a la cita: {noSePresento.citas[0].etiqueta}</p>
-              ) : (
-                <div className="flex flex-wrap items-center gap-2 text-xs text-ink/40">
-                  <label htmlFor="cita-no-se-presento">Aplica a la cita:</label>
-                  <select
-                    id="cita-no-se-presento"
-                    value={noSePresento.citaId ?? ""}
-                    onChange={(e) => noSePresento.onCambiarCita(e.target.value)}
-                    className="rounded-lg border border-edge/10 bg-field px-2 py-1 text-xs text-ink outline-none focus:border-accent/60"
-                  >
-                    {noSePresento.citas.map((c) => (
-                      <option key={c.id} value={c.id}>
-                        {c.etiqueta}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-              )}
-              <p className="text-[11px] text-ink/30">
-                Se abrirá una nota corta; la cita no cambia de estatus hasta que guardes esa nota.
-              </p>
-            </>
+              </select>
+            </div>
           )}
-        </div>
+          <p className="text-[11px] text-ink/30">
+            Se abrirá una nota corta; la cita no cambia de estatus hasta que guardes esa nota.
+          </p>
+        </>
       )}
+    </div>
     </div>
   );
 }

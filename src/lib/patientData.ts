@@ -2,6 +2,7 @@ import { capitalizarNombre } from "./textoNombre";
 import type { PrioridadTratamiento } from "./planTratamiento";
 import { montoMayorQue, redondearDinero } from "./dinero";
 import type { MigracionEstado } from "./migracionExpedienteEstado";
+import type { RazonNoAsistencia } from "./noAsistencia";
 
 export type Patient = {
   id: string;
@@ -733,6 +734,10 @@ export type CitaAgenda = {
   seguimientoMotivo?: string;
   /** Ausente = cita creada a mano (compatibilidad con citas existentes). */
   origenCita?: "manual" | "seguimiento_automatico";
+  /** Por qué no se presentó / canceló / reagendó — solo con estatus No
+   * Asistió, Cancelada o Reagendada (ver src/lib/noAsistencia.ts). Opcional. */
+  razonNoAsistencia?: RazonNoAsistencia;
+  detalleNoAsistencia?: string;
 };
 
 export const laboratorioTipoOptions = ["Dental", "Químico", "Radiografía"] as const;

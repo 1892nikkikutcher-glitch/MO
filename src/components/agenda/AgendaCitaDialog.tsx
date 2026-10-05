@@ -26,6 +26,12 @@ import {
 } from "@/lib/seguimientoAutomatico";
 import { manejarCambioNombre } from "@/lib/textoNombre";
 import { medicoPreferidoDePaciente } from "@/lib/agendaHelpers";
+import {
+  estatusAdmiteMotivo,
+  razonesNoAsistencia,
+  razonNoAsistenciaLabel,
+  type RazonNoAsistencia,
+} from "@/lib/noAsistencia";
 import { formatDuracion } from "@/lib/procedimientos";
 import GlobalAgregarPago from "@/components/GlobalAgregarPago";
 import ConfirmarEliminar from "@/components/ConfirmarEliminar";
@@ -173,6 +179,8 @@ export default function AgendaCitaDialog({
   );
   const [estatus, setEstatus] = useState<CitaEstatus>(initial.estatus ?? "Agendada");
   const [horaLlegada, setHoraLlegada] = useState(initial.horaLlegada ?? "");
+  const [razonNA, setRazonNA] = useState<RazonNoAsistencia | "">(initial.razonNoAsistencia ?? "");
+  const [detalleNA, setDetalleNA] = useState(initial.detalleNoAsistencia ?? "");
   const [confirmandoEliminarCita, setConfirmandoEliminarCita] = useState(false);
 
   /** "En espera" significa que el paciente ya llegó y está esperando ser
@@ -394,6 +402,10 @@ export default function AgendaCitaDialog({
       seguimientoSecuencia: initial.seguimientoSecuencia,
       seguimientoMotivo: seguimientoAutomatico ? seguimientoMotivo.trim() : undefined,
       origenCita: initial.origenCita ?? "manual",
+      // Motivo de inasistencia: solo si el estatus lo admite (al pasar a
+      // Atendida, etc., se descarta solo porque `base` se arma desde cero).
+      ...(estatusAdmiteMotivo(estatus) && razonNA ? { razonNoAsistencia: razonNA } : {}),
+      ...(estatusAdmiteMotivo(estatus) && detalleNA.trim() ? { detalleNoAsistencia: detalleNA.trim() } : {}),
     };
 
     // Si la cita queda ligada a un paciente y trae un costo estimado, se
@@ -561,6 +573,37 @@ export default function AgendaCitaDialog({
                 );
               })}
             </div>
+            {estatusAdmiteMotivo(estatus) && (
+              <div className="mt-3 space-y-2 rounded-lg border border-edge/10 bg-inset p-3">
+                <p className="text-xs font-medium text-ink/70">
+                  ¿Por qué {estatus === "No Asistió" ? "no se presentó" : estatus === "Cancelada" ? "canceló" : "reagendó"}?{" "}
+                  <span className="font-normal text-ink/40">(opcional)</span>
+                </p>
+                <div className="flex flex-wrap gap-1.5">
+                  {razonesNoAsistencia.map((r) => (
+                    <button
+                      key={r}
+                      type="button"
+                      onClick={() => setRazonNA(razonNA === r ? "" : r)}
+                      className={`rounded-full border px-2.5 py-1 text-xs transition-colors ${
+                        razonNA === r
+                          ? "border-accent/60 bg-accent/15 text-accent"
+                          : "border-edge/15 text-ink/60 hover:text-ink"
+                      }`}
+                    >
+                      {razonNoAsistenciaLabel[r]}
+                    </button>
+                  ))}
+                </div>
+                <input
+                  type="text"
+                  value={detalleNA}
+                  onChange={(e) => setDetalleNA(e.target.value)}
+                  placeholder="Detalle (ej. avisó por WhatsApp, quedó de llamar)"
+                  className="w-full rounded-lg border border-edge/10 bg-field px-3 py-1.5 text-xs text-ink outline-none focus:border-accent/60"
+                />
+              </div>
+            )}
           </div>
           {isEditing && (
             // En mobile son parte del flujo normal (su propia fila, centradas);

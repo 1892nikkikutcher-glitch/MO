@@ -4,6 +4,13 @@ import { useState } from "react";
 import { usePatientData } from "@/context/PatientDataContext";
 import { citaEstatusOptions, formatFechaCita, type CitaEstatus } from "@/lib/patientData";
 import { enRangoFecha } from "@/lib/reportes";
+import {
+  estatusAdmiteMotivo,
+  razonesNoAsistencia,
+  razonNoAsistenciaLabel,
+  textoMotivoNoAsistencia,
+  type RazonNoAsistencia,
+} from "@/lib/noAsistencia";
 
 const inputClass =
   "w-full rounded-lg border border-edge/10 bg-field px-3 py-2 text-sm text-ink outline-none focus:border-accent/60";
@@ -25,17 +32,30 @@ export default function BitacoraCitas() {
   const [recursoId, setRecursoId] = useState("");
   const [estatus, setEstatus] = useState<CitaEstatus | "">("");
   const [busqueda, setBusqueda] = useState("");
+  const [razon, setRazon] = useState<RazonNoAsistencia | "sin_motivo" | "">("");
 
   const filtradas = citas
     .filter((c) => enRangoFecha(c.fecha, desde, hasta))
     .filter((c) => !recursoId || c.recursoId === recursoId)
     .filter((c) => !estatus || c.estatus === estatus)
+    .filter((c) => {
+      if (!razon) return true;
+      if (razon === "sin_motivo") return estatusAdmiteMotivo(c.estatus) && !c.razonNoAsistencia;
+      return c.razonNoAsistencia === razon;
+    })
     .filter((c) => !busqueda.trim() || c.paciente.toLowerCase().includes(busqueda.trim().toLowerCase()))
     .sort((a, b) => (a.fecha + a.horaInicio < b.fecha + b.horaInicio ? 1 : -1));
 
+  // Cuántas inasistencias/cancelaciones/reagendas hay por motivo dentro del
+  // filtro actual — para ver de un vistazo por qué se pierden citas.
+  const conteoMotivos = razonesNoAsistencia
+    .map((r) => ({ r, n: filtradas.filter((c) => c.razonNoAsistencia === r).length }))
+    .filter((x) => x.n > 0);
+  const sinMotivo = filtradas.filter((c) => estatusAdmiteMotivo(c.estatus) && !c.razonNoAsistencia).length;
+
   return (
     <div className="space-y-6">
-      <div className="grid grid-cols-2 gap-3 rounded-2xl border border-edge/10 bg-surface p-6 sm:grid-cols-5">
+      <div className="grid grid-cols-2 gap-3 rounded-2xl border border-edge/10 bg-surface p-6 sm:grid-cols-6">
         <div>
           <label className="mb-1 block text-xs font-medium text-ink/60">Desde</label>
           <input type="date" value={desde} onChange={(e) => setDesde(e.target.value)} className={inputClass} />
@@ -71,6 +91,22 @@ export default function BitacoraCitas() {
           </select>
         </div>
         <div>
+          <label className="mb-1 block text-xs font-medium text-ink/60">Motivo</label>
+          <select
+            value={razon}
+            onChange={(e) => setRazon(e.target.value as RazonNoAsistencia | "sin_motivo" | "")}
+            className={inputClass}
+          >
+            <option value="">Todos</option>
+            {razonesNoAsistencia.map((r) => (
+              <option key={r} value={r}>
+                {razonNoAsistenciaLabel[r]}
+              </option>
+            ))}
+            <option value="sin_motivo">Sin motivo registrado</option>
+          </select>
+        </div>
+        <div>
           <label className="mb-1 block text-xs font-medium text-ink/60">Paciente</label>
           <input
             type="text"
@@ -83,6 +119,20 @@ export default function BitacoraCitas() {
       </div>
 
       <p className="text-xs text-ink/40">{filtradas.length} cita(s) encontrada(s).</p>
+      {(conteoMotivos.length > 0 || sinMotivo > 0) && (
+        <div className="flex flex-wrap gap-2 text-xs">
+          {conteoMotivos.map(({ r, n }) => (
+            <span key={r} className="rounded-full border border-edge/15 px-2.5 py-1 text-ink/70">
+              {razonNoAsistenciaLabel[r]}: <span className="font-semibold text-ink">{n}</span>
+            </span>
+          ))}
+          {sinMotivo > 0 && (
+            <span className="rounded-full border border-edge/15 px-2.5 py-1 text-ink/40">
+              Sin motivo registrado: <span className="font-semibold">{sinMotivo}</span>
+            </span>
+          )}
+        </div>
+      )}
 
       {filtradas.length === 0 ? (
         <div className="rounded-2xl border border-dashed border-edge/15 bg-surface p-10 text-center text-sm text-ink/40">
@@ -99,6 +149,7 @@ export default function BitacoraCitas() {
                 <th className="px-4 py-3 font-medium">Médico / Unidad</th>
                 <th className="px-4 py-3 font-medium">Procedimiento(s)</th>
                 <th className="px-4 py-3 font-medium">Estatus</th>
+                <th className="px-4 py-3 font-medium">Motivo</th>
               </tr>
             </thead>
             <tbody>
@@ -118,6 +169,7 @@ export default function BitacoraCitas() {
                       {c.estatus}
                     </span>
                   </td>
+                  <td className="px-4 py-3 text-ink/60">{textoMotivoNoAsistencia(c) || "—"}</td>
                 </tr>
               ))}
             </tbody>

@@ -17,6 +17,7 @@ import {
 } from "@/lib/notasEvolucion";
 import { generarNarrativa } from "@/lib/notaNarrativa";
 import type { DiagnosticoPaciente } from "@/lib/notasEvolucion";
+import { razonNoAsistenciaLabel } from "@/lib/noAsistencia";
 import type { NotaEvolucion } from "@/lib/patientData";
 
 /** Fecha + hora de una entrada del historial — antes solo se mostraba la
@@ -140,6 +141,7 @@ function TarjetaAdministrativa({ nota }: { nota: NotaEvolucionAdministrativa }) 
         </span>
       </div>
       <p className="mt-2 text-sm font-medium text-ink">{motivoNotaAdministrativaLabel[nota.motivo]}</p>
+      {nota.razon && <p className="mt-0.5 text-xs text-ink/60">Motivo: {razonNoAsistenciaLabel[nota.razon]}</p>}
       {nota.notaLibre && <p className="mt-1 text-sm text-ink/70">{nota.notaLibre}</p>}
       {nota.psoap && (
         <div className="mt-3 space-y-2 border-t border-edge/10 pt-2">

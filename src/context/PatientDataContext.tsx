@@ -81,6 +81,7 @@ import {
 import { presupuestoGastosInicial, type Gasto, type PresupuestoGastosConfig } from "@/lib/gastos";
 import { migrarIdentidadDoctor } from "@/lib/migracionIdentidadDoctor";
 import { archivarYEliminar } from "@/lib/papeleraFirestore";
+import { aplicarEstatusConMotivo, type MotivoNoAsistencia } from "@/lib/noAsistencia";
 import { estadoRegulacionInicial, type EstadoRegulacionSanitaria } from "@/lib/regulacionSanitaria";
 import { formatosWhatsAppInicial, type FormatosWhatsApp } from "@/lib/formatosWhatsapp";
 import { contratoOrtodonciaInicial, type ContratoOrtodonciaConfig } from "@/lib/contratoOrtodoncia";
@@ -789,7 +790,7 @@ type PatientDataContextValue = {
   /** Cambia solo el estatus de una cita — para registrar desde la nota de
    * evolución que el paciente no llegó, canceló o reagendó, sin tener que
    * salir a Agenda a cambiarlo a mano. */
-  marcarEstatusCita: (citaId: string, estatus: CitaEstatus) => void;
+  marcarEstatusCita: (citaId: string, estatus: CitaEstatus, motivo?: MotivoNoAsistencia) => void;
   procedimientos: Procedimiento[];
   setProcedimientos: (updater: Updater<Procedimiento[]>) => void;
   importarCatalogoProcedimientos: (nuevos: Procedimiento[]) => Promise<void>;
@@ -2537,8 +2538,8 @@ export function PatientDataProvider({
     setCitas((prev) => prev.map((c) => (c.id === citaId ? { ...c, horaLlegada: hora } : c)));
   };
 
-  const marcarEstatusCita = (citaId: string, estatus: CitaEstatus) => {
-    setCitas((prev) => prev.map((c) => (c.id === citaId ? { ...c, estatus } : c)));
+  const marcarEstatusCita = (citaId: string, estatus: CitaEstatus, motivo?: MotivoNoAsistencia) => {
+    setCitas((prev) => prev.map((c) => (c.id === citaId ? aplicarEstatusConMotivo(c, estatus, motivo) : c)));
   };
 
   const invitarColaborador = async (data: {
