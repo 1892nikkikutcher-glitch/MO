@@ -155,7 +155,7 @@ export default function ExpedienteCompartidoVista({
       )}
 
       {expediente.odontograma && (
-        <Bloque titulo={`Odontograma (${expediente.odontograma.length} piezas con hallazgos)`}>
+        <Bloque titulo={`Odontograma (${expediente.odontograma.length} ${expediente.odontograma.length === 1 ? "pieza con hallazgos" : "piezas con hallazgos"})`}>
           {expediente.odontograma.length === 0 && <p className="text-ink/50">Sin hallazgos marcados.</p>}
           <ul className="grid gap-x-6 gap-y-1 sm:grid-cols-2">
             {expediente.odontograma.map((o) => (
