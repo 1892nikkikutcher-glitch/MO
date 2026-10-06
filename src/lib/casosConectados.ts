@@ -4,6 +4,8 @@
  * lo de ese paciente (ver `soloDelPaciente`). */
 
 import { colegaDelCaso, type ResumenInvitacionDeCaso } from "./colegaDelCaso";
+import { normalizarNombre } from "./contactosColegas";
+import { capitalizarNombre } from "./textoNombre";
 import type { Interconsulta } from "./moConecta";
 
 type CasoMinimo = Pick<
@@ -54,9 +56,13 @@ export function pacientesYMedicosConectados(
     p.colegas = sinRepetir(p.colegas, colega.nombre);
     pacientes.set(kp, p);
 
-    const km = colega.nombre.toLowerCase();
+    // Mismo colega = mismo uid; si todavía no acepta, mismo correo con que se le
+    // invitó o, en su defecto, mismo nombre (sin acentos ni mayúsculas).
+    const otroUid = enviado ? c.destinatarioUid : c.odontologoRemitenteUid;
+    const correoInvitado = invitaciones[c.id]?.destinatarioCorreo;
+    const km = otroUid ? `u:${otroUid}` : correoInvitado ? `c:${correoInvitado.toLowerCase()}` : `n:${normalizarNombre(colega.nombre)}`;
     const m = medicos.get(km) ?? {
-      nombre: colega.nombre,
+      nombre: colega.pendiente ? capitalizarNombre(colega.nombre) : colega.nombre,
       enviados: 0,
       recibidos: 0,
       pacientes: [],
