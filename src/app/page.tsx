@@ -10,6 +10,8 @@ import {
 } from "firebase/auth";
 import { auth } from "@/lib/firebase";
 import Dashboard from "@/components/Dashboard";
+import AvisoCorreoSugerido from "@/components/AvisoCorreoSugerido";
+import { sugerirCorreo } from "@/lib/correoSugerencia";
 
 type View = "login" | "register" | "forgot";
 
@@ -69,6 +71,9 @@ export default function Home() {
     }
   };
 
+  const [sugerenciaCorreo, setSugerenciaCorreo] = useState<string | null>(null);
+  const [ignorarSugerencia, setIgnorarSugerencia] = useState(false);
+
   const handleRegister = async (e: FormEvent) => {
     e.preventDefault();
     resetMessages();
@@ -76,6 +81,15 @@ export default function Home() {
     if (!EMAIL_RE.test(email)) {
       setError("Ingresa un correo electrónico válido.");
       return;
+    }
+    // Un correo con error de dedo (…@gmail.con) crea una cuenta que nunca se
+    // podrá verificar: se avisa antes, con la corrección sugerida.
+    if (!ignorarSugerencia) {
+      const sugerido = sugerirCorreo(email);
+      if (sugerido) {
+        setSugerenciaCorreo(sugerido);
+        return;
+      }
     }
     if (password.length < 6) {
       setError("La contraseña debe tener al menos 6 caracteres.");
@@ -239,11 +253,30 @@ export default function Home() {
               <input
                 type="email"
                 value={email}
-                onChange={(e) => setEmail(e.target.value)}
+                onChange={(e) => {
+                  setEmail(e.target.value);
+                  setSugerenciaCorreo(null);
+                  setIgnorarSugerencia(false);
+                }}
                 placeholder="tu@email.com"
                 required
                 className="w-full rounded-lg border border-edge/10 bg-field px-3 py-2 text-sm text-ink placeholder-ink/30 outline-none focus:border-accent/60"
               />
+              {sugerenciaCorreo && (
+                <div className="mt-2">
+                  <AvisoCorreoSugerido
+                    sugerencia={sugerenciaCorreo}
+                    onUsar={() => {
+                      setEmail(sugerenciaCorreo);
+                      setSugerenciaCorreo(null);
+                    }}
+                    onContinuar={() => {
+                      setIgnorarSugerencia(true);
+                      setSugerenciaCorreo(null);
+                    }}
+                  />
+                </div>
+              )}
             </div>
             <div>
               <label className="mb-1 block text-xs font-medium text-ink/60">

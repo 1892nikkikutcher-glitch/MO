@@ -16,6 +16,8 @@ import {
   type User,
 } from "firebase/auth";
 import { auth } from "@/lib/firebase";
+import { sugerirCorreo } from "@/lib/correoSugerencia";
+import AvisoCorreoSugerido from "@/components/AvisoCorreoSugerido";
 import { obtenerInvitacionPublicaApi, reclamarInvitacionApi } from "@/lib/conectaApi";
 
 const inputClass =
@@ -106,11 +108,22 @@ function AutenticacionInline() {
   const [password, setPassword] = useState("");
   const [enviando, setEnviando] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [sugerencia, setSugerencia] = useState<string | null>(null);
+  const [ignorarSugerencia, setIgnorarSugerencia] = useState(false);
 
   async function enviar(e: FormEvent) {
     e.preventDefault();
-    setEnviando(true);
     setError(null);
+    // Crear cuenta con un correo mal escrito (…@gmail.con) deja a la persona
+    // sin poder verificarlo ni reclamar la invitación: se avisa antes.
+    if (modo === "registro" && !ignorarSugerencia) {
+      const sugerido = sugerirCorreo(email);
+      if (sugerido) {
+        setSugerencia(sugerido);
+        return;
+      }
+    }
+    setEnviando(true);
     try {
       if (modo === "login") {
         await signInWithEmailAndPassword(auth, email, password);
@@ -135,8 +148,25 @@ function AutenticacionInline() {
         placeholder="Correo electrónico"
         className={inputClass}
         value={email}
-        onChange={(e) => setEmail(e.target.value)}
+        onChange={(e) => {
+          setEmail(e.target.value);
+          setSugerencia(null);
+          setIgnorarSugerencia(false);
+        }}
       />
+      {sugerencia && (
+        <AvisoCorreoSugerido
+          sugerencia={sugerencia}
+          onUsar={() => {
+            setEmail(sugerencia);
+            setSugerencia(null);
+          }}
+          onContinuar={() => {
+            setIgnorarSugerencia(true);
+            setSugerencia(null);
+          }}
+        />
+      )}
       <input
         type="password"
         required
@@ -172,7 +202,11 @@ function VerificarCorreo({ user, token }: { user: User; token: string }) {
       await sendEmailVerification(user);
       setEnviado(true);
     } catch {
-      setError("No se pudo enviar el correo — intenta de nuevo en un momento.");
+      setError(
+        sugerirCorreo(user.email ?? "")
+          ? "No se pudo enviar el correo porque la dirección parece estar mal escrita."
+          : "No se pudo enviar el correo — intenta de nuevo en un momento."
+      );
     }
   }
 
@@ -193,11 +227,20 @@ function VerificarCorreo({ user, token }: { user: User; token: string }) {
     return <ReclamarInvitacion token={token} />;
   }
 
+  const correoSugerido = user.email ? sugerirCorreo(user.email) : null;
+
   return (
     <div className="space-y-3">
       <p className="text-sm text-ink/70">
         Para reclamar esta invitación primero verifica tu correo ({user.email}).
       </p>
+      {correoSugerido && (
+        <div className="rounded-lg border border-warning/40 bg-warning/10 p-3 text-xs text-ink/80" role="alert">
+          Ese correo parece tener un error — quizá quisiste escribir <strong className="break-all">{correoSugerido}</strong>.
+          Si es así, toca «Cierra sesión» aquí abajo y crea tu cuenta de nuevo con el correo correcto; la invitación
+          sigue vigente.
+        </div>
+      )}
       <button onClick={enviarVerificacion} className={`${botonPrimario} w-full`}>
         {enviado ? "Reenviar correo de verificación" : "Enviar correo de verificación"}
       </button>
@@ -214,7 +257,7 @@ function VerificarCorreo({ user, token }: { user: User; token: string }) {
         onClick={() => signOut(auth)}
         className="w-full text-center text-xs text-ink/50 hover:text-ink/80"
       >
-        ¿Este correo está equivocado? Cierra sesión e identifícate de nuevo
+        ¿Este correo está equivocado? Cierra sesión y crea tu cuenta con el correo correcto
       </button>
     </div>
   );
