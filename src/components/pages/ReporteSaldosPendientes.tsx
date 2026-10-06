@@ -5,6 +5,8 @@ import { usePatientData } from "@/context/PatientDataContext";
 import { formatCurrency } from "@/lib/patientData";
 import type { PagosSinLigar, SaldoPendienteEntry } from "@/lib/saldosPendientes";
 import type { PosibleDuplicado, PresupuestoDeCitaNoAtendida } from "@/lib/saldosFalsos";
+import { textoAutoriaPresupuesto } from "@/lib/autoriaRegistros";
+import type { PropuestaControl } from "@/lib/controlesPorError";
 
 export default function ReporteSaldosPendientes() {
   const {
@@ -13,8 +15,12 @@ export default function ReporteSaldosPendientes() {
     recalcularSaldosPendientes,
     quitarPresupuestosDeCitasNoAtendidas,
     unirPresupuestoDuplicado,
+    corregirControlPorError,
     puedeVerFinanzas,
   } = usePatientData();
+  const [corrigiendoControles, setCorrigiendoControles] = useState(false);
+  const [mensajesControl, setMensajesControl] = useState<Record<string, { ok: boolean; texto: string }>>({});
+  const [controlesOmitidos, setControlesOmitidos] = useState<Set<string>>(new Set());
   const [limpiando, setLimpiando] = useState(false);
   const [mensajeLimpieza, setMensajeLimpieza] = useState("");
   const [uniendo, setUniendo] = useState<string | null>(null);
@@ -28,6 +34,7 @@ export default function ReporteSaldosPendientes() {
     porPaciente: Record<string, SaldoPendienteEntry>;
     noAtendidas: PresupuestoDeCitaNoAtendida[];
     duplicados: PosibleDuplicado[];
+    controles: PropuestaControl[];
   } | null>(null);
   const [calculadoEl, setCalculadoEl] = useState<Date | null>(null);
   const [errorRecalculo, setErrorRecalculo] = useState("");
@@ -65,6 +72,26 @@ export default function ReporteSaldosPendientes() {
     } finally {
       setLimpiando(false);
     }
+  };
+
+  const aplicarControles = async (items: PropuestaControl[]) => {
+    const aplicables = items.filter((c) => c.accion !== "revisar");
+    if (aplicables.length === 0) return;
+    const pasan = aplicables.filter((c) => c.accion === "pasar_pagos").length;
+    const texto =
+      `Se corregirán ${aplicables.length} presupuestos de control` +
+      (pasan > 0 ? ` (${pasan} con pagos que pasan al presupuesto principal de ortodoncia)` : "") +
+      ". Los quitados quedan en la Papelera y el dinero cobrado no cambia. ¿Continuar?";
+    if (!window.confirm(texto)) return;
+    setCorrigiendoControles(true);
+    const nuevos: Record<string, { ok: boolean; texto: string }> = {};
+    for (const c of aplicables) {
+      const r = await corregirControlPorError(c);
+      nuevos[c.presupuestoId] = { ok: r.ok, texto: r.mensaje };
+    }
+    setMensajesControl((m) => ({ ...m, ...nuevos }));
+    setCorrigiendoControles(false);
+    await recalcular();
   };
 
   const unir = async (d: PosibleDuplicado) => {
@@ -162,6 +189,85 @@ export default function ReporteSaldosPendientes() {
             </div>
           )}
           {mensajeLimpieza && <p className="text-xs text-success">{mensajeLimpieza}</p>}
+
+          {resultado.controles.length > 0 && (
+            <div className="rounded-xl border border-warning/30 bg-warning/5 p-3">
+              <p className="text-sm font-semibold text-warning">
+                {resultado.controles.length} presupuestos son controles o mensualidades que se crearon solos
+              </p>
+              <p className="mt-1 text-xs text-ink/60">
+                Un control o una mensualidad es una visita de un tratamiento que ya tiene su presupuesto, no un
+                tratamiento nuevo. Los que no tienen pagos se quitan; si ya tenían un pago, ese pago pasa antes al
+                presupuesto principal de ortodoncia del paciente. Todo queda en la Papelera y el dinero cobrado no
+                cambia. Quita la palomita a los que quieras conservar.
+              </p>
+              <ul className="mt-2 max-h-72 divide-y divide-edge/5 overflow-y-auto text-xs text-ink/70">
+                {resultado.controles.map((c) => (
+                  <li key={c.presupuestoId} className="py-1.5">
+                    <div className="flex items-center justify-between gap-3">
+                      <label className="flex min-w-0 items-start gap-2">
+                        <input
+                          type="checkbox"
+                          className="mt-0.5 shrink-0"
+                          disabled={c.accion === "revisar"}
+                          checked={c.accion !== "revisar" && !controlesOmitidos.has(c.presupuestoId)}
+                          onChange={(e) =>
+                            setControlesOmitidos((s) => {
+                              const n = new Set(s);
+                              if (e.target.checked) n.delete(c.presupuestoId);
+                              else n.add(c.presupuestoId);
+                              return n;
+                            })
+                          }
+                        />
+                        <span className="min-w-0">
+                          <button
+                            onClick={() => irAExpediente(c.patientId, "Pagos")}
+                            className="text-left underline decoration-ink/20 underline-offset-2 hover:text-accent"
+                          >
+                            {c.patientName}
+                          </button>{" "}
+                          · {c.procedimientos.join(", ")} · {formatCurrency(c.total)}
+                          <span className="block text-[11px] text-ink/40">
+                            {textoAutoriaPresupuesto({ id: c.presupuestoId, creadoPorEmail: c.creadoPorEmail })}
+                          </span>
+                        </span>
+                      </label>
+                      <span className="shrink-0 text-right">
+                        {c.accion === "quitar" && <span className="text-ink/50">Sin pagos: se quita</span>}
+                        {c.accion === "pasar_pagos" && (
+                          <span className="text-success">
+                            Pagó {formatCurrency(c.pagado)} → pasa al presupuesto {c.destinoFolio}
+                          </span>
+                        )}
+                        {c.accion === "revisar" && <span className="text-warning">Revisar a mano</span>}
+                      </span>
+                    </div>
+                    {c.accion === "revisar" && c.motivoRevisar && (
+                      <p className="mt-0.5 pl-6 text-[11px] text-warning/80">{c.motivoRevisar}</p>
+                    )}
+                    {mensajesControl[c.presupuestoId] && (
+                      <p className={`mt-0.5 pl-6 ${mensajesControl[c.presupuestoId].ok ? "text-success" : "text-danger"}`}>
+                        {mensajesControl[c.presupuestoId].texto}
+                      </p>
+                    )}
+                  </li>
+                ))}
+              </ul>
+              {(() => {
+                const marcados = resultado.controles.filter((c) => c.accion !== "revisar" && !controlesOmitidos.has(c.presupuestoId));
+                return (
+                  <button
+                    onClick={() => aplicarControles(marcados)}
+                    disabled={corrigiendoControles || marcados.length === 0}
+                    className="mt-3 rounded-lg border border-accent/60 bg-accent/15 px-4 py-2 text-xs font-semibold text-accent hover:bg-accent/25 disabled:opacity-50"
+                  >
+                    {corrigiendoControles ? "Corrigiendo…" : `Corregir los ${marcados.length} marcados`}
+                  </button>
+                );
+              })()}
+            </div>
+          )}
 
           {resultado.duplicados.length > 0 && (
             <div className="rounded-xl border border-warning/30 bg-warning/5 p-3">

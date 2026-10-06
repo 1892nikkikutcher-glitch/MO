@@ -81,6 +81,7 @@ import {
 import { presupuestoGastosInicial, type Gasto, type PresupuestoGastosConfig } from "@/lib/gastos";
 import { migrarIdentidadDoctor } from "@/lib/migracionIdentidadDoctor";
 import { estamparNuevos } from "@/lib/autoriaRegistros";
+import { aplicarMovimientosAPagos, controlesPorError, type PropuestaControl } from "@/lib/controlesPorError";
 import {
   archivarYEliminar,
   marcarEntradaRestaurada,
@@ -776,6 +777,7 @@ type PatientDataContextValue = {
     porPaciente: SaldosPendientesConfig["porPaciente"];
     noAtendidas: PresupuestoDeCitaNoAtendida[];
     duplicados: PosibleDuplicado[];
+    controles: PropuestaControl[];
   }>;
   /** Quita (a la Papelera) presupuestos generados por citas que no se atendieron
    * y que nadie ha pagado — corrige saldos inflados. Devuelve cuántos quitó. */
@@ -784,6 +786,10 @@ type PatientDataContextValue = {
    * del mismo trabajo: el pago pasa a descontar del de la cita y el duplicado
    * se quita (queda en la Papelera). */
   unirPresupuestoDuplicado: (d: PosibleDuplicado) => Promise<{ ok: boolean; mensaje: string }>;
+  /** Corrige un presupuesto de control/mensualidad creado por error: lo quita
+   * (a la Papelera) y, si tenía pagos, los pasa antes al presupuesto principal
+   * de ortodoncia. Re-valida con los datos reales; el dinero cobrado no cambia. */
+  corregirControlPorError: (p: PropuestaControl) => Promise<{ ok: boolean; mensaje: string }>;
   /** Al cancelar/reagendar/no asistir una cita, quita su presupuesto automático si nadie lo pagó. */
   limpiarPresupuestoDeCita: (patientId: string, citaId: string, estatus: string) => Promise<void>;
   /** Adjunta la firma de recepción (ya subida a Storage) a una devolución
@@ -2032,7 +2038,10 @@ export function PatientDataProvider({
     const duplicados = entradas.flatMap((e) =>
       posiblesDuplicados({ patientId: e.patientId, patientName: e.patientName, presupuestos: e.presupuestos, pagos: e.pagos }, citasPorId)
     );
-    return { pacientes: lista.length, conSaldo: Object.keys(porPaciente).length, sinLigar, porPaciente, noAtendidas, duplicados };
+    const controles = entradas.flatMap((e) =>
+      controlesPorError({ patientId: e.patientId, patientName: e.patientName, presupuestos: e.presupuestos, pagos: e.pagos })
+    );
+    return { pacientes: lista.length, conSaldo: Object.keys(porPaciente).length, sinLigar, porPaciente, noAtendidas, duplicados, controles };
   };
 
   /** Devuelve un registro de la Papelera a su lugar. Los que arrastran
@@ -2213,6 +2222,46 @@ export function PatientDataProvider({
     } catch (err) {
       console.error("No se pudo unir el presupuesto duplicado", err);
       return { ok: false, mensaje: "No se pudo unir. Revisa tu conexión e intenta de nuevo." };
+    }
+  };
+
+  const corregirControlPorError = async (p: PropuestaControl): Promise<{ ok: boolean; mensaje: string }> => {
+    if (!clinicUid) return { ok: false, mensaje: "Sin clínica activa." };
+    try {
+      const [presupuestos, pagos, devoluciones] = await Promise.all([
+        leerSubcoleccion<SavedBudget>(p.patientId, "presupuestos"),
+        leerSubcoleccion<Pago>(p.patientId, "pagos"),
+        leerSubcoleccion<DevolucionPago>(p.patientId, "devoluciones"),
+      ]);
+      // Se vuelve a decidir con los datos reales de ahora: si algo cambió
+      // desde que se armó la lista, no se aplica lo que ya no corresponde.
+      const vigente = controlesPorError({ patientId: p.patientId, patientName: p.patientName, presupuestos, pagos }).find(
+        (c) => c.presupuestoId === p.presupuestoId
+      );
+      if (!vigente) return { ok: false, mensaje: "Ya cambió: este presupuesto ya no aparece como control por error." };
+      if (vigente.accion === "revisar") return { ok: false, mensaje: vigente.motivoRevisar ?? "Hay que revisarlo a mano." };
+      const base = `users/${clinicUid}/pacientes/${p.patientId}`;
+      const pagosNuevos = vigente.accion === "pasar_pagos" ? aplicarMovimientosAPagos(pagos, vigente.movimientos) : pagos;
+      // 1) los pagos pasan a descontar del presupuesto principal (el monto cobrado no cambia).
+      await Promise.all(pagosNuevos.filter((x, i) => x !== pagos[i]).map((x) => setDoc(doc(db, `${base}/pagos`, x.id), x)));
+      // 2) el presupuesto de control se quita a la Papelera, con sus resúmenes.
+      const control = presupuestos.find((x) => x.id === p.presupuestoId)!;
+      const next = presupuestos.filter((x) => x.id !== p.presupuestoId);
+      archivarYEliminar(`${base}/presupuestos`, [control] as unknown as ({ id: string } & Record<string, unknown>)[]);
+      registrarDeltaPresupuestos(presupuestos, next);
+      registrarPresupuestosPendientesDetalle(p.patientId, presupuestos, next);
+      registrarPresupuestosCreadosDetalle(p.patientId, presupuestos, next);
+      registrarSaldoPendiente(p.patientId, next, pagosNuevos, devoluciones);
+      return {
+        ok: true,
+        mensaje:
+          vigente.accion === "pasar_pagos"
+            ? `Listo: los pagos pasaron al presupuesto ${vigente.destinoFolio} y el control se quitó.`
+            : "Listo: el control se quitó.",
+      };
+    } catch (err) {
+      console.error("No se pudo corregir el presupuesto de control", err);
+      return { ok: false, mensaje: "No se pudo completar. Revisa tu conexión e intenta de nuevo." };
     }
   };
 
@@ -3026,6 +3075,7 @@ export function PatientDataProvider({
         recalcularSaldosPendientes,
         quitarPresupuestosDeCitasNoAtendidas,
         unirPresupuestoDuplicado,
+        corregirControlPorError,
         limpiarPresupuestoDeCita,
         restaurarDePapelera,
         agregarFirmaRecepcionDevolucion,

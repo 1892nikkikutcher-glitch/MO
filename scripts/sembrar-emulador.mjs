@@ -199,6 +199,38 @@ pagos.push({
   },
 });
 
+// Controles de ortodoncia convertidos en presupuesto por error (ver controlesPorError.ts).
+// p7: tratamiento principal + un control sin pagar + un control ya pagado.
+// p8: un control pagado y NINGÚN presupuesto principal -> "revisar a mano".
+const presControl = (citaId, total) => ({
+  id: `pres-cita-${citaId}`, folio: citaId.slice(-6), fecha: dmy(mas(-1)), medico: "Dra. Ana Mendoza", tipoDePrecio: "Consultorio",
+  especialidad: "Ortodoncia", diagnostico: "Generado automáticamente a partir de una cita agendada.",
+  items: [{ id: `item-cita-${citaId}-0`, procedure: "Control de ortodoncia", price: total, teeth: [], note: "" }], total,
+});
+presupuestos.push(
+  {
+    pid: "p7",
+    doc: {
+      id: "b-orto", folio: "1500", fecha: dmy(mas(-60)), medico: "Dra. Ana Mendoza", tipoDePrecio: "Consultorio",
+      especialidad: "Ortodoncia", diagnostico: "Maloclusión clase II.",
+      items: [{ id: "item-b-orto-0", procedure: "Ortodoncia (tratamiento completo)", price: 18000, teeth: [], note: "" }],
+      total: 18000, estado: "aceptado",
+    },
+  },
+  { pid: "p7", doc: presControl("c-ct1", 500) },
+  { pid: "p7", doc: presControl("c-ct2", 500) },
+  { pid: "p8", doc: presControl("c-ct3", 600) }
+);
+const pagoSimple = (id, trat, folio, label, monto) => ({
+  id, fecha: dmy(mas(-1)), medico: "Dra. Ana Mendoza", formaPago: "Efectivo",
+  lineas: [{ id: `${id}-l1`, tratamientoId: trat, folio, label, monto }], total: monto, facturar: false, firma: null,
+});
+pagos.push(
+  { pid: "p7", doc: pagoSimple("pg-o1", "item-b-orto-0", "1500", "Ortodoncia (tratamiento completo)", 3000) },
+  { pid: "p7", doc: pagoSimple("pg-ct2", "item-cita-c-ct2-0", "c-ct2", "Control de ortodoncia", 500) },
+  { pid: "p8", doc: pagoSimple("pg-ct3", "item-cita-c-ct3-0", "c-ct3", "Control de ortodoncia", 600) }
+);
+
 const batch = db.batch();
 recursos.forEach((r) => batch.set(db.doc(`${base}/recursos/${r.id}`), r));
 pacientes.forEach((p) => batch.set(db.doc(`${base}/pacientes/${p.id}`), p));
