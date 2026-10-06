@@ -89,6 +89,7 @@ export default function RegistrarDevolucionDialog({
     agregarFirmaRecepcionDevolucion,
     perfilDoctor,
     clinicInfo,
+    userEmail,
   } = usePatientData();
   const devoluciones = devolucionesPorPaciente[patientId] ?? [];
 
@@ -222,13 +223,10 @@ export default function RegistrarDevolucionDialog({
         pagoOrigen: pago,
         pacienteNombre: patientName,
         clinicaNombre: clinicInfo?.nombre || "",
-        // Antes usaba perfilDoctor?.nombre (el médico único de la cuenta) —
-        // conceptualmente esto es "qué colaborador registró la devolución",
-        // no un médico; resolverlo bien requiere una suscripción nueva al
-        // colaborador en sesión (fuera de alcance de esta unificación, ver
-        // plan). generarComprobanteDevolucionPdf ya maneja vacío con
-        // gracia (cae a "—").
-        registradoPorNombre: "",
+        // "Quién registró la devolución" es el colaborador en sesión, no un
+        // médico: se usa su correo de acceso (antes iba vacío y el
+        // comprobante imprimía "—").
+        registradoPorNombre: userEmail || "",
       });
       if (accion === "imprimir") {
         const url = URL.createObjectURL(blob);
