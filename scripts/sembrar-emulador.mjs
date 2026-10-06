@@ -174,8 +174,12 @@ const presCita = (citaId, total) => ({
   items: [{ id: `item-cita-${citaId}-0`, procedure: "Resina", price: total, teeth: [], note: "" }], total,
 });
 citas.push(citaFalsa("c-fx1", "p4", "Jorge Iván Mendoza", "Cancelada"), citaFalsa("c-fx2", "p5", "Paola Guadalupe Ríos", "Confirmada"));
+// p6: cita de HOY pendiente con su presupuesto sin pagar — sirve para probar que al marcar
+// "No llega" desde la nota el presupuesto automático se quita.
+citas.push({ ...citaFalsa("c-fx3", "p6", "María Fernanda López", "Agendada"), fecha: iso(mas(0)), horaInicio: "08:00", horaFin: "08:45" });
 presupuestos.push(
   { pid: "p4", doc: presCita("c-fx1", 800) },
+  { pid: "p6", doc: presCita("c-fx3", 900) },
   { pid: "p5", doc: presCita("c-fx2", 1000) },
   {
     pid: "p5",

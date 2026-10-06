@@ -86,7 +86,7 @@ function EliminarPagoDialog({
         <h3 className="text-base font-semibold text-ink">Eliminar pago</h3>
         <p className="mt-2 text-sm text-ink/70">
           Vas a eliminar el pago de <span className="font-semibold text-ink">{formatCurrency(pago.total)}</span>{" "}
-          del {pago.fecha}. Este registro se guarda en Reportes → Pagos para poder auditarlo después.
+          del {pago.fecha}. Este registro se guarda en Reportes → Pagos para auditarlo y también en Administración → Papelera, desde donde un administrador puede restaurarlo.
         </p>
         <label className="mb-1 mt-4 block text-xs font-medium text-ink/60">
           Motivo de la eliminación

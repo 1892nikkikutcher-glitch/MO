@@ -36,3 +36,8 @@ pacientes_importar.json
 
 # clave de administrador de Firebase — nunca en el repositorio
 serviceAccountKey.json
+
+# registros de depuración de los emuladores de Firebase
+firebase-debug.log
+firestore-debug.log
+ui-debug.log
