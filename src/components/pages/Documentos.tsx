@@ -7,6 +7,7 @@ import ConsentimientoEspecialidad from "./ConsentimientoEspecialidad";
 import ConstanciaPermanencia from "./ConstanciaPermanencia";
 import HojaIndicaciones from "./HojaIndicaciones";
 import AvisoPrivacidad from "./AvisoPrivacidad";
+import DocumentosPago, { type TipoDocumentoPago } from "./DocumentosPago";
 import { formatNombreConEdad } from "@/lib/patientData";
 import type { TipoHojaIndicaciones } from "@/lib/hojasIndicaciones";
 import {
@@ -21,8 +22,13 @@ type TipoDocumento =
   | "consentimiento"
   | "constancia"
   | "avisoPrivacidad"
+  | TipoDocumentoPago
   | TipoHojaIndicaciones
   | TipoConsentimientoEspecialidad;
+
+function esDocumentoPago(tipo: TipoDocumento): tipo is TipoDocumentoPago {
+  return tipo === "acuerdoPago" || tipo === "contratoServicios" || tipo === "carnetPaciente";
+}
 
 function esConsentimientoEspecialidad(tipo: TipoDocumento): tipo is TipoConsentimientoEspecialidad {
   return tipo in consentimientosEspecialidad;
@@ -48,6 +54,21 @@ const documentosDisponibles: { tipo: TipoDocumento; titulo: string; descripcion:
     tipo: "consentimientoUsoImagen",
     titulo: "Consentimiento Informado — Uso de Imagen",
     descripcion: "Autoriza el uso de fotografías o videos del paciente en redes sociales y materiales de difusión.",
+  },
+  {
+    tipo: "acuerdoPago",
+    titulo: "Acuerdo de Pago",
+    descripcion: "Para montos menores: anticipo, pagos y fechas acordadas con el paciente, con cantidad en letra y firma.",
+  },
+  {
+    tipo: "contratoServicios",
+    titulo: "Contrato de Prestación de Servicios",
+    descripcion: "Para tratamientos de monto mayor: objeto, honorarios y calendario de pagos, garantía, rescisión y testigos.",
+  },
+  {
+    tipo: "carnetPaciente",
+    titulo: "Carnet del Paciente",
+    descripcion: "Tarjeta con datos del paciente y sus próximas citas, con filas libres para anotar a mano.",
   },
   {
     tipo: "protesis",
@@ -129,6 +150,9 @@ export default function Documentos() {
     }
     if (documentoActivo === "avisoPrivacidad") {
       return <AvisoPrivacidad onVolver={onVolver} />;
+    }
+    if (esDocumentoPago(documentoActivo)) {
+      return <DocumentosPago patient={patient} tipo={documentoActivo} onVolver={onVolver} />;
     }
     if (esConsentimientoEspecialidad(documentoActivo)) {
       return <ConsentimientoEspecialidad patient={patient} tipo={documentoActivo} onVolver={onVolver} />;

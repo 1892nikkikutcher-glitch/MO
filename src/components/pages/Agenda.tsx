@@ -1110,8 +1110,16 @@ export default function Agenda() {
               const recurso = { id: `r${Date.now()}`, ...datos };
               setRecursos((prev) => [...prev, recurso]);
             } else {
+              // El diálogo OMITE cédula y comisión cuando se dejan vacías (nunca
+              // manda `undefined`); un simple { ...r, ...datos } conservaría el
+              // valor viejo y vaciar el campo no tendría efecto. Se quitan
+              // primero las dos claves que el diálogo administra.
               setRecursos((prev) =>
-                prev.map((r) => (r.id === recursoDialog.id ? { ...r, ...datos } : r))
+                prev.map((r) => {
+                  if (r.id !== recursoDialog.id) return r;
+                  const { cedulaProfesional: _cedula, porcentajeComision: _comision, ...resto } = r;
+                  return { ...resto, ...datos };
+                })
               );
             }
             setRecursoDialog(null);
