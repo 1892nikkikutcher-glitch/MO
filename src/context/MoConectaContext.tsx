@@ -34,8 +34,14 @@ type MoConectaContextValue = {
    * directo en la sala del caso, en vez de tener que buscarlo dentro de la
    * lista de interconsultas — mismo patrón que pacientePreseleccionado. */
   interconsultaPreseleccionada: string | null;
-  verInterconsulta: (interconsultaId: string) => void;
+  verInterconsulta: (interconsultaId: string, paciente: PacientePreseleccionado) => void;
   limpiarInterconsultaPreseleccionada: () => void;
+  /** Si MO Conecta se abre DESDE el expediente de un paciente, solo se ve lo de
+   * ese paciente. Lo fija el expediente (al solicitar o abrir un caso) y
+   * MoConecta lo toma una sola vez al montar: entrar después desde el menú
+   * muestra el módulo completo. */
+  alcanceDeExpediente: PacientePreseleccionado | null;
+  limpiarAlcanceDeExpediente: () => void;
 };
 
 const MoConectaContext = createContext<MoConectaContextValue | null>(null);
@@ -50,6 +56,7 @@ export function MoConectaProvider({ uid, children }: { uid: string; children: Re
   const [cargandoCasos, setCargandoCasos] = useState(true);
   const [pacientePreseleccionado, setPacientePreseleccionado] = useState<PacientePreseleccionado | null>(null);
   const [interconsultaPreseleccionada, setInterconsultaPreseleccionada] = useState<string | null>(null);
+  const [alcanceDeExpediente, setAlcanceDeExpediente] = useState<PacientePreseleccionado | null>(null);
 
   useEffect(() => {
     if (!uid) return;
@@ -125,10 +132,18 @@ export function MoConectaProvider({ uid, children }: { uid: string; children: Re
         casosRecibidos,
         cargando: cargandoPerfil || cargandoCasos,
         pacientePreseleccionado,
-        prepararInterconsulta: (patientId, patientName) => setPacientePreseleccionado({ patientId, patientName }),
+        prepararInterconsulta: (patientId, patientName) => {
+          setPacientePreseleccionado({ patientId, patientName });
+          setAlcanceDeExpediente({ patientId, patientName });
+        },
         limpiarPacientePreseleccionado: () => setPacientePreseleccionado(null),
         interconsultaPreseleccionada,
-        verInterconsulta: (interconsultaId) => setInterconsultaPreseleccionada(interconsultaId),
+        verInterconsulta: (interconsultaId, paciente) => {
+          setInterconsultaPreseleccionada(interconsultaId);
+          setAlcanceDeExpediente(paciente);
+        },
+        alcanceDeExpediente,
+        limpiarAlcanceDeExpediente: () => setAlcanceDeExpediente(null),
         limpiarInterconsultaPreseleccionada: () => setInterconsultaPreseleccionada(null),
       }}
     >

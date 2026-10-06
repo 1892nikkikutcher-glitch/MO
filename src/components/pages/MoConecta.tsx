@@ -1,6 +1,7 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { createContext, useContext, useMemo, useState } from "react";
+import { pacientesYMedicosConectados, soloDelPaciente } from "@/lib/casosConectados";
 import { useMoConecta } from "@/context/MoConectaContext";
 import { usePatientData } from "@/context/PatientDataContext";
 import {
@@ -111,11 +112,32 @@ export function EstadoBadge({ estado }: { estado: InterconsultaEstado }) {
 
 type TabId = "resumen" | "directorio" | "interconsultas" | "perfil" | "afiliacion";
 
+/** Paciente al que se limita todo el módulo cuando se abre desde su expediente
+ * (null = módulo general, con todos los pacientes y médicos). */
+const AlcanceContext = createContext<{ patientId: string; patientName: string } | null>(null);
+
 export default function MoConecta() {
-  const { perfilPublico, pacientePreseleccionado, interconsultaPreseleccionada, limpiarInterconsultaPreseleccionada } =
-    useMoConecta();
+  const {
+    perfilPublico,
+    pacientePreseleccionado,
+    interconsultaPreseleccionada,
+    limpiarInterconsultaPreseleccionada,
+    alcanceDeExpediente,
+    limpiarAlcanceDeExpediente,
+    limpiarPacientePreseleccionado,
+  } = useMoConecta();
+  // Se toma UNA vez al montar: el alcance dura lo que dura esta apertura del
+  // módulo, y entrar luego desde el menú trae el módulo completo.
+  const [alcance] = useState(alcanceDeExpediente);
+  useEffect(() => {
+    if (alcanceDeExpediente) limpiarAlcanceDeExpediente();
+    // Entrar desde el menú (sin alcance) con una paciente que quedó pendiente de
+    // una visita anterior al expediente: ya no corresponde, se descarta.
+    else if (pacientePreseleccionado) limpiarPacientePreseleccionado();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
   const [tab, setTab] = useState<TabId>(
-    interconsultaPreseleccionada ? "interconsultas" : pacientePreseleccionado ? "directorio" : "resumen"
+    interconsultaPreseleccionada ? "interconsultas" : alcance && pacientePreseleccionado ? "directorio" : "resumen"
   );
   const [casoAbierto, setCasoAbierto] = useState<string | null>(interconsultaPreseleccionada);
 
@@ -136,10 +158,17 @@ export default function MoConecta() {
   }
 
   return (
+    <AlcanceContext.Provider value={alcance}>
     <div className="space-y-6">
       <p className="max-w-3xl text-sm text-ink/60">
         Colabora con otros odontólogos, refiere pacientes y recibe contrarreferencias de manera segura.
       </p>
+      {alcance && (
+        <div className="rounded-lg border border-accent/30 bg-accent/10 px-3 py-2 text-sm text-accent">
+          Estás viendo solo la información de <strong>{alcance.patientName}</strong>. Para ver todos los pacientes y
+          médicos con casos conectados, entra a MO Conecta desde el menú.
+        </div>
+      )}
 
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div className="flex gap-2 border-b border-edge/10">
@@ -219,6 +248,7 @@ export default function MoConecta() {
         />
       )}
     </div>
+    </AlcanceContext.Provider>
   );
 }
 
@@ -246,7 +276,14 @@ function ResumenTab({
   onNuevaInterconsulta: () => void;
   onAbrirCaso: (id: string) => void;
 }) {
-  const { perfilPublico, directorio, uid, casosEnviados, casosRecibidos, misCasos } = useMoConecta();
+  const { perfilPublico, directorio, uid, casosEnviados: todosEnviados, casosRecibidos: todosRecibidos } = useMoConecta();
+  const alcance = useContext(AlcanceContext);
+  // Desde el expediente de un paciente solo cuentan los casos ENVIADOS de ese paciente.
+  const casosEnviados = alcance ? soloDelPaciente(todosEnviados, uid, alcance.patientId) : todosEnviados;
+  const casosRecibidos = alcance ? [] : todosRecibidos;
+  const misCasos = [...casosEnviados, ...casosRecibidos];
+  const invitaciones = useInvitacionesDeCasos(casosEnviados.filter((c) => !c.destinatarioUid).map((c) => c.id));
+  const conectados = alcance ? null : pacientesYMedicosConectados(misCasos, uid, directorio, invitaciones);
 
   const activas: InterconsultaEstado[] = ["sent", "received", "accepted", "patient_contacted", "scheduled", "in_treatment"];
   const concluidasEstados: InterconsultaEstado[] = ["completed", "counter_referral_sent", "closed", "cancelled", "rejected"];
@@ -287,6 +324,54 @@ function ResumenTab({
           <GuiaPaso hecho={yaRecibioContrarreferencia} texto="Recibe una contrarreferencia" />
         </div>
       </div>
+
+      {conectados && misCasos.length > 0 && (
+        <div className="grid gap-4 sm:grid-cols-2">
+          <div className="rounded-2xl border border-edge/10 bg-surface p-5">
+            <h3 className="mb-3 text-sm font-semibold text-ink">Pacientes con casos conectados ({conectados.pacientes.length})</h3>
+            <div className="space-y-2">
+              {conectados.pacientes.map((p) => (
+                <button
+                  key={p.nombre + p.ultimoCasoId}
+                  onClick={() => onAbrirCaso(p.ultimoCasoId)}
+                  className="flex w-full flex-col rounded-xl border border-edge/10 p-3 text-left transition-colors hover:border-accent/40"
+                >
+                  <span className="truncate text-sm font-medium text-ink">{p.nombre}</span>
+                  <span className="truncate text-xs text-ink/50">
+                    {p.casos} {p.casos === 1 ? "caso" : "casos"} · con {p.colegas.join(", ")}
+                  </span>
+                </button>
+              ))}
+            </div>
+          </div>
+          <div className="rounded-2xl border border-edge/10 bg-surface p-5">
+            <h3 className="mb-3 text-sm font-semibold text-ink">Médicos con casos conectados ({conectados.medicos.length})</h3>
+            <div className="space-y-2">
+              {conectados.medicos.map((m) => (
+                <button
+                  key={m.nombre + m.ultimoCasoId}
+                  onClick={() => onAbrirCaso(m.ultimoCasoId)}
+                  className="flex w-full flex-col rounded-xl border border-edge/10 p-3 text-left transition-colors hover:border-accent/40"
+                >
+                  <span className="truncate text-sm font-medium text-ink">
+                    {m.nombre}
+                    {m.pendiente && <span className="ml-2 text-xs font-normal text-warning">pendiente de aceptar</span>}
+                  </span>
+                  <span className="truncate text-xs text-ink/50">
+                    {[
+                      m.enviados > 0 ? `${m.enviados} ${m.enviados === 1 ? "enviado" : "enviados"}` : "",
+                      m.recibidos > 0 ? `${m.recibidos} ${m.recibidos === 1 ? "recibido" : "recibidos"}` : "",
+                    ]
+                      .filter(Boolean)
+                      .join(" · ")}{" "}
+                    · {m.pacientes.join(", ")}
+                  </span>
+                </button>
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
 
       {!tieneColegas ? (
         <TarjetaBienvenida onCompletarPerfil={() => onIrATab("perfil")} onInvitar={onNuevaInterconsulta} />
@@ -972,14 +1057,17 @@ function NuevaInterconsultaDialog({
   onClose: () => void;
   onCreada: (id: string) => void;
 }) {
-  const { clinicUid, patients } = usePatientData();
+  const { clinicUid, patients: todosLosPacientes } = usePatientData();
+  const alcance = useContext(AlcanceContext);
+  // Desde el expediente de un paciente solo se puede referir a ESE paciente.
+  const patients = alcance ? todosLosPacientes.filter((p) => p.id === alcance.patientId) : todosLosPacientes;
   const { pacientePreseleccionado, limpiarPacientePreseleccionado, directorio, uid: miUid } = useMoConecta();
   const [destinatario, setDestinatario] = useState<DestinatarioElegido | null>(destinatarioInicial);
   const [modo, setModo] = useState<"elegir" | "formulario">(
     destinatarioInicial || forzarExterno ? "formulario" : "elegir"
   );
   const [busquedaColega, setBusquedaColega] = useState("");
-  const [pacienteId, setPacienteId] = useState(pacientePreseleccionado?.patientId ?? "");
+  const [pacienteId, setPacienteId] = useState(alcance?.patientId ?? pacientePreseleccionado?.patientId ?? "");
   const [especialidadSolicitada, setEspecialidadSolicitada] = useState("");
   const [motivo, setMotivo] = useState("");
   const [preguntaClinica, setPreguntaClinica] = useState("");
@@ -1217,7 +1305,7 @@ function NuevaInterconsultaDialog({
           )}
           <div>
             <label className={labelClass}>Paciente</label>
-            <select className={inputClass} value={pacienteId} onChange={(e) => setPacienteId(e.target.value)}>
+            <select className={inputClass} value={pacienteId} disabled={!!alcance} onChange={(e) => setPacienteId(e.target.value)}>
               <option value="">Selecciona un paciente…</option>
               {patients.map((p) => (
                 <option key={p.id} value={p.id}>
@@ -1339,7 +1427,11 @@ function CasosTab({
   casoAbiertoId: string | null;
   onAbrirCaso: (id: string | null) => void;
 }) {
-  const { uid, directorio, casosEnviados, casosRecibidos, cargando } = useMoConecta();
+  const { uid, directorio, casosEnviados: todosEnviados, casosRecibidos: todosRecibidos, cargando } = useMoConecta();
+  const alcance = useContext(AlcanceContext);
+  // Desde el expediente de un paciente: solo sus casos enviados, sin recibidos.
+  const casosEnviados = alcance ? soloDelPaciente(todosEnviados, uid, alcance.patientId) : todosEnviados;
+  const casosRecibidos = alcance ? [] : todosRecibidos;
   const [sub, setSub] = useState<"enviados" | "recibidos">("enviados");
   // Con qué colega se comparte cada caso enviado que todavía no tiene colega aceptado.
   const invitaciones = useInvitacionesDeCasos(casosEnviados.filter((c) => !c.destinatarioUid).map((c) => c.id));
@@ -1360,12 +1452,14 @@ function CasosTab({
         >
           Enviados ({casosEnviados.length})
         </button>
-        <button
-          onClick={() => setSub("recibidos")}
-          className={`rounded-lg px-3 py-1.5 text-sm ${sub === "recibidos" ? "bg-accent text-black" : "bg-surface text-ink/60"}`}
-        >
-          Recibidos ({casosRecibidos.length})
-        </button>
+        {!alcance && (
+          <button
+            onClick={() => setSub("recibidos")}
+            className={`rounded-lg px-3 py-1.5 text-sm ${sub === "recibidos" ? "bg-accent text-black" : "bg-surface text-ink/60"}`}
+          >
+            Recibidos ({casosRecibidos.length})
+          </button>
+        )}
       </div>
 
       {cargando && <p className="text-sm text-ink/50">Cargando…</p>}

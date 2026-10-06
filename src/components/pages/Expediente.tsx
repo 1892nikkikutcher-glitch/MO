@@ -1564,7 +1564,7 @@ export default function Expediente({
                 irAPagina("mo-conecta");
               }}
               onAbrirCaso={(interconsultaId) => {
-                verInterconsulta(interconsultaId);
+                verInterconsulta(interconsultaId, { patientId: patient.id, patientName: patient.name });
                 irAPagina("mo-conecta");
               }}
             />
