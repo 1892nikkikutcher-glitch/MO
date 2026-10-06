@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { elegirColorDisponible, RECURSO_COLOR_PALETTE, type Recurso } from "@/lib/patientData";
-import { manejarCambioNombre } from "@/lib/textoNombre";
+import { capitalizarNombre, manejarCambioNombre } from "@/lib/textoNombre";
 import { inputClass } from "@/lib/agendaHelpers";
 
 export default function AgendaRecursoDialog({
@@ -33,7 +33,7 @@ export default function AgendaRecursoDialog({
   const [cedulaProfesional, setCedulaProfesional] = useState(inicial?.cedulaProfesional ?? "");
   const [consultaExterna, setConsultaExterna] = useState(inicial?.consultaExterna === true);
   const [compartido, setCompartido] = useState(!!inicial?.calendarioCompartidoCon);
-  const [compartidoCon, setCompartidoCon] = useState(inicial?.calendarioCompartidoCon ?? "");
+  const [compartidoCon, setCompartidoCon] = useState(capitalizarNombre(inicial?.calendarioCompartidoCon ?? ""));
 
   const puedeGuardar = nombre.trim().length > 0;
 
@@ -140,7 +140,7 @@ export default function AgendaRecursoDialog({
               <input
                 type="text"
                 value={compartidoCon}
-                onChange={(e) => setCompartidoCon(e.target.value)}
+                onChange={(e) => manejarCambioNombre(e, setCompartidoCon)}
                 placeholder="¿Con quién? Ej. Dr. Enrique Santin"
                 className={inputClass}
               />
@@ -192,7 +192,7 @@ export default function AgendaRecursoDialog({
               if (consultaExterna) datos = { ...datos, consultaExterna: true };
               // Marcado "compartido" sin escribir con quién: se guarda como
               // "un colega" para que la etiqueta no se pierda.
-              if (compartido) datos = { ...datos, calendarioCompartidoCon: compartidoCon.trim() || "un colega" };
+              if (compartido) datos = { ...datos, calendarioCompartidoCon: capitalizarNombre(compartidoCon.trim()) || "un colega" };
               // Nunca `porcentajeComision: undefined`/`cedulaProfesional:
               // undefined` explícitos — Firestore rechaza escribir un campo
               // con ese valor. Si no hay nada capturado, se omite la llave
