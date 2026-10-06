@@ -6,6 +6,14 @@
  *  - `ExpedienteCompartidoVista`: lo que el colega (y el remitente) ven en la
  *    sala del caso — la foto fija tomada al enviar. */
 
+import { useMemo, useState } from "react";
+import {
+  mesInicial,
+  semanasDelMes,
+  tonoDeEstatus,
+  type CitaCompartida,
+  type TonoEstatus,
+} from "@/lib/calendarioCitasCompartidas";
 import {
   descripcionSeccionCompartible,
   etiquetaSeccionCompartible,
@@ -79,6 +87,101 @@ function Bloque({ titulo, children, abierto = false }: { titulo: string; childre
       <summary className="cursor-pointer select-none px-4 py-2.5 text-sm font-medium text-ink">{titulo}</summary>
       <div className="border-t border-edge/10 px-4 py-3 text-sm text-ink/80">{children}</div>
     </details>
+  );
+}
+
+const MESES = ["enero", "febrero", "marzo", "abril", "mayo", "junio", "julio", "agosto", "septiembre", "octubre", "noviembre", "diciembre"];
+const DIAS_SEMANA = ["L", "M", "M", "J", "V", "S", "D"];
+
+const colorPunto: Record<TonoEstatus, string> = {
+  exito: "bg-success",
+  peligro: "bg-danger",
+  aviso: "bg-warning",
+  neutro: "bg-info",
+};
+
+/** Calendario mensual de las citas compartidas: cada día con cita lleva un
+ * punto del color de su estatus; al tocar un día se ven las citas de ese día. */
+function CalendarioCitas({ citas }: { citas: CitaCompartida[] }) {
+  const hoy = new Date();
+  const hoyISO = `${hoy.getFullYear()}-${String(hoy.getMonth() + 1).padStart(2, "0")}-${String(hoy.getDate()).padStart(2, "0")}`;
+  const [{ anio, mes0 }, setMes] = useState(() => mesInicial(citas, hoyISO));
+  const semanas = useMemo(() => semanasDelMes(anio, mes0, citas), [anio, mes0, citas]);
+  const [elegido, setElegido] = useState<string | null>(null);
+  const diaElegido = semanas.flat().find((d) => d?.fecha === elegido) ?? null;
+  const citasDelMes = semanas.flat().reduce((n, d) => n + (d?.citas.length ?? 0), 0);
+
+  const mover = (delta: number) => {
+    const f = new Date(anio, mes0 + delta, 1);
+    setMes({ anio: f.getFullYear(), mes0: f.getMonth() });
+    setElegido(null);
+  };
+
+  return (
+    <div>
+      <div className="mb-2 flex items-center justify-between">
+        <button type="button" onClick={() => mover(-1)} aria-label="Mes anterior" className="rounded-lg px-2 py-1 text-ink/60 hover:bg-edge/10">
+          ‹
+        </button>
+        <p className="text-sm font-semibold capitalize text-ink">
+          {MESES[mes0]} {anio}
+          <span className="ml-2 text-xs font-normal normal-case text-ink/40">
+            {citasDelMes === 0 ? "sin citas" : citasDelMes === 1 ? "1 cita" : `${citasDelMes} citas`}
+          </span>
+        </p>
+        <button type="button" onClick={() => mover(1)} aria-label="Mes siguiente" className="rounded-lg px-2 py-1 text-ink/60 hover:bg-edge/10">
+          ›
+        </button>
+      </div>
+      <div className="grid grid-cols-7 gap-1 text-center text-[11px] text-ink/40">
+        {DIAS_SEMANA.map((d, i) => (
+          <span key={i}>{d}</span>
+        ))}
+      </div>
+      <div className="mt-1 grid grid-cols-7 gap-1">
+        {semanas.flat().map((d, i) =>
+          d === null ? (
+            <span key={i} />
+          ) : (
+            <button
+              key={d.fecha}
+              type="button"
+              disabled={d.citas.length === 0}
+              onClick={() => setElegido(d.fecha === elegido ? null : d.fecha)}
+              className={`flex h-11 flex-col items-center justify-center rounded-lg text-xs ${
+                d.fecha === elegido
+                  ? "bg-accent/20 font-semibold text-ink ring-1 ring-accent"
+                  : d.citas.length > 0
+                    ? "bg-edge/10 font-medium text-ink hover:bg-edge/20"
+                    : "text-ink/40"
+              } ${d.fecha === hoyISO ? "underline underline-offset-2" : ""}`}
+            >
+              {d.dia}
+              <span className="mt-0.5 flex h-1.5 gap-0.5">
+                {d.citas.slice(0, 3).map((c, j) => (
+                  <span key={j} className={`h-1.5 w-1.5 rounded-full ${colorPunto[tonoDeEstatus(c.estatus)]}`} />
+                ))}
+              </span>
+            </button>
+          )
+        )}
+      </div>
+      <div className="mt-3 space-y-1.5">
+        {diaElegido ? (
+          diaElegido.citas.map((c, i) => (
+            <p key={i}>
+              <span className="font-medium text-ink">
+                {fechaLegible(c.fecha)} · {c.hora}
+              </span>{" "}
+              <span className="text-ink/50">({c.estatus})</span>
+              {c.tratamientos.length > 0 && <span> — {c.tratamientos.join(", ")}</span>}
+            </p>
+          ))
+        ) : (
+          <p className="text-xs text-ink/40">Toca un día marcado para ver su cita.</p>
+        )}
+      </div>
+    </div>
   );
 }
 
@@ -186,18 +289,7 @@ export default function ExpedienteCompartidoVista({
 
       {expediente.citas && (
         <Bloque titulo={`Citas del paciente (${expediente.citas.length})`}>
-          {expediente.citas.length === 0 && <p className="text-ink/50">Sin citas.</p>}
-          <ul className="space-y-1">
-            {expediente.citas.map((c, i) => (
-              <li key={i}>
-                <span className="font-medium text-ink">
-                  {fechaLegible(c.fecha)} · {c.hora}
-                </span>{" "}
-                <span className="text-ink/50">({c.estatus})</span>
-                {c.tratamientos.length > 0 && <span> — {c.tratamientos.join(", ")}</span>}
-              </li>
-            ))}
-          </ul>
+          {expediente.citas.length === 0 ? <p className="text-ink/50">Sin citas.</p> : <CalendarioCitas citas={expediente.citas} />}
         </Bloque>
       )}
 

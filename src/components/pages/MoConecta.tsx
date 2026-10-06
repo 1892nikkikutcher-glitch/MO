@@ -1432,7 +1432,7 @@ function useSolicitudesAcceso(interconsultaId: string) {
 }
 
 function SalaDelCaso({ interconsulta, onVolver }: { interconsulta: Interconsulta; onVolver: () => void }) {
-  const { uid } = useMoConecta();
+  const { uid, directorio } = useMoConecta();
   const { irAPagina } = usePatientData();
   const mensajes = useMensajes(interconsulta.id);
   const solicitudesAcceso = useSolicitudesAcceso(interconsulta.id);
@@ -1690,7 +1690,8 @@ function SalaDelCaso({ interconsulta, onVolver }: { interconsulta: Interconsulta
           {interconsulta.participantesAutorizados.map((p) => (
             <div key={p} className="flex items-center justify-between">
               <span>
-                {p === interconsulta.odontologoRemitenteUid ? "Remitente" : "Destinatario"} — {p === uid ? "Tú" : p}
+                {p === interconsulta.odontologoRemitenteUid ? "Remitente" : "Destinatario"} —{" "}
+                {p === uid ? "Tú" : directorio.find((x) => x.uid === p)?.nombreCompleto ?? "un colega"}
               </span>
               {p !== interconsulta.odontologoRemitenteUid && p !== uid && (
                 <button onClick={() => revocar(p)} className="text-xs text-danger hover:underline">
