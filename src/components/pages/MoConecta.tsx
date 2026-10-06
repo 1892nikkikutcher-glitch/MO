@@ -42,6 +42,8 @@ import { manejarCambioNombre } from "@/lib/textoNombre";
 import { buildMensajeInvitacionConecta } from "@/lib/invitacionesConecta";
 import type { MensajeInterconsulta } from "@/lib/conectaMensajes";
 import type { SolicitudAcceso } from "@/lib/invitacionesConecta";
+import { colegaDelCaso } from "@/lib/colegaDelCaso";
+import { useInvitacionesDeCasos } from "@/lib/useInvitacionesDeCasos";
 
 const inputClass =
   "w-full rounded-lg border border-edge/10 bg-field px-3 py-2 text-sm text-ink outline-none focus:border-accent/60";
@@ -1326,8 +1328,10 @@ function CasosTab({
   casoAbiertoId: string | null;
   onAbrirCaso: (id: string | null) => void;
 }) {
-  const { casosEnviados, casosRecibidos, cargando } = useMoConecta();
+  const { uid, directorio, casosEnviados, casosRecibidos, cargando } = useMoConecta();
   const [sub, setSub] = useState<"enviados" | "recibidos">("enviados");
+  // Con qué colega se comparte cada caso enviado que todavía no tiene colega aceptado.
+  const invitaciones = useInvitacionesDeCasos(casosEnviados.filter((c) => !c.destinatarioUid).map((c) => c.id));
   const casoAbierto = [...casosEnviados, ...casosRecibidos].find((c) => c.id === casoAbiertoId) ?? null;
 
   if (casoAbierto) {
@@ -1371,6 +1375,15 @@ function CasosTab({
                   {nombreYEspecialidad(c.resumenPaciente.nombre, c.especialidadSolicitada)}
                 </p>
                 {c.motivo && <p className="truncate text-xs text-ink/50">{c.motivo}</p>}
+                {(() => {
+                  const colega = colegaDelCaso(c, uid, directorio, invitaciones[c.id]);
+                  return (
+                    <p className="truncate text-xs text-ink/60">
+                      {sub === "enviados" ? "Enviada a" : "Recibida de"} <span className="font-medium text-ink/80">{colega.nombre}</span>
+                      {colega.detalle && <> · {colega.detalle}</>}
+                    </p>
+                  );
+                })()}
               </div>
               <EstadoBadge estado={c.estado} />
             </button>

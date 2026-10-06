@@ -2,9 +2,17 @@ import { NextRequest, NextResponse } from "next/server";
 import { verificarSesion } from "@/lib/adminAuth";
 import { dbAdmin } from "@/lib/firebaseAdmin";
 import { invitacionCrearSchema } from "@/lib/conectaSchemas";
-import { crearInvitacion } from "@/lib/conectaInvitaciones";
+import { crearInvitacion, resumenInvitacionesDeCasos } from "@/lib/conectaInvitaciones";
 import { urlInvitacion } from "@/lib/invitacionesConecta";
 import { ConectaError, nowISO } from "@/lib/conectaServer";
+
+/** A quién se invitó en cada caso (?ids=a,b,c) — solo invitaciones propias. */
+export async function GET(req: NextRequest) {
+  const sesion = await verificarSesion(req);
+  if (sesion instanceof NextResponse) return sesion;
+  const ids = (req.nextUrl.searchParams.get("ids") ?? "").split(",").map((x) => x.trim()).filter(Boolean);
+  return NextResponse.json(await resumenInvitacionesDeCasos(sesion.uid, ids));
+}
 
 /** Crea una invitación — el token crudo SOLO se regresa en esta respuesta;
  * Firestore solo guarda su hash (§2/§4 del plan). */

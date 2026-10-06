@@ -19,15 +19,11 @@
  * inerte, sin ningún dato real todavía). */
 
 import { useMoConecta } from "@/context/MoConectaContext";
+import { colegaDelCaso } from "@/lib/colegaDelCaso";
+import { useInvitacionesDeCasos } from "@/lib/useInvitacionesDeCasos";
 import { EstadoBadge, nombreYEspecialidad } from "./MoConecta";
 import type { Interconsulta } from "@/lib/moConecta";
 import { calcularResponsableActual } from "@/lib/responsableActualInterconsulta";
-
-function nombreColega(caso: Interconsulta, uid: string, directorio: { uid: string; nombreCompleto: string }[]): string {
-  const otroUid = caso.odontologoRemitenteUid === uid ? caso.destinatarioUid : caso.odontologoRemitenteUid;
-  if (!otroUid) return "colega por confirmar";
-  return directorio.find((p) => p.uid === otroUid)?.nombreCompleto ?? "un colega";
-}
 
 function textoResponsable(casos: Interconsulta[], directorio: { uid: string; nombreCompleto: string }[]): string {
   const resultado = calcularResponsableActual(casos);
@@ -50,15 +46,39 @@ export default function InterconsultasPaciente({
     .slice()
     .sort((a, b) => b.actualizadoEl.localeCompare(a.actualizadoEl));
 
+  // Los casos enviados por invitación todavía no tienen colega (destinatarioUid):
+  // se pregunta al servidor a quién se invitó, para poder mostrarlo.
+  const idsSinColega = casos.filter((c) => c.odontologoRemitenteUid === uid && !c.destinatarioUid).map((c) => c.id);
+  const invitaciones = useInvitacionesDeCasos(idsSinColega);
+
   if (cargando) {
     return <p className="text-sm text-ink/50">Cargando…</p>;
   }
 
   const responsable = textoResponsable(casos, directorio);
+  // Colegas con quienes se comparte (o se compartió) el expediente de este paciente.
+  const colegas = Array.from(
+    new Map(
+      casos
+        .filter((c) => c.odontologoRemitenteUid === uid)
+        .map((c) => colegaDelCaso(c, uid, directorio, invitaciones[c.id]))
+        .map((x) => [x.nombre, x])
+    ).values()
+  );
   const banner = (
-    <div className="rounded-lg border border-edge/10 bg-field px-3 py-2 text-sm">
-      <span className="text-ink/50">Responsable actual: </span>
-      <span className="font-medium text-ink">{responsable}</span>
+    <div className="space-y-1 rounded-lg border border-edge/10 bg-field px-3 py-2 text-sm">
+      <div>
+        <span className="text-ink/50">Responsable actual: </span>
+        <span className="font-medium text-ink">{responsable}</span>
+      </div>
+      {colegas.length > 0 && (
+        <div>
+          <span className="text-ink/50">Expediente compartido con: </span>
+          <span className="font-medium text-ink">
+            {colegas.map((x) => (x.pendiente ? `${x.nombre} (pendiente)` : x.nombre)).join(", ")}
+          </span>
+        </div>
+      )}
     </div>
   );
 
@@ -90,6 +110,7 @@ export default function InterconsultasPaciente({
       <div className="space-y-2">
         {casos.map((c) => {
           const esRemitente = c.odontologoRemitenteUid === uid;
+          const colega = colegaDelCaso(c, uid, directorio, invitaciones[c.id]);
           return (
             <button
               key={c.id}
@@ -98,8 +119,9 @@ export default function InterconsultasPaciente({
             >
               <div className="min-w-0">
                 <p className="truncate font-medium text-ink">
-                  {esRemitente ? "Enviada a" : "Recibida de"} {nombreColega(c, uid, directorio)}
+                  {esRemitente ? "Enviada a" : "Recibida de"} {colega.nombre}
                 </p>
+                {colega.detalle && <p className="truncate text-xs text-ink/60">{colega.detalle}</p>}
                 <p className="truncate text-xs text-ink/50">{nombreYEspecialidad(c.motivo || "Sin motivo", c.especialidadSolicitada)}</p>
               </div>
               <EstadoBadge estado={c.estado} />

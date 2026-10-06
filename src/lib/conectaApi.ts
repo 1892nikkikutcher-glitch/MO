@@ -202,6 +202,13 @@ export function crearInvitacionApi(body: CrearInvitacionBody) {
   return llamarApi("/api/conecta/invitaciones", { method: "POST", body: JSON.stringify(body) });
 }
 
+import type { ResumenInvitacionDeCaso } from "./colegaDelCaso";
+
+/** A quién se invitó en cada caso (solo invitaciones propias). */
+export function invitacionesDeCasosApi(interconsultaIds: string[]): Promise<Record<string, ResumenInvitacionDeCaso>> {
+  return llamarApi(`/api/conecta/invitaciones?ids=${encodeURIComponent(interconsultaIds.join(","))}`);
+}
+
 export function obtenerInvitacionPublicaApi(token: string) {
   return fetch(`/api/conecta/invitaciones/${token}`).then(async (res) => {
     const data = await res.json().catch(() => ({}));

@@ -85,6 +85,45 @@ export async function crearInvitacion(
   return { id: ref.id, tokenCrudo, venceEl: invitacion.venceEl };
 }
 
+export type ResumenInvitacionDeCaso = {
+  destinatarioNombre: string | null;
+  destinatarioCorreo: string | null;
+  canal: string;
+  estado: "activa" | "reclamada" | "vencida" | "cancelada";
+  creadoEl: string;
+  venceEl: string;
+};
+
+/** A quién se invitó, por caso — SOLO las invitaciones que creó este mismo
+ * usuario (nunca las de otro remitente) para que su pestaña de MO Conecta del
+ * paciente diga con qué colega se compartió el expediente aunque ese colega
+ * todavía no haya aceptado (no tiene destinatarioUid). Devuelve la invitación
+ * más reciente de cada caso. */
+export async function resumenInvitacionesDeCasos(
+  remitenteUid: string,
+  interconsultaIds: string[]
+): Promise<Record<string, ResumenInvitacionDeCaso>> {
+  const ids = new Set(interconsultaIds.slice(0, 50));
+  if (ids.size === 0) return {};
+  const snap = await dbAdmin.collection("invitacionesConecta").where("remitenteUid", "==", remitenteUid).get();
+  const resultado: Record<string, ResumenInvitacionDeCaso> = {};
+  snap.docs
+    .map((d) => d.data() as InvitacionConecta)
+    .filter((i) => ids.has(i.interconsultaId))
+    .sort((a, b) => a.creadoEl.localeCompare(b.creadoEl))
+    .forEach((i) => {
+      resultado[i.interconsultaId] = {
+        destinatarioNombre: i.destinatarioNombre ?? null,
+        destinatarioCorreo: i.destinatarioCorreoNormalizado ?? null,
+        canal: i.canal,
+        estado: i.estado === "activa" && invitacionVencida(i) ? "vencida" : i.estado,
+        creadoEl: i.creadoEl,
+        venceEl: i.venceEl,
+      };
+    });
+  return resultado;
+}
+
 /** Vista pública (sin sesión) por token — SOLO datos genéricos, nunca
  * clínicos (§4/§5 del plan). */
 export async function obtenerInvitacionPublica(tokenCrudo: string) {
