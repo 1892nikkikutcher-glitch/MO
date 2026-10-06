@@ -750,7 +750,12 @@ type PatientDataContextValue = {
   /** Recalcula los saldos de todos los pacientes desde sus datos reales. */
   recalcularSaldosPendientes: (
     onProgreso?: (hechos: number, total: number) => void
-  ) => Promise<{ pacientes: number; conSaldo: number; sinLigar: PagosSinLigar[] }>;
+  ) => Promise<{
+    pacientes: number;
+    conSaldo: number;
+    sinLigar: PagosSinLigar[];
+    porPaciente: SaldosPendientesConfig["porPaciente"];
+  }>;
   /** Adjunta la firma de recepción (ya subida a Storage) a una devolución
    * completada — no transaccional, nunca sugiere que la devolución falló. */
   agregarFirmaRecepcionDevolucion: (
@@ -1985,7 +1990,7 @@ export function PatientDataProvider({
     const { porPaciente, sinLigar } = calcularSaldosGlobales(entradas, new Date().toISOString());
     // Sin merge: reemplaza el documento completo (también quita lo obsoleto).
     await setDoc(doc(db, `users/${clinicUid}/config/saldosPendientes`), { porPaciente });
-    return { pacientes: lista.length, conSaldo: Object.keys(porPaciente).length, sinLigar };
+    return { pacientes: lista.length, conSaldo: Object.keys(porPaciente).length, sinLigar, porPaciente };
   };
 
   const registrarDevolucion = async (devolucionId: string, input: DevolucionInput, patientName: string) => {

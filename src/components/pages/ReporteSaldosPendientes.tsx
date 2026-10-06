@@ -1,15 +1,21 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { usePatientData } from "@/context/PatientDataContext";
 import { formatCurrency } from "@/lib/patientData";
-import type { PagosSinLigar } from "@/lib/saldosPendientes";
+import type { PagosSinLigar, SaldoPendienteEntry } from "@/lib/saldosPendientes";
 
 export default function ReporteSaldosPendientes() {
   const { saldosPendientes, irAExpediente, recalcularSaldosPendientes, puedeVerFinanzas } = usePatientData();
   const [recalculando, setRecalculando] = useState(false);
   const [progreso, setProgreso] = useState<{ hechos: number; total: number } | null>(null);
-  const [resultado, setResultado] = useState<{ pacientes: number; conSaldo: number; sinLigar: PagosSinLigar[] } | null>(null);
+  const [resultado, setResultado] = useState<{
+    pacientes: number;
+    conSaldo: number;
+    sinLigar: PagosSinLigar[];
+    porPaciente: Record<string, SaldoPendienteEntry>;
+  } | null>(null);
+  const [calculadoEl, setCalculadoEl] = useState<Date | null>(null);
   const [errorRecalculo, setErrorRecalculo] = useState("");
 
   const recalcular = async () => {
@@ -18,6 +24,7 @@ export default function ReporteSaldosPendientes() {
     setResultado(null);
     try {
       setResultado(await recalcularSaldosPendientes((hechos, total) => setProgreso({ hechos, total })));
+      setCalculadoEl(new Date());
     } catch (err) {
       console.error("No se pudo recalcular los saldos", err);
       setErrorRecalculo("No se pudieron recalcular los saldos. Revisa tu conexión e intenta de nuevo.");
@@ -27,7 +34,18 @@ export default function ReporteSaldosPendientes() {
     }
   };
 
-  const lista = Object.values(saldosPendientes.porPaciente).sort(
+  // Al abrir el reporte se calcula con los presupuestos y pagos REALES de cada
+  // expediente (no con el resumen guardado, que puede estar desfasado). Mientras
+  // termina, se muestra el resumen guardado marcado como provisional.
+  const yaCalculo = useRef(false);
+  useEffect(() => {
+    if (!puedeVerFinanzas || yaCalculo.current) return;
+    yaCalculo.current = true;
+    void recalcular();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [puedeVerFinanzas]);
+
+  const lista = Object.values(resultado?.porPaciente ?? saldosPendientes.porPaciente).sort(
     (a, b) => b.totalPresupuestado - b.totalPagado - (a.totalPresupuestado - a.totalPagado)
   );
   const totalPendiente = lista.reduce((s, e) => s + (e.totalPresupuestado - e.totalPagado), 0);
@@ -39,8 +57,12 @@ export default function ReporteSaldosPendientes() {
           Saldos Pendientes
         </h3>
         <p className="mt-1 text-xs text-ink/40">
-          Se actualiza conforme se registran presupuestos y pagos. Si algo no cuadra (por ejemplo, un
-          paciente que ya pagó y sigue apareciendo), usa «Recalcular desde los expedientes».
+          Los saldos se calculan al abrir este reporte con los presupuestos y pagos reales de cada
+          expediente.
+          {recalculando && " Mientras termina se muestra el último resumen guardado (provisional)."}
+          {!recalculando &&
+            calculadoEl &&
+            ` Calculado hoy a las ${calculadoEl.toLocaleTimeString("es-MX", { hour: "2-digit", minute: "2-digit" })}.`}
         </p>
         {puedeVerFinanzas && (
           <div className="mt-3 flex flex-wrap items-center gap-3">
@@ -53,7 +75,7 @@ export default function ReporteSaldosPendientes() {
                 ? progreso
                   ? `Recalculando… ${progreso.hechos} de ${progreso.total}`
                   : "Recalculando…"
-                : "Recalcular desde los expedientes"}
+                : "Volver a calcular"}
             </button>
             {errorRecalculo && <span className="text-xs text-danger">{errorRecalculo}</span>}
           </div>
@@ -131,6 +153,12 @@ export default function ReporteSaldosPendientes() {
                     >
                       {e.patientName}
                     </button>
+                    {resultado?.sinLigar.find((x) => x.patientId === e.patientId) && (
+                      <p className="mt-0.5 text-[11px] text-warning">
+                        Tiene {formatCurrency(resultado.sinLigar.find((x) => x.patientId === e.patientId)!.monto)} cobrados
+                        sin ligar a un tratamiento
+                      </p>
+                    )}
                   </td>
                   <td className="px-6 py-3 text-right text-ink/70">
                     {formatCurrency(e.totalPresupuestado)}
