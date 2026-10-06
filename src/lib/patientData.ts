@@ -214,6 +214,11 @@ export type SavedBudget = BudgetData & {
    * cada vez que esa cita se vuelve a guardar — sin esta bandera, esa
    * regeneración pisaba en silencio cualquier ajuste manual de precio. */
   editadoManualmente?: boolean;
+  /** Quién y cuándo lo creó — ausente en presupuestos anteriores a este
+   * registro (ver autoriaRegistros.ts). */
+  creadoPorUid?: string;
+  creadoPorEmail?: string;
+  creadoEl?: string;
 };
 
 export type Tratamiento = {
@@ -738,6 +743,10 @@ export type CitaAgenda = {
    * Asistió, Cancelada o Reagendada (ver src/lib/noAsistencia.ts). Opcional. */
   razonNoAsistencia?: RazonNoAsistencia;
   detalleNoAsistencia?: string;
+  /** Quién agendó la cita y cuándo — ausente en citas anteriores. */
+  creadaPorUid?: string;
+  creadaPorEmail?: string;
+  creadaEl?: string;
 };
 
 export const laboratorioTipoOptions = ["Dental", "Químico", "Radiografía"] as const;

@@ -150,6 +150,7 @@ export default function BitacoraCitas() {
                 <th className="px-4 py-3 font-medium">Procedimiento(s)</th>
                 <th className="px-4 py-3 font-medium">Estatus</th>
                 <th className="px-4 py-3 font-medium">Motivo</th>
+                <th className="px-4 py-3 font-medium">Agendada por</th>
               </tr>
             </thead>
             <tbody>
@@ -170,6 +171,7 @@ export default function BitacoraCitas() {
                     </span>
                   </td>
                   <td className="px-4 py-3 text-ink/60">{textoMotivoNoAsistencia(c) || "—"}</td>
+                  <td className="px-4 py-3 text-xs text-ink/50">{c.creadaPorEmail ?? "Sin registro"}</td>
                 </tr>
               ))}
             </tbody>

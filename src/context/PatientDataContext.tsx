@@ -80,6 +80,7 @@ import {
 } from "@/lib/metas";
 import { presupuestoGastosInicial, type Gasto, type PresupuestoGastosConfig } from "@/lib/gastos";
 import { migrarIdentidadDoctor } from "@/lib/migracionIdentidadDoctor";
+import { estamparNuevos } from "@/lib/autoriaRegistros";
 import {
   archivarYEliminar,
   marcarEntradaRestaurada,
@@ -1691,6 +1692,7 @@ export function PatientDataProvider({
       total: p.total,
       procedimientos: p.items.map((i) => i.procedure),
       creadoEn: new Date().toISOString(),
+      ...(p.creadoPorEmail ? { creadoPorEmail: p.creadoPorEmail } : {}),
     }));
     setPresupuestosLog((prev) => [...entradas, ...prev]);
   };
@@ -1746,7 +1748,9 @@ export function PatientDataProvider({
   const setPresupuestosPaciente = (patientId: string, updater: Updater<SavedBudget[]>) => {
     if (!clinicUid) return;
     const prevArr = presupuestosPorPaciente[patientId] ?? [];
-    const next = resolveUpdater(updater, prevArr);
+    // Todo presupuesto NUEVO queda marcado con quién lo creó y cuándo (antes no
+    // se guardaba y era imposible saber qué colaborador lo capturó).
+    const next = estamparNuevos(prevArr, resolveUpdater(updater, prevArr), { uid, email: userEmail }, new Date().toISOString());
     syncFirestoreList(`users/${clinicUid}/pacientes/${patientId}/presupuestos`, prevArr, next);
     registrarDeltaPresupuestos(prevArr, next);
     registrarPresupuestosPendientesDetalle(patientId, prevArr, next);

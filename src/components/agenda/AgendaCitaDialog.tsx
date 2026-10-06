@@ -26,6 +26,7 @@ import {
 } from "@/lib/seguimientoAutomatico";
 import { manejarCambioNombre } from "@/lib/textoNombre";
 import { medicoPreferidoDePaciente } from "@/lib/agendaHelpers";
+import { pareceControlOMensualidad } from "@/lib/autoriaRegistros";
 import {
   estatusAdmiteMotivo,
   razonesNoAsistencia,
@@ -110,6 +111,8 @@ export default function AgendaCitaDialog({
     citas,
     horario,
     limpiarPresupuestoDeCita,
+    miUid,
+    userEmail,
   } = usePatientData();
   const medicos = recursos.filter((r) => r.tipo === "medico");
   const unidades = recursos.filter((r) => r.tipo === "unidad");
@@ -172,6 +175,10 @@ export default function AgendaCitaDialog({
   const [tratamientos, setTratamientos] = useState<string[]>(initial.tratamientos ?? []);
   const [procedimientoInput, setProcedimientoInput] = useState("");
   const [costo, setCosto] = useState(initial.costo ?? "");
+  // null = decidir solo: un control de ortodoncia o una mensualidad es una
+  // visita/cuota de un tratamiento que YA existe, no un tratamiento nuevo, y
+  // no debe crear su propio presupuesto. Recepción puede cambiarlo.
+  const [generarPresupuestoElegido, setGenerarPresupuestoElegido] = useState<boolean | null>(null);
   const [comentarios, setComentarios] = useState(initial.comentarios ?? "");
   const [fecha, setFecha] = useState(initial.fecha);
   const [horaInicio, setHoraInicio] = useState(initial.horaInicio);
@@ -405,6 +412,12 @@ export default function AgendaCitaDialog({
       origenCita: initial.origenCita ?? "manual",
       // Motivo de inasistencia: solo si el estatus lo admite (al pasar a
       // Atendida, etc., se descarta solo porque `base` se arma desde cero).
+      // Quién agendó la cita (solo al crearla; al editar se conserva el original).
+      ...(initial.creadaPorEmail
+        ? { creadaPorUid: initial.creadaPorUid, creadaPorEmail: initial.creadaPorEmail, creadaEl: initial.creadaEl }
+        : !isEditing
+          ? { creadaPorUid: miUid, creadaPorEmail: userEmail, creadaEl: new Date().toISOString() }
+          : {}),
       ...(estatusAdmiteMotivo(estatus) && razonNA ? { razonNoAsistencia: razonNA } : {}),
       ...(estatusAdmiteMotivo(estatus) && detalleNA.trim() ? { detalleNoAsistencia: detalleNA.trim() } : {}),
     };
@@ -427,7 +440,8 @@ export default function AgendaCitaDialog({
     if (patientId && estatusAdmiteMotivo(estatus) && isEditing) {
       void limpiarPresupuestoDeCita(patientId, base.id, estatus);
     }
-    if (patientId && tratamientos.length > 0 && !estatusAdmiteMotivo(estatus)) {
+    const generarPresupuesto = generarPresupuestoElegido ?? !pareceControlOMensualidad(tratamientos);
+    if (patientId && tratamientos.length > 0 && !estatusAdmiteMotivo(estatus) && generarPresupuesto) {
       const montoCosto = Number(costo.replace(/[^\d.]/g, "")) || 0;
       if (montoCosto > 0) {
         const presupuestoId = `pres-cita-${base.id}`;
@@ -551,6 +565,12 @@ export default function AgendaCitaDialog({
             </h2>
             <p className="text-xs text-ink/40">
               Folio: {initial.folio ?? folioRef}
+              {initial.creadaPorEmail && (
+                <span className="ml-2 text-ink/40">
+                  · Agendada por {initial.creadaPorEmail}
+                  {initial.creadaEl ? ` el ${new Date(initial.creadaEl).toLocaleDateString("es-MX")}` : ""}
+                </span>
+              )}
               {initial.origenCita === "seguimiento_automatico" && (
                 <span className="ml-2 rounded-full bg-accent/10 px-2 py-0.5 text-[11px] font-semibold text-accent">
                   Seguimiento automático
@@ -895,6 +915,24 @@ export default function AgendaCitaDialog({
               className={inputClass}
             />
           </div>
+
+          {patientId && costo.trim() && tratamientos.length > 0 && (
+            <label className="flex cursor-pointer items-start gap-2 text-xs text-ink/70 sm:col-span-2">
+              <input
+                type="checkbox"
+                className="mt-0.5"
+                checked={generarPresupuestoElegido ?? !pareceControlOMensualidad(tratamientos)}
+                onChange={(e) => setGenerarPresupuestoElegido(e.target.checked)}
+              />
+              <span>
+                Crear un presupuesto con este costo en el expediente del paciente.
+                <span className="block text-ink/40">
+                  Déjalo apagado en controles de ortodoncia, mensualidades o revisiones: son visitas de un tratamiento
+                  que ya tiene su presupuesto, y cobrarlas se aplica a ese presupuesto desde la pestaña Pagos.
+                </span>
+              </span>
+            </label>
+          )}
 
           <div>
             <label className="mb-1 block text-xs font-medium text-ink/60">Comentarios de la cita</label>

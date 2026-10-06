@@ -41,6 +41,7 @@ import {
   type LineItem,
 } from "@/lib/patientData";
 import { textoMotivoNoAsistencia } from "@/lib/noAsistencia";
+import { textoAutoriaPresupuesto } from "@/lib/autoriaRegistros";
 import {
   condicionesSistemicasPositivas,
   esNegacionAlergia,
@@ -626,6 +627,7 @@ function PresupuestosTab({
                       </div>
                     ))}
                   </div>
+                  <p className="mt-1.5 text-[11px] text-ink/40">{textoAutoriaPresupuesto(p)}</p>
                   <div className="mt-2 flex flex-wrap items-center gap-3">
                     <span className="font-semibold text-accent">{formatCurrency(p.total)}</span>
                     <span className="text-xs text-ink/40">{p.fecha}</span>

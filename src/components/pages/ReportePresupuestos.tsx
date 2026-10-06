@@ -56,6 +56,7 @@ export default function ReportePresupuestos() {
                 <th className="px-6 py-3 font-medium">Paciente</th>
                 <th className="px-6 py-3 font-medium">Procedimientos</th>
                 <th className="px-6 py-3 font-medium">Médico</th>
+                <th className="px-6 py-3 font-medium">Creado por</th>
                 <th className="px-6 py-3 text-right font-medium">Total</th>
                 <th className="px-6 py-3 text-right font-medium">Acción</th>
               </tr>
@@ -75,6 +76,7 @@ export default function ReportePresupuestos() {
                   </td>
                   <td className="px-6 py-3 text-ink/70">{p.procedimientos.join(", ") || "—"}</td>
                   <td className="px-6 py-3 text-ink/60">{p.medico}</td>
+                  <td className="px-6 py-3 text-xs text-ink/50">{p.creadoPorEmail ?? "Sin registro"}</td>
                   <td className="px-6 py-3 text-right font-semibold text-ink">
                     {formatCurrency(p.total)}
                   </td>

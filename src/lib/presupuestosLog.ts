@@ -14,4 +14,6 @@ export type PresupuestoLogEntry = {
   total: number;
   procedimientos: string[];
   creadoEn: string;
+  /** Quién lo creó — ausente en entradas anteriores. */
+  creadoPorEmail?: string;
 };
