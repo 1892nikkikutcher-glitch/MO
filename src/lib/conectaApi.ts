@@ -5,6 +5,7 @@
  * Firebase Auth de la sesión actual, nunca escribe Firestore directo. */
 
 import { auth } from "./firebase";
+import type { SeccionCompartible } from "./expedienteCompartido";
 import type { CategoriaArchivoInterconsulta, InterconsultaEstado, PrioridadInterconsulta, TipoInterconsulta } from "./moConecta";
 
 /** Cuando la ruta rechaza el body por Zod, `detalles.fieldErrors` trae el
@@ -77,6 +78,7 @@ export type CrearInterconsultaBody = {
   destinatarioUid?: string;
   destinatarioClinicaId?: string;
   informacionMinima?: string;
+  seccionesCompartidas?: SeccionCompartible[];
   consentimiento: {
     destinatarioTipo: "odontologo_registrado" | "clinica" | "invitacion";
     destinatarioId?: string;

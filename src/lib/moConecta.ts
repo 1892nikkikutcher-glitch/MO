@@ -336,6 +336,8 @@ export type Contrarreferencia = {
   esBorrador: boolean;
 };
 
+import type { ExpedienteCompartido } from "./expedienteCompartido";
+
 export type FuenteInvitacion = "directorio" | "invitacion_enlace";
 
 export type Interconsulta = {
@@ -349,6 +351,10 @@ export type Interconsulta = {
   resumenPaciente: ResumenPacienteAutorizado;
   destinatarioUid?: string;
   destinatarioClinicaId?: string;
+  /** Partes del expediente que el remitente decidió compartir (foto fija al
+   * enviar, construida en servidor) — ausente si solo se compartió el
+   * resumen mínimo de `resumenPaciente`. Ver expedienteCompartido.ts. */
+  expedienteCompartido?: ExpedienteCompartido;
   /** Ausente en interconsultas creadas antes de este campo — el código que
    * lee este valor para decidir transiciones debe resolverlo como
    * "legacy_sin_clasificar" (v3 §14), nunca asumir "aislado_con_retorno" ni

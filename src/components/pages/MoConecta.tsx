@@ -43,6 +43,8 @@ import { buildMensajeInvitacionConecta } from "@/lib/invitacionesConecta";
 import type { MensajeInterconsulta } from "@/lib/conectaMensajes";
 import type { SolicitudAcceso } from "@/lib/invitacionesConecta";
 import { colegaDelCaso } from "@/lib/colegaDelCaso";
+import ExpedienteCompartidoVista, { ElegirSeccionesCompartir } from "./ExpedienteCompartidoVista";
+import type { SeccionCompartible } from "@/lib/expedienteCompartido";
 import { useInvitacionesDeCasos } from "@/lib/useInvitacionesDeCasos";
 
 const inputClass =
@@ -988,6 +990,7 @@ function NuevaInterconsultaDialog({
   const [correoEspecialista, setCorreoEspecialista] = useState("");
   const [whatsappEspecialista, setWhatsappEspecialista] = useState("");
   const [aceptaConsentimiento, setAceptaConsentimiento] = useState(false);
+  const [seccionesCompartidas, setSeccionesCompartidas] = useState<SeccionCompartible[]>([]);
   const [enviando, setEnviando] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [interconsultaCreadaId, setInterconsultaCreadaId] = useState<string | null>(null);
@@ -1011,6 +1014,7 @@ function NuevaInterconsultaDialog({
         tipoInterconsulta,
         destinatarioUid: destinatario?.uid,
         informacionMinima: informacionMinima || undefined,
+        seccionesCompartidas: seccionesCompartidas.length > 0 ? seccionesCompartidas : undefined,
         consentimiento: {
           destinatarioTipo: destinatario ? "odontologo_registrado" : "invitacion",
           destinatarioId: destinatario?.uid,
@@ -1254,6 +1258,11 @@ function NuevaInterconsultaDialog({
               placeholder="Solo lo estrictamente necesario para este caso"
             />
           </div>
+          <ElegirSeccionesCompartir
+            valor={seccionesCompartidas}
+            onChange={setSeccionesCompartidas}
+            nombreColega={destinatario?.nombreCompleto ?? (nombreEspecialista || "tu colega")}
+          />
           <div>
             <label className={labelClass}>Prioridad</label>
             <select
@@ -1293,7 +1302,9 @@ function NuevaInterconsultaDialog({
               checked={aceptaConsentimiento}
               onChange={(e) => setAceptaConsentimiento(e.target.checked)}
             />
-            Cuento con el consentimiento del paciente para compartir esta información con el colega destinatario.
+            Cuento con el consentimiento del paciente para compartir esta información
+            {seccionesCompartidas.length > 0 ? " (incluidas las partes del expediente que marqué)" : ""} con el colega
+            destinatario.
           </label>
         </div>
 
@@ -1556,6 +1567,13 @@ function SalaDelCaso({ interconsulta, onVolver }: { interconsulta: Interconsulta
           </div>
         </div>
       </div>
+
+      {interconsulta.expedienteCompartido && (
+        <ExpedienteCompartidoVista
+          expediente={interconsulta.expedienteCompartido}
+          cantidadFotos={interconsulta.expedienteCompartido.fotosArchivoIds?.length ?? 0}
+        />
+      )}
 
       {solicitudesAcceso.length > 0 && esRemitente && (
         <div className="space-y-2 rounded-2xl border border-warning/30 bg-warning/10 p-4">

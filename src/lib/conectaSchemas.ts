@@ -6,6 +6,7 @@
 
 import { z } from "zod";
 import { modalidadesAtencion } from "./moConecta";
+import { seccionesCompartibles } from "./expedienteCompartido";
 
 const camposPerfil = {
   nombreCompleto: z.string().trim().min(1).max(200),
@@ -72,6 +73,8 @@ export const interconsultaCrearSchema = z
     destinatarioUid: z.string().trim().min(1).max(200).optional(),
     destinatarioClinicaId: z.string().trim().min(1).max(200).optional(),
     informacionMinima: z.string().trim().max(2000).optional(),
+    /** Qué partes del expediente se comparten (el servidor las lee de Firestore). */
+    seccionesCompartidas: z.array(z.enum(seccionesCompartibles)).max(seccionesCompartibles.length).optional(),
     consentimiento: z.object({
       destinatarioTipo: z.enum(["odontologo_registrado", "clinica", "invitacion"]),
       destinatarioId: z.string().trim().max(200).optional(),
