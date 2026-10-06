@@ -207,7 +207,7 @@ const ORDEN_AVANCE: InterconsultaEstado[] = [
   "closed",
 ];
 
-const ESTADOS_TERMINALES: InterconsultaEstado[] = ["closed", "transferida", "cancelled", "rejected"];
+export const ESTADOS_TERMINALES: InterconsultaEstado[] = ["closed", "transferida", "cancelled", "rejected"];
 
 /** Exclusiva de "aislado_con_retorno" — una "transferencia_continuidad"
  * nunca pasa por aquí, termina en "transferida" directo desde "accepted"

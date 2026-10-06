@@ -39,6 +39,8 @@ import {
 import AppointmentStatusBadge from "@/components/agenda/AppointmentStatusBadge";
 import AgendaCitaDialog from "@/components/agenda/AgendaCitaDialog";
 import AgendaRecursoDialog from "@/components/agenda/AgendaRecursoDialog";
+import { useMoConecta } from "@/context/MoConectaContext";
+import { colegasPorRecurso, unirColegas } from "@/lib/calendariosCompartidos";
 
 
 /** Primera fase de optimización de lecturas: además del listener completo
@@ -88,6 +90,18 @@ export default function Agenda() {
     procedimientos,
     misRecursosVisibles,
   } = usePatientData();
+  // Calendarios compartidos solos: los recursos cuyas citas se compartieron con
+  // un colega por MO Conecta (caso enviado y todavía abierto).
+  const { casosEnviados, directorio } = useMoConecta();
+  const colegasAuto = useMemo(
+    () =>
+      colegasPorRecurso(
+        casosEnviados,
+        citasDeLaClinica,
+        (u) => directorio.find((p) => p.uid === u)?.nombreCompleto ?? "un colega"
+      ),
+    [casosEnviados, citasDeLaClinica, directorio]
+  );
   // Si este colaborador tiene un límite de calendarios configurado
   // (Administración → Colaboradores), toda la Agenda — tarjetas, columnas,
   // conflictos, recordatorios de WhatsApp — trabaja solo con ese
@@ -1041,16 +1055,23 @@ export default function Agenda() {
                     />
                     <span className="flex min-w-0 flex-col items-start">
                       <span className="max-w-full truncate text-ink/80">{r.nombre}</span>
-                      {(r.consultaExterna || r.calendarioCompartidoCon) && (
+                      {(r.consultaExterna || unirColegas(r.calendarioCompartidoCon, colegasAuto.get(r.id)).length > 0) && (
                         <span className="mt-0.5 flex max-w-full flex-wrap gap-1">
                           {r.consultaExterna && (
                             <span className="rounded-full border border-warning/40 bg-warning/10 px-1.5 text-[10px] font-medium text-warning">
                               Consulta externa
                             </span>
                           )}
-                          {r.calendarioCompartidoCon && (
-                            <span className="max-w-full truncate rounded-full border border-info/40 bg-info/10 px-1.5 text-[10px] font-medium text-info">
-                              Calendario compartido · {r.calendarioCompartidoCon}
+                          {unirColegas(r.calendarioCompartidoCon, colegasAuto.get(r.id)).length > 0 && (
+                            <span
+                              title={
+                                colegasAuto.has(r.id)
+                                  ? "Detectado en MO Conecta: se compartieron citas de este calendario con un colega."
+                                  : undefined
+                              }
+                              className="max-w-full truncate rounded-full border border-info/40 bg-info/10 px-1.5 text-[10px] font-medium text-info"
+                            >
+                              Calendario compartido · {unirColegas(r.calendarioCompartidoCon, colegasAuto.get(r.id)).join(", ")}
                             </span>
                           )}
                         </span>
