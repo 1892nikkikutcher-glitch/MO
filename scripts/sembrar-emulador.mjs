@@ -159,6 +159,42 @@ const gastos = [
   { id: "g4", concepto: "Luz e internet", categoria: "Servicios", monto: 1480, fecha: iso(mas(-1)) },
 ];
 
+// --- Casos de "saldos falsos" (para probar Reportes → Saldos pendientes) ---
+// p4: cita CANCELADA con su presupuesto automático sin pagar (nadie lo puede pagar).
+// p5: cita confirmada con presupuesto sin pagar + el mismo trabajo cobrado como pago
+//     "extra" (presupuesto automático ya pagado) -> mismo trabajo dos veces.
+const citaFalsa = (id, patientId, paciente, estatus) => ({
+  id, folio: id, recursoId: "r1", medicoId: "r1", unidadId: "u1", patientId, paciente,
+  tratamientos: ["Resina"], comentarios: "", costo: "$1,000", fecha: iso(mas(1)), horaInicio: "17:00", horaFin: "17:45",
+  estatus, recurrenciaId: null,
+});
+const presCita = (citaId, total) => ({
+  id: `pres-cita-${citaId}`, folio: citaId.slice(-6), fecha: dmy(mas(-1)), medico: "Dra. Ana Mendoza", tipoDePrecio: "Consultorio",
+  especialidad: "Odontología General", diagnostico: "Generado automáticamente a partir de una cita agendada.",
+  items: [{ id: `item-cita-${citaId}-0`, procedure: "Resina", price: total, teeth: [], note: "" }], total,
+});
+citas.push(citaFalsa("c-fx1", "p4", "Jorge Iván Mendoza", "Cancelada"), citaFalsa("c-fx2", "p5", "Paola Guadalupe Ríos", "Confirmada"));
+presupuestos.push(
+  { pid: "p4", doc: presCita("c-fx1", 800) },
+  { pid: "p5", doc: presCita("c-fx2", 1000) },
+  {
+    pid: "p5",
+    doc: {
+      id: "pres-pg-fx2", folio: "pg-fx2", fecha: dmy(mas(0)), medico: "Dra. Ana Mendoza", tipoDePrecio: "Consultorio",
+      especialidad: "Odontología General", diagnostico: "Generado automáticamente a partir de un pago sin presupuesto previo.",
+      items: [{ id: "item-pg-fx2-l1", procedure: "Resina", price: 1000, teeth: [], note: "" }], total: 1000,
+    },
+  }
+);
+pagos.push({
+  pid: "p5",
+  doc: {
+    id: "pg-fx2", fecha: dmy(mas(0)), medico: "Dra. Ana Mendoza", formaPago: "Efectivo",
+    lineas: [{ id: "pg-fx2-l1", tratamientoId: "item-pg-fx2-l1", folio: "pg-fx2", label: "Resina", monto: 1000, generarPresupuesto: true }],
+    total: 1000, facturar: false, firma: null,
+  },
+});
+
 const batch = db.batch();
 recursos.forEach((r) => batch.set(db.doc(`${base}/recursos/${r.id}`), r));
 pacientes.forEach((p) => batch.set(db.doc(`${base}/pacientes/${p.id}`), p));

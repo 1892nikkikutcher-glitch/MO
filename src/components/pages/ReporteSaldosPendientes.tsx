@@ -4,9 +4,21 @@ import { useEffect, useRef, useState } from "react";
 import { usePatientData } from "@/context/PatientDataContext";
 import { formatCurrency } from "@/lib/patientData";
 import type { PagosSinLigar, SaldoPendienteEntry } from "@/lib/saldosPendientes";
+import type { PosibleDuplicado, PresupuestoDeCitaNoAtendida } from "@/lib/saldosFalsos";
 
 export default function ReporteSaldosPendientes() {
-  const { saldosPendientes, irAExpediente, recalcularSaldosPendientes, puedeVerFinanzas } = usePatientData();
+  const {
+    saldosPendientes,
+    irAExpediente,
+    recalcularSaldosPendientes,
+    quitarPresupuestosDeCitasNoAtendidas,
+    unirPresupuestoDuplicado,
+    puedeVerFinanzas,
+  } = usePatientData();
+  const [limpiando, setLimpiando] = useState(false);
+  const [mensajeLimpieza, setMensajeLimpieza] = useState("");
+  const [uniendo, setUniendo] = useState<string | null>(null);
+  const [mensajesUnion, setMensajesUnion] = useState<Record<string, { ok: boolean; texto: string }>>({});
   const [recalculando, setRecalculando] = useState(false);
   const [progreso, setProgreso] = useState<{ hechos: number; total: number } | null>(null);
   const [resultado, setResultado] = useState<{
@@ -14,6 +26,8 @@ export default function ReporteSaldosPendientes() {
     conSaldo: number;
     sinLigar: PagosSinLigar[];
     porPaciente: Record<string, SaldoPendienteEntry>;
+    noAtendidas: PresupuestoDeCitaNoAtendida[];
+    duplicados: PosibleDuplicado[];
   } | null>(null);
   const [calculadoEl, setCalculadoEl] = useState<Date | null>(null);
   const [errorRecalculo, setErrorRecalculo] = useState("");
@@ -32,6 +46,33 @@ export default function ReporteSaldosPendientes() {
       setRecalculando(false);
       setProgreso(null);
     }
+  };
+
+  const quitarNoAtendidas = async () => {
+    if (!resultado || resultado.noAtendidas.length === 0) return;
+    const n = resultado.noAtendidas.length;
+    if (!window.confirm(`Se quitarán ${n} presupuestos de citas que nunca se atendieron y que nadie ha pagado. Quedan guardados en la Papelera. ¿Continuar?`)) return;
+    setLimpiando(true);
+    setMensajeLimpieza("");
+    try {
+      const quitados = await quitarPresupuestosDeCitasNoAtendidas(resultado.noAtendidas);
+      setMensajeLimpieza(`Listo: se quitaron ${quitados} presupuestos. Recalculando saldos…`);
+      await recalcular();
+      setMensajeLimpieza(`Listo: se quitaron ${quitados} presupuestos (están en Administración → Papelera).`);
+    } catch (err) {
+      console.error("No se pudieron quitar los presupuestos", err);
+      setMensajeLimpieza("No se pudo completar. Intenta de nuevo.");
+    } finally {
+      setLimpiando(false);
+    }
+  };
+
+  const unir = async (d: PosibleDuplicado) => {
+    setUniendo(d.presupuestoCitaId);
+    const r = await unirPresupuestoDuplicado(d);
+    setMensajesUnion((m) => ({ ...m, [d.presupuestoCitaId]: { ok: r.ok, texto: r.mensaje } }));
+    setUniendo(null);
+    if (r.ok) await recalcular();
   };
 
   // Al abrir el reporte se calcula con los presupuestos y pagos REALES de cada
@@ -88,6 +129,79 @@ export default function ReporteSaldosPendientes() {
             Listo: se revisaron {resultado.pacientes} expedientes y {resultado.conSaldo}{" "}
             {resultado.conSaldo === 1 ? "paciente tiene" : "pacientes tienen"} saldo pendiente.
           </p>
+          {resultado.noAtendidas.length > 0 && (
+            <div className="rounded-xl border border-danger/30 bg-danger/5 p-3">
+              <p className="text-sm font-semibold text-danger">
+                {resultado.noAtendidas.length} presupuestos son de citas que nunca se atendieron (
+                {formatCurrency(resultado.noAtendidas.reduce((sum, x) => sum + x.total, 0))}) y nadie los ha pagado
+              </p>
+              <p className="mt-1 text-xs text-ink/60">
+                Cada cita con costo crea su presupuesto; si la cita se canceló, se reagendó o el paciente no llegó,
+                ese presupuesto se quedaba como deuda que nadie puede pagar. Quitarlos baja el saldo a lo real
+                (quedan guardados en la Papelera y se pueden restaurar).
+              </p>
+              <ul className="mt-2 max-h-40 divide-y divide-edge/5 overflow-y-auto text-xs text-ink/70">
+                {resultado.noAtendidas.map((x) => (
+                  <li key={x.presupuestoId} className="flex justify-between gap-3 py-1">
+                    <button onClick={() => irAExpediente(x.patientId, "Pagos")} className="text-left underline decoration-ink/20 underline-offset-2 hover:text-accent">
+                      {x.patientName}
+                    </button>
+                    <span className="shrink-0">
+                      {formatCurrency(x.total)} · cita {x.citaEstatus}
+                    </span>
+                  </li>
+                ))}
+              </ul>
+              <button
+                onClick={quitarNoAtendidas}
+                disabled={limpiando}
+                className="mt-3 rounded-lg border border-danger/50 bg-danger/10 px-4 py-2 text-xs font-semibold text-danger hover:bg-danger/20 disabled:opacity-50"
+              >
+                {limpiando ? "Quitando…" : `Quitar estos ${resultado.noAtendidas.length} presupuestos`}
+              </button>
+            </div>
+          )}
+          {mensajeLimpieza && <p className="text-xs text-success">{mensajeLimpieza}</p>}
+
+          {resultado.duplicados.length > 0 && (
+            <div className="rounded-xl border border-warning/30 bg-warning/5 p-3">
+              <p className="text-sm font-semibold text-warning">
+                {resultado.duplicados.length} pacientes tienen el mismo trabajo dos veces: una vez pagado y otra como deuda
+              </p>
+              <p className="mt-1 text-xs text-ink/60">
+                Pasa cuando el pago se registra como «extra» en lugar de ligarlo al presupuesto de la cita. «Unir» pasa el
+                pago al presupuesto de la cita y quita el duplicado (queda en la Papelera). El dinero cobrado no cambia.
+              </p>
+              <ul className="mt-2 divide-y divide-edge/5 text-xs text-ink/70">
+                {resultado.duplicados.map((d) => (
+                  <li key={d.presupuestoCitaId} className="py-1.5">
+                    <div className="flex items-center justify-between gap-3">
+                      <button onClick={() => irAExpediente(d.patientId, "Pagos")} className="text-left underline decoration-ink/20 underline-offset-2 hover:text-accent">
+                        {d.patientName} · {formatCurrency(d.total)}
+                      </button>
+                      {d.unibleAutomaticamente ? (
+                        <button
+                          onClick={() => unir(d)}
+                          disabled={uniendo === d.presupuestoCitaId}
+                          className="shrink-0 rounded-lg border border-accent/60 bg-accent/15 px-3 py-1 font-semibold text-accent hover:bg-accent/25 disabled:opacity-50"
+                        >
+                          {uniendo === d.presupuestoCitaId ? "Uniendo…" : "Unir"}
+                        </button>
+                      ) : (
+                        <span className="shrink-0 text-ink/40">Revisar a mano</span>
+                      )}
+                    </div>
+                    {mensajesUnion[d.presupuestoCitaId] && (
+                      <p className={`mt-1 ${mensajesUnion[d.presupuestoCitaId].ok ? "text-success" : "text-danger"}`}>
+                        {mensajesUnion[d.presupuestoCitaId].texto}
+                      </p>
+                    )}
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
+
           {resultado.sinLigar.length > 0 ? (
             <div>
               <p className="text-sm font-semibold text-warning">

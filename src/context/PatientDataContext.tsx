@@ -88,7 +88,7 @@ import {
   type ResultadoRestauracion,
 } from "@/lib/papeleraFirestore";
 import { analizarRutaOrigen, type EntradaPapelera } from "@/lib/papelera";
-import { aplicarEstatusConMotivo, type MotivoNoAsistencia } from "@/lib/noAsistencia";
+import { aplicarEstatusConMotivo, estatusAdmiteMotivo, type MotivoNoAsistencia } from "@/lib/noAsistencia";
 import { estadoRegulacionInicial, type EstadoRegulacionSanitaria } from "@/lib/regulacionSanitaria";
 import { formatosWhatsAppInicial, type FormatosWhatsApp } from "@/lib/formatosWhatsapp";
 import { contratoOrtodonciaInicial, type ContratoOrtodonciaConfig } from "@/lib/contratoOrtodoncia";
@@ -99,6 +99,15 @@ import type { CentroRadiodiagnostico } from "@/lib/centroRadiodiagnostico";
 import type { LaboratorioDental } from "@/lib/laboratorioDental";
 import type { PagoEliminado } from "@/lib/pagosEliminados";
 import type { PagoRealizado } from "@/lib/pagosRealizados";
+import {
+  aplicarUnionAPagos,
+  planUnion,
+  posiblesDuplicados,
+  presupuestosDeCitasNoAtendidas,
+  type CitaMinima,
+  type PosibleDuplicado,
+  type PresupuestoDeCitaNoAtendida,
+} from "@/lib/saldosFalsos";
 import {
   saldosPendientesInicial,
   calcularSaldoPendiente,
@@ -764,7 +773,18 @@ type PatientDataContextValue = {
     conSaldo: number;
     sinLigar: PagosSinLigar[];
     porPaciente: SaldosPendientesConfig["porPaciente"];
+    noAtendidas: PresupuestoDeCitaNoAtendida[];
+    duplicados: PosibleDuplicado[];
   }>;
+  /** Quita (a la Papelera) presupuestos generados por citas que no se atendieron
+   * y que nadie ha pagado — corrige saldos inflados. Devuelve cuántos quitó. */
+  quitarPresupuestosDeCitasNoAtendidas: (items: PresupuestoDeCitaNoAtendida[]) => Promise<number>;
+  /** Une un presupuesto de cita sin pagar con el presupuesto "extra" ya pagado
+   * del mismo trabajo: el pago pasa a descontar del de la cita y el duplicado
+   * se quita (queda en la Papelera). */
+  unirPresupuestoDuplicado: (d: PosibleDuplicado) => Promise<{ ok: boolean; mensaje: string }>;
+  /** Al cancelar/reagendar/no asistir una cita, quita su presupuesto automático si nadie lo pagó. */
+  limpiarPresupuestoDeCita: (patientId: string, citaId: string, estatus: string) => Promise<void>;
   /** Adjunta la firma de recepción (ya subida a Storage) a una devolución
    * completada — no transaccional, nunca sugiere que la devolución falló. */
   agregarFirmaRecepcionDevolucion: (
@@ -1999,7 +2019,16 @@ export function PatientDataProvider({
     const { porPaciente, sinLigar } = calcularSaldosGlobales(entradas, new Date().toISOString());
     // Sin merge: reemplaza el documento completo (también quita lo obsoleto).
     await setDoc(doc(db, `users/${clinicUid}/config/saldosPendientes`), { porPaciente });
-    return { pacientes: lista.length, conSaldo: Object.keys(porPaciente).length, sinLigar, porPaciente };
+    // Saldos "falsos": con los mismos datos ya leídos, se detectan los
+    // presupuestos de citas que nunca se atendieron y los duplicados.
+    const citasPorId = new Map<string, CitaMinima>(citas.map((c) => [c.id, c]));
+    const noAtendidas = entradas.flatMap((e) =>
+      presupuestosDeCitasNoAtendidas({ patientId: e.patientId, patientName: e.patientName, presupuestos: e.presupuestos, pagos: e.pagos }, citasPorId)
+    );
+    const duplicados = entradas.flatMap((e) =>
+      posiblesDuplicados({ patientId: e.patientId, patientName: e.patientName, presupuestos: e.presupuestos, pagos: e.pagos }, citasPorId)
+    );
+    return { pacientes: lista.length, conSaldo: Object.keys(porPaciente).length, sinLigar, porPaciente, noAtendidas, duplicados };
   };
 
   /** Devuelve un registro de la Papelera a su lugar. Los que arrastran
@@ -2087,6 +2116,99 @@ export function PatientDataProvider({
     } catch (err) {
       console.error("No se pudo restaurar desde la Papelera", err);
       return { ok: false, mensaje: "No se pudo restaurar. Revisa tu conexión e intenta de nuevo." };
+    }
+  };
+
+  /** Lee una subcolección del paciente directo de Firestore. */
+  const leerSubcoleccion = async <T,>(patientId: string, sub: string) =>
+    (await getDocs(collection(db, `users/${clinicUid}/pacientes/${patientId}/${sub}`))).docs.map((d) => ({
+      ...(d.data() as T),
+      id: d.id,
+    }));
+
+  /** Quita presupuestos de citas no atendidas y sin pagos de UN paciente, con
+   * los mismos resúmenes (totales, pendientes, saldo) que cualquier baja de
+   * presupuesto. Todo se re-valida con los datos reales de Firestore. */
+  const quitarPresupuestosSinPagarDe = async (
+    patientId: string,
+    citasPorId: Map<string, CitaMinima>,
+    soloIds?: Set<string>
+  ): Promise<PresupuestoDeCitaNoAtendida[]> => {
+    if (!clinicUid) return [];
+    const [presupuestos, pagos, devoluciones] = await Promise.all([
+      leerSubcoleccion<SavedBudget>(patientId, "presupuestos"),
+      leerSubcoleccion<Pago>(patientId, "pagos"),
+      leerSubcoleccion<DevolucionPago>(patientId, "devoluciones"),
+    ]);
+    const nombre = patients.find((p) => p.id === patientId)?.name ?? "";
+    const candidatos = presupuestosDeCitasNoAtendidas({ patientId, patientName: nombre, presupuestos, pagos }, citasPorId).filter(
+      (c) => !soloIds || soloIds.has(c.presupuestoId)
+    );
+    if (candidatos.length === 0) return [];
+    const ids = new Set(candidatos.map((c) => c.presupuestoId));
+    const next = presupuestos.filter((p) => !ids.has(p.id));
+    archivarYEliminar(
+      `users/${clinicUid}/pacientes/${patientId}/presupuestos`,
+      presupuestos.filter((p) => ids.has(p.id)) as unknown as ({ id: string } & Record<string, unknown>)[]
+    );
+    registrarDeltaPresupuestos(presupuestos, next);
+    registrarPresupuestosPendientesDetalle(patientId, presupuestos, next);
+    registrarPresupuestosCreadosDetalle(patientId, presupuestos, next);
+    registrarSaldoPendiente(patientId, next, pagos, devoluciones);
+    return candidatos;
+  };
+
+  const quitarPresupuestosDeCitasNoAtendidas = async (items: PresupuestoDeCitaNoAtendida[]) => {
+    const citasPorId = new Map<string, CitaMinima>(citas.map((c) => [c.id, c]));
+    const porPaciente = new Map<string, Set<string>>();
+    items.forEach((i) => porPaciente.set(i.patientId, (porPaciente.get(i.patientId) ?? new Set()).add(i.presupuestoId)));
+    let total = 0;
+    for (const [pid, ids] of porPaciente) total += (await quitarPresupuestosSinPagarDe(pid, citasPorId, ids)).length;
+    return total;
+  };
+
+  const limpiarPresupuestoDeCita = async (patientId: string, citaId: string, estatus: string) => {
+    if (!clinicUid || !patientId) return;
+    try {
+      const citasPorId = new Map<string, CitaMinima>(citas.map((c) => [c.id, c]));
+      citasPorId.set(citaId, { id: citaId, patientId, fecha: "", estatus });
+      await quitarPresupuestosSinPagarDe(patientId, citasPorId, new Set([`pres-cita-${citaId}`]));
+    } catch (err) {
+      console.error("No se pudo limpiar el presupuesto de la cita", err);
+    }
+  };
+
+  const unirPresupuestoDuplicado = async (d: PosibleDuplicado): Promise<{ ok: boolean; mensaje: string }> => {
+    if (!clinicUid) return { ok: false, mensaje: "Sin clínica activa." };
+    try {
+      const [presupuestos, pagos, devoluciones] = await Promise.all([
+        leerSubcoleccion<SavedBudget>(d.patientId, "presupuestos"),
+        leerSubcoleccion<Pago>(d.patientId, "pagos"),
+        leerSubcoleccion<DevolucionPago>(d.patientId, "devoluciones"),
+      ]);
+      const deCita = presupuestos.find((p) => p.id === d.presupuestoCitaId);
+      const deExtra = presupuestos.find((p) => p.id === d.presupuestoPagoId);
+      if (!deCita || !deExtra) return { ok: false, mensaje: "Ya cambió: alguno de los dos presupuestos no existe." };
+      const plan = planUnion(deCita, deExtra);
+      if (!plan) return { ok: false, mensaje: "Los renglones no coinciden uno a uno; revísalo a mano en el expediente." };
+      const etiquetas = new Map(deCita.items.map((i) => [i.id, i.note || i.procedure]));
+      const pagosNuevos = aplicarUnionAPagos(pagos, plan, etiquetas);
+      const base = `users/${clinicUid}/pacientes/${d.patientId}`;
+      // 1) los pagos pasan a descontar del presupuesto de la cita (el monto cobrado no cambia).
+      await Promise.all(
+        pagosNuevos.filter((p, i) => p !== pagos[i]).map((p) => setDoc(doc(db, `${base}/pagos`, p.id), p))
+      );
+      // 2) se quita el presupuesto duplicado (a la Papelera) con sus resúmenes.
+      const next = presupuestos.filter((p) => p.id !== deExtra.id);
+      archivarYEliminar(`${base}/presupuestos`, [deExtra] as unknown as ({ id: string } & Record<string, unknown>)[]);
+      registrarDeltaPresupuestos(presupuestos, next);
+      registrarPresupuestosPendientesDetalle(d.patientId, presupuestos, next);
+      registrarPresupuestosCreadosDetalle(d.patientId, presupuestos, next);
+      registrarSaldoPendiente(d.patientId, next, pagosNuevos, devoluciones);
+      return { ok: true, mensaje: "Unidos: el pago ahora descuenta del presupuesto de la cita." };
+    } catch (err) {
+      console.error("No se pudo unir el presupuesto duplicado", err);
+      return { ok: false, mensaje: "No se pudo unir. Revisa tu conexión e intenta de nuevo." };
     }
   };
 
@@ -2717,6 +2839,10 @@ export function PatientDataProvider({
 
   const marcarEstatusCita = (citaId: string, estatus: CitaEstatus, motivo?: MotivoNoAsistencia) => {
     setCitas((prev) => prev.map((c) => (c.id === citaId ? aplicarEstatusConMotivo(c, estatus, motivo) : c)));
+    // Una cita que no se va a atender no debe dejar un presupuesto "pendiente"
+    // que nadie puede pagar (infla el saldo del paciente).
+    const cita = citas.find((c) => c.id === citaId);
+    if (cita?.patientId && estatusAdmiteMotivo(estatus)) void limpiarPresupuestoDeCita(cita.patientId, citaId, estatus);
   };
 
   const invitarColaborador = async (data: {
@@ -2894,6 +3020,9 @@ export function PatientDataProvider({
         corregirDevolucion,
         reconciliarSaldoPendiente,
         recalcularSaldosPendientes,
+        quitarPresupuestosDeCitasNoAtendidas,
+        unirPresupuestoDuplicado,
+        limpiarPresupuestoDeCita,
         restaurarDePapelera,
         agregarFirmaRecepcionDevolucion,
         comparativasPorPaciente,

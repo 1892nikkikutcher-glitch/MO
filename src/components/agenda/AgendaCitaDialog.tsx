@@ -109,6 +109,7 @@ export default function AgendaCitaDialog({
     pagosPorPaciente,
     citas,
     horario,
+    limpiarPresupuestoDeCita,
   } = usePatientData();
   const medicos = recursos.filter((r) => r.tipo === "medico");
   const unidades = recursos.filter((r) => r.tipo === "unidad");
@@ -420,7 +421,13 @@ export default function AgendaCitaDialog({
     // paciente, pero eso hacía que una limpieza (o cualquier tratamiento
     // recurrente) ya facturada alguna vez dejara de generar presupuesto en
     // citas futuras — quedaban sin nada pendiente por cobrar.
-    if (patientId && tratamientos.length > 0) {
+    // Una cita que no se va a atender (cancelada, reagendada, no asistió) NO
+    // genera presupuesto — nadie puede pagarlo y solo infla el saldo — y el
+    // que ya tuviera, si nadie lo pagó, se quita (queda en la Papelera).
+    if (patientId && estatusAdmiteMotivo(estatus) && isEditing) {
+      void limpiarPresupuestoDeCita(patientId, base.id, estatus);
+    }
+    if (patientId && tratamientos.length > 0 && !estatusAdmiteMotivo(estatus)) {
       const montoCosto = Number(costo.replace(/[^\d.]/g, "")) || 0;
       if (montoCosto > 0) {
         const presupuestoId = `pres-cita-${base.id}`;

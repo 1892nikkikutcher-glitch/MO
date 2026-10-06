@@ -703,6 +703,13 @@ export function AgregarPagoDialog({
               </button>
             </div>
 
+            {tratamientosPendientes.length > 0 && (
+              <p className="mb-1.5 rounded-lg border border-warning/30 bg-warning/10 p-2 text-[11px] text-ink/70">
+                Si este pago es de alguno de estos tratamientos, <strong>márcalo aquí abajo</strong> (no uses «+ pago
+                extra»): así el saldo del presupuesto baja. Un pago extra se cuenta como trabajo aparte y el
+                tratamiento seguiría apareciendo como deuda.
+              </p>
+            )}
             {tratamientosPendientes.length === 0 && extras.length === 0 ? (
               <p className="rounded-lg border border-dashed border-edge/15 p-4 text-center text-xs text-ink/30">
                 Este paciente no tiene tratamientos pendientes por pagar. Usa el botón + para un pago
