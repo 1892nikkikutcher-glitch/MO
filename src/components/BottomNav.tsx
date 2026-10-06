@@ -184,6 +184,7 @@ export const navItems = [
       { id: "administracion-procedimientos", label: "Procedimientos y costos" },
       { id: "administracion-historial-clinico", label: "Historial Clínico" },
       { id: "administracion-borrar-citas", label: "Borrar citas" },
+      { id: "administracion-papelera", label: "Papelera" },
       { id: "administracion-consultorio", label: "Consultorio" },
       { id: "administracion-comisiones", label: "Comisiones" },
       { id: "administracion-medicos-pacientes", label: "Médicos vs pacientes" },

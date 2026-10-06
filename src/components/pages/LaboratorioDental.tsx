@@ -378,7 +378,7 @@ export default function LaboratorioDentalPage() {
       {laboratorioAEliminar && (
         <ConfirmarEliminar
           titulo="¿Eliminar este laboratorio dental?"
-          mensaje={`Vas a eliminar "${laboratorioAEliminar.nombre}" del catálogo. Esta acción no se puede deshacer.`}
+          mensaje={`Vas a eliminar "${laboratorioAEliminar.nombre}" del catálogo. Quedará guardado en la Papelera por si necesitas recuperarlo.`}
           onCancel={() => setLaboratorioAEliminar(null)}
           onConfirm={() => {
             setLaboratoriosDentales((prev) => prev.filter((x) => x.id !== laboratorioAEliminar.id));
@@ -412,7 +412,7 @@ export default function LaboratorioDentalPage() {
           titulo="¿Eliminar esta orden de laboratorio?"
           mensaje={`Vas a eliminar la orden de "${ordenAEliminar.trabajo}" con ${ordenAEliminar.laboratorio}${
             ordenAEliminar.patientName ? ` para ${ordenAEliminar.patientName}` : ""
-          }. Esta acción no se puede deshacer.`}
+          }. Quedará guardado en la Papelera por si necesitas recuperarlo.`}
           onCancel={() => setOrdenAEliminar(null)}
           onConfirm={() => {
             void eliminarSolicitudLaboratorioDirecta(ordenAEliminar.patientId, ordenAEliminar.id);

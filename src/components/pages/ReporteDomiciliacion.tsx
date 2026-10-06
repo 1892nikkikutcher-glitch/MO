@@ -286,7 +286,7 @@ export default function ReporteDomiciliacion() {
       {domiciliacionAEliminar && (
         <ConfirmarEliminar
           titulo="¿Eliminar esta domiciliación?"
-          mensaje={`Vas a eliminar la domiciliación de ${domiciliacionAEliminar.patientName} (${domiciliacionAEliminar.banco}) por ${formatCurrency(domiciliacionAEliminar.monto)} mensuales. Esta acción no se puede deshacer.`}
+          mensaje={`Vas a eliminar la domiciliación de ${domiciliacionAEliminar.patientName} (${domiciliacionAEliminar.banco}) por ${formatCurrency(domiciliacionAEliminar.monto)} mensuales. Quedará guardado en la Papelera por si necesitas recuperarlo.`}
           onCancel={() => setDomiciliacionAEliminar(null)}
           onConfirm={() => {
             setDomiciliaciones((prev) => prev.filter((x) => x.id !== domiciliacionAEliminar.id));

@@ -14,6 +14,7 @@ import type { FotoPaciente } from "./patientData";
 import {
   analizarRutaOrigen,
   construirEntradaPapelera,
+  hashTexto,
   REGISTROS_POR_LOTE,
   trocear,
   type CampoFoto,
@@ -30,6 +31,24 @@ function usuarioActual(): UsuarioPapelera {
 }
 
 let ultimoAviso = 0;
+
+/** React puede ejecutar dos veces la función que pide un borrado (siempre en
+ * desarrollo con StrictMode; en producción, si reprocesa una actualización de
+ * estado). Sin esto, el mismo registro quedaría dos veces en la Papelera. Se
+ * recuerda unos segundos qué se acaba de archivar y se ignora el repetido. */
+const archivadosRecientes = new Map<string, number>();
+const VENTANA_DUPLICADO_MS = 2000;
+
+function esDuplicadoReciente(ruta: string, item: { id: string }): boolean {
+  const ahora = Date.now();
+  archivadosRecientes.forEach((t, k) => {
+    if (ahora - t > VENTANA_DUPLICADO_MS) archivadosRecientes.delete(k);
+  });
+  const clave = `${ruta}/${item.id}/${hashTexto(JSON.stringify(item))}`;
+  if (archivadosRecientes.has(clave)) return true;
+  archivadosRecientes.set(clave, ahora);
+  return false;
+}
 
 /** Si el archivado falla (sin permisos, por ejemplo), Firestore revierte el
  * batch completo: el registro NO se elimina y vuelve a aparecer solo. Aquí
@@ -52,7 +71,8 @@ function avisarFalloPapelera(err: unknown) {
  * MISMO batch — o pasan las dos cosas o ninguna, nunca se pierde un registro
  * por un fallo a medias. Cada llamada comparte un `loteId` (útil cuando una
  * sola acción borra cientos, como "Borrar citas"). */
-export function archivarYEliminar(ruta: string, items: ({ id: string } & Record<string, unknown>)[]) {
+export function archivarYEliminar(ruta: string, itemsPedidos: ({ id: string } & Record<string, unknown>)[]) {
+  const items = itemsPedidos.filter((item) => !esDuplicadoReciente(ruta, item));
   if (items.length === 0) return;
   const origen = analizarRutaOrigen(ruta);
   if (!origen) {

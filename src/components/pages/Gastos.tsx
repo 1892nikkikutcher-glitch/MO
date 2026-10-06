@@ -249,7 +249,7 @@ export default function Gastos() {
       {gastoAEliminar && (
         <ConfirmarEliminar
           titulo="¿Eliminar este gasto?"
-          mensaje={`Vas a eliminar "${gastoAEliminar.concepto}" por ${formatCurrency(gastoAEliminar.monto)}. Esta acción no se puede deshacer.`}
+          mensaje={`Vas a eliminar "${gastoAEliminar.concepto}" por ${formatCurrency(gastoAEliminar.monto)}. Quedará guardado en la Papelera por si necesitas recuperarlo.`}
           onCancel={() => setGastoAEliminar(null)}
           onConfirm={() => {
             eliminarGasto(gastoAEliminar.id);

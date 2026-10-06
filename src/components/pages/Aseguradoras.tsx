@@ -171,7 +171,7 @@ export default function Aseguradoras() {
       {aseguradoraAEliminar && (
         <ConfirmarEliminar
           titulo="¿Eliminar esta aseguradora?"
-          mensaje={`Vas a eliminar "${aseguradoraAEliminar.nombre}" del catálogo. Esta acción no se puede deshacer.`}
+          mensaje={`Vas a eliminar "${aseguradoraAEliminar.nombre}" del catálogo. Quedará guardado en la Papelera por si necesitas recuperarlo.`}
           onCancel={() => setAseguradoraAEliminar(null)}
           onConfirm={() => {
             setAseguradoras((prev) => prev.filter((x) => x.id !== aseguradoraAEliminar.id));

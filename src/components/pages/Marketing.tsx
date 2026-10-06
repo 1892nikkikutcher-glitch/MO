@@ -296,7 +296,7 @@ export default function Marketing() {
       {promocionAEliminar && (
         <ConfirmarEliminar
           titulo="¿Eliminar esta promoción?"
-          mensaje={`Vas a eliminar "${promocionAEliminar.nombre}". Esta acción no se puede deshacer.`}
+          mensaje={`Vas a eliminar "${promocionAEliminar.nombre}". Quedará guardado en la Papelera por si necesitas recuperarlo.`}
           onCancel={() => setPromocionAEliminar(null)}
           onConfirm={() => {
             setPromociones((prev) => prev.filter((x) => x.id !== promocionAEliminar.id));

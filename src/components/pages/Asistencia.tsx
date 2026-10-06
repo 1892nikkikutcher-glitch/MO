@@ -261,7 +261,7 @@ function TabPersonal() {
       {personalAEliminar && (
         <ConfirmarEliminar
           titulo="¿Eliminar a este colaborador?"
-          mensaje={`Vas a eliminar a "${personalAEliminar.nombre}" (${personalAEliminar.puesto}) de la lista de personal. Esta acción no se puede deshacer.`}
+          mensaje={`Vas a eliminar a "${personalAEliminar.nombre}" (${personalAEliminar.puesto}) de la lista de personal. Quedará guardado en la Papelera por si necesitas recuperarlo.`}
           onCancel={() => setPersonalAEliminar(null)}
           onConfirm={() => {
             eliminarPersonal(personalAEliminar.id);

@@ -80,7 +80,14 @@ import {
 } from "@/lib/metas";
 import { presupuestoGastosInicial, type Gasto, type PresupuestoGastosConfig } from "@/lib/gastos";
 import { migrarIdentidadDoctor } from "@/lib/migracionIdentidadDoctor";
-import { archivarYEliminar } from "@/lib/papeleraFirestore";
+import {
+  archivarYEliminar,
+  marcarEntradaRestaurada,
+  restaurarDocumentoDePapelera,
+  restaurarFotoDePapelera,
+  type ResultadoRestauracion,
+} from "@/lib/papeleraFirestore";
+import { analizarRutaOrigen, type EntradaPapelera } from "@/lib/papelera";
 import { aplicarEstatusConMotivo, type MotivoNoAsistencia } from "@/lib/noAsistencia";
 import { estadoRegulacionInicial, type EstadoRegulacionSanitaria } from "@/lib/regulacionSanitaria";
 import { formatosWhatsAppInicial, type FormatosWhatsApp } from "@/lib/formatosWhatsapp";
@@ -747,6 +754,8 @@ type PatientDataContextValue = {
    * expuesto para el botón "Reintentar sincronización" cuando
    * registrarDevolucion devuelve saldoSincronizado: false. */
   reconciliarSaldoPendiente: (patientId: string) => void;
+  /** Devuelve un registro de la Papelera a su lugar (ver Papelera.tsx). */
+  restaurarDePapelera: (entrada: EntradaPapelera) => Promise<ResultadoRestauracion>;
   /** Recalcula los saldos de todos los pacientes desde sus datos reales. */
   recalcularSaldosPendientes: (
     onProgreso?: (hechos: number, total: number) => void
@@ -1993,6 +2002,94 @@ export function PatientDataProvider({
     return { pacientes: lista.length, conSaldo: Object.keys(porPaciente).length, sinLigar, porPaciente };
   };
 
+  /** Devuelve un registro de la Papelera a su lugar. Los que arrastran
+   * totales en otras partes (presupuestos, pagos, órdenes de laboratorio) se
+   * restauran con las mismas funciones que los dan de alta normalmente, usando
+   * las listas REALES de Firestore del paciente (no el estado local, que puede
+   * no tenerlo cargado), para que Finanzas, Saldos y Pendientes queden bien. */
+  const restaurarDePapelera = async (entrada: EntradaPapelera): Promise<ResultadoRestauracion> => {
+    if (!clinicUid) return { ok: false, mensaje: "No hay una clínica activa." };
+    const origen = analizarRutaOrigen(entrada.rutaOrigen);
+    if (!origen || origen.clinicUid !== clinicUid) return { ok: false, mensaje: "Este registro pertenece a otra clínica." };
+    if (entrada.restauradoEl) return { ok: false, mensaje: "Este registro ya se restauró." };
+    const pid = origen.pacienteId;
+    const yaExiste: ResultadoRestauracion = {
+      ok: false,
+      mensaje: "Ya existe un registro con el mismo identificador en su lugar de origen; no se restauró para no pisarlo.",
+    };
+    const ok: ResultadoRestauracion = { ok: true, mensaje: "Registro restaurado." };
+    const item = { ...entrada.datos, id: entrada.docId };
+    const refItem = doc(db, entrada.rutaOrigen, entrada.docId);
+    const leerLista = async <T,>(sub: string) =>
+      (await getDocs(collection(db, `users/${clinicUid}/pacientes/${pid}/${sub}`))).docs.map((d) => ({
+        ...(d.data() as T),
+        id: d.id,
+      }));
+    try {
+      let r: ResultadoRestauracion;
+      if (entrada.tipo === "fotos") {
+        r = await restaurarFotoDePapelera(entrada);
+      } else if (pid && entrada.tipo === "presupuestos") {
+        const prevArr = await leerLista<SavedBudget>("presupuestos");
+        if (prevArr.some((p) => p.id === entrada.docId)) {
+          r = yaExiste;
+        } else {
+          const [pagos, devoluciones] = await Promise.all([leerLista<Pago>("pagos"), leerLista<DevolucionPago>("devoluciones")]);
+          const nuevo = item as unknown as SavedBudget;
+          const next = [nuevo, ...prevArr];
+          await setDoc(refItem, nuevo);
+          registrarDeltaPresupuestos(prevArr, next);
+          registrarPresupuestosPendientesDetalle(pid, prevArr, next);
+          registrarPresupuestosCreadosDetalle(pid, prevArr, next);
+          registrarSaldoPendiente(pid, next, pagos, devoluciones);
+          if (!presupuestosLog.some((l) => l.id === entrada.docId)) registrarLogPresupuestos(pid, prevArr, next);
+          r = ok;
+        }
+      } else if (pid && entrada.tipo === "pagos") {
+        const prevArr = await leerLista<Pago>("pagos");
+        if (prevArr.some((p) => p.id === entrada.docId)) {
+          r = yaExiste;
+        } else {
+          const [presupuestos, devoluciones] = await Promise.all([
+            leerLista<SavedBudget>("presupuestos"),
+            leerLista<DevolucionPago>("devoluciones"),
+          ]);
+          const nuevo = item as unknown as Pago;
+          const next = [nuevo, ...prevArr];
+          await setDoc(refItem, nuevo);
+          registrarDeltaFinanzas(prevArr, next);
+          setEstadisticas((prevEst) => ({ ...prevEst, pagosCount: prevEst.pagosCount + 1 }));
+          registrarSaldoPendiente(pid, presupuestos, next, devoluciones);
+          r = ok;
+        }
+      } else if (pid && entrada.tipo === "laboratorios") {
+        const prevArr = await leerLista<SolicitudLaboratorio>("laboratorios");
+        if (prevArr.some((p) => p.id === entrada.docId)) {
+          r = yaExiste;
+        } else {
+          const nuevo = item as unknown as SolicitudLaboratorio;
+          await setDoc(refItem, nuevo);
+          aplicarCambiosLaboratorios(pid, prevArr, [nuevo, ...prevArr]);
+          r = ok;
+        }
+      } else if (pid && entrada.tipo === "recetas") {
+        r = await restaurarDocumentoDePapelera(entrada);
+        if (r.ok && !recetasLog.some((l) => l.id === entrada.docId)) {
+          const prevArr = (await leerLista<Receta>("recetas")).filter((x) => x.id !== entrada.docId);
+          registrarLogRecetas(pid, prevArr, [item as unknown as Receta, ...prevArr]);
+        }
+      } else {
+        r = await restaurarDocumentoDePapelera(entrada);
+      }
+      // Solo se marca como restaurada si de verdad volvió a su lugar.
+      if (r.ok) await marcarEntradaRestaurada(clinicUid, entrada.id, userEmail);
+      return r;
+    } catch (err) {
+      console.error("No se pudo restaurar desde la Papelera", err);
+      return { ok: false, mensaje: "No se pudo restaurar. Revisa tu conexión e intenta de nuevo." };
+    }
+  };
+
   const registrarDevolucion = async (devolucionId: string, input: DevolucionInput, patientName: string) => {
     if (!clinicUid) throw new Error("Sin clínica activa.");
     // Atómico y garantizado: si esto no lanza, el dinero ya quedó
@@ -2797,6 +2894,7 @@ export function PatientDataProvider({
         corregirDevolucion,
         reconciliarSaldoPendiente,
         recalcularSaldosPendientes,
+        restaurarDePapelera,
         agregarFirmaRecepcionDevolucion,
         comparativasPorPaciente,
         setComparativasPaciente,

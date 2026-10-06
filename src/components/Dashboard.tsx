@@ -37,6 +37,7 @@ import BitacoraCitas from "./pages/BitacoraCitas";
 import ReporteProcedimientos from "./pages/ReporteProcedimientos";
 import MedicosPacientes from "./pages/MedicosPacientes";
 import BorrarCitas from "./pages/BorrarCitas";
+import Papelera from "./pages/Papelera";
 import Clasificacion from "./pages/Clasificacion";
 import Recordatorios from "./pages/Recordatorios";
 import Consultorio from "./pages/Consultorio";
@@ -99,6 +100,7 @@ const paginasConstruidas = new Set([
   "reportes-procedimientos",
   "administracion-medicos-pacientes",
   "administracion-borrar-citas",
+  "administracion-papelera",
   "reportes-clasificacion",
   "reportes-recordatorios",
   "administracion-consultorio",
@@ -837,6 +839,7 @@ function DashboardBody({
           {activePage === "reportes-procedimientos" && <ReporteProcedimientos />}
           {activePage === "administracion-medicos-pacientes" && <MedicosPacientes />}
           {activePage === "administracion-borrar-citas" && <BorrarCitas />}
+          {activePage === "administracion-papelera" && <Papelera />}
           {activePage === "reportes-clasificacion" && <Clasificacion />}
           {activePage === "reportes-recordatorios" && <Recordatorios />}
           {activePage === "administracion-consultorio" && <Consultorio />}

@@ -285,7 +285,7 @@ export default function Medicamentos() {
       {medicamentoAEliminar && (
         <ConfirmarEliminar
           titulo="¿Eliminar este medicamento?"
-          mensaje={`Vas a eliminar "${medicamentoAEliminar.nombre}" del catálogo. Esta acción no se puede deshacer.`}
+          mensaje={`Vas a eliminar "${medicamentoAEliminar.nombre}" del catálogo. Quedará guardado en la Papelera por si necesitas recuperarlo.`}
           onCancel={() => setMedicamentoAEliminar(null)}
           onConfirm={() => {
             eliminarMedicamento(medicamentoAEliminar.id);

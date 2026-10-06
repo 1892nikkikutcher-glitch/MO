@@ -353,7 +353,7 @@ export default function Procedimientos() {
       {procedimientoAEliminar && (
         <ConfirmarEliminar
           titulo="¿Eliminar este procedimiento?"
-          mensaje={`Vas a eliminar "${procedimientoAEliminar.nombre}" del catálogo. Esta acción no se puede deshacer.`}
+          mensaje={`Vas a eliminar "${procedimientoAEliminar.nombre}" del catálogo. Quedará guardado en la Papelera por si necesitas recuperarlo.`}
           onCancel={() => setProcedimientoAEliminar(null)}
           onConfirm={() => {
             eliminarProcedimiento(procedimientoAEliminar.id);

@@ -41,7 +41,7 @@ export default function BorrarCitas() {
   return (
     <div className="space-y-6">
       <div className="rounded-2xl border border-danger/20 bg-danger/5 p-4 text-xs text-danger">
-        Esta herramienta elimina citas de forma permanente. Define un filtro, revisa la lista de
+        Esta herramienta elimina citas en bloque; quedan guardadas en Administración → Papelera, desde donde se pueden restaurar. Define un filtro, revisa la lista de
         abajo antes de confirmar, y borra solo lo que necesites.
       </div>
 
@@ -138,7 +138,7 @@ export default function BorrarCitas() {
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4">
           <div className="w-full max-w-sm rounded-2xl border border-edge/10 bg-modal p-6 text-center">
             <h3 className="text-base font-semibold text-ink">¿Borrar {seleccionadas.length} cita(s)?</h3>
-            <p className="mt-2 text-sm text-ink/60">Esta acción no se puede deshacer.</p>
+            <p className="mt-2 text-sm text-ink/60">Quedará guardado en la Papelera por si necesitas recuperarlo.</p>
             <div className="mt-6 flex gap-3">
               <button
                 onClick={() => setConfirmando(false)}

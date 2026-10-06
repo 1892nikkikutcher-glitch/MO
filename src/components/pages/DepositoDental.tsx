@@ -656,7 +656,7 @@ export default function DepositoDental() {
       {depositoAEliminar && (
         <ConfirmarEliminar
           titulo="¿Eliminar este depósito dental?"
-          mensaje={`Vas a eliminar "${depositoAEliminar.nombre}" del catálogo. Esta acción no se puede deshacer.`}
+          mensaje={`Vas a eliminar "${depositoAEliminar.nombre}" del catálogo. Quedará guardado en la Papelera por si necesitas recuperarlo.`}
           onCancel={() => setDepositoAEliminar(null)}
           onConfirm={() => {
             setDepositos((prev) => prev.filter((x) => x.id !== depositoAEliminar.id));
@@ -668,7 +668,7 @@ export default function DepositoDental() {
       {faltanteAEliminar && (
         <ConfirmarEliminar
           titulo="¿Eliminar este faltante?"
-          mensaje={`Vas a eliminar "${faltanteAEliminar.nombre}" de la lista de faltantes. Esta acción no se puede deshacer.`}
+          mensaje={`Vas a eliminar "${faltanteAEliminar.nombre}" de la lista de faltantes. Quedará guardado en la Papelera por si necesitas recuperarlo.`}
           onCancel={() => setFaltanteAEliminar(null)}
           onConfirm={() => {
             setArticulosFaltantes((prev) => prev.filter((x) => x.id !== faltanteAEliminar.id));
@@ -680,7 +680,7 @@ export default function DepositoDental() {
       {caducidadAEliminar && (
         <ConfirmarEliminar
           titulo="¿Eliminar este producto?"
-          mensaje={`Vas a eliminar "${caducidadAEliminar.nombre}" del control de caducidades. Esta acción no se puede deshacer.`}
+          mensaje={`Vas a eliminar "${caducidadAEliminar.nombre}" del control de caducidades. Quedará guardado en la Papelera por si necesitas recuperarlo.`}
           onCancel={() => setCaducidadAEliminar(null)}
           onConfirm={() => {
             setArticulosCaducidad((prev) => prev.filter((x) => x.id !== caducidadAEliminar.id));

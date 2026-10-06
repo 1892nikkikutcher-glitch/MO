@@ -244,7 +244,7 @@ export default function CentroRadiodiagnosticoPage() {
       {centroAEliminar && (
         <ConfirmarEliminar
           titulo="¿Eliminar este centro de radiodiagnóstico?"
-          mensaje={`Vas a eliminar "${centroAEliminar.nombre}" del catálogo. Esta acción no se puede deshacer.`}
+          mensaje={`Vas a eliminar "${centroAEliminar.nombre}" del catálogo. Quedará guardado en la Papelera por si necesitas recuperarlo.`}
           onCancel={() => setCentroAEliminar(null)}
           onConfirm={() => {
             setCentrosRadiodiagnostico((prev) => prev.filter((x) => x.id !== centroAEliminar.id));

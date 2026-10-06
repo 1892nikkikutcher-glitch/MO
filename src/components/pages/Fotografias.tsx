@@ -150,7 +150,7 @@ function SingleUploadCard({
       {confirmarEliminar && (
         <ConfirmarEliminar
           titulo={label ? `¿Quitar ${label.toLowerCase()}?` : "¿Quitar esta foto?"}
-          mensaje="Esta acción no se puede deshacer."
+          mensaje="Quedará guardado en la Papelera por si necesitas recuperarlo."
           onCancel={() => setConfirmarEliminar(false)}
           onConfirm={() => {
             onRemove();
@@ -258,7 +258,7 @@ function GalleryUploadCard({
       {fotoAEliminar && (
         <ConfirmarEliminar
           titulo="¿Eliminar esta fotografía?"
-          mensaje="Esta acción no se puede deshacer."
+          mensaje="Quedará guardado en la Papelera por si necesitas recuperarlo."
           onCancel={() => setFotoAEliminar(null)}
           onConfirm={() => {
             onRemove(fotoAEliminar);

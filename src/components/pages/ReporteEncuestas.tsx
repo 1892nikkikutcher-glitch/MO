@@ -372,7 +372,7 @@ export default function ReporteEncuestas() {
       {encuestaAEliminar && (
         <ConfirmarEliminar
           titulo="¿Quitar esta encuesta de la bitácora?"
-          mensaje={`Encuesta de ${encuestaAEliminar.patientName}. Esta acción no se puede deshacer.`}
+          mensaje={`Encuesta de ${encuestaAEliminar.patientName}. Quedará guardado en la Papelera por si necesitas recuperarlo.`}
           confirmLabel="Quitar"
           onCancel={() => setEncuestaAEliminar(null)}
           onConfirm={() => {

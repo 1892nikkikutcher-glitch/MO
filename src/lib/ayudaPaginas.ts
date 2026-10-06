@@ -206,6 +206,16 @@ export const ayudaPaginas: Record<string, AyudaPagina> = {
       "El nombre y el color de cada médico se editan desde Agenda → Recursos.",
     ],
   },
+  "administracion-papelera": {
+    titulo: "Administración — Papelera",
+    resumen: "Aquí queda guardado todo lo que se elimina en MO (citas, presupuestos, pagos, recetas, fotos, catálogos…), con quién lo eliminó y cuándo.",
+    puntos: [
+      "Nada se borra de forma definitiva: usa «Ver detalle» para revisar todo lo que tenía y «Restaurar» para regresarlo a su lugar.",
+      "Los presupuestos, pagos y órdenes de laboratorio restaurados vuelven a sumar en saldos, finanzas y pendientes.",
+      "Lo que se elimina en bloque (por ejemplo con «Borrar citas») aparece agrupado y se puede restaurar completo.",
+      "Solo los administradores ven esta pantalla.",
+    ],
+  },
   "administracion-consultorio": {
     titulo: "Administración — Consultorio",
     resumen: "Horario de atención del consultorio (apertura, cierre, horario de comida) — controla el rango visible/agendable en Agenda.",

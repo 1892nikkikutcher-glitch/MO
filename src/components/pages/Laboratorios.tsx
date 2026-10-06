@@ -493,7 +493,7 @@ export default function Laboratorios({ patientId }: { patientId: string }) {
       {solicitudAEliminar && (
         <ConfirmarEliminar
           titulo="¿Eliminar esta solicitud de laboratorio?"
-          mensaje={`Vas a eliminar la solicitud de "${solicitudAEliminar.trabajo}" con ${solicitudAEliminar.laboratorio}. Esta acción no se puede deshacer.`}
+          mensaje={`Vas a eliminar la solicitud de "${solicitudAEliminar.trabajo}" con ${solicitudAEliminar.laboratorio}. Quedará guardado en la Papelera por si necesitas recuperarlo.`}
           onCancel={() => setSolicitudAEliminar(null)}
           onConfirm={() => {
             eliminarSolicitud(solicitudAEliminar.id);

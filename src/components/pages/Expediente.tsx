@@ -770,7 +770,7 @@ function PresupuestosTab({
             <h3 className="text-base font-semibold text-ink">Eliminar comparativa</h3>
             <p className="mt-2 text-sm text-ink/70">
               Vas a eliminar la comparativa <span className="font-semibold text-ink">&quot;{comparativaAEliminar.titulo}&quot;</span>.
-              Los presupuestos que compara no se ven afectados. Esta acción no se puede deshacer.
+              Los presupuestos que compara no se ven afectados. Quedará guardado en la Papelera por si necesitas recuperarlo.
             </p>
             <div className="mt-6 flex gap-3">
               <button
@@ -799,8 +799,7 @@ function PresupuestosTab({
             <h3 className="text-base font-semibold text-ink">Eliminar presupuesto</h3>
             <p className="mt-2 text-sm text-ink/70">
               Vas a eliminar el presupuesto <span className="font-semibold text-ink">#{presupuestoAEliminar.folio}</span>{" "}
-              por <span className="font-semibold text-ink">{formatCurrency(presupuestoAEliminar.total)}</span>. Esta
-              acción no se puede deshacer.
+              por <span className="font-semibold text-ink">{formatCurrency(presupuestoAEliminar.total)}</span>. Quedará guardado en la Papelera por si necesitas recuperarlo.
             </p>
             <div className="mt-6 flex gap-3">
               <button

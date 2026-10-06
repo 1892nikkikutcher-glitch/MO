@@ -328,7 +328,7 @@ export default function Rpbi() {
       {empresaAEliminar && (
         <ConfirmarEliminar
           titulo="¿Eliminar esta empresa RPBI?"
-          mensaje={`Vas a eliminar "${empresaAEliminar.empresa}" del catálogo. Esta acción no se puede deshacer.`}
+          mensaje={`Vas a eliminar "${empresaAEliminar.empresa}" del catálogo. Quedará guardado en la Papelera por si necesitas recuperarlo.`}
           onCancel={() => setEmpresaAEliminar(null)}
           onConfirm={() => {
             setEmpresasRpbi((prev) => prev.filter((x) => x.id !== empresaAEliminar.id));

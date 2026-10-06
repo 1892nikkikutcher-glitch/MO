@@ -288,7 +288,7 @@ export default function Contabilidad() {
       {contadorAEliminar && (
         <ConfirmarEliminar
           titulo="¿Eliminar este contador?"
-          mensaje={`Vas a eliminar "${tituloContador(contadorAEliminar)}" del catálogo. Esta acción no se puede deshacer.`}
+          mensaje={`Vas a eliminar "${tituloContador(contadorAEliminar)}" del catálogo. Quedará guardado en la Papelera por si necesitas recuperarlo.`}
           onCancel={() => setContadorAEliminar(null)}
           onConfirm={() => {
             setContadores((prev) => prev.filter((x) => x.id !== contadorAEliminar.id));

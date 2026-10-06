@@ -1146,7 +1146,7 @@ export default function AgendaCitaDialog({
           titulo="¿Eliminar esta cita?"
           mensaje={`Vas a eliminar la cita de ${nombrePacienteActual || searchText || "este paciente"}${
             fecha ? ` del ${fecha}` : ""
-          }${horaInicio ? ` a las ${horaInicio}` : ""}. Esta acción no se puede deshacer.`}
+          }${horaInicio ? ` a las ${horaInicio}` : ""}. Quedará guardado en la Papelera por si necesitas recuperarlo.`}
           onCancel={() => setConfirmandoEliminarCita(false)}
           onConfirm={onDelete}
         />
