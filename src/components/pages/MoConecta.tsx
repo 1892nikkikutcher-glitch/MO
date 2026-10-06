@@ -54,6 +54,7 @@ import type { MensajeInterconsulta } from "@/lib/conectaMensajes";
 import type { SolicitudAcceso } from "@/lib/invitacionesConecta";
 import { colegaDelCaso } from "@/lib/colegaDelCaso";
 import ExpedienteCompartidoVista, { ElegirSeccionesCompartir } from "./ExpedienteCompartidoVista";
+import { CalendariosCompartidosTab } from "./CalendariosCompartidos";
 import type { SeccionCompartible } from "@/lib/expedienteCompartido";
 import { useInvitacionesDeCasos } from "@/lib/useInvitacionesDeCasos";
 
@@ -197,7 +198,7 @@ export function EstadoBadge({ estado }: { estado: InterconsultaEstado }) {
   );
 }
 
-type TabId = "resumen" | "directorio" | "interconsultas" | "perfil" | "afiliacion";
+type TabId = "resumen" | "directorio" | "interconsultas" | "calendarios" | "perfil" | "afiliacion";
 
 /** Paciente al que se limita todo el módulo cuando se abre desde su expediente
  * (null = módulo general, con todos los pacientes y médicos). */
@@ -263,6 +264,8 @@ export default function MoConecta() {
             { id: "resumen" as const, label: "Resumen" },
             { id: "directorio" as const, label: "Directorio" },
             { id: "interconsultas" as const, label: "Interconsultas" },
+            // Desde el expediente de un paciente solo se ve lo de ese paciente.
+            ...(alcance ? [] : [{ id: "calendarios" as const, label: "Calendarios" }]),
             { id: "perfil" as const, label: "Mi perfil" },
             { id: "afiliacion" as const, label: "Afiliación" },
           ].map((t) => (
@@ -309,6 +312,7 @@ export default function MoConecta() {
         />
       )}
       {tab === "interconsultas" && <CasosTab casoAbiertoId={casoAbierto} onAbrirCaso={setCasoAbierto} />}
+      {tab === "calendarios" && !alcance && <CalendariosCompartidosTab />}
       {tab === "perfil" && <PerfilTab />}
       {tab === "afiliacion" && <AfiliacionTab />}
 

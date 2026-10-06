@@ -41,6 +41,8 @@ import AgendaCitaDialog from "@/components/agenda/AgendaCitaDialog";
 import AgendaRecursoDialog from "@/components/agenda/AgendaRecursoDialog";
 import { useMoConecta } from "@/context/MoConectaContext";
 import { colegasPorRecurso, unirColegas } from "@/lib/calendariosCompartidos";
+import { useCalendariosCompartidos } from "@/lib/useCalendariosCompartidos";
+import { CompartirCalendarioDialog } from "@/components/pages/CalendariosCompartidos";
 
 
 /** Primera fase de optimización de lecturas: además del listener completo
@@ -93,15 +95,19 @@ export default function Agenda() {
   // Calendarios compartidos solos: los recursos cuyas citas se compartieron con
   // un colega por MO Conecta (caso enviado y todavía abierto).
   const { casosEnviados, directorio } = useMoConecta();
-  const colegasAuto = useMemo(
-    () =>
-      colegasPorRecurso(
-        casosEnviados,
-        citasDeLaClinica,
-        (u) => directorio.find((p) => p.uid === u)?.nombreCompleto ?? "un colega"
-      ),
-    [casosEnviados, citasDeLaClinica, directorio]
-  );
+  const { mios: calendariosMios, refrescar: refrescarCalendarios } = useCalendariosCompartidos();
+  const [recursoACompartir, setRecursoACompartir] = useState<Recurso | null>(null);
+  const colegasAuto = useMemo(() => {
+    const porCasos = colegasPorRecurso(
+      casosEnviados,
+      citasDeLaClinica,
+      (u) => directorio.find((p) => p.uid === u)?.nombreCompleto ?? "un colega"
+    );
+    // Calendarios compartidos de verdad (Compartir calendario) se suman a lo detectado por casos.
+    const todos = new Map(porCasos);
+    calendariosMios.forEach((c) => todos.set(c.recursoId, unirColegas(undefined, [...(todos.get(c.recursoId) ?? []), c.destinatarioNombre])));
+    return todos;
+  }, [casosEnviados, citasDeLaClinica, directorio, calendariosMios]);
   // Si este colaborador tiene un límite de calendarios configurado
   // (Administración → Colaboradores), toda la Agenda — tarjetas, columnas,
   // conflictos, recordatorios de WhatsApp — trabaja solo con ese
@@ -1082,6 +1088,13 @@ export default function Agenda() {
                     {r.tipo === "medico" ? "Médico" : "Unidad"}
                   </span>
                   <button
+                    onClick={() => setRecursoACompartir(r)}
+                    title="Compartir este calendario con un colega (solo ocupado/libre)"
+                    className="shrink-0 px-1 text-[11px] font-medium text-ink/40 transition-colors hover:text-accent"
+                  >
+                    Compartir
+                  </button>
+                  <button
                     onClick={() => setRecursoDialog(r)}
                     title="Editar recurso"
                     className="shrink-0 px-1 text-ink/40 transition-colors hover:text-accent"
@@ -1134,6 +1147,14 @@ export default function Agenda() {
           onSave={guardarCita}
           onDelete={dialogState.isEditing ? eliminarCita : undefined}
           onNavegarCita={(cita) => setDialogState({ initial: cita, isEditing: true })}
+        />
+      )}
+
+      {recursoACompartir && (
+        <CompartirCalendarioDialog
+          recurso={recursoACompartir}
+          onClose={() => setRecursoACompartir(null)}
+          onCambio={() => void refrescarCalendarios()}
         />
       )}
 

@@ -6,6 +6,7 @@
 
 import { auth } from "./firebase";
 import type { SeccionCompartible } from "./expedienteCompartido";
+import type { CalendarioCompartidoDoc, OcupacionDeCalendario } from "./calendarioOcupacion";
 import type { CategoriaArchivoInterconsulta, InterconsultaEstado, PrioridadInterconsulta, TipoInterconsulta } from "./moConecta";
 
 /** Cuando la ruta rechaza el body por Zod, `detalles.fieldErrors` trae el
@@ -209,6 +210,22 @@ import type { ResumenInvitacionDeCaso } from "./colegaDelCaso";
 /** A quién se invitó en cada caso (solo invitaciones propias). */
 export function invitacionesDeCasosApi(interconsultaIds: string[]): Promise<Record<string, ResumenInvitacionDeCaso>> {
   return llamarApi(`/api/conecta/invitaciones?ids=${encodeURIComponent(interconsultaIds.join(","))}`);
+}
+
+export function listarCalendariosApi(): Promise<{ mios: CalendarioCompartidoDoc[]; conmigo: CalendarioCompartidoDoc[] }> {
+  return llamarApi("/api/conecta/calendarios");
+}
+
+export function compartirCalendarioApi(body: { clinicaId: string; recursoId: string; destinatarioUid: string }): Promise<{ calendario: CalendarioCompartidoDoc }> {
+  return llamarApi("/api/conecta/calendarios", { method: "POST", body: JSON.stringify(body) });
+}
+
+export function dejarDeCompartirCalendarioApi(id: string) {
+  return llamarApi(`/api/conecta/calendarios/${id}`, { method: "DELETE" });
+}
+
+export function ocupacionCalendarioApi(id: string, desde: string, hasta: string): Promise<OcupacionDeCalendario> {
+  return llamarApi(`/api/conecta/calendarios/${id}/ocupacion?desde=${desde}&hasta=${hasta}`);
 }
 
 export function obtenerInvitacionPublicaApi(token: string) {
