@@ -19,6 +19,8 @@ describe("puedeTransicionar", () => {
   it("permite el avance normal paso a paso", () => {
     expect(puedeTransicionar("sent", "received", false)).toBe(true);
     expect(puedeTransicionar("received", "accepted", false)).toBe(true);
+    // El colega acepta directo desde "Enviada", sin justificación (nada marca "received").
+    expect(puedeTransicionar("sent", "accepted", false)).toBe(true);
     expect(puedeTransicionar("accepted", "patient_contacted", false)).toBe(true);
     expect(puedeTransicionar("patient_contacted", "scheduled", false)).toBe(true);
     expect(puedeTransicionar("scheduled", "in_treatment", false)).toBe(true);

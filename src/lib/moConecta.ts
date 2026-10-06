@@ -273,6 +273,10 @@ export function puedeTransicionar(
   }
   if (siguiente === "rejected") return actual === "sent" || actual === "received";
   if (siguiente === "closed") return actual === "counter_referral_sent";
+  // "received" es un paso intermedio que ninguna pantalla marca por sí sola: el
+  // colega que recibe un caso "sent" lo acepta directo, sin tener que escribir
+  // una justificación por "saltarse" un paso que nunca existió para él.
+  if (actual === "sent" && siguiente === "accepted") return true;
 
   const idxActual = ORDEN_AVANCE.indexOf(actual);
   const idxSiguiente = ORDEN_AVANCE.indexOf(siguiente);
