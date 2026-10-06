@@ -1039,7 +1039,23 @@ export default function Agenda() {
                       className="h-3 w-3 shrink-0 rounded-full"
                       style={{ backgroundColor: r.color, boxShadow: `0 0 6px ${r.color}` }}
                     />
-                    <span className="truncate text-ink/80">{r.nombre}</span>
+                    <span className="flex min-w-0 flex-col items-start">
+                      <span className="max-w-full truncate text-ink/80">{r.nombre}</span>
+                      {(r.consultaExterna || r.calendarioCompartidoCon) && (
+                        <span className="mt-0.5 flex max-w-full flex-wrap gap-1">
+                          {r.consultaExterna && (
+                            <span className="rounded-full border border-warning/40 bg-warning/10 px-1.5 text-[10px] font-medium text-warning">
+                              Consulta externa
+                            </span>
+                          )}
+                          {r.calendarioCompartidoCon && (
+                            <span className="max-w-full truncate rounded-full border border-info/40 bg-info/10 px-1.5 text-[10px] font-medium text-info">
+                              Calendario compartido · {r.calendarioCompartidoCon}
+                            </span>
+                          )}
+                        </span>
+                      )}
+                    </span>
                   </button>
                   <span className="shrink-0 text-[10px] uppercase text-ink/30">
                     {r.tipo === "medico" ? "Médico" : "Unidad"}
@@ -1117,7 +1133,13 @@ export default function Agenda() {
               setRecursos((prev) =>
                 prev.map((r) => {
                   if (r.id !== recursoDialog.id) return r;
-                  const { cedulaProfesional: _cedula, porcentajeComision: _comision, ...resto } = r;
+                  const {
+                    cedulaProfesional: _cedula,
+                    porcentajeComision: _comision,
+                    consultaExterna: _externa,
+                    calendarioCompartidoCon: _compartido,
+                    ...resto
+                  } = r;
                   return { ...resto, ...datos };
                 })
               );

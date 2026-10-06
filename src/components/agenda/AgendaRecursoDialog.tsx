@@ -20,6 +20,8 @@ export default function AgendaRecursoDialog({
     color: string;
     porcentajeComision?: number;
     cedulaProfesional?: string;
+    consultaExterna?: boolean;
+    calendarioCompartidoCon?: string;
   }) => void;
 }) {
   const [nombre, setNombre] = useState(inicial?.nombre ?? "");
@@ -29,6 +31,9 @@ export default function AgendaRecursoDialog({
     inicial?.porcentajeComision != null ? String(inicial.porcentajeComision) : ""
   );
   const [cedulaProfesional, setCedulaProfesional] = useState(inicial?.cedulaProfesional ?? "");
+  const [consultaExterna, setConsultaExterna] = useState(inicial?.consultaExterna === true);
+  const [compartido, setCompartido] = useState(!!inicial?.calendarioCompartidoCon);
+  const [compartidoCon, setCompartidoCon] = useState(inicial?.calendarioCompartidoCon ?? "");
 
   const puedeGuardar = nombre.trim().length > 0;
 
@@ -116,6 +121,31 @@ export default function AgendaRecursoDialog({
               />
             </div>
           )}
+          <div className="space-y-2 rounded-lg border border-edge/10 p-3">
+            <label className="flex cursor-pointer items-start gap-2 text-xs text-ink/70">
+              <input type="checkbox" className="mt-0.5" checked={consultaExterna} onChange={(e) => setConsultaExterna(e.target.checked)} />
+              <span>
+                Consulta externa
+                <span className="block text-[11px] text-ink/40">Se atiende fuera de tu consultorio principal.</span>
+              </span>
+            </label>
+            <label className="flex cursor-pointer items-start gap-2 text-xs text-ink/70">
+              <input type="checkbox" className="mt-0.5" checked={compartido} onChange={(e) => setCompartido(e.target.checked)} />
+              <span>
+                Calendario compartido
+                <span className="block text-[11px] text-ink/40">Esta agenda se comparte con un colega.</span>
+              </span>
+            </label>
+            {compartido && (
+              <input
+                type="text"
+                value={compartidoCon}
+                onChange={(e) => setCompartidoCon(e.target.value)}
+                placeholder="¿Con quién? Ej. Dr. Enrique Santin"
+                className={inputClass}
+              />
+            )}
+          </div>
           <div>
             <label className="mb-1 block text-xs font-medium text-ink/60">
               Color de identificación en agenda
@@ -156,7 +186,13 @@ export default function AgendaRecursoDialog({
                 color: string;
                 porcentajeComision?: number;
                 cedulaProfesional?: string;
+                consultaExterna?: boolean;
+                calendarioCompartidoCon?: string;
               } = { nombre: nombre.trim(), tipo, color };
+              if (consultaExterna) datos = { ...datos, consultaExterna: true };
+              // Marcado "compartido" sin escribir con quién: se guarda como
+              // "un colega" para que la etiqueta no se pierda.
+              if (compartido) datos = { ...datos, calendarioCompartidoCon: compartidoCon.trim() || "un colega" };
               // Nunca `porcentajeComision: undefined`/`cedulaProfesional:
               // undefined` explícitos — Firestore rechaza escribir un campo
               // con ese valor. Si no hay nada capturado, se omite la llave

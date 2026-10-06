@@ -574,6 +574,12 @@ export type Recurso = {
    * cobra la clínica. Solo aplica a tipo "medico"; ausente = todavía sin
    * configurar, nunca se asume un valor por defecto. */
   porcentajeComision?: number;
+  /** Se atiende fuera del consultorio principal (consulta externa) — solo para
+   * identificarlo en la lista de Recursos de la Agenda. Ausente = no. */
+  consultaExterna?: boolean;
+  /** Nombre del colega con quien se comparte el calendario de este recurso;
+   * ausente = no está compartido. */
+  calendarioCompartidoCon?: string;
   /** Cédula profesional de ESTE médico — para que Consentimiento Informado,
    * recetas y cualquier otro documento firmado muestren la cédula de quien
    * realmente atiende (ver identidadDoctorDe). Se edita en Administración →
