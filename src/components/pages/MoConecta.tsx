@@ -55,6 +55,7 @@ import type { SolicitudAcceso } from "@/lib/invitacionesConecta";
 import { colegaDelCaso } from "@/lib/colegaDelCaso";
 import ExpedienteCompartidoVista, { ElegirQueCompartirRapido } from "./ExpedienteCompartidoVista";
 import { CalendariosCompartidosTab } from "./CalendariosCompartidos";
+import AvisoAlColega from "./AvisoAlColega";
 import type { SeccionCompartible } from "@/lib/expedienteCompartido";
 import { useInvitacionesDeCasos } from "@/lib/useInvitacionesDeCasos";
 
@@ -1873,6 +1874,12 @@ function SalaDelCaso({ interconsulta, onVolver }: { interconsulta: Interconsulta
           </div>
         )}
       </div>
+
+      {esRemitente && interconsulta.destinatarioUid && interconsulta.estado === "sent" && (
+        <AvisoAlColega
+          nombreColega={directorio.find((p) => p.uid === interconsulta.destinatarioUid)?.nombreCompleto ?? "tu colega"}
+        />
+      )}
 
       {interconsulta.contrarreferencia && (
         <div className="rounded-2xl border border-edge/10 bg-surface p-5">

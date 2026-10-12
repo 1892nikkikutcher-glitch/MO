@@ -13,7 +13,8 @@ import { useMoConecta } from "@/context/MoConectaContext";
 import { compartirCalendarioApi, dejarDeCompartirCalendarioApi, ocupacionCalendarioApi } from "@/lib/conectaApi";
 import { useCalendariosCompartidos } from "@/lib/useCalendariosCompartidos";
 import type { CalendarioCompartidoDoc, OcupacionDeCalendario } from "@/lib/calendarioOcupacion";
-import { leerContactosLocales, normalizarNombre, telefonoLocal } from "@/lib/contactosColegas";
+import { leerContactosLocales, normalizarNombre } from "@/lib/contactosColegas";
+import { urlWhatsApp } from "@/lib/avisoWhatsApp";
 import { DIAS_SEMANA, MESES_ABR, addDays, getMonday, timeToMinutes, toISODate } from "@/lib/agendaHelpers";
 import type { Recurso } from "@/lib/patientData";
 
@@ -28,9 +29,7 @@ function avisarPorWhatsApp(nombreColega: string, recursoNombre: string, numero: 
   const mensaje =
     `Hola ${nombreColega.split(" ")[0] || ""}, te compartí mi calendario de «${recursoNombre}» en MO Conecta ` +
     `(solo ves horarios ocupados y libres, no datos de pacientes). Entra a MO → MO Conecta → Calendarios para verlo.`;
-  const digitos = telefonoLocal(numero);
-  const destino = digitos ? `https://wa.me/52${digitos}` : "https://wa.me/";
-  window.open(`${destino}?text=${encodeURIComponent(mensaje)}`, "_blank");
+  window.open(urlWhatsApp(numero, mensaje), "_blank");
 }
 
 export function CompartirCalendarioDialog({
