@@ -62,19 +62,19 @@
 }
 
 [data-theme="light"] {
-  /* Liquid glass — claro (restaurado a como era antes del 30-sep): vidrio
-     esmerilado sobre gris Oxford con resplandores suaves; naranja quemado
-     como acento. El modo oscuro NO usa vidrio (ver :root). */
-  --app: #eef1f7;
-  --surface: rgba(255, 255, 255, 0.58);
-  --surface2: rgba(255, 255, 255, 0.78);
-  --field: rgba(255, 255, 255, 0.62);
+  /* Liquid glass — claro (iOS 26): paneles de vidrio translúcido con brillo en
+     los bordes sobre un fondo rojo/magenta/azul, los colores del logo de MO.
+     El acento es el rojo del logo. El modo oscuro NO usa vidrio (ver :root). */
+  --app: #c9d4f7;
+  --surface: rgba(255, 255, 255, 0.5);
+  --surface2: rgba(255, 255, 255, 0.72);
+  --field: rgba(255, 255, 255, 0.6);
   --inset: rgba(20, 23, 32, 0.05);
   --modal: rgba(255, 255, 255, 0.8);
   --modal-solid: #ffffff;
   --cita-card-bg: #ffffff;
   /* Barra superior / panel de navegación: vidrio claro, ya no azul marino. */
-  --nav-bg: rgba(255, 255, 255, 0.58);
+  --nav-bg: rgba(255, 255, 255, 0.5);
   --nav-ink-rgb: 0 0 0;
 
   /* Mismas familias de color que el modo oscuro, pero más oscuras/
@@ -93,10 +93,11 @@
   --edge-rgb: 64 67 76;
   /* Negro puro — pedido explícito de que el negro se vea más marcado. */
   --ink-rgb: 0 0 0;
-  /* #bf360c naranja quemado + ámbar profundo para el degradado de botones
-     primarios (from-accent to-accent-2), como era antes. */
-  --accent-rgb: 191 54 12;
-  --accent-2-rgb: 180 83 9;
+  /* Rojo del logo (#FF5757 oscurecido hasta dar ≥4.5:1 como texto sobre
+     blanco Y como fondo de botón con texto negro) → magenta profundo para el
+     degradado de botones primarios (from-accent to-accent-2). */
+  --accent-rgb: 222 46 58;
+  --accent-2-rgb: 214 44 108;
   /* Dorado champán — acento premium, mismo uso puntual que en oscuro. */
   --premium-rgb: 197 166 106;
   /* Sin cambios en esta retunada — ya tenían contraste verificado contra
@@ -106,9 +107,17 @@
   --info-rgb: 29 78 216;
   --warning-rgb: 126 34 206;
 
-  --shadow-card: inset 0 1px 0 0 rgba(255, 255, 255, 0.7), 0 10px 26px -10px rgba(30, 31, 36, 0.16);
-  --shadow-modal: inset 0 1px 0 0 rgba(255, 255, 255, 0.8), 0 30px 60px -18px rgba(30, 31, 36, 0.24);
-  --glass-blur: 20px;
+  /* Bordes de vidrio: brillo arriba y a la izquierda, luz tenue abajo, y una
+     sombra suave que despega el panel del fondo. */
+  --glass-edge:
+    inset 0 1.5px 0 rgba(255, 255, 255, 0.95),
+    inset 0 -1.5px 0 rgba(255, 255, 255, 0.35),
+    inset 1.5px 0 0 rgba(255, 255, 255, 0.55),
+    inset -1.5px 0 0 rgba(255, 255, 255, 0.25),
+    inset 0 0 22px rgba(255, 255, 255, 0.28);
+  --shadow-card: var(--glass-edge), 0 1px 2px rgba(30, 40, 90, 0.1), 0 14px 34px -10px rgba(40, 55, 120, 0.3);
+  --shadow-modal: var(--glass-edge), 0 30px 60px -18px rgba(40, 55, 120, 0.36);
+  --glass-blur: 18px;
   --glass-blur-modal: 24px;
 }
 
@@ -127,10 +136,16 @@ body {
 /* Liquid glass SOLO en modo claro: resplandores difusos detrás de paneles de
    vidrio esmerilado (blur + saturación + brillo sutil arriba). */
 [data-theme="light"] .bg-app {
+  /* Manchas grandes de los colores del logo (azul #3B82F6, rojo #FF5757,
+     magenta #D946EF) sobre un degradado suave: el vidrio solo luce si hay
+     color detrás que difuminar. */
   background-image:
-    radial-gradient(680px circle at 12% 18%, rgba(59, 130, 246, 0.10), transparent 60%),
-    radial-gradient(560px circle at 88% 12%, rgba(168, 85, 247, 0.08), transparent 58%),
-    radial-gradient(760px circle at 55% 105%, rgba(14, 165, 233, 0.07), transparent 62%);
+    radial-gradient(540px circle at 4% 24%, rgba(59, 130, 246, 0.78), rgba(59, 130, 246, 0) 70%),
+    radial-gradient(520px circle at 96% 10%, rgba(255, 87, 87, 0.74), rgba(255, 87, 87, 0) 70%),
+    radial-gradient(460px circle at 50% 100%, rgba(217, 70, 239, 0.55), rgba(217, 70, 239, 0) 70%),
+    radial-gradient(380px circle at 2% 96%, rgba(59, 130, 246, 0.6), rgba(59, 130, 246, 0) 70%),
+    radial-gradient(400px circle at 98% 92%, rgba(255, 87, 87, 0.5), rgba(255, 87, 87, 0) 70%),
+    linear-gradient(120deg, #a9c2fb 0%, #cfc4f5 45%, #f7c9d2 100%);
   background-attachment: fixed;
 }
 
@@ -138,14 +153,22 @@ body {
 [data-theme="light"] .bg-surface2,
 [data-theme="light"] .bg-modal,
 [data-theme="light"] .bg-nav {
-  backdrop-filter: blur(var(--glass-blur)) saturate(160%);
-  -webkit-backdrop-filter: blur(var(--glass-blur)) saturate(160%);
-  background-image: linear-gradient(180deg, rgba(255, 255, 255, 0.07), rgba(255, 255, 255, 0) 45%);
+  backdrop-filter: blur(var(--glass-blur)) saturate(190%) brightness(1.06);
+  -webkit-backdrop-filter: blur(var(--glass-blur)) saturate(190%) brightness(1.06);
+  /* reflejo especular arriba a la izquierda + luz tenue abajo a la derecha */
+  background-image:
+    radial-gradient(120% 70% at 12% 0%, rgba(255, 255, 255, 0.5), rgba(255, 255, 255, 0) 48%),
+    radial-gradient(90% 60% at 100% 100%, rgba(255, 255, 255, 0.2), rgba(255, 255, 255, 0) 55%);
 }
 
 [data-theme="light"] .bg-modal {
-  backdrop-filter: blur(var(--glass-blur-modal)) saturate(160%);
-  -webkit-backdrop-filter: blur(var(--glass-blur-modal)) saturate(160%);
+  backdrop-filter: blur(var(--glass-blur-modal)) saturate(190%) brightness(1.04);
+  -webkit-backdrop-filter: blur(var(--glass-blur-modal)) saturate(190%) brightness(1.04);
+}
+
+/* La barra superior también lleva el borde de vidrio. */
+[data-theme="light"] .bg-nav {
+  box-shadow: var(--glass-edge), 0 10px 30px -12px rgba(40, 55, 120, 0.3);
 }
 
 /* En claro la barra es vidrio claro: bordes oscuros (la tinta ya es negra). */
