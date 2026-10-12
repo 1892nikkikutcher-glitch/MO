@@ -53,7 +53,7 @@ import { buildMensajeInvitacionConecta } from "@/lib/invitacionesConecta";
 import type { MensajeInterconsulta } from "@/lib/conectaMensajes";
 import type { SolicitudAcceso } from "@/lib/invitacionesConecta";
 import { colegaDelCaso } from "@/lib/colegaDelCaso";
-import ExpedienteCompartidoVista, { ElegirSeccionesCompartir } from "./ExpedienteCompartidoVista";
+import ExpedienteCompartidoVista, { ElegirQueCompartirRapido } from "./ExpedienteCompartidoVista";
 import { CalendariosCompartidosTab } from "./CalendariosCompartidos";
 import type { SeccionCompartible } from "@/lib/expedienteCompartido";
 import { useInvitacionesDeCasos } from "@/lib/useInvitacionesDeCasos";
@@ -1171,6 +1171,7 @@ function NuevaInterconsultaDialog({
   const [whatsappEspecialista, setWhatsappEspecialista] = useState("");
   const [aceptaConsentimiento, setAceptaConsentimiento] = useState(false);
   const [seccionesCompartidas, setSeccionesCompartidas] = useState<SeccionCompartible[]>([]);
+  const [masOpciones, setMasOpciones] = useState(false);
   const [enviando, setEnviando] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [interconsultaCreadaId, setInterconsultaCreadaId] = useState<string | null>(null);
@@ -1383,118 +1384,143 @@ function NuevaInterconsultaDialog({
                 />
               </div>
               <div>
-                <label className={labelClass}>WhatsApp del especialista</label>
+                <label className={labelClass}>WhatsApp del especialista (opcional)</label>
                 <input
                   className={inputClass}
                   type="tel"
                   value={whatsappEspecialista}
                   onChange={(e) => setWhatsappEspecialista(e.target.value)}
-                  placeholder="10 dígitos — para enviarle el enlace directo por WhatsApp"
-                />
-              </div>
-              <div>
-                <label className={labelClass}>Correo del especialista (opcional)</label>
-                <input
-                  className={inputClass}
-                  type="email"
-                  value={correoEspecialista}
-                  onChange={(e) => setCorreoEspecialista(e.target.value)}
-                  placeholder="si lo agregas, el enlace se reclama solo si coincide su correo verificado"
+                  placeholder="10 dígitos — para mandarle el enlace directo por WhatsApp"
                 />
               </div>
             </>
           )}
           <div>
             <label className={labelClass}>Paciente</label>
-            <select className={inputClass} value={pacienteId} disabled={!!alcance} onChange={(e) => setPacienteId(e.target.value)}>
-              <option value="">Selecciona un paciente…</option>
-              {patients.map((p) => (
-                <option key={p.id} value={p.id}>
-                  {p.name}
-                </option>
-              ))}
-            </select>
+            {alcance ? (
+              <p className="rounded-lg border border-edge/10 bg-field px-3 py-2 text-sm text-ink">{alcance.patientName}</p>
+            ) : (
+              <select className={inputClass} value={pacienteId} onChange={(e) => setPacienteId(e.target.value)}>
+                <option value="">Selecciona un paciente…</option>
+                {patients.map((p) => (
+                  <option key={p.id} value={p.id}>
+                    {p.name}
+                  </option>
+                ))}
+              </select>
+            )}
           </div>
           <div>
-            <label className={labelClass}>Especialidad solicitada (opcional)</label>
-            <input
-              className={inputClass}
-              value={especialidadSolicitada}
-              onChange={(e) => setEspecialidadSolicitada(e.target.value)}
-              placeholder="Ej. Endodoncia"
-            />
-          </div>
-          <div>
-            <label className={labelClass}>Motivo (opcional)</label>
-            <textarea className={inputClass} rows={2} value={motivo} onChange={(e) => setMotivo(e.target.value)} />
-          </div>
-          <div>
-            <label className={labelClass}>Pregunta clínica (opcional)</label>
+            <label className={labelClass}>¿Qué necesitas de tu colega? (opcional)</label>
             <textarea
               className={inputClass}
               rows={2}
-              value={preguntaClinica}
-              onChange={(e) => setPreguntaClinica(e.target.value)}
+              value={motivo}
+              onChange={(e) => setMotivo(e.target.value)}
+              placeholder="Ej. Valoración para endodoncia del OD 36"
             />
           </div>
-          <div>
-            <label className={labelClass}>Información mínima adicional (opcional)</label>
-            <textarea
-              className={inputClass}
-              rows={2}
-              value={informacionMinima}
-              onChange={(e) => setInformacionMinima(e.target.value)}
-              placeholder="Solo lo estrictamente necesario para este caso"
-            />
-          </div>
-          <ElegirSeccionesCompartir
+          <ElegirQueCompartirRapido
             valor={seccionesCompartidas}
             onChange={setSeccionesCompartidas}
             nombreColega={destinatario?.nombreCompleto ?? (nombreEspecialista || "tu colega")}
           />
+
           <div>
-            <label className={labelClass}>Prioridad</label>
-            <select
-              className={inputClass}
-              value={prioridad}
-              onChange={(e) => setPrioridad(e.target.value as PrioridadInterconsulta)}
-            >
-              <option value="ordinaria">Ordinaria</option>
-              <option value="preferente">Preferente</option>
-              <option value="urgente">Urgente</option>
-            </select>
-          </div>
-          <div>
-            <label className={labelClass}>Tipo de interconsulta</label>
-            <select
-              className={inputClass}
-              value={tipoInterconsulta}
-              onChange={(e) => setTipoInterconsulta(e.target.value as TipoInterconsulta)}
-            >
-              <option value="aislado_con_retorno">Consulta puntual (el paciente regresa contigo)</option>
-              <option value="transferencia_continuidad">Transferencia de responsabilidad</option>
-            </select>
-            <p className="mt-1 text-xs text-ink/50">
-              {tipoInterconsulta === "aislado_con_retorno"
-                ? "El colega atiende este caso puntual y te lo regresa con una contrarreferencia."
-                : "El colega asume el tratamiento continuo del paciente a partir de este caso."}
-            </p>
+            <button type="button" onClick={() => setMasOpciones((v) => !v)} className="text-xs text-accent hover:underline">
+              {masOpciones ? "Ocultar más opciones" : "Más opciones (especialidad, pregunta clínica, prioridad, tipo…)"}
+            </button>
+            {masOpciones && (
+              <div className="mt-3 space-y-3 rounded-lg border border-edge/10 p-3">
+                {!destinatario && (
+                  <div>
+                    <label className={labelClass}>Correo del especialista (opcional)</label>
+                    <input
+                      className={inputClass}
+                      type="email"
+                      value={correoEspecialista}
+                      onChange={(e) => setCorreoEspecialista(e.target.value)}
+                      placeholder="si lo agregas, el enlace se reclama solo si coincide su correo verificado"
+                    />
+                  </div>
+                )}
+                <div>
+                  <label className={labelClass}>Especialidad solicitada</label>
+                  <input
+                    className={inputClass}
+                    value={especialidadSolicitada}
+                    onChange={(e) => setEspecialidadSolicitada(e.target.value)}
+                    placeholder="Ej. Endodoncia"
+                  />
+                </div>
+                <div>
+                  <label className={labelClass}>Pregunta clínica</label>
+                  <textarea
+                    className={inputClass}
+                    rows={2}
+                    value={preguntaClinica}
+                    onChange={(e) => setPreguntaClinica(e.target.value)}
+                  />
+                </div>
+                <div>
+                  <label className={labelClass}>Información mínima adicional</label>
+                  <textarea
+                    className={inputClass}
+                    rows={2}
+                    value={informacionMinima}
+                    onChange={(e) => setInformacionMinima(e.target.value)}
+                    placeholder="Solo lo estrictamente necesario para este caso"
+                  />
+                </div>
+                <div className="grid gap-3 sm:grid-cols-2">
+                  <div>
+                    <label className={labelClass}>Prioridad</label>
+                    <select
+                      className={inputClass}
+                      value={prioridad}
+                      onChange={(e) => setPrioridad(e.target.value as PrioridadInterconsulta)}
+                    >
+                      <option value="ordinaria">Ordinaria</option>
+                      <option value="preferente">Preferente</option>
+                      <option value="urgente">Urgente</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label className={labelClass}>Tipo de interconsulta</label>
+                    <select
+                      className={inputClass}
+                      value={tipoInterconsulta}
+                      onChange={(e) => setTipoInterconsulta(e.target.value as TipoInterconsulta)}
+                    >
+                      <option value="aislado_con_retorno">Consulta puntual (regresa contigo)</option>
+                      <option value="transferencia_continuidad">Transferencia de responsabilidad</option>
+                    </select>
+                  </div>
+                </div>
+                <p className="text-xs text-ink/50">
+                  {tipoInterconsulta === "aislado_con_retorno"
+                    ? "El colega atiende este caso puntual y te lo regresa con una contrarreferencia."
+                    : "El colega asume el tratamiento continuo del paciente a partir de este caso."}
+                </p>
+              </div>
+            )}
           </div>
 
-          <div className="rounded-lg border border-edge/10 bg-field p-3 text-xs text-ink/60">
-            {TEXTO_DISCLAIMER_CONSENTIMIENTO}
+          <div>
+            <label className="flex items-start gap-2 text-sm text-ink/70">
+              <input
+                type="checkbox"
+                className="mt-0.5"
+                checked={aceptaConsentimiento}
+                onChange={(e) => setAceptaConsentimiento(e.target.checked)}
+              />
+              Cuento con el consentimiento del paciente para compartir esta información con el colega.
+            </label>
+            <details className="mt-1 pl-6 text-xs text-ink/50">
+              <summary className="cursor-pointer">Ver aviso</summary>
+              <p className="mt-1">{TEXTO_DISCLAIMER_CONSENTIMIENTO}</p>
+            </details>
           </div>
-          <label className="flex items-start gap-2 text-sm text-ink/70">
-            <input
-              type="checkbox"
-              className="mt-0.5"
-              checked={aceptaConsentimiento}
-              onChange={(e) => setAceptaConsentimiento(e.target.checked)}
-            />
-            Cuento con el consentimiento del paciente para compartir esta información
-            {seccionesCompartidas.length > 0 ? " (incluidas las partes del expediente que marqué)" : ""} con el colega
-            destinatario.
-          </label>
         </div>
 
         {error && <p className="mt-3 text-sm text-danger">{error}</p>}
@@ -1508,8 +1534,7 @@ function NuevaInterconsultaDialog({
             disabled={
               enviando ||
               !pacienteId ||
-              !aceptaConsentimiento ||
-              (!destinatario && !whatsappEspecialista.trim())
+              !aceptaConsentimiento
             }
             className={botonPrimario}
           >
@@ -2035,7 +2060,7 @@ function InvitarColegaDialog({ interconsultaId, onClose }: { interconsultaId: st
               <input className={inputClass} value={nombre} onChange={(e) => manejarCambioNombre(e, setNombre)} />
             </div>
             <div>
-              <label className={labelClass}>WhatsApp del colega</label>
+              <label className={labelClass}>WhatsApp del colega (opcional)</label>
               <input
                 className={inputClass}
                 type="tel"
@@ -2057,7 +2082,7 @@ function InvitarColegaDialog({ interconsultaId, onClose }: { interconsultaId: st
               <button onClick={onClose} className={botonSecundario}>
                 Cancelar
               </button>
-              <button onClick={crear} disabled={enviando || !whatsapp.trim()} className={botonPrimario}>
+              <button onClick={crear} disabled={enviando} className={botonPrimario}>
                 {enviando ? "Creando…" : "Crear enlace"}
               </button>
             </div>

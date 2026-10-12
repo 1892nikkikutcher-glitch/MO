@@ -81,6 +81,65 @@ export function ElegirSeccionesCompartir({
   );
 }
 
+const SOLO_BASICO: SeccionCompartible[] = [];
+const EXPEDIENTE_CLINICO: SeccionCompartible[] = ["historia_clinica", "diagnosticos_plan", "odontograma", "notas_evolucion", "fotos_radiografias"];
+const TODO_CON_CITAS: SeccionCompartible[] = [...EXPEDIENTE_CLINICO, "citas"];
+const mismasSecciones = (a: SeccionCompartible[], b: SeccionCompartible[]) => a.length === b.length && a.every((x) => b.includes(x));
+
+/** Versión corta de "qué compartir": tres opciones de un toque y, si hace falta,
+ * "elegir una por una" (el selector detallado de siempre). */
+export function ElegirQueCompartirRapido({
+  valor,
+  onChange,
+  nombreColega,
+}: {
+  valor: SeccionCompartible[];
+  onChange: (siguiente: SeccionCompartible[]) => void;
+  nombreColega: string;
+}) {
+  const [detalle, setDetalle] = useState(false);
+  const opciones = [
+    { etiqueta: "Solo lo básico", ayuda: "Nombre, edad, alergias y tu motivo", valor: SOLO_BASICO },
+    { etiqueta: "Expediente clínico", ayuda: "Historia, diagnósticos, odontograma, notas y fotos", valor: EXPEDIENTE_CLINICO },
+    { etiqueta: "Todo, con citas", ayuda: "Lo anterior más el calendario de citas", valor: TODO_CON_CITAS },
+  ];
+  return (
+    <div>
+      <p className="text-sm font-medium text-ink">¿Qué compartes de su expediente?</p>
+      <div className="mt-2 grid gap-2 sm:grid-cols-3">
+        {opciones.map((o) => {
+          const activa = mismasSecciones(valor, o.valor);
+          return (
+            <button
+              key={o.etiqueta}
+              type="button"
+              onClick={() => onChange(o.valor)}
+              className={`rounded-lg border p-2.5 text-left transition-colors ${
+                activa ? "border-accent bg-accent/10" : "border-edge/10 hover:border-accent/40"
+              }`}
+            >
+              <span className={`block text-sm font-medium ${activa ? "text-accent" : "text-ink"}`}>{o.etiqueta}</span>
+              <span className="mt-0.5 block text-[11px] leading-snug text-ink/50">{o.ayuda}</span>
+            </button>
+          );
+        })}
+      </div>
+      <p className="mt-2 text-xs text-ink/50">
+        Es una foto fija de hoy: si el expediente cambia, {nombreColega} no lo verá hasta que lo vuelvas a enviar. Nunca se
+        comparte: precios, pagos, teléfono ni dirección del paciente, INE ni foto de perfil.
+      </p>
+      <button type="button" onClick={() => setDetalle((v) => !v)} className="mt-1 text-xs text-accent hover:underline">
+        {detalle ? "Ocultar" : "Elegir una por una"}
+      </button>
+      {detalle && (
+        <div className="mt-2">
+          <ElegirSeccionesCompartir valor={valor} onChange={onChange} nombreColega={nombreColega} />
+        </div>
+      )}
+    </div>
+  );
+}
+
 function Bloque({ titulo, children, abierto = false }: { titulo: string; children: React.ReactNode; abierto?: boolean }) {
   return (
     <details open={abierto} className="rounded-xl border border-edge/10 bg-field">
