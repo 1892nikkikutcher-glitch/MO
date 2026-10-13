@@ -4,6 +4,7 @@ import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { auth } from "@/lib/firebase";
 import BottomNav, { navItems } from "./BottomNav";
 import { categoriaSugerenciaOptions, DURACION_PRUEBA_DIAS, pruebaVencida, type CategoriaSugerencia } from "@/lib/patientData";
+import { MO_ES_GRATIS } from "@/lib/planesConfig";
 import Inicio from "./pages/Inicio";
 import Pacientes from "./pages/Pacientes";
 import Agenda from "./pages/Agenda";
@@ -716,7 +717,8 @@ function DashboardBody({
   // plataforma nunca queda bloqueado por su propia prueba. "planes" queda
   // siempre alcanzable para poder pagar y salir del bloqueo sin ayuda de
   // un admin.
-  if (!esAdmin && activePage !== "planes" && pruebaVencida(suscripcion)) {
+  // MO es gratis por ahora (ver planesConfig.ts): la prueba vencida no bloquea a nadie.
+  if (!MO_ES_GRATIS && !esAdmin && activePage !== "planes" && pruebaVencida(suscripcion)) {
     return <PruebaVencida onVerPlanes={() => setActivePage("planes")} onLogout={onLogout} />;
   }
 

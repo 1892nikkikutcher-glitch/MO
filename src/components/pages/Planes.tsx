@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { usePatientData } from "@/context/PatientDataContext";
+import { MO_ES_GRATIS } from "@/lib/planesConfig";
 import {
   DURACION_PRUEBA_DIAS,
   diasRestantesDePrueba,
@@ -43,6 +44,24 @@ export default function Planes() {
       setCargando(null);
     }
   };
+
+  // MO es gratis por ahora (ver planesConfig.ts): candado en lugar de planes y pagos.
+  if (MO_ES_GRATIS) {
+    return (
+      <div className="mx-auto max-w-xl rounded-2xl border border-edge/10 bg-surface p-8 text-center">
+        <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-full bg-accent/15 text-accent">
+          <svg viewBox="0 0 24 24" className="h-7 w-7" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+            <path d="M17 10V7a5 5 0 0 0-10 0v3M5 10h14a1 1 0 0 1 1 1v9a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1v-9a1 1 0 0 1 1-1ZM12 15v3" />
+          </svg>
+        </div>
+        <h2 className="mt-4 text-lg font-semibold text-ink">MO es gratis por ahora</h2>
+        <p className="mt-2 text-sm text-ink/70">
+          Estamos dando a conocer MO: puedes usar todas sus funciones sin costo y sin límite de tiempo. Cuando haya
+          planes de pago, te avisaremos aquí con anticipación.
+        </p>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6">

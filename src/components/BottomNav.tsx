@@ -11,6 +11,7 @@
  * pantallas anchas (`lg:`). */
 
 import { useEffect, useRef, useState } from "react";
+import { MO_ES_GRATIS } from "@/lib/planesConfig";
 
 export const navItems = [
   {
@@ -280,7 +281,26 @@ export const navItems = [
   {
     id: "planes",
     label: "Planes",
-    icon: (
+    // Con MO gratis (planesConfig.ts) el menú lleva un candado: la hoja de planes
+    // se achica arriba a la izquierda y el candado va abajo a la derecha.
+    icon: MO_ES_GRATIS ? (
+      <>
+        <path
+          d="M3 3h12v12H3V3ZM6 7h6M6 10h6"
+          stroke="currentColor"
+          strokeWidth="1.8"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+        />
+        <path
+          d="M13 14.5a1 1 0 0 1 1-1h6.5a1 1 0 0 1 1 1V20a1 1 0 0 1-1 1H14a1 1 0 0 1-1-1v-5.5ZM15 13.5V12a2.25 2.25 0 0 1 4.5 0v1.5"
+          stroke="currentColor"
+          strokeWidth="1.8"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+        />
+      </>
+    ) : (
       <path
         d="M4 4h16v16H4V4ZM8 9h8M8 13h8M8 17h4"
         stroke="currentColor"
