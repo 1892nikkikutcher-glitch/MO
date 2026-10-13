@@ -105,6 +105,27 @@ export function etiquetaTotalFondos(vista: VistaFondos): string {
 
 export type RangoFondos = { desde: Date; hasta: Date; label: string };
 
+const DIAS_SEMANA = ["domingo", "lunes", "martes", "miércoles", "jueves", "viernes", "sábado"];
+
+/** Número de semana del año (ISO 8601: la semana empieza en lunes y la 1 es la que trae el primer
+ * jueves del año) — mismo corte lunes-domingo que usa la vista Semana. */
+export function semanaDelAnio(fecha: Date): number {
+  const d = new Date(Date.UTC(fecha.getFullYear(), fecha.getMonth(), fecha.getDate()));
+  const diaLunes1 = d.getUTCDay() || 7; // lunes = 1 … domingo = 7
+  d.setUTCDate(d.getUTCDate() + 4 - diaLunes1); // el jueves de esa semana decide el año y el número
+  const inicioAnio = new Date(Date.UTC(d.getUTCFullYear(), 0, 1));
+  return Math.ceil(((d.getTime() - inicioAnio.getTime()) / 86_400_000 + 1) / 7);
+}
+
+/** Título completo del cuadro del total: en Día dice qué día de la semana fue ("Total del día ·
+ * sábado 10 oct."), en Semana dice cuál semana del año es ("Total de la semana 41 · 5–11 oct.");
+ * quincena y mes no cambian. */
+export function tituloTotalFondos(vista: VistaFondos, rango: RangoFondos, ancla: Date): string {
+  if (vista === "dia") return `${etiquetaTotalFondos(vista)} · ${DIAS_SEMANA[ancla.getDay()]} ${rango.label}`;
+  if (vista === "semana") return `${etiquetaTotalFondos(vista)} ${semanaDelAnio(rango.desde)} · ${rango.label}`;
+  return `${etiquetaTotalFondos(vista)} · ${rango.label}`;
+}
+
 /** Mismo estilo breve que ya usan quincena/mes (sin "de", sin año) — a
  * diferencia de `formatRangeLabel` en agendaHelpers.ts, pensado para un
  * lugar con más espacio (el selector de periodo general). */

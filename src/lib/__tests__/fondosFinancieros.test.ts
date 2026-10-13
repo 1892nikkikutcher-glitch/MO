@@ -4,6 +4,8 @@ import {
   GRUPOS_ELECTRONICO,
   calcularAsignacionFondos,
   etiquetaTotalFondos,
+  semanaDelAnio,
+  tituloTotalFondos,
   navegarVistaFondos,
   rangoVistaFondos,
   sumarRangoPorFormaPago,
@@ -252,5 +254,34 @@ describe("total del periodo", () => {
     expect(etiquetaTotalFondos("quincena1")).toBe("Total de la quincena 1–15");
     expect(etiquetaTotalFondos("quincena2")).toBe("Total de la quincena 16–fin");
     expect(etiquetaTotalFondos("mes")).toBe("Total del mes");
+  });
+});
+
+describe("título del total (día de la semana y semana del año)", () => {
+  it("semana del año con el corte lunes-domingo (ISO)", () => {
+    expect(semanaDelAnio(new Date(2026, 9, 5))).toBe(41); // lunes 5 oct. 2026
+    expect(semanaDelAnio(new Date(2026, 9, 11))).toBe(41); // domingo 11 oct. 2026: misma semana
+    expect(semanaDelAnio(new Date(2026, 9, 12))).toBe(42);
+    expect(semanaDelAnio(new Date(2026, 0, 1))).toBe(1); // jueves 1 ene. 2026
+    expect(semanaDelAnio(new Date(2027, 0, 1))).toBe(53); // viernes: aún es la semana 53 de 2026
+    expect(semanaDelAnio(new Date(2024, 11, 30))).toBe(1); // lunes 30 dic. 2024 ya es la semana 1 de 2025
+  });
+
+  it("día: dice qué día de la semana fue", () => {
+    const ancla = new Date(2026, 9, 10);
+    expect(tituloTotalFondos("dia", rangoVistaFondos("dia", ancla), ancla)).toBe("Total del día · sábado 10 oct.");
+    const lunes = new Date(2026, 9, 5);
+    expect(tituloTotalFondos("dia", rangoVistaFondos("dia", lunes), lunes)).toBe("Total del día · lunes 5 oct.");
+  });
+
+  it("semana: dice cuál semana del año es", () => {
+    const ancla = new Date(2026, 9, 8);
+    expect(tituloTotalFondos("semana", rangoVistaFondos("semana", ancla), ancla)).toBe("Total de la semana 41 · 5–11 oct.");
+  });
+
+  it("quincena y mes quedan como estaban", () => {
+    const ancla = new Date(2026, 9, 8);
+    expect(tituloTotalFondos("mes", rangoVistaFondos("mes", ancla), ancla)).toBe("Total del mes · oct. 2026");
+    expect(tituloTotalFondos("quincena1", rangoVistaFondos("quincena1", ancla), ancla)).toBe("Total de la quincena 1–15 · 1–15 oct.");
   });
 });
