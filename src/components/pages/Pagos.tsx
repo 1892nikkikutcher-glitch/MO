@@ -16,10 +16,13 @@ import {
 } from "@/lib/patientData";
 import { usePatientData } from "@/context/PatientDataContext";
 import FirmaCanvas from "@/components/FirmaCanvas";
-import AvisoNoCabeEnHoja from "@/components/AvisoNoCabeEnHoja";
+import AbrirWhatsAppPrompt from "@/components/AbrirWhatsAppPrompt";
 import RegistrarDevolucionDialog from "@/components/RegistrarDevolucionDialog";
 import { calcularDisponibleDevolucion, resumenDesdeDevoluciones } from "@/lib/devolucionesPago";
 import { renderPlantilla, formatosWhatsAppInicial, buildProximaCitaTexto } from "@/lib/formatosWhatsapp";
+import { generarReciboPagoPdf } from "@/lib/generarReciboPagoPdf";
+import { enviarPdfPorWhatsapp } from "@/lib/enviarPdfWhatsapp";
+import { slugify } from "@/lib/textoNombre";
 
 const formasDePago = ["Efectivo", "Tarjeta de crédito", "Tarjeta de débito", "Transferencia", "Cheque"];
 
@@ -341,6 +344,101 @@ function AgregarPagoExtraDialog({
   );
 }
 
+/** El recibo de pago siempre es un PDF: se descarga, se abre para imprimir o se manda por
+ * WhatsApp/correo. Se genera al momento a partir del pago guardado (nunca se sube a ningún lado). */
+function useReciboPdf(patientId: string, patientName: string) {
+  const { citas, patients, clinicInfo, formatosWhatsapp, perfilDoctor } = usePatientData();
+  const [ocupado, setOcupado] = useState(false);
+  const [waUrlPendiente, setWaUrlPendiente] = useState<string | null>(null);
+
+  const generar = (pago: Pago) =>
+    generarReciboPagoPdf({
+      pago,
+      pacienteNombre: patientName,
+      clinicaNombre: clinicInfo?.nombre || "",
+      perfilDoctor,
+      notaPie: buildProximaCitaTexto(citas, patientId, pago.fecha),
+    });
+  const nombreArchivo = (pago: Pago) => `Recibo_${slugify(patientName)}_${slugify(pago.fecha)}.pdf`;
+
+  const descargarBlob = (blob: Blob, nombre: string) => {
+    const url = URL.createObjectURL(blob);
+    const enlace = document.createElement("a");
+    enlace.href = url;
+    enlace.download = nombre;
+    enlace.click();
+    setTimeout(() => URL.revokeObjectURL(url), 10_000);
+  };
+
+  async function conPdf(accion: () => Promise<void>, ventana?: Window | null) {
+    if (ocupado) {
+      ventana?.close();
+      return;
+    }
+    setOcupado(true);
+    try {
+      await accion();
+    } catch (err) {
+      console.error("No se pudo generar el recibo en PDF", err);
+      ventana?.close();
+      alert("No se pudo generar el recibo en PDF. Intenta de nuevo.");
+    } finally {
+      setOcupado(false);
+    }
+  }
+
+  const descargar = (pago: Pago) => conPdf(async () => descargarBlob(await generar(pago), nombreArchivo(pago)));
+
+  /** Abre el PDF en otra pestaña para verlo o imprimirlo desde el visor del navegador. La pestaña
+   * se abre en el mismo clic (antes de generar) para que ningún bloqueador de ventanas la frene. */
+  const abrir = (pago: Pago) => {
+    const ventana = window.open("", "_blank");
+    return conPdf(async () => {
+      const blob = await generar(pago);
+      if (ventana) ventana.location.href = URL.createObjectURL(blob);
+      else descargarBlob(blob, nombreArchivo(pago));
+    }, ventana);
+  };
+
+  const enviarWhatsApp = (pago: Pago) => {
+    const ventana = window.open("", "_blank");
+    return conPdf(async () => {
+      const plantilla = formatosWhatsapp.reciboPago ?? formatosWhatsAppInicial.reciboPago;
+      const caption = renderPlantilla(plantilla, {
+        clinica: clinicInfo?.nombre || "tu clínica",
+        paciente: patientName,
+        fecha: pago.fecha,
+        medico: pago.medico,
+        formaPago: pago.formaPago,
+        conceptos: pago.lineas.map((l) => `- ${l.label}: ${formatCurrency(l.monto)}`).join("\n"),
+        total: formatCurrency(pago.total),
+        proximaCita: buildProximaCitaTexto(citas, patientId, pago.fecha),
+      });
+      const resultado = await enviarPdfPorWhatsapp({
+        blob: await generar(pago),
+        nombreArchivo: nombreArchivo(pago),
+        telefono: patients.find((p) => p.id === patientId)?.phone,
+        caption,
+        ventanaPrevia: ventana,
+      });
+      if (resultado.requiereAbrirManualmente) setWaUrlPendiente(resultado.waUrl);
+    }, ventana);
+  };
+
+  /** Un enlace de correo no puede llevar archivos adjuntos: se descarga el PDF y se abre el
+   * correo ya redactado para que solo se adjunte. */
+  const enviarCorreo = (pago: Pago) =>
+    conPdf(async () => {
+      descargarBlob(await generar(pago), nombreArchivo(pago));
+      const asunto = encodeURIComponent(`Recibo de pago — ${patientName}`);
+      const cuerpo = encodeURIComponent(`${buildReciboTexto(patientName, pago)}\n\n(Adjunta el PDF del recibo que se acaba de descargar.)`);
+      window.open(`mailto:${patients.find((p) => p.id === patientId)?.email ?? ""}?subject=${asunto}&body=${cuerpo}`, "_blank");
+    });
+
+  const avisoWhatsApp = waUrlPendiente ? <AbrirWhatsAppPrompt waUrl={waUrlPendiente} onCerrar={() => setWaUrlPendiente(null)} /> : null;
+  return { ocupado, descargar, abrir, enviarWhatsApp, enviarCorreo, avisoWhatsApp };
+}
+
 function ReciboActions({
   patientId,
   patientName,
@@ -352,37 +450,7 @@ function ReciboActions({
   pago: Pago;
   onDone: () => void;
 }) {
-  const { citas, patients, clinicInfo, formatosWhatsapp } = usePatientData();
-
-  const handleImprimir = () => {
-    window.print();
-  };
-
-  const handleEnviarCorreo = () => {
-    const asunto = encodeURIComponent(`Recibo de pago — ${patientName}`);
-    const cuerpo = encodeURIComponent(buildReciboTexto(patientName, pago));
-    window.open(`mailto:?subject=${asunto}&body=${cuerpo}`, "_blank");
-  };
-
-  const handleEnviarWhatsApp = () => {
-    const plantilla = formatosWhatsapp.reciboPago ?? formatosWhatsAppInicial.reciboPago;
-    const texto = renderPlantilla(plantilla, {
-      clinica: clinicInfo?.nombre || "tu clínica",
-      paciente: patientName,
-      fecha: pago.fecha,
-      medico: pago.medico,
-      formaPago: pago.formaPago,
-      conceptos: pago.lineas.map((l) => `- ${l.label}: ${formatCurrency(l.monto)}`).join("\n"),
-      total: formatCurrency(pago.total),
-      proximaCita: buildProximaCitaTexto(citas, patientId, pago.fecha),
-    });
-    // Mismo patrón que Recordatorios.tsx/enviarPdfWhatsapp.ts: sin el
-    // teléfono en la URL, WhatsApp abre sin contacto seleccionado y hay que
-    // buscar al paciente a mano — con el teléfono, abre directo en su chat.
-    const telefono = patients.find((p) => p.id === patientId)?.phone?.replace(/\D/g, "");
-    const destino = telefono ? `/${telefono}` : "/";
-    window.open(`https://wa.me${destino}?text=${encodeURIComponent(texto)}`, "_blank");
-  };
+  const recibo = useReciboPdf(patientId, patientName);
 
   return (
     <div className="space-y-4">
@@ -407,29 +475,35 @@ function ReciboActions({
         )}
       </div>
 
-      <AvisoNoCabeEnHoja mostrar={pago.lineas.length > 8}>
-        Este recibo tiene {pago.lineas.length} conceptos — revisa la vista previa de impresión de
-        tu navegador antes de entregarlo, por si no cabe en una sola hoja.
-      </AvisoNoCabeEnHoja>
-
       <div>
-        <p className="mb-2 text-xs font-medium text-ink/60">Enviar recibo</p>
+        <p className="mb-2 text-xs font-medium text-ink/60">Recibo en PDF</p>
+        <button
+          onClick={() => recibo.descargar(pago)}
+          disabled={recibo.ocupado}
+          className="mb-2 w-full rounded-lg border border-accent/60 bg-accent/15 py-2.5 text-sm font-semibold text-accent transition-colors hover:bg-accent/25 disabled:opacity-50"
+        >
+          {recibo.ocupado ? "Generando PDF…" : "Descargar recibo (PDF)"}
+        </button>
         <div className="flex flex-wrap gap-2">
           <button
-            onClick={handleImprimir}
-            className="flex-1 rounded-lg border border-edge/15 py-2 text-sm font-semibold text-ink/80 transition-colors hover:bg-surface"
+            onClick={() => recibo.abrir(pago)}
+            disabled={recibo.ocupado}
+            title="Abre el PDF para verlo o imprimirlo"
+            className="flex-1 rounded-lg border border-edge/15 py-2 text-sm font-semibold text-ink/80 transition-colors hover:bg-surface disabled:opacity-50"
           >
-            Imprimir
+            Ver / imprimir
           </button>
           <button
-            onClick={handleEnviarCorreo}
-            className="flex-1 rounded-lg border border-info/40 py-2 text-sm font-semibold text-info transition-colors hover:bg-info/10"
+            onClick={() => recibo.enviarCorreo(pago)}
+            disabled={recibo.ocupado}
+            className="flex-1 rounded-lg border border-info/40 py-2 text-sm font-semibold text-info transition-colors hover:bg-info/10 disabled:opacity-50"
           >
             Enviar por mail
           </button>
           <button
-            onClick={handleEnviarWhatsApp}
-            className="flex-1 rounded-lg border border-success/40 py-2 text-sm font-semibold text-success transition-colors hover:bg-success/10"
+            onClick={() => recibo.enviarWhatsApp(pago)}
+            disabled={recibo.ocupado}
+            className="flex-1 rounded-lg border border-success/40 py-2 text-sm font-semibold text-success transition-colors hover:bg-success/10 disabled:opacity-50"
           >
             Enviar por WhatsApp
           </button>
@@ -442,30 +516,7 @@ function ReciboActions({
       >
         Listo
       </button>
-
-      <div className="hidden print:block">
-        <h2 className="text-xl font-bold">Recibo de Pago</h2>
-        <p className="mt-1 text-sm">Paciente: {patientName}</p>
-        <p className="text-sm">Fecha: {pago.fecha}</p>
-        <p className="text-sm">Médico: {pago.medico}</p>
-        <p className="text-sm">Forma de pago: {pago.formaPago}</p>
-        <div className="mt-4 space-y-1">
-          {pago.lineas.map((l) => (
-            <div key={l.id} className="flex justify-between text-sm">
-              <span>{l.label}</span>
-              <span>{formatCurrency(l.monto)}</span>
-            </div>
-          ))}
-        </div>
-        <div className="mt-4 flex justify-between border-t pt-2 text-sm font-bold">
-          <span>Total</span>
-          <span>{formatCurrency(pago.total)}</span>
-        </div>
-        {pago.firma && (
-          // eslint-disable-next-line @next/next/no-img-element
-          <img src={pago.firma} alt="Firma del paciente" className="mt-4 h-20" />
-        )}
-      </div>
+      {recibo.avisoWhatsApp}
     </div>
   );
 }
@@ -848,10 +899,9 @@ export default function Pagos({
   devoluciones: DevolucionPago[];
   setPagos: Dispatch<SetStateAction<Pago[]>>;
 }) {
-  const { userEmail, setPagosEliminados, setPagosRealizados, citas, patients, clinicInfo, formatosWhatsapp } =
-    usePatientData();
+  const { userEmail, setPagosEliminados, setPagosRealizados } = usePatientData();
+  const recibo = useReciboPdf(patientId, patientName);
   const [showDialog, setShowDialog] = useState(false);
-  const [printTarget, setPrintTarget] = useState<Pago | null>(null);
   const [pagoAEliminar, setPagoAEliminar] = useState<Pago | null>(null);
   const [pagoAEditar, setPagoAEditar] = useState<Pago | null>(null);
   const [pagoParaDevolver, setPagoParaDevolver] = useState<Pago | "sin-preseleccion" | null>(null);
@@ -895,12 +945,6 @@ export default function Pagos({
     setPagos((prev) => prev.filter((p) => p.id !== pago.id));
     setPagoAEliminar(null);
   };
-
-  useEffect(() => {
-    if (printTarget) {
-      window.print();
-    }
-  }, [printTarget]);
 
   const tratamientosPendientes: TratamientoPendiente[] = computeTratamientosPendientes(
     presupuestos,
@@ -1048,36 +1092,18 @@ export default function Pagos({
                   <td className="px-6 py-3">
                     <div className="flex items-center gap-1.5">
                       <button
-                        onClick={() => setPrintTarget(pago)}
-                        title="Imprimir comprobante"
-                        className="flex h-7 w-7 items-center justify-center rounded-full border border-edge/15 text-ink/50 transition-colors hover:border-accent/50 hover:text-accent"
+                        onClick={() => recibo.abrir(pago)}
+                        disabled={recibo.ocupado}
+                        title="Ver / imprimir recibo (PDF)"
+                        className="flex h-7 w-7 items-center justify-center rounded-full border border-edge/15 text-ink/50 transition-colors hover:border-accent/50 hover:text-accent disabled:opacity-50"
                       >
                         <PrinterIcon />
                       </button>
                       <button
-                        onClick={() => {
-                          const plantilla = formatosWhatsapp.reciboPago ?? formatosWhatsAppInicial.reciboPago;
-                          const texto = renderPlantilla(plantilla, {
-                            clinica: clinicInfo?.nombre || "tu clínica",
-                            paciente: patientName,
-                            fecha: pago.fecha,
-                            medico: pago.medico,
-                            formaPago: pago.formaPago,
-                            conceptos: pago.lineas
-                              .map((l) => `- ${l.label}: ${formatCurrency(l.monto)}`)
-                              .join("\n"),
-                            total: formatCurrency(pago.total),
-                            proximaCita: buildProximaCitaTexto(citas, patientId, pago.fecha),
-                          });
-                          // Mismo bug que ya se corrigió en ReciboActions: sin el
-                          // teléfono en la URL, WhatsApp abre sin contacto
-                          // seleccionado y hay que buscarlo a mano.
-                          const telefono = patients.find((p) => p.id === patientId)?.phone?.replace(/\D/g, "");
-                          const destino = telefono ? `/${telefono}` : "/";
-                          window.open(`https://wa.me${destino}?text=${encodeURIComponent(texto)}`, "_blank");
-                        }}
-                        title="Enviar comprobante por WhatsApp"
-                        className="flex h-7 w-7 items-center justify-center rounded-full border border-success/30 text-success/70 transition-colors hover:border-success hover:text-success"
+                        onClick={() => recibo.enviarWhatsApp(pago)}
+                        disabled={recibo.ocupado}
+                        title="Enviar recibo (PDF) por WhatsApp"
+                        className="flex h-7 w-7 items-center justify-center rounded-full border border-success/30 text-success/70 transition-colors hover:border-success hover:text-success disabled:opacity-50"
                       >
                         <WhatsAppIcon />
                       </button>
@@ -1139,31 +1165,7 @@ export default function Pagos({
         </div>
       )}
 
-      {printTarget && (
-        <div className="hidden print:block">
-          <h2 className="text-xl font-bold">Recibo de Pago</h2>
-          <p className="mt-1 text-sm">Paciente: {patientName}</p>
-          <p className="text-sm">Fecha: {printTarget.fecha}</p>
-          <p className="text-sm">Médico: {printTarget.medico}</p>
-          <p className="text-sm">Forma de pago: {printTarget.formaPago}</p>
-          <div className="mt-4 space-y-1">
-            {printTarget.lineas.map((l) => (
-              <div key={l.id} className="flex justify-between text-sm">
-                <span>{l.label}</span>
-                <span>{formatCurrency(l.monto)}</span>
-              </div>
-            ))}
-          </div>
-          <div className="mt-4 flex justify-between border-t pt-2 text-sm font-bold">
-            <span>Total</span>
-            <span>{formatCurrency(printTarget.total)}</span>
-          </div>
-          {printTarget.firma && (
-            // eslint-disable-next-line @next/next/no-img-element
-            <img src={printTarget.firma} alt="Firma del paciente" className="mt-4 h-20" />
-          )}
-        </div>
-      )}
+      {recibo.avisoWhatsApp}
 
       {showDialog && (
         <AgregarPagoDialog
