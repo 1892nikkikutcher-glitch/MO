@@ -1,7 +1,7 @@
 "use client";
 
 import { createContext, useContext, useMemo, useState } from "react";
-import { pacientesYMedicosConectados, soloDelPaciente } from "@/lib/casosConectados";
+import { casosPorAtender, pacientesYMedicosConectados, soloDelPaciente } from "@/lib/casosConectados";
 import { AtajoColegas, useContactosColegas } from "./ContactosColegas";
 import { useMoConecta } from "@/context/MoConectaContext";
 import { usePatientData } from "@/context/PatientDataContext";
@@ -306,8 +306,35 @@ function ResumenTab({
     .sort((a, b) => b.actualizadoEl.localeCompare(a.actualizadoEl))
     .slice(0, 5);
 
+  const porAtender = alcance ? [] : casosPorAtender(casosRecibidos, uid);
+
   return (
     <div className="space-y-6">
+      {porAtender.length > 0 && (
+        <div className="rounded-2xl border border-danger/30 bg-danger/10 p-4">
+          <p className="text-sm font-semibold text-ink">
+            {porAtender.length === 1 ? "Te enviaron 1 caso y espera tu respuesta" : `Te enviaron ${porAtender.length} casos y esperan tu respuesta`}
+          </p>
+          <div className="mt-2 space-y-1.5">
+            {porAtender.slice(0, 5).map((c) => (
+              <button
+                key={c.id}
+                onClick={() => onAbrirCaso(c.id)}
+                className="flex w-full items-center justify-between gap-3 rounded-lg border border-edge/10 bg-surface px-3 py-2 text-left text-sm text-ink transition-colors hover:border-accent/40"
+              >
+                <span className="truncate">
+                  {nombreYEspecialidad(c.resumenPaciente.nombre, c.especialidadSolicitada)}
+                  <span className="ml-2 text-xs text-ink/50">
+                    de {directorio.find((p) => p.uid === c.odontologoRemitenteUid)?.nombreCompleto ?? "un colega"}
+                  </span>
+                </span>
+                <span className="shrink-0 text-xs text-accent">Abrir</span>
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
+
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
         {[
           { label: "Enviadas", valor: casosEnviados.length },

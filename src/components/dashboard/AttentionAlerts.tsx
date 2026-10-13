@@ -2,6 +2,8 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { usePatientData } from "@/context/PatientDataContext";
+import { useMoConecta } from "@/context/MoConectaContext";
+import { casosPorAtender } from "@/lib/casosConectados";
 import { formatCurrency } from "@/lib/patientData";
 import { agruparLaboratoriosPendientes, parseFechaEntrega, type RangoPeriodo } from "@/lib/dashboardMetrics";
 import {
@@ -26,7 +28,8 @@ type CategoriaAlerta =
   | "agenda"
   | "asistencia"
   | "perfil"
-  | "configuracion";
+  | "configuracion"
+  | "conecta";
 
 const ORDEN_PRIORIDAD: Record<PrioridadAlerta, number> = { alta: 0, media: 1, baja: 2 };
 
@@ -73,6 +76,8 @@ export default function AttentionAlerts({ rango }: { rango: RangoPeriodo }) {
     cargarNotasPaciente,
   } = usePatientData();
   const [mostrarLaboratorios, setMostrarLaboratorios] = useState(false);
+  const { casosRecibidos, uid: miUidConecta } = useMoConecta();
+  const conectaPorAtender = casosPorAtender(casosRecibidos, miUidConecta).length;
 
   const hoy = new Date();
   const manana = new Date(hoy);
@@ -139,6 +144,17 @@ export default function AttentionAlerts({ rango }: { rango: RangoPeriodo }) {
   const listaRevision = clasificadas.filter((x) => x.estado === "lista_revision");
 
   const alertas: Alerta[] = [];
+
+  if (conectaPorAtender > 0) {
+    alertas.push({
+      key: "conecta",
+      emoji: "🔴",
+      texto: `${conectaPorAtender} caso(s) de MO Conecta esperan tu respuesta`,
+      prioridad: "alta",
+      categoria: "conecta",
+      onClick: () => irAPagina("mo-conecta"),
+    });
+  }
 
   if (puedeVerFinanzas && saldosArr.length > 0) {
     alertas.push({

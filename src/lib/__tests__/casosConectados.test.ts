@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { pacientesYMedicosConectados, soloDelPaciente } from "../casosConectados";
+import { casosPorAtender, pacientesYMedicosConectados, soloDelPaciente } from "../casosConectados";
 
 const YO = "yo";
 const dir = [
@@ -60,5 +60,18 @@ describe("soloDelPaciente", () => {
   it("deja solo los casos enviados de ese paciente", () => {
     const casos = [caso("1"), caso("2", { pacienteId: "p2" }), caso("3", { odontologoRemitenteUid: "a", destinatarioUid: YO })];
     expect(soloDelPaciente(casos, YO, "p1").map((c) => c.id)).toEqual(["1"]);
+  });
+});
+
+describe("casosPorAtender", () => {
+  it("solo los recibidos que siguen sin atender, del más reciente al más antiguo", () => {
+    const casos = [
+      caso("1", { odontologoRemitenteUid: "a", destinatarioUid: YO, estado: "sent" }),
+      caso("2", { odontologoRemitenteUid: "a", destinatarioUid: YO, estado: "accepted" }),
+      caso("3", { odontologoRemitenteUid: "b", destinatarioUid: YO, estado: "sent" }),
+      caso("4", { estado: "sent" }), // enviado por mí: no cuenta
+      caso("5", { odontologoRemitenteUid: "a", destinatarioUid: YO, estado: "rejected" }),
+    ].map((c) => c as typeof c & { estado: string });
+    expect(casosPorAtender(casos, YO).map((c) => c.id)).toEqual(["3", "1"]);
   });
 });

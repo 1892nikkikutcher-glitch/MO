@@ -377,9 +377,12 @@ export default function BottomNav({
   onNavigate,
   fanAbierto,
   onFanAbiertoChange,
+  insignias = {},
 }: {
   active: string;
   onNavigate: (id: string) => void;
+  /** Número rojo sobre un módulo (ej. casos de MO Conecta por atender). */
+  insignias?: Record<string, number>;
   /** El Asistente flotante necesita saber cuándo el abanico está abierto
    * para esconderse (comparten la misma esquina) — por eso este estado
    * vive controlado desde Dashboard en vez de manejarse solo aquí adentro. */
@@ -581,7 +584,7 @@ export default function BottomNav({
               <button
                 key={item.id}
                 onClick={() => seleccionar(item)}
-                className={`flex w-full shrink-0 select-none scroll-my-1 flex-col items-center gap-[3px] rounded-xl px-0.5 py-2 text-center transition-colors [scroll-snap-align:start] lg:py-2.5 ${
+                className={`relative flex w-full shrink-0 select-none scroll-my-1 flex-col items-center gap-[3px] rounded-xl px-0.5 py-2 text-center transition-colors [scroll-snap-align:start] lg:py-2.5 ${
                   isActive ? "bg-accent/10 text-accent" : "text-ink/50 hover:bg-surface hover:text-ink"
                 }`}
               >
@@ -591,6 +594,11 @@ export default function BottomNav({
                 <span className="line-clamp-2 max-w-[44px] break-words text-[9px] font-semibold leading-tight lg:max-w-[68px] lg:text-[10px]">
                   {item.label}
                 </span>
+                {(insignias[item.id] ?? 0) > 0 && (
+                  <span className="absolute right-1.5 top-1 flex h-4 min-w-4 items-center justify-center rounded-full bg-danger px-1 text-[9px] font-bold leading-none text-white">
+                    {insignias[item.id] > 9 ? "9+" : insignias[item.id]}
+                  </span>
+                )}
               </button>
             );
           })}
@@ -666,6 +674,11 @@ export default function BottomNav({
               <svg width="32" height="32" viewBox="0 0 24 24" fill="none" className="shrink-0">
                 {item.icon}
               </svg>
+              {(insignias[item.id] ?? 0) > 0 && (
+                <span className="absolute right-0 top-0 flex h-5 min-w-5 items-center justify-center rounded-full bg-danger px-1 text-[10px] font-bold leading-none text-white">
+                  {insignias[item.id] > 9 ? "9+" : insignias[item.id]}
+                </span>
+              )}
               <span
                 className={`absolute -bottom-5 left-1/2 max-w-[70px] -translate-x-1/2 break-words rounded bg-modal-solid/80 px-1 text-center text-[9.5px] font-semibold leading-tight ${
                   isActive ? "text-accent" : "text-ink/60"

@@ -92,3 +92,14 @@ export function soloDelPaciente<T extends { pacienteId: string; odontologoRemite
 ): T[] {
   return casos.filter((c) => c.odontologoRemitenteUid === uid && c.pacienteId === patientId);
 }
+
+/** Casos que ME enviaron y todavía no atiendo (no los acepto ni los rechazo): son
+ * los que ameritan un aviso dentro de MO, ya que MO no manda notificaciones solo. */
+export function casosPorAtender<T extends { odontologoRemitenteUid: string; estado: string; actualizadoEl: string }>(
+  casos: T[],
+  uid: string
+): T[] {
+  return casos
+    .filter((c) => c.odontologoRemitenteUid !== uid && (c.estado === "sent" || c.estado === "received"))
+    .sort((a, b) => b.actualizadoEl.localeCompare(a.actualizadoEl));
+}

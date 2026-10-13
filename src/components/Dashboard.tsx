@@ -64,7 +64,8 @@ import AsistenteFlotante from "./AsistenteFlotante";
 import { PatientDataProvider, usePatientData } from "@/context/PatientDataContext";
 import { useTheme, type TemaPreferencia } from "@/context/ThemeContext";
 import { PrivacidadProvider } from "@/context/PrivacidadContext";
-import { MoConectaProvider } from "@/context/MoConectaContext";
+import { MoConectaProvider, useMoConecta } from "@/context/MoConectaContext";
+import { casosPorAtender } from "@/lib/casosConectados";
 import MoConecta from "./pages/MoConecta";
 import SelectorClinica from "./SelectorClinica";
 
@@ -637,6 +638,8 @@ function DashboardBody({
   esAdmin: boolean;
 }) {
   const { clinicInfo, suscripcion, membresiasDisponibles, seleccionarClinica } = usePatientData();
+  const { casosRecibidos, uid: miUidConecta } = useMoConecta();
+  const porAtenderConecta = casosPorAtender(casosRecibidos, miUidConecta).length;
   const { resuelto: temaResuelto, preferencia: temaPreferencia, setPreferencia: setTemaPreferencia } = useTheme();
   const isLight = temaResuelto === "light";
   const [mostrarSugerencia, setMostrarSugerencia] = useState(false);
@@ -871,6 +874,7 @@ function DashboardBody({
         onNavigate={setActivePage}
         fanAbierto={fanAbierto}
         onFanAbiertoChange={setFanAbierto}
+        insignias={{ "mo-conecta": porAtenderConecta }}
       />
 
       {showRegistrarPago && (
