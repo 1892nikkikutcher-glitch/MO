@@ -6,7 +6,7 @@
 import type { PrioridadTratamiento } from "./planTratamiento";
 import type { SuperficieDental } from "./odontograma";
 
-export type TipoPregunta = "sino" | "texto" | "textarea" | "chips" | "odontograma" | "listaPrioridad";
+export type TipoPregunta = "sino" | "texto" | "textarea" | "chips" | "odontograma" | "listaPrioridad" | "valoracionDientes";
 
 export const tipoPreguntaLabel: Record<TipoPregunta, string> = {
   sino: "Sí / No",
@@ -15,6 +15,7 @@ export const tipoPreguntaLabel: Record<TipoPregunta, string> = {
   chips: "Opciones múltiples",
   odontograma: "Odontograma",
   listaPrioridad: "Lista numerada (plan de tratamiento)",
+  valoracionDientes: "Cuadro por diente (periodontal y pronóstico)",
 };
 
 /** Fases del plan de tratamiento — mismo vocabulario en Historia Clínica
@@ -73,7 +74,100 @@ export type SeccionTemplate = {
 
 export type HistoriaClinicaTemplate = {
   secciones: SeccionTemplate[];
+  /** Versión de la plantilla ya adaptada a las secciones nuevas de MO. Ausente =
+   * plantilla guardada antes de que existiera el cuadro por diente (ver
+   * conSeccionValoracionDientes). Sirve para agregar una sección nueva UNA sola vez:
+   * si luego el dueño la quita, no vuelve a aparecer. */
+  version?: number;
 };
+
+/** Versión actual de la plantilla por defecto. 2 = incluye el cuadro por diente. */
+export const VERSION_PLANTILLA = 2;
+
+/** Ids fijos (no aleatorios) para que la sección sea la misma en cada clínica y
+ * en cada sesión — las respuestas se guardan por id de pregunta. */
+export const ID_SECCION_VALORACION_DIENTES = "sec_valoracion_dientes";
+export const ID_PREGUNTA_VALORACION_DIENTES = "p_valoracion_dientes";
+
+/** Columnas del cuadro por diente (formato de valoración periodontal y pronóstico
+ * del consultorio). `sugerencias` solo ayudan a capturar rápido — cada celda sigue
+ * siendo texto libre. */
+export const COLUMNAS_VALORACION_DIENTES = [
+  { id: "proporcionCoronaRaiz", titulo: "Proporción corona-raíz", sugerencias: ["1:2", "2:3", "1:1", "Desfavorable"] },
+  { id: "porcentajeReabsorcion", titulo: "Porcentaje de reabsorción ósea", sugerencias: ["0%", "10%", "20%", "30%", "40%", "50%", "60%", "70%"] },
+  { id: "tipoReabsorcion", titulo: "Tipo de reabsorción ósea", sugerencias: ["Horizontal", "Vertical", "Mixta"] },
+  { id: "ligamentoEnsanchado", titulo: "Ensanchado ligamento periodontal", sugerencias: ["Sí", "No"] },
+  { id: "furcas", titulo: "Furcas involucradas", sugerencias: ["No", "Grado I", "Grado II", "Grado III"] },
+  { id: "caries", titulo: "Caries", sugerencias: ["No", "Sí", "Incipiente", "Moderada", "Profunda"] },
+  { id: "patologiaPeriapical", titulo: "Patología periapical", sugerencias: ["Sin patología", "Periodontitis apical", "Absceso apical", "Granuloma", "Quiste"] },
+  { id: "pronostico", titulo: "Pronóstico", sugerencias: ["Bueno", "Regular", "Reservado", "Malo"] },
+] as const;
+export type ColumnaValoracionDientes = (typeof COLUMNAS_VALORACION_DIENTES)[number]["id"];
+
+/** Lo que se guarda en la respuesta: diente (FDI, como texto) → columna → texto.
+ * Solo existen las celdas que tienen algo escrito. */
+export type ValoracionDientes = Record<string, Partial<Record<ColumnaValoracionDientes, string>>>;
+
+/** Los 32 dientes permanentes en el orden del formato en papel. */
+export const DIENTES_VALORACION: number[] = [
+  18, 17, 16, 15, 14, 13, 12, 11,
+  21, 22, 23, 24, 25, 26, 27, 28,
+  38, 37, 36, 35, 34, 33, 32, 31,
+  41, 42, 43, 44, 45, 46, 47, 48,
+];
+
+/** Lee la respuesta guardada; cualquier cosa que no sea el objeto esperado (la
+ * pregunta se creó recién, o cambió de tipo) se toma como cuadro vacío. */
+export function valorComoValoracionDientes(valor: unknown): ValoracionDientes {
+  if (!valor || typeof valor !== "object" || Array.isArray(valor)) return {};
+  return valor as ValoracionDientes;
+}
+
+/** Devuelve el cuadro con una celda cambiada. Nunca deja celdas ni dientes vacíos
+ * guardados (así "borrar todo" deja `{}`, igual que un paciente sin captura) y
+ * nunca muta el original. */
+export function conCeldaValoracion(
+  actual: ValoracionDientes,
+  diente: number,
+  columna: ColumnaValoracionDientes,
+  texto: string
+): ValoracionDientes {
+  const clave = String(diente);
+  const fila = { ...(actual[clave] ?? {}) };
+  if (texto.trim() === "") delete fila[columna];
+  else fila[columna] = texto;
+  const siguiente = { ...actual };
+  if (Object.keys(fila).length === 0) delete siguiente[clave];
+  else siguiente[clave] = fila;
+  return siguiente;
+}
+
+/** Dientes (en el orden del formato) que tienen al menos una celda escrita. */
+export function dientesConValoracion(valoracion: ValoracionDientes): number[] {
+  return DIENTES_VALORACION.filter((d) => Object.values(valoracion[String(d)] ?? {}).some((t) => (t ?? "").trim() !== ""));
+}
+
+/** Plantillas guardadas antes del cuadro por diente: lo agrega justo después del
+ * odontograma (una sola vez, ver `version`). Pura y sin efectos: si la plantilla ya
+ * está al día, o ya tiene un cuadro por diente, devuelve la misma sin sección nueva.
+ * Si la clínica quitó el odontograma no se inserta nada — solo se marca al día. */
+export function conSeccionValoracionDientes(template: HistoriaClinicaTemplate): HistoriaClinicaTemplate {
+  if ((template.version ?? 1) >= VERSION_PLANTILLA) return template;
+  const yaTiene = template.secciones.some((s) => s.preguntas.some((p) => p.tipo === "valoracionDientes"));
+  const indiceOdontograma = template.secciones.findIndex((s) => s.preguntas.some((p) => p.tipo === "odontograma"));
+  if (yaTiene || indiceOdontograma === -1) return { ...template, version: VERSION_PLANTILLA };
+  const secciones = [...template.secciones];
+  secciones.splice(indiceOdontograma + 1, 0, seccionValoracionDientes());
+  return { ...template, secciones, version: VERSION_PLANTILLA };
+}
+
+function seccionValoracionDientes(): SeccionTemplate {
+  return {
+    id: ID_SECCION_VALORACION_DIENTES,
+    titulo: "Valoración por Diente y Pronóstico",
+    preguntas: [{ id: ID_PREGUNTA_VALORACION_DIENTES, tipo: "valoracionDientes", etiqueta: "Valoración por diente" }],
+  };
+}
 
 function id(prefijo: string) {
   return `${prefijo}${Math.random().toString(36).slice(2, 9)}`;
@@ -82,6 +176,7 @@ function id(prefijo: string) {
 /** La historia clínica proporcionada por el usuario, precargada tal cual
  * como plantilla inicial editable. */
 export const plantillaInicial: HistoriaClinicaTemplate = {
+  version: VERSION_PLANTILLA,
   secciones: [
     {
       id: id("sec"),
@@ -224,6 +319,7 @@ export const plantillaInicial: HistoriaClinicaTemplate = {
       titulo: "Odontograma Diagnóstico",
       preguntas: [{ id: id("p"), tipo: "odontograma", etiqueta: "Odontograma" }],
     },
+    seccionValoracionDientes(),
     {
       id: id("sec"),
       titulo: "Higiene Bucal",

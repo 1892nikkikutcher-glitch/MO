@@ -4,6 +4,7 @@ import {
   createContext,
   useContext,
   useEffect,
+  useMemo,
   useRef,
   useState,
   type ReactNode,
@@ -149,6 +150,7 @@ import { crearProcedimientoDesdeTemplate, idDesdeCodigo } from "@/lib/importarCa
 import { catalogoInicial, type MedicamentoCatalogo } from "@/lib/medicamentos";
 import {
   plantillaInicial,
+  conSeccionValoracionDientes,
   respuestasVacias,
   type HistoriaClinicaTemplate,
   type RespuestasHistoriaClinica,
@@ -1162,11 +1164,22 @@ export function PatientDataProvider({
     "registrosAsistencia"
   );
   const [procedimientos, setProcedimientos] = useFirestoreList<Procedimiento>(clinicUid, "procedimientos");
-  const [historiaClinicaTemplate, setHistoriaClinicaTemplate] = useFirestoreDoc<HistoriaClinicaTemplate>(
-    clinicUid,
-    "historiaClinicaTemplate",
-    plantillaInicial
+  const [historiaClinicaTemplateGuardada, setHistoriaClinicaTemplate, historiaClinicaTemplateCargada] =
+    useFirestoreDoc<HistoriaClinicaTemplate>(clinicUid, "historiaClinicaTemplate", plantillaInicial);
+  // Plantillas guardadas antes del cuadro por diente: se les agrega esa sección. Todos
+  // la ven de inmediato (el cálculo es puro y usa ids fijos); solo el dueño la guarda en
+  // Firestore (config/* solo admite escritura de admin), y al guardarla queda marcada
+  // como al día para que, si luego la quita, no vuelva a aparecer.
+  const historiaClinicaTemplate = useMemo(
+    () => conSeccionValoracionDientes(historiaClinicaTemplateGuardada),
+    [historiaClinicaTemplateGuardada]
   );
+  useEffect(() => {
+    if (!clinicUid || rol !== "admin" || !historiaClinicaTemplateCargada) return;
+    if (historiaClinicaTemplate === historiaClinicaTemplateGuardada) return;
+    setHistoriaClinicaTemplate(historiaClinicaTemplate);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [clinicUid, rol, historiaClinicaTemplateCargada, historiaClinicaTemplate, historiaClinicaTemplateGuardada]);
   const [folioReceta, setFolioReceta] = useFirestoreDoc<{ siguiente: number }>(
     clinicUid,
     "folioReceta",

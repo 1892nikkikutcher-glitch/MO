@@ -13,6 +13,7 @@ export type ResultadoFusionCampos<T> = { fusionado: Record<string, T>; conflicto
 function estaVacio(valor: unknown): boolean {
   if (valor === undefined || valor === null || valor === "") return true;
   if (Array.isArray(valor)) return valor.length === 0;
+  if (typeof valor === "object") return Object.keys(valor as object).length === 0;
   return false;
 }
 

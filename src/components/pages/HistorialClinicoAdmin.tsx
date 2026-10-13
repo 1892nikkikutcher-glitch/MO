@@ -277,21 +277,22 @@ export default function HistorialClinicoAdmin() {
 
   const actualizarSeccion = (index: number, siguiente: SeccionTemplate) => {
     setHistoriaClinicaTemplate((prev) => ({
+      ...prev,
       secciones: prev.secciones.map((s, i) => (i === index ? siguiente : s)),
     }));
   };
 
   const moverSeccion = (index: number, direccion: -1 | 1) => {
-    setHistoriaClinicaTemplate((prev) => ({ secciones: moverEnArray(prev.secciones, index, direccion) }));
+    setHistoriaClinicaTemplate((prev) => ({ ...prev, secciones: moverEnArray(prev.secciones, index, direccion) }));
   };
 
   const quitarSeccion = (index: number) => {
-    setHistoriaClinicaTemplate((prev) => ({ secciones: prev.secciones.filter((_, i) => i !== index) }));
+    setHistoriaClinicaTemplate((prev) => ({ ...prev, secciones: prev.secciones.filter((_, i) => i !== index) }));
   };
 
   const agregarSeccion = () => {
     const nueva: SeccionTemplate = { id: nuevoId("sec"), titulo: "", preguntas: [] };
-    setHistoriaClinicaTemplate((prev) => ({ secciones: [...prev.secciones, nueva] }));
+    setHistoriaClinicaTemplate((prev) => ({ ...prev, secciones: [...prev.secciones, nueva] }));
   };
 
   const restaurarPlantilla = () => {

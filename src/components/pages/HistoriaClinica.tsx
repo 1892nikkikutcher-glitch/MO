@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import OdontogramaSuperficies from "./OdontogramaSuperficies";
+import ValoracionPorDiente from "./ValoracionPorDiente";
 import { usePatientData } from "@/context/PatientDataContext";
 import ConfirmarEliminar from "@/components/ConfirmarEliminar";
 import { sonEquivalentes } from "@/lib/deepEqual";
@@ -18,6 +19,7 @@ import {
   estadoParaMostrar,
   respuestasVacias,
   resumenAntecedentesPatologicos,
+  valorComoValoracionDientes,
   valorOdontogramaComoDiagnosticos,
   type DiagnosticoOdontograma,
   type EstadoDiagnosticoOdontograma,
@@ -1189,6 +1191,14 @@ function PreguntaRenderer({
         onGuardarPlan={onGuardarPlan}
         onCrearCotizacion={onCrearCotizacion}
         onVerPresupuestos={onVerPresupuestos}
+      />
+    );
+  }
+  if (pregunta.tipo === "valoracionDientes") {
+    return (
+      <ValoracionPorDiente
+        valor={valorComoValoracionDientes(valor)}
+        onChange={(v) => onChange(v as unknown as RespuestaValor)}
       />
     );
   }

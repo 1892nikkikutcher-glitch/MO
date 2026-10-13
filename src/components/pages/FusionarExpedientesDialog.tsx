@@ -54,6 +54,11 @@ const etiquetaCampoPaciente: Record<string, string> = {
 function mostrarValor(v: unknown): string {
   if (v === undefined || v === null) return "—";
   if (Array.isArray(v)) return v.length > 0 ? v.join(", ") : "—";
+  if (typeof v === "object") {
+    // Cuadro por diente: un objeto diente → datos.
+    const n = Object.keys(v as object).length;
+    return n > 0 ? `${n} ${n === 1 ? "diente" : "dientes"} con datos` : "—";
+  }
   return String(v);
 }
 
