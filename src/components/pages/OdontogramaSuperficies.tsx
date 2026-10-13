@@ -78,12 +78,15 @@ function colorDeDiente(pintados: PinturaOdontograma[], tooth: number): ColorOdon
 function SimboloDiente({
   tooth,
   superficiesActivas,
+  dienteCompleto,
   colorActual,
   pintados,
   onToggleSuperficie,
 }: {
   tooth: number;
   superficiesActivas: SuperficieDental[];
+  /** El diente está marcado entero (sin caras específicas): se pinta completo en el color actual. */
+  dienteCompleto: boolean;
   colorActual: ColorOdontograma;
   pintados: PinturaOdontograma[];
   onToggleSuperficie: (superficie: SuperficieDental) => void;
@@ -106,10 +109,13 @@ function SimboloDiente({
     if (superficiesActivas.includes(superficie)) {
       return { clase: "", style: { fill: `rgb(${colorOdontogramaInfo[colorActual].rgb} / 0.8)` } };
     }
+    if (dienteCompleto) {
+      return { clase: "", style: { fill: `rgb(${colorOdontogramaInfo[colorActual].rgb} / 0.6)` } };
+    }
     const guardada = pinturaDeSuperficie(pintados, tooth, superficie);
     if (!guardada) return { clase: rellenoSuperficie(false) };
     if (!guardada.color) return { clase: rellenoSuperficie(true) };
-    const alfa = guardada.pleno ? 0.8 : 0.45;
+    const alfa = guardada.pleno ? 0.8 : 0.6;
     return { clase: "", style: { fill: `rgb(${colorOdontogramaInfo[guardada.color].rgb} / ${alfa})` } };
   };
 
@@ -197,6 +203,7 @@ export default function OdontogramaSuperficies({
         <SimboloDiente
           tooth={tooth}
           superficiesActivas={selectedSurfaces[tooth] ?? []}
+          dienteCompleto={seleccionado && (selectedSurfaces[tooth] ?? []).length === 0}
           colorActual={colorActual}
           pintados={pintados}
           onToggleSuperficie={(s) => onToggleSurface(tooth, s)}
