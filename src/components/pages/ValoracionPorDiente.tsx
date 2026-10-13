@@ -11,7 +11,7 @@ import {
 } from "@/lib/historiaClinica";
 
 /** Color del pronóstico para que se lea de un vistazo al recorrer el cuadro. */
-function claseDePronostico(texto: string): string {
+export function claseDePronostico(texto: string): string {
   const t = texto.trim().toLowerCase();
   if (t.startsWith("bueno")) return "text-success";
   if (t.startsWith("malo") || t.startsWith("desahuc") || t.startsWith("sin esperanza")) return "text-danger";
@@ -105,6 +105,50 @@ export default function ValoracionPorDiente({
           ))}
         </datalist>
       ))}
+    </div>
+  );
+}
+
+/** El mismo cuadro, solo para mirar (el colega con quien se comparte el expediente): solo
+ * los dientes con datos y solo las columnas que tienen algo. */
+export function ValoracionDientesLectura({ valor }: { valor: ValoracionDientes }) {
+  const dientes = dientesConValoracion(valor);
+  const columnas = COLUMNAS_VALORACION_DIENTES.filter((col) => dientes.some((d) => (valor[String(d)]?.[col.id] ?? "").trim() !== ""));
+  if (dientes.length === 0) return <p className="text-ink/50">Sin datos capturados.</p>;
+  return (
+    <div className="overflow-x-auto rounded-xl border border-edge/10">
+      <table className="w-full min-w-[420px] border-separate border-spacing-0 text-xs">
+        <thead>
+          <tr>
+            <th className="border-b border-edge/10 px-2 py-2 text-left font-semibold text-ink/70">Diente</th>
+            {columnas.map((col) => (
+              <th key={col.id} className="border-b border-edge/10 px-2 py-2 text-left font-semibold leading-tight text-ink/70">
+                {col.titulo}
+              </th>
+            ))}
+          </tr>
+        </thead>
+        <tbody>
+          {dientes.map((d) => (
+            <tr key={d}>
+              <th scope="row" className="border-b border-edge/10 px-2 py-1.5 text-left font-semibold text-accent">
+                {d}
+              </th>
+              {columnas.map((col) => {
+                const texto = valor[String(d)]?.[col.id] ?? "";
+                return (
+                  <td
+                    key={col.id}
+                    className={`border-b border-edge/10 px-2 py-1.5 ${col.id === "pronostico" ? `font-semibold ${claseDePronostico(texto)}` : "text-ink"}`}
+                  >
+                    {texto}
+                  </td>
+                );
+              })}
+            </tr>
+          ))}
+        </tbody>
+      </table>
     </div>
   );
 }

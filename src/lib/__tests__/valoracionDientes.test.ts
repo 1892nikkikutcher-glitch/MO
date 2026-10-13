@@ -67,6 +67,44 @@ describe("conSeccionValoracionDientes", () => {
   });
 });
 
+describe("nombre del cuadro", () => {
+  it("se llama Evaluación Radiográfica y Pronóstico", () => {
+    const s = plantillaInicial.secciones.find((x) => x.id === "sec_valoracion_dientes");
+    expect(s?.titulo).toBe("Evaluación Radiográfica y Pronóstico");
+  });
+
+  it("una clínica que ya lo guardó con el nombre de estreno lo recibe actualizado", () => {
+    const vieja: HistoriaClinicaTemplate = {
+      version: VERSION_PLANTILLA,
+      secciones: [
+        {
+          id: "sec_valoracion_dientes",
+          titulo: "Valoración por Diente y Pronóstico",
+          preguntas: [{ id: ID_PREGUNTA_VALORACION_DIENTES, tipo: "valoracionDientes", etiqueta: "Valoración por diente" }],
+        },
+      ],
+    };
+    const r = conSeccionValoracionDientes(vieja);
+    expect(r.secciones[0].titulo).toBe("Evaluación Radiográfica y Pronóstico");
+    expect(r.secciones[0].preguntas[0].etiqueta).toBe("Evaluación radiográfica por diente");
+    expect(conSeccionValoracionDientes(r)).toBe(r); // ya al día: no cambia de nuevo
+  });
+
+  it("si el dueño le puso su propio nombre, no se toca", () => {
+    const propia: HistoriaClinicaTemplate = {
+      version: VERSION_PLANTILLA,
+      secciones: [
+        {
+          id: "sec_valoracion_dientes",
+          titulo: "Mi cuadro de pronóstico",
+          preguntas: [{ id: ID_PREGUNTA_VALORACION_DIENTES, tipo: "valoracionDientes", etiqueta: "Mi etiqueta" }],
+        },
+      ],
+    };
+    expect(conSeccionValoracionDientes(propia)).toBe(propia);
+  });
+});
+
 describe("captura del cuadro", () => {
   it("lee cualquier valor raro como cuadro vacío", () => {
     expect(valorComoValoracionDientes(undefined)).toEqual({});

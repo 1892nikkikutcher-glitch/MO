@@ -15,7 +15,7 @@ export const tipoPreguntaLabel: Record<TipoPregunta, string> = {
   chips: "Opciones múltiples",
   odontograma: "Odontograma",
   listaPrioridad: "Lista numerada (plan de tratamiento)",
-  valoracionDientes: "Cuadro por diente (periodontal y pronóstico)",
+  valoracionDientes: "Cuadro por diente (evaluación radiográfica y pronóstico)",
 };
 
 /** Fases del plan de tratamiento — mismo vocabulario en Historia Clínica
@@ -89,7 +89,7 @@ export const VERSION_PLANTILLA = 2;
 export const ID_SECCION_VALORACION_DIENTES = "sec_valoracion_dientes";
 export const ID_PREGUNTA_VALORACION_DIENTES = "p_valoracion_dientes";
 
-/** Columnas del cuadro por diente (formato de valoración periodontal y pronóstico
+/** Columnas del cuadro por diente (formato de evaluación radiográfica y pronóstico
  * del consultorio). `sugerencias` solo ayudan a capturar rápido — cada celda sigue
  * siendo texto libre. */
 export const COLUMNAS_VALORACION_DIENTES = [
@@ -151,7 +151,8 @@ export function dientesConValoracion(valoracion: ValoracionDientes): number[] {
  * odontograma (una sola vez, ver `version`). Pura y sin efectos: si la plantilla ya
  * está al día, o ya tiene un cuadro por diente, devuelve la misma sin sección nueva.
  * Si la clínica quitó el odontograma no se inserta nada — solo se marca al día. */
-export function conSeccionValoracionDientes(template: HistoriaClinicaTemplate): HistoriaClinicaTemplate {
+export function conSeccionValoracionDientes(entrada: HistoriaClinicaTemplate): HistoriaClinicaTemplate {
+  const template = conNombreActualDelCuadro(entrada);
   if ((template.version ?? 1) >= VERSION_PLANTILLA) return template;
   const yaTiene = template.secciones.some((s) => s.preguntas.some((p) => p.tipo === "valoracionDientes"));
   const indiceOdontograma = template.secciones.findIndex((s) => s.preguntas.some((p) => p.tipo === "odontograma"));
@@ -161,11 +162,46 @@ export function conSeccionValoracionDientes(template: HistoriaClinicaTemplate): 
   return { ...template, secciones, version: VERSION_PLANTILLA };
 }
 
+const TITULO_SECCION_VALORACION_DIENTES = "Evaluación Radiográfica y Pronóstico";
+const ETIQUETA_PREGUNTA_VALORACION_DIENTES = "Evaluación radiográfica por diente";
+/** Nombres que tuvo el cuadro al estrenarse; se actualizan solos, pero solo si el dueño no los cambió. */
+const TITULO_ANTERIOR_VALORACION_DIENTES = "Valoración por Diente y Pronóstico";
+const ETIQUETA_ANTERIOR_VALORACION_DIENTES = "Valoración por diente";
+
+/** Cambia al nombre actual el título y la etiqueta del cuadro por diente en plantillas que
+ * lo guardaron con el nombre de estreno. No toca nada que el dueño haya renombrado a su
+ * gusto; devuelve la misma plantilla si no hay nada que cambiar. */
+function conNombreActualDelCuadro(template: HistoriaClinicaTemplate): HistoriaClinicaTemplate {
+  const hayQueCambiar = template.secciones.some(
+    (s) =>
+      s.id === ID_SECCION_VALORACION_DIENTES &&
+      (s.titulo === TITULO_ANTERIOR_VALORACION_DIENTES ||
+        s.preguntas.some((p) => p.id === ID_PREGUNTA_VALORACION_DIENTES && p.etiqueta === ETIQUETA_ANTERIOR_VALORACION_DIENTES))
+  );
+  if (!hayQueCambiar) return template;
+  return {
+    ...template,
+    secciones: template.secciones.map((s) =>
+      s.id !== ID_SECCION_VALORACION_DIENTES
+        ? s
+        : {
+            ...s,
+            titulo: s.titulo === TITULO_ANTERIOR_VALORACION_DIENTES ? TITULO_SECCION_VALORACION_DIENTES : s.titulo,
+            preguntas: s.preguntas.map((p) =>
+              p.id === ID_PREGUNTA_VALORACION_DIENTES && p.etiqueta === ETIQUETA_ANTERIOR_VALORACION_DIENTES
+                ? { ...p, etiqueta: ETIQUETA_PREGUNTA_VALORACION_DIENTES }
+                : p
+            ),
+          }
+    ),
+  };
+}
+
 function seccionValoracionDientes(): SeccionTemplate {
   return {
     id: ID_SECCION_VALORACION_DIENTES,
-    titulo: "Valoración por Diente y Pronóstico",
-    preguntas: [{ id: ID_PREGUNTA_VALORACION_DIENTES, tipo: "valoracionDientes", etiqueta: "Valoración por diente" }],
+    titulo: TITULO_SECCION_VALORACION_DIENTES,
+    preguntas: [{ id: ID_PREGUNTA_VALORACION_DIENTES, tipo: "valoracionDientes", etiqueta: ETIQUETA_PREGUNTA_VALORACION_DIENTES }],
   };
 }
 

@@ -6,7 +6,7 @@ import ValoracionPorDiente from "./ValoracionPorDiente";
 import { usePatientData } from "@/context/PatientDataContext";
 import ConfirmarEliminar from "@/components/ConfirmarEliminar";
 import { sonEquivalentes } from "@/lib/deepEqual";
-import { CUADRANTES, cuadrantePrincipal, esDienteAnterior, ordenarDientes, type SuperficieDental } from "@/lib/odontograma";
+import { CUADRANTES, cuadrantePrincipal, etiquetaSuperficie, ordenarDientes, type SuperficieDental } from "@/lib/odontograma";
 import {
   claveDetalleSiNo,
   esNegacionExplicita,
@@ -657,22 +657,6 @@ function PlanTratamientoRow({
       )}
     </div>
   );
-}
-
-const SUPERFICIE_LABEL: Record<SuperficieDental, string> = {
-  vestibular: "Vestibular",
-  lingual: "Lingual/Palatino",
-  mesial: "Mesial",
-  distal: "Distal",
-  oclusal: "Oclusal",
-};
-
-/** "Oclusal" en posteriores, "Incisal" en anteriores (ver esDienteAnterior)
- * — misma distinción que ya hace el símbolo interactivo, aquí solo para el
- * resumen de texto de un diagnóstico ya guardado. */
-function etiquetaSuperficie(superficie: SuperficieDental, diente: number): string {
-  if (superficie === "oclusal" && esDienteAnterior(diente)) return "Incisal";
-  return SUPERFICIE_LABEL[superficie];
 }
 
 /** Quita del mapa de superficies cualquier diente con arreglo vacío, y

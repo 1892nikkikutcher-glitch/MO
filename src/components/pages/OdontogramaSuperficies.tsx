@@ -82,6 +82,7 @@ function SimboloDiente({
   colorActual,
   pintados,
   onToggleSuperficie,
+  soloLectura,
 }: {
   tooth: number;
   superficiesActivas: SuperficieDental[];
@@ -90,6 +91,7 @@ function SimboloDiente({
   colorActual: ColorOdontograma;
   pintados: PinturaOdontograma[];
   onToggleSuperficie: (superficie: SuperficieDental) => void;
+  soloLectura: boolean;
 }) {
   const anterior = esDienteAnterior(tooth);
   const mesialDerecha = ladoMesialDerecha(tooth);
@@ -113,7 +115,7 @@ function SimboloDiente({
       return { clase: "", style: { fill: `rgb(${colorOdontogramaInfo[colorActual].rgb} / 0.8)` } };
     }
     const guardada = pinturaDeSuperficie(pintados, tooth, superficie);
-    if (!guardada) return { clase: rellenoSuperficie(false) };
+    if (!guardada) return { clase: soloLectura ? "fill-surface" : rellenoSuperficie(false) };
     if (!guardada.color) return { clase: rellenoSuperficie(true) };
     return { clase: "", style: { fill: `rgb(${colorOdontogramaInfo[guardada.color].rgb} / 0.8)` } };
   };
@@ -133,7 +135,7 @@ function SimboloDiente({
             d={pathGajo(z.angulo)}
             onClick={() => onToggleSuperficie(z.superficie)}
             style={e.style}
-            className={`cursor-pointer transition-colors ${e.clase}`}
+            className={`${soloLectura ? "" : "cursor-pointer"} transition-colors ${e.clase}`}
           >
             <title>{z.titulo}</title>
           </path>
@@ -145,7 +147,7 @@ function SimboloDiente({
         r={R_INNER}
         onClick={() => onToggleSuperficie("oclusal")}
         style={circulo.style}
-        className={`cursor-pointer transition-colors ${circulo.clase}`}
+        className={`${soloLectura ? "" : "cursor-pointer"} transition-colors ${circulo.clase}`}
       >
         <title>{anterior === false ? "Oclusal" : "Incisal"}</title>
       </circle>
@@ -163,6 +165,7 @@ export default function OdontogramaSuperficies({
   colorActual = "rojo",
   onCambiarColor,
   pintados = [],
+  soloLectura = false,
   title = "Odontograma",
 }: {
   selectedTeeth: number[];
@@ -175,6 +178,9 @@ export default function OdontogramaSuperficies({
   onCambiarColor?: (color: ColorOdontograma) => void;
   /** Diagnósticos ya guardados, del más nuevo al más viejo, para pintarlos. */
   pintados?: PinturaOdontograma[];
+  /** Solo se mira (vista del colega con quien se comparte el expediente): no se puede marcar
+   * nada, no hay selector de color y en su lugar se muestra la leyenda de colores. */
+  soloLectura?: boolean;
   title?: string;
 }) {
   const celda = (tooth: number, columna: number, fila: number) => {
@@ -192,10 +198,11 @@ export default function OdontogramaSuperficies({
         <button
           type="button"
           onClick={() => onToggleTooth(tooth)}
+          disabled={soloLectura}
           style={estiloNumero}
           className={`rounded px-1 text-[10px] font-semibold transition-colors ${
-            seleccionado ? "bg-accent/20 text-accent" : colorGuardado ? "" : "text-ink/50 hover:text-ink"
-          }`}
+            seleccionado ? "bg-accent/20 text-accent" : colorGuardado ? "" : soloLectura ? "text-ink/50" : "text-ink/50 hover:text-ink"
+          } ${soloLectura ? "cursor-default" : ""}`}
         >
           {tooth}
         </button>
@@ -205,7 +212,10 @@ export default function OdontogramaSuperficies({
           dienteCompleto={seleccionado && (selectedSurfaces[tooth] ?? []).length === 0}
           colorActual={colorActual}
           pintados={pintados}
-          onToggleSuperficie={(s) => onToggleSurface(tooth, s)}
+          onToggleSuperficie={(s) => {
+            if (!soloLectura) onToggleSurface(tooth, s);
+          }}
+          soloLectura={soloLectura}
         />
       </div>
     );
@@ -215,7 +225,17 @@ export default function OdontogramaSuperficies({
     <div className="rounded-2xl border border-edge/10 bg-surface p-5">
       <div className="mb-4 flex flex-wrap items-center justify-between gap-2">
         {title && <h3 className="text-xs font-semibold uppercase tracking-wide text-ink/50">{title}</h3>}
-        {onCambiarColor && (
+        {soloLectura && (
+          <div className="flex flex-wrap items-center gap-3 text-[11px] text-ink/60">
+            {COLORES_ODONTOGRAMA.map((c) => (
+              <span key={c} className="flex items-center gap-1.5">
+                <span className="h-2.5 w-2.5 rounded-full" style={{ backgroundColor: `rgb(${colorOdontogramaInfo[c].rgb})` }} />
+                {colorOdontogramaInfo[c].etiqueta} · {colorOdontogramaInfo[c].significado}
+              </span>
+            ))}
+          </div>
+        )}
+        {!soloLectura && onCambiarColor && (
           <div className="flex flex-wrap items-center gap-2" role="radiogroup" aria-label="Color con el que se pinta">
             <span className="text-[11px] font-semibold text-ink/50">Pintar en:</span>
             {COLORES_ODONTOGRAMA.map((c) => {
@@ -240,9 +260,11 @@ export default function OdontogramaSuperficies({
             })}
           </div>
         )}
-        <p className="w-full text-[11px] text-ink/40 sm:w-auto">
-          Clic en el número = todo el diente · clic en una cara del símbolo = esa superficie
-        </p>
+        {!soloLectura && (
+          <p className="w-full text-[11px] text-ink/40 sm:w-auto">
+            Clic en el número = todo el diente · clic en una cara del símbolo = esa superficie
+          </p>
+        )}
       </div>
       <div className="grid grid-cols-1 gap-3 lg:grid-cols-2">
         {CUADRANTES.map((c) => {

@@ -22,6 +22,8 @@ import {
   historiaClinicaCompartible,
   notasCompartibles,
   odontogramaCompartible,
+  hallazgosOdontogramaCompartibles,
+  valoracionDientesCompartible,
   planCompartible,
   textoConsentimientoSecciones,
   type ExpedienteCompartido,
@@ -80,6 +82,7 @@ async function construirExpedienteCompartido(args: {
 
   if (secciones.includes("historia_clinica")) {
     expediente.historiaClinica = historiaClinicaCompartible(args.template, args.respuestas);
+    expediente.valoracionDientes = valoracionDientesCompartible(args.template, args.respuestas);
   }
   if (secciones.includes("diagnosticos_plan")) {
     expediente.diagnosticos = diagnosticosCompartibles(diagnosticos);
@@ -87,6 +90,7 @@ async function construirExpedienteCompartido(args: {
   }
   if (secciones.includes("odontograma")) {
     expediente.odontograma = odontogramaCompartible(args.template, args.respuestas);
+    expediente.odontogramaHallazgos = hallazgosOdontogramaCompartibles(args.template, args.respuestas);
   }
   if (secciones.includes("notas_evolucion")) {
     expediente.notas = notasCompartibles(await lista<NotaEvolucionAny>("notasEvolucion"), diagnosticos);

@@ -43,9 +43,15 @@ await paciente.collection("historiaClinica").doc("respuestas").set({
     dm: "No",
     hta: "Sí",
     od: [
-      { id: "d1", dientes: [36], diagnostico: "Caries clase II", fecha: "2026-10-01", estado: "confirmado" },
-      { id: "d2", dientes: [11], diagnostico: "Apiñamiento leve", fecha: "2026-10-01", estado: "confirmado" },
+      { id: "d1", dientes: [36], diagnostico: "Caries clase II", fecha: "2026-10-01", estado: "confirmado", color: "rojo", superficiesPorDiente: { 36: ["oclusal", "distal"] } },
+      { id: "d2", dientes: [11, 51], diagnostico: "Apiñamiento leve", fecha: "2026-10-01", estado: "confirmado", color: "azul" },
     ],
+    // Cuadro por diente (evaluación radiográfica y pronóstico); la plantilla vieja de arriba no lo trae,
+    // el servidor la adapta igual que la app.
+    p_valoracion_dientes: {
+      36: { proporcionCoronaRaiz: "1:2", porcentajeReabsorcion: "20%", tipoReabsorcion: "Horizontal", pronostico: "Reservado" },
+      11: { caries: "No", pronostico: "Bueno" },
+    },
   },
 });
 await paciente.collection("diagnosticos").doc("dx1").set({

@@ -95,3 +95,18 @@ export function ladoMesialDerecha(tooth: number): boolean | null {
   if (cuadrante === null) return null;
   return cuadrante === 1 || cuadrante === 4;
 }
+
+export const SUPERFICIE_LABEL: Record<SuperficieDental, string> = {
+  vestibular: "Vestibular",
+  lingual: "Lingual/Palatino",
+  mesial: "Mesial",
+  distal: "Distal",
+  oclusal: "Oclusal",
+};
+
+/** "Oclusal" en posteriores, "Incisal" en anteriores (ver esDienteAnterior) — misma
+ * distinción que hace el símbolo interactivo, para los resúmenes de texto. */
+export function etiquetaSuperficie(superficie: SuperficieDental, diente: number): string {
+  if (superficie === "oclusal" && esDienteAnterior(diente)) return "Incisal";
+  return SUPERFICIE_LABEL[superficie];
+}

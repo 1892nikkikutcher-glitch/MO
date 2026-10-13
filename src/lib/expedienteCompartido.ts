@@ -10,14 +10,21 @@
  * foto de perfil. */
 
 import {
+  COLORES_ODONTOGRAMA,
+  COLUMNAS_VALORACION_DIENTES,
+  DIENTES_VALORACION,
   claveDetalleSiNo,
+  conSeccionValoracionDientes,
   todosLosDiagnosticosOdontograma,
+  valorComoValoracionDientes,
+  type ColorOdontograma,
   type HistoriaClinicaTemplate,
   type RespuestasHistoriaClinica,
+  type ValoracionDientes,
 } from "./historiaClinica";
 import { generarNarrativa } from "./notaNarrativa";
 import { esNotaAdministrativa, esNotaV2, type DiagnosticoPaciente, type NotaEvolucionAny } from "./notasEvolucion";
-import { formatearDientes, ordenarDientes } from "./odontograma";
+import { SUPERFICIES_DENTALES, formatearDientes, ordenarDientes, type SuperficieDental } from "./odontograma";
 import { destinoPlanTratamientoLabel, prioridadTratamientoLabel, type PlanTratamientoItem } from "./planTratamiento";
 
 export const seccionesCompartibles = [
@@ -40,9 +47,9 @@ export const etiquetaSeccionCompartible: Record<SeccionCompartible, string> = {
 };
 
 export const descripcionSeccionCompartible: Record<SeccionCompartible, string> = {
-  historia_clinica: "Antecedentes y respuestas de la historia clínica (sin datos de contacto).",
+  historia_clinica: "Antecedentes y respuestas de la historia clínica, con la evaluación radiográfica y pronóstico (sin datos de contacto).",
   diagnosticos_plan: "Diagnósticos activos y tratamientos planeados, sin precios.",
-  odontograma: "Diagnósticos marcados en cada pieza dental.",
+  odontograma: "Diagnósticos marcados en cada pieza dental, pintados en rojo (por tratar) y azul (realizado).",
   notas_evolucion: "Las últimas 5 notas clínicas firmadas (no las administrativas).",
   fotos_radiografias: "Hasta 8 fotografías clínicas recientes (extraorales e intraorales). Nunca la INE ni la foto de perfil.",
   citas: "Citas pasadas y próximas de este paciente: fecha, hora, estatus y tratamiento. Sin costos ni comentarios.",
@@ -54,6 +61,14 @@ export const MAX_CITAS_COMPARTIDAS = 40;
 const MAX_TEXTO_NOTA = 3000;
 const MAX_FILAS = 120;
 
+export type HallazgoOdontogramaCompartido = {
+  dientes: number[];
+  /** Caras marcadas por diente; sin entrada = todo el diente. */
+  superficies?: Record<string, SuperficieDental[]>;
+  color?: ColorOdontograma;
+  diagnostico: string;
+};
+
 export type ExpedienteCompartido = {
   secciones: SeccionCompartible[];
   /** ISO — cuándo se tomó esta foto fija. */
@@ -62,6 +77,13 @@ export type ExpedienteCompartido = {
   diagnosticos?: { dientes: string; diagnostico: string; estado: string; tratamientoSugerido?: string }[];
   planTratamiento?: { dientes: string; tratamiento: string; prioridad: string; destino: string }[];
   odontograma?: { diente: number; diagnosticos: string[] }[];
+  /** Cada hallazgo del odontograma con sus caras y su color, para dibujarlo pintado como lo
+   * ve quien lo capturó. Ausente en fotos tomadas antes de este campo: ahí solo se ve la
+   * lista de `odontograma`. Del más nuevo al más viejo (si dos tocan la misma cara, gana el
+   * más reciente). */
+  odontogramaHallazgos?: HallazgoOdontogramaCompartido[];
+  /** Cuadro por diente (evaluación radiográfica y pronóstico) de la historia clínica. */
+  valoracionDientes?: ValoracionDientes;
   notas?: { fecha: string; medico: string; texto: string }[];
   citas?: { fecha: string; hora: string; estatus: string; tratamientos: string[] }[];
   /** Ids de los archivos de la interconsulta que son fotos compartidas. */
@@ -139,6 +161,62 @@ export function odontogramaCompartible(
     }
   }
   return ordenarDientes([...porDiente.keys()]).map((diente) => ({ diente, diagnosticos: porDiente.get(diente)! }));
+}
+
+/** Los hallazgos del odontograma tal como están pintados: dientes, caras y color. Misma
+ * regla que `odontogramaCompartible` (sin descartados ni sin diagnóstico), pero conserva
+ * las caras y el color. Todo se valida: nunca se copia un valor que no sea una cara, un
+ * color o un diente reales. */
+export function hallazgosOdontogramaCompartibles(
+  template: HistoriaClinicaTemplate,
+  respuestas: RespuestasHistoriaClinica
+): HallazgoOdontogramaCompartido[] {
+  const hallazgos: HallazgoOdontogramaCompartido[] = [];
+  for (const { diagnostico } of todosLosDiagnosticosOdontograma(template, respuestas)) {
+    if (diagnostico.estado === "descartado" || !diagnostico.diagnostico?.trim()) continue;
+    const dientes = ordenarDientes((diagnostico.dientes ?? []).filter((d) => Number.isInteger(d))).slice(0, 52);
+    if (dientes.length === 0) continue;
+    const superficies: Record<string, SuperficieDental[]> = {};
+    for (const d of dientes) {
+      const caras = (diagnostico.superficiesPorDiente?.[d] ?? []).filter((s): s is SuperficieDental =>
+        (SUPERFICIES_DENTALES as readonly string[]).includes(s)
+      );
+      if (caras.length > 0) superficies[String(d)] = Array.from(new Set(caras));
+    }
+    const color = (COLORES_ODONTOGRAMA as readonly string[]).includes(diagnostico.color ?? "") ? diagnostico.color : undefined;
+    hallazgos.push({
+      dientes,
+      ...(Object.keys(superficies).length > 0 ? { superficies } : {}),
+      ...(color ? { color } : {}),
+      diagnostico: diagnostico.diagnostico.trim().slice(0, 200),
+    });
+  }
+  return hallazgos.slice(0, MAX_FILAS);
+}
+
+/** El cuadro por diente de la historia clínica, solo con las celdas que tienen algo escrito
+ * (texto recortado). Vacío si la clínica no tiene ese cuadro o no hay nada capturado. */
+export function valoracionDientesCompartible(
+  template: HistoriaClinicaTemplate,
+  respuestas: RespuestasHistoriaClinica
+): ValoracionDientes {
+  const resultado: ValoracionDientes = {};
+  const plantilla = conSeccionValoracionDientes(template);
+  for (const seccion of plantilla.secciones) {
+    for (const pregunta of seccion.preguntas) {
+      if (pregunta.tipo !== "valoracionDientes") continue;
+      const valoracion = valorComoValoracionDientes(respuestas.porPregunta[pregunta.id]);
+      for (const diente of DIENTES_VALORACION) {
+        const fila = valoracion[String(diente)] ?? {};
+        for (const col of COLUMNAS_VALORACION_DIENTES) {
+          const texto = limpiarTexto(fila[col.id], 120);
+          if (!texto) continue;
+          resultado[String(diente)] = { ...(resultado[String(diente)] ?? {}), [col.id]: texto };
+        }
+      }
+    }
+  }
+  return resultado;
 }
 
 function fechaOrdenable(nota: NotaEvolucionAny): string {

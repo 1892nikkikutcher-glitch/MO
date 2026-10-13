@@ -7,6 +7,10 @@
  *    sala del caso — la foto fija tomada al enviar. */
 
 import { useMemo, useState } from "react";
+import OdontogramaSuperficies from "./OdontogramaSuperficies";
+import { ValoracionDientesLectura } from "./ValoracionPorDiente";
+import { colorOdontogramaInfo } from "@/lib/historiaClinica";
+import { etiquetaSuperficie } from "@/lib/odontograma";
 import {
   mesInicial,
   semanasDelMes,
@@ -287,6 +291,12 @@ export default function ExpedienteCompartidoVista({
         </Bloque>
       )}
 
+      {expediente.valoracionDientes && Object.keys(expediente.valoracionDientes).length > 0 && (
+        <Bloque titulo={`Evaluación radiográfica y pronóstico (${Object.keys(expediente.valoracionDientes).length} ${Object.keys(expediente.valoracionDientes).length === 1 ? "diente" : "dientes"})`}>
+          <ValoracionDientesLectura valor={expediente.valoracionDientes} />
+        </Bloque>
+      )}
+
       {expediente.diagnosticos && (
         <Bloque titulo={`Diagnósticos y plan de tratamiento (${expediente.diagnosticos.length} + ${expediente.planTratamiento?.length ?? 0})`}>
           {expediente.diagnosticos.length === 0 && <p className="text-ink/50">Sin diagnósticos registrados.</p>}
@@ -319,13 +329,63 @@ export default function ExpedienteCompartidoVista({
       {expediente.odontograma && (
         <Bloque titulo={`Odontograma (${expediente.odontograma.length} ${expediente.odontograma.length === 1 ? "pieza con hallazgos" : "piezas con hallazgos"})`}>
           {expediente.odontograma.length === 0 && <p className="text-ink/50">Sin hallazgos marcados.</p>}
-          <ul className="grid gap-x-6 gap-y-1 sm:grid-cols-2">
-            {expediente.odontograma.map((o) => (
-              <li key={o.diente}>
-                <span className="font-medium text-ink">OD {o.diente}</span>: {o.diagnosticos.join("; ")}
-              </li>
-            ))}
-          </ul>
+          {expediente.odontogramaHallazgos && expediente.odontograma.length > 0 && (
+            <div className="mb-3">
+              <OdontogramaSuperficies
+                selectedTeeth={[]}
+                selectedSurfaces={{}}
+                onToggleTooth={() => {}}
+                onToggleSurface={() => {}}
+                soloLectura
+                title=""
+                pintados={expediente.odontogramaHallazgos.map((h) => ({
+                  dientes: h.dientes,
+                  superficiesPorDiente: h.superficies,
+                  color: h.color,
+                }))}
+              />
+            </div>
+          )}
+          {expediente.odontogramaHallazgos ? (
+            <ul className="space-y-1">
+              {expediente.odontogramaHallazgos.map((h, i) => (
+                <li key={i}>
+                  {h.color && (
+                    <span
+                      aria-label={colorOdontogramaInfo[h.color].etiqueta}
+                      title={`${colorOdontogramaInfo[h.color].etiqueta}: ${colorOdontogramaInfo[h.color].significado}`}
+                      className="mr-1.5 inline-block h-2.5 w-2.5 rounded-full align-middle"
+                      style={{ backgroundColor: `rgb(${colorOdontogramaInfo[h.color].rgb})` }}
+                    />
+                  )}
+                  <span className="font-medium text-ink">
+                    OD{" "}
+                    {h.dientes.map((d, j) => {
+                      const caras = h.superficies?.[String(d)];
+                      return (
+                        <span key={d}>
+                          {j > 0 && ", "}
+                          {d}
+                          {caras && caras.length > 0 && (
+                            <span className="font-normal text-ink/60"> ({caras.map((s) => etiquetaSuperficie(s, d)).join(", ")})</span>
+                          )}
+                        </span>
+                      );
+                    })}
+                  </span>
+                  : {h.diagnostico}
+                </li>
+              ))}
+            </ul>
+          ) : (
+            <ul className="grid gap-x-6 gap-y-1 sm:grid-cols-2">
+              {expediente.odontograma.map((o) => (
+                <li key={o.diente}>
+                  <span className="font-medium text-ink">OD {o.diente}</span>: {o.diagnosticos.join("; ")}
+                </li>
+              ))}
+            </ul>
+          )}
         </Bloque>
       )}
 
