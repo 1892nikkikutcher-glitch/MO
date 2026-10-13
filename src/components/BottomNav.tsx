@@ -11,6 +11,7 @@
  * pantallas anchas (`lg:`). */
 
 import { useEffect, useRef, useState } from "react";
+import type { LadoNavegacion } from "@/lib/ladoNavegacion";
 import { MO_ES_GRATIS } from "@/lib/planesConfig";
 
 export const navItems = [
@@ -378,8 +379,11 @@ export default function BottomNav({
   fanAbierto,
   onFanAbiertoChange,
   insignias = {},
+  lado = "derecha",
 }: {
   active: string;
+  /** De qué lado de la pantalla va la barra en computadora (en celular no aplica). */
+  lado?: LadoNavegacion;
   onNavigate: (id: string) => void;
   /** Número rojo sobre un módulo (ej. casos de MO Conecta por atender). */
   insignias?: Record<string, number>;
@@ -555,7 +559,7 @@ export default function BottomNav({
 
       <nav
         aria-label="Navegación principal"
-        className="fixed right-2.5 top-1/2 z-40 hidden max-h-[62vh] w-[60px] -translate-y-1/2 flex-col rounded-[20px] border border-edge/10 bg-nav p-1.5 shadow-[0_12px_30px_-10px_rgba(0,0,0,0.6)] print:hidden lg:flex lg:max-h-[68vh] lg:w-[84px] lg:p-2"
+        className={`fixed ${lado === "izquierda" ? "left-2.5" : "right-2.5"} top-1/2 z-40 hidden max-h-[62vh] w-[60px] -translate-y-1/2 flex-col rounded-[20px] border border-edge/10 bg-nav p-1.5 shadow-[0_12px_30px_-10px_rgba(0,0,0,0.6)] print:hidden lg:flex lg:max-h-[68vh] lg:w-[84px] lg:p-2`}
       >
         <div className="pointer-events-none absolute inset-x-0 top-0 z-10 h-4 rounded-t-[20px] bg-gradient-to-b from-nav to-transparent" />
         <div
@@ -693,7 +697,7 @@ export default function BottomNav({
 
       {abierto && (
         <div
-          className="fixed inset-x-0 bottom-0 z-50 flex max-h-[65vh] flex-col rounded-t-2xl border-t border-edge/10 bg-modal-solid p-4 pb-6 lg:inset-x-auto lg:bottom-auto lg:left-auto lg:right-24 lg:top-1/2 lg:max-h-[80vh] lg:w-[420px] lg:max-w-[42vw] lg:-translate-y-1/2 lg:rounded-2xl lg:border"
+          className={`fixed inset-x-0 bottom-0 z-50 flex max-h-[65vh] flex-col rounded-t-2xl border-t border-edge/10 bg-modal-solid p-4 pb-6 lg:inset-x-auto lg:bottom-auto ${lado === "izquierda" ? "lg:left-24 lg:right-auto" : "lg:left-auto lg:right-24"} lg:top-1/2 lg:max-h-[80vh] lg:w-[420px] lg:max-w-[42vw] lg:-translate-y-1/2 lg:rounded-2xl lg:border`}
         >
           <div className="mx-auto mb-3 h-1 w-10 shrink-0 rounded-full bg-edge/20 lg:hidden" />
           <div className="mb-3 flex shrink-0 items-center gap-2 text-sm font-semibold text-ink">

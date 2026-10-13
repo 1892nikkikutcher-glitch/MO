@@ -1,6 +1,8 @@
 "use client";
 
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
+import { useLadoNavegacion } from "@/lib/useLadoNavegacion";
+import { ladoOpuesto } from "@/lib/ladoNavegacion";
 import { auth } from "@/lib/firebase";
 import BottomNav, { navItems } from "./BottomNav";
 import { categoriaSugerenciaOptions, DURACION_PRUEBA_DIAS, pruebaVencida, type CategoriaSugerencia } from "@/lib/patientData";
@@ -241,6 +243,16 @@ function SunIcon() {
         strokeLinecap="round"
         strokeLinejoin="round"
       />
+    </svg>
+  );
+}
+
+/** Ícono de "barra lateral": una ventana con el panel del lado en que está la barra. */
+function BarraLateralIcon({ lado }: { lado: "izquierda" | "derecha" }) {
+  return (
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" className="shrink-0">
+      <rect x="3.5" y="4.5" width="17" height="15" rx="2.5" stroke="currentColor" strokeWidth="1.8" />
+      <rect x={lado === "izquierda" ? "5.5" : "15.5"} y="6.5" width="3" height="11" rx="1" fill="currentColor" />
     </svg>
   );
 }
@@ -640,6 +652,8 @@ function DashboardBody({
   const { clinicInfo, suscripcion, membresiasDisponibles, seleccionarClinica } = usePatientData();
   const { casosRecibidos, uid: miUidConecta, novedades: novedadesConecta } = useMoConecta();
   const porAtenderConecta = casosPorAtender(casosRecibidos, miUidConecta).length + novedadesConecta.length;
+  // De qué lado va la barra lateral (solo computadora): preferencia de cada usuario.
+  const [ladoNav, setLadoNav] = useLadoNavegacion(miUidConecta);
   const { resuelto: temaResuelto, preferencia: temaPreferencia, setPreferencia: setTemaPreferencia } = useTheme();
   const isLight = temaResuelto === "light";
   const [mostrarSugerencia, setMostrarSugerencia] = useState(false);
@@ -777,6 +791,14 @@ function DashboardBody({
                   <MessageIcon />
                 </button>
                 <button
+                  onClick={() => setLadoNav(ladoOpuesto(ladoNav))}
+                  title={`Barra lateral a la ${ladoOpuesto(ladoNav)}`}
+                  aria-label={`Mover la barra lateral a la ${ladoOpuesto(ladoNav)}`}
+                  className="hidden h-9 w-9 shrink-0 items-center justify-center rounded-lg text-ink/60 transition-colors hover:bg-surface hover:text-ink lg:flex"
+                >
+                  <BarraLateralIcon lado={ladoNav} />
+                </button>
+                <button
                   onClick={() => setMostrarSelectorTema(true)}
                   title="Apariencia: Claro, Oscuro o Sistema"
                   className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg text-ink/60 transition-colors hover:bg-surface hover:text-ink"
@@ -808,7 +830,7 @@ function DashboardBody({
           )}
         </header>
 
-        <div className="px-3 py-6 sm:px-6 sm:py-8 lg:pr-28">
+        <div className={`px-3 py-6 sm:px-6 sm:py-8 ${ladoNav === "izquierda" ? "lg:pl-28" : "lg:pr-28"}`}>
           <h1 className="mb-6 text-2xl font-semibold print:hidden">
             {activePage === "inicio" ? "Dashboard Principal" : activeLabel}
           </h1>
@@ -875,6 +897,7 @@ function DashboardBody({
         fanAbierto={fanAbierto}
         onFanAbiertoChange={setFanAbierto}
         insignias={{ "mo-conecta": porAtenderConecta }}
+        lado={ladoNav}
       />
 
       {showRegistrarPago && (
