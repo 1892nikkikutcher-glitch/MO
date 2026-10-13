@@ -82,6 +82,7 @@ import { presupuestoGastosInicial, type Gasto, type PresupuestoGastosConfig } fr
 import { migrarIdentidadDoctor } from "@/lib/migracionIdentidadDoctor";
 import { estamparNuevos } from "@/lib/autoriaRegistros";
 import { aplicarMovimientosAPagos, controlesPorError, type PropuestaControl } from "@/lib/controlesPorError";
+import { construirFinanzasDesdePagos, type ResultadoRecalculo } from "@/lib/finanzasRecalculo";
 import {
   archivarYEliminar,
   marcarEntradaRestaurada,
@@ -779,6 +780,14 @@ type PatientDataContextValue = {
     duplicados: PosibleDuplicado[];
     controles: PropuestaControl[];
   }>;
+  /** Lee los pagos reales de todos los expedientes y arma el resumen de cobros que
+   * debería existir, SIN guardar nada: devuelve lo guardado y lo reconstruido para
+   * compararlos (ver FondosFinancieros → "Revisar contra los pagos reales"). */
+  revisarFinanzasContraPagos: (
+    onProgreso?: (hechos: number, total: number) => void
+  ) => Promise<ResultadoRecalculo & { actual: FinanzasConfig }>;
+  /** Guarda el resumen reconstruido (reemplaza las cifras por fecha del resumen). */
+  aplicarFinanzasRecalculadas: (nuevo: FinanzasConfig) => Promise<void>;
   /** Quita (a la Papelera) presupuestos generados por citas que no se atendieron
    * y que nadie ha pagado — corrige saldos inflados. Devuelve cuántos quitó. */
   quitarPresupuestosDeCitasNoAtendidas: (items: PresupuestoDeCitaNoAtendida[]) => Promise<number>;
@@ -2171,6 +2180,28 @@ export function PatientDataProvider({
     return candidatos;
   };
 
+  const revisarFinanzasContraPagos = async (onProgreso?: (hechos: number, total: number) => void) => {
+    if (!clinicUid) throw new Error("Sin clínica activa.");
+    const lista = patients.filter((p) => !p.fusionadoEnId);
+    const pagos: Pago[] = [];
+    let hechos = 0;
+    const concurrencia = 8;
+    for (let i = 0; i < lista.length; i += concurrencia) {
+      const grupo = lista.slice(i, i + concurrencia);
+      const leidos = await Promise.all(grupo.map((p) => leerSubcoleccion<Pago>(p.id, "pagos")));
+      leidos.forEach((l) => pagos.push(...l));
+      hechos += grupo.length;
+      onProgreso?.(hechos, lista.length);
+    }
+    return { ...construirFinanzasDesdePagos(pagos, finanzas), actual: finanzas };
+  };
+
+  const aplicarFinanzasRecalculadas = async (nuevo: FinanzasConfig) => {
+    if (!clinicUid) throw new Error("Sin clínica activa.");
+    // Sin merge: reemplaza el documento completo, así también se quitan fechas que sobraban.
+    await setDoc(doc(db, `users/${clinicUid}/config/finanzas`), nuevo);
+  };
+
   const quitarPresupuestosDeCitasNoAtendidas = async (items: PresupuestoDeCitaNoAtendida[]) => {
     const citasPorId = new Map<string, CitaMinima>(citas.map((c) => [c.id, c]));
     const porPaciente = new Map<string, Set<string>>();
@@ -3075,6 +3106,8 @@ export function PatientDataProvider({
         recalcularSaldosPendientes,
         quitarPresupuestosDeCitasNoAtendidas,
         unirPresupuestoDuplicado,
+        revisarFinanzasContraPagos,
+        aplicarFinanzasRecalculadas,
         corregirControlPorError,
         limpiarPresupuestoDeCita,
         restaurarDePapelera,

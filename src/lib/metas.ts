@@ -141,9 +141,26 @@ export function inicioMes(hoy: Date): Date {
 /** Los pagos guardan `fecha` como texto "DD/MM/YYYY" (formato de despliegue
  * es-MX), no ISO — hay que convertirlo antes de usarlo como llave de fecha. */
 export function fechaPagoAIso(fechaDisplay: string): string | null {
-  const m = fechaDisplay.match(/^(\d{2})\/(\d{2})\/(\d{4})$/);
-  if (!m) return null;
-  return `${m[3]}-${m[2]}-${m[1]}`;
+  const texto = (fechaDisplay ?? "").trim();
+  // dd/mm/aaaa (el formato de siempre), también d/m/aaaa o con guiones.
+  let anio: string;
+  let mes: string;
+  let dia: string;
+  let m = texto.match(/^(\d{1,2})[/-](\d{1,2})[/-](\d{4})$/);
+  if (m) {
+    [, dia, mes, anio] = m;
+  } else {
+    // ISO aaaa-mm-dd (con o sin hora): pagos importados o escritos por otro sistema.
+    m = texto.match(/^(\d{4})-(\d{2})-(\d{2})(?:[T ].*)?$/);
+    if (!m) return null;
+    [, anio, mes, dia] = m;
+  }
+  const d = Number(dia);
+  const mm = Number(mes);
+  const fecha = new Date(Number(anio), mm - 1, d);
+  // Rechaza fechas que no existen (31/02) en vez de correrlas al mes siguiente.
+  if (fecha.getFullYear() !== Number(anio) || fecha.getMonth() !== mm - 1 || fecha.getDate() !== d) return null;
+  return `${anio}-${String(mm).padStart(2, "0")}-${String(d).padStart(2, "0")}`;
 }
 
 export function sumarRango(porFecha: Record<string, number>, desde: Date, hasta: Date): number {

@@ -1,9 +1,11 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { usePatientData } from "@/context/PatientDataContext";
 import { usePrivacidad } from "@/context/PrivacidadContext";
 import { formatCurrency } from "@/lib/patientData";
+import { cobradoEnRango, cobradoTotal, type ResultadoRecalculo } from "@/lib/finanzasRecalculo";
+import type { FinanzasConfig } from "@/lib/metas";
 import {
   GRUPOS_EFECTIVO,
   GRUPOS_ELECTRONICO,
@@ -102,6 +104,131 @@ function CanalFondos({
   );
 }
 
+/** "¿No cuadra?": compara el resumen de cobros guardado contra los pagos reales
+ * de todos los expedientes y, si hay diferencia, permite corregir el resumen. */
+function RevisarContraPagos({
+  desde,
+  hasta,
+  periodo,
+  onClose,
+}: {
+  desde: Date;
+  hasta: Date;
+  periodo: string;
+  onClose: () => void;
+}) {
+  const { revisarFinanzasContraPagos, aplicarFinanzasRecalculadas } = usePatientData();
+  const [progreso, setProgreso] = useState<{ hechos: number; total: number } | null>(null);
+  const [resultado, setResultado] = useState<(ResultadoRecalculo & { actual: FinanzasConfig }) | null>(null);
+  const [error, setError] = useState("");
+  const [aplicando, setAplicando] = useState(false);
+  const [aplicado, setAplicado] = useState(false);
+  const iniciado = useRef(false);
+
+  useEffect(() => {
+    if (iniciado.current) return;
+    iniciado.current = true;
+    revisarFinanzasContraPagos((hechos, total) => setProgreso({ hechos, total }))
+      .then(setResultado)
+      .catch((e) => {
+        console.error("No se pudo revisar el resumen de cobros", e);
+        setError("No se pudo revisar. Revisa tu conexión e intenta de nuevo.");
+      });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  const guardadoPeriodo = resultado ? cobradoEnRango(resultado.actual, desde, hasta) : 0;
+  const realPeriodo = resultado ? cobradoEnRango(resultado.nuevo, desde, hasta) : 0;
+  const guardadoTotal = resultado ? cobradoTotal(resultado.actual) : 0;
+  const realTotal = resultado ? cobradoTotal(resultado.nuevo) : 0;
+  const cuadra = resultado ? JSON.stringify(resultado.actual.porFechaYFormaPago ?? {}) === JSON.stringify(resultado.nuevo.porFechaYFormaPago) && guardadoTotal === realTotal : false;
+
+  async function corregir() {
+    if (!resultado) return;
+    if (!window.confirm("Se reemplazarán las cifras del resumen de cobros por las de los pagos reales. El dinero de los pagos no cambia. ¿Continuar?")) return;
+    setAplicando(true);
+    try {
+      await aplicarFinanzasRecalculadas(resultado.nuevo);
+      setAplicado(true);
+    } catch (e) {
+      console.error(e);
+      setError("No se pudo guardar. Intenta de nuevo.");
+    } finally {
+      setAplicando(false);
+    }
+  }
+
+  const fila = (titulo: string, guardado: number, real: number) => (
+    <div className="grid grid-cols-3 gap-2 border-b border-edge/5 py-2 text-sm last:border-0">
+      <span className="text-ink/70">{titulo}</span>
+      <span className="text-right text-ink">{formatCurrency(guardado)}</span>
+      <span className={`text-right font-semibold ${guardado === real ? "text-ink" : "text-warning"}`}>{formatCurrency(real)}</span>
+    </div>
+  );
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4">
+      <div className="max-h-[90vh] w-full max-w-md overflow-y-auto rounded-2xl border border-edge/10 bg-modal p-6">
+        <h3 className="mb-1 text-base font-semibold text-ink">Revisar contra los pagos reales</h3>
+        <p className="mb-4 text-xs text-ink/50">
+          Este cuadro suma los cobros que se fueron guardando al registrar cada pago. Aquí se compara contra lo que de
+          verdad hay en los pagos de todos los expedientes.
+        </p>
+
+        {error && <p className="mb-3 text-sm text-danger">{error}</p>}
+        {!resultado && !error && (
+          <p className="text-sm text-ink/60">
+            Revisando los pagos… {progreso ? `${progreso.hechos} de ${progreso.total} expedientes` : ""}
+          </p>
+        )}
+
+        {resultado && (
+          <>
+            <div className="grid grid-cols-3 gap-2 border-b border-edge/10 pb-1 text-[11px] font-semibold uppercase tracking-wide text-ink/40">
+              <span />
+              <span className="text-right">Resumen guardado</span>
+              <span className="text-right">Pagos reales</span>
+            </div>
+            {fila(periodo, guardadoPeriodo, realPeriodo)}
+            {fila("Todo el historial", guardadoTotal, realTotal)}
+            <p className="mt-3 text-xs text-ink/50">
+              Se leyeron {resultado.pagosLeidos} pagos.
+              {resultado.sinFechaValida > 0 &&
+                ` ${resultado.sinFechaValida} tienen una fecha que MO no entiende y no entran en ningún periodo; revísalos en el expediente del paciente.`}
+            </p>
+
+            {aplicado ? (
+              <p className="mt-4 text-sm text-success">Listo: el resumen ya coincide con los pagos reales.</p>
+            ) : cuadra ? (
+              <p className="mt-4 text-sm text-success">Todo cuadra: el resumen coincide con los pagos reales.</p>
+            ) : (
+              <div className="mt-4 rounded-lg border border-warning/30 bg-warning/10 p-3 text-sm text-ink/80">
+                <p>
+                  El resumen no coincide con los pagos reales (diferencia en el historial: {formatCurrency(realTotal - guardadoTotal)}).
+                  Si los pagos están bien, corrige el resumen.
+                </p>
+                <button
+                  onClick={corregir}
+                  disabled={aplicando}
+                  className="mt-2 rounded-lg bg-accent px-4 py-2 text-sm font-semibold text-black transition-opacity hover:opacity-90 disabled:opacity-50"
+                >
+                  {aplicando ? "Corrigiendo…" : "Corregir el resumen"}
+                </button>
+              </div>
+            )}
+          </>
+        )}
+
+        <div className="mt-5 flex justify-end">
+          <button onClick={onClose} className="rounded-lg border border-edge/10 bg-surface px-4 py-2 text-sm text-ink/70 hover:text-ink">
+            Cerrar
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 /** Regla de sobres del consultorio: separa lo que entra por Efectivo de lo
  * que entra Electrónico (tarjeta/transferencia/cheque) y reparte cada
  * canal entre fondos fijos, en pesos reales de la vista elegida (Quincena
@@ -119,6 +246,7 @@ export default function FondosFinancieros() {
   // de vista (Día/Semana/...) siempre vuelve al periodo actual de ese tipo
   // — mismo criterio que el selector de periodo del Dashboard Principal.
   const [ancla, setAncla] = useState<Date>(() => new Date());
+  const [revisando, setRevisando] = useState(false);
 
   if (!puedeVerFinanzas) return null;
 
@@ -174,7 +302,10 @@ export default function FondosFinancieros() {
           ‹
         </button>
         <span className="min-w-0 flex-1 text-xs text-ink/40">
-          Reparto fijo de {rangoActivo.label} entre fondos, según cómo pagó el paciente.
+          Reparto fijo de {rangoActivo.label} entre fondos, según cómo pagó el paciente.{" "}
+          <button onClick={() => setRevisando(true)} className="text-accent hover:underline">
+            ¿No cuadra? Revisar contra los pagos reales
+          </button>
         </span>
         <button
           onClick={() => setAncla((prev) => navegarVistaFondos(vista, prev, 1))}
@@ -199,6 +330,10 @@ export default function FondosFinancieros() {
             : `Electrónico ${formatCurrency(ingresos.electronico)} + Efectivo ${formatCurrency(ingresos.efectivo)}`}
         </span>
       </div>
+
+      {revisando && (
+        <RevisarContraPagos desde={rangoActivo.desde} hasta={rangoActivo.hasta} periodo={rangoActivo.label} onClose={() => setRevisando(false)} />
+      )}
 
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
         <CanalFondos
