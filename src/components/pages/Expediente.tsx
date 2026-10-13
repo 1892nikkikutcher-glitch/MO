@@ -2,6 +2,7 @@
 
 import { useEffect, useLayoutEffect, useRef, useState, type Dispatch, type SetStateAction } from "react";
 import NuevoPresupuesto from "./NuevoPresupuesto";
+import PropuestaDesdeOdontograma from "./PropuestaDesdeOdontograma";
 import PresupuestoImpreso from "./PresupuestoImpreso";
 import PresupuestoTotalImpreso from "./PresupuestoTotalImpreso";
 import NuevaComparativaRehabilitacion from "./NuevaComparativaRehabilitacion";
@@ -241,6 +242,7 @@ function PresupuestosTab({
   planTratamientoSugerido,
   prefillPresupuesto,
   onConsumirPrefillPresupuesto,
+  onCargarPrefill,
 }: {
   patient: Patient;
   presupuestos: SavedBudget[];
@@ -248,6 +250,8 @@ function PresupuestosTab({
   planTratamientoSugerido: string;
   prefillPresupuesto: PresupuestoPrefillItem[] | null;
   onConsumirPrefillPresupuesto: () => void;
+  /** Abre Nuevo Presupuesto con estos renglones ya cargados (ver PropuestaDesdeOdontograma). */
+  onCargarPrefill: (items: PresupuestoPrefillItem[]) => void;
 }) {
   const {
     perfilDoctor,
@@ -576,6 +580,8 @@ function PresupuestosTab({
           </button>
         </div>
       </div>
+
+      <PropuestaDesdeOdontograma patientId={patient.id} onCrearPresupuesto={onCargarPrefill} />
 
       {presupuestos.length === 0 ? (
         <div className="rounded-2xl border border-dashed border-edge/15 bg-surface p-10 text-center text-sm text-ink/40">
@@ -1491,6 +1497,7 @@ export default function Expediente({
               planTratamientoSugerido={planTratamientoSugerido}
               prefillPresupuesto={prefillPresupuesto}
               onConsumirPrefillPresupuesto={() => setPrefillPresupuesto(null)}
+              onCargarPrefill={(items) => setPrefillPresupuesto(items)}
             />
           )}
           {activeTab === "Datos del Paciente" && (
