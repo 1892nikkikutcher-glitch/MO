@@ -8,9 +8,11 @@ import {
   GRUPOS_EFECTIVO,
   GRUPOS_ELECTRONICO,
   calcularAsignacionFondos,
+  etiquetaTotalFondos,
   navegarVistaFondos,
   rangoVistaFondos,
   sumarRangoPorFormaPago,
+  totalCobrado,
   type GrupoConMonto,
   type VistaFondos,
 } from "@/lib/fondosFinancieros";
@@ -182,6 +184,20 @@ export default function FondosFinancieros() {
         >
           ›
         </button>
+      </div>
+
+      <div className="mb-4 flex flex-col items-center rounded-xl border border-accent/30 bg-accent/10 px-4 py-3 text-center">
+        <span className="text-[11px] font-semibold uppercase tracking-wide text-ink/60">
+          {etiquetaTotalFondos(vista)} · {rangoActivo.label}
+        </span>
+        <span className={`text-3xl font-bold text-ink ${oculto ? "blur-[8px] select-none" : ""}`}>
+          {oculto ? "••••••" : formatCurrency(totalCobrado(ingresos))}
+        </span>
+        <span className={`text-xs text-ink/50 ${oculto ? "blur-[6px] select-none" : ""}`}>
+          {oculto
+            ? "••••••"
+            : `Electrónico ${formatCurrency(ingresos.electronico)} + Efectivo ${formatCurrency(ingresos.efectivo)}`}
+        </span>
       </div>
 
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">

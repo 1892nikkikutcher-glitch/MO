@@ -82,6 +82,27 @@ export function sumarRangoPorFormaPago(
 
 export type VistaFondos = "dia" | "semana" | "quincena1" | "quincena2" | "mes";
 
+/** Total que llevamos en el periodo: todo lo cobrado, sea efectivo o electrónico. */
+export function totalCobrado(ingresos: { efectivo: number; electronico: number }): number {
+  return redondearDinero(ingresos.efectivo + ingresos.electronico);
+}
+
+/** Título del total según la vista elegida (día, semana, quincena o mes). */
+export function etiquetaTotalFondos(vista: VistaFondos): string {
+  switch (vista) {
+    case "dia":
+      return "Total del día";
+    case "semana":
+      return "Total de la semana";
+    case "quincena1":
+      return "Total de la quincena 1–15";
+    case "quincena2":
+      return "Total de la quincena 16–fin";
+    case "mes":
+      return "Total del mes";
+  }
+}
+
 export type RangoFondos = { desde: Date; hasta: Date; label: string };
 
 /** Mismo estilo breve que ya usan quincena/mes (sin "de", sin año) — a

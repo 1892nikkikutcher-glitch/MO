@@ -3,9 +3,11 @@ import {
   GRUPOS_EFECTIVO,
   GRUPOS_ELECTRONICO,
   calcularAsignacionFondos,
+  etiquetaTotalFondos,
   navegarVistaFondos,
   rangoVistaFondos,
   sumarRangoPorFormaPago,
+  totalCobrado,
 } from "../fondosFinancieros";
 import { inicioSemana } from "../metas";
 import { MESES_ABR } from "../agendaHelpers";
@@ -236,5 +238,19 @@ describe("navegarVistaFondos", () => {
     const unMesAtras = navegarVistaFondos("mes", hoy, -1);
     const devuelta = navegarVistaFondos("mes", unMesAtras, 1);
     expect(rangoVistaFondos("mes", devuelta, hoy).label).toBe(rangoVistaFondos("mes", hoy, hoy).label);
+  });
+});
+
+describe("total del periodo", () => {
+  it("suma efectivo y electrónico sin errores de centavos", () => {
+    expect(totalCobrado({ efectivo: 23000, electronico: 14110 })).toBe(37110);
+    expect(totalCobrado({ efectivo: 0.1, electronico: 0.2 })).toBe(0.3);
+  });
+  it("el título sigue la vista elegida", () => {
+    expect(etiquetaTotalFondos("dia")).toBe("Total del día");
+    expect(etiquetaTotalFondos("semana")).toBe("Total de la semana");
+    expect(etiquetaTotalFondos("quincena1")).toBe("Total de la quincena 1–15");
+    expect(etiquetaTotalFondos("quincena2")).toBe("Total de la quincena 16–fin");
+    expect(etiquetaTotalFondos("mes")).toBe("Total del mes");
   });
 });
