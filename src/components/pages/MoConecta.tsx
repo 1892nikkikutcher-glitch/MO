@@ -20,6 +20,7 @@ import {
   type TipoInterconsulta,
 } from "@/lib/moConecta";
 import {
+  compartirExpedienteApi,
   crearInterconsultaApi,
   crearInvitacionApi,
   crearMensajeApi,
@@ -47,6 +48,8 @@ import type { SolicitudAcceso } from "@/lib/invitacionesConecta";
 import { colegaDelCaso } from "@/lib/colegaDelCaso";
 import ExpedienteCompartidoVista, { ElegirQueCompartirRapido } from "./ExpedienteCompartidoVista";
 import CompartirExpedientePanel from "./CompartirExpedientePanel";
+import EtiquetaCompartirCaso from "./EtiquetaCompartirCaso";
+import { estadoCompartirDelCaso } from "@/lib/compartirExpedienteEstado";
 import { CalendariosCompartidosTab } from "./CalendariosCompartidos";
 import AvisoAlColega from "./AvisoAlColega";
 import SelectorPacientes from "./SelectorPacientes";
@@ -471,6 +474,7 @@ function ResumenTab({
                       {nombreYEspecialidad(c.resumenPaciente.nombre, c.especialidadSolicitada)}
                     </p>
                     {c.motivo && <p className="truncate text-xs text-ink/50">{c.motivo}</p>}
+                <EtiquetaCompartirCaso caso={c} />
                   </div>
                   <EstadoBadge estado={c.estado} />
                 </button>
@@ -1727,6 +1731,7 @@ function CasosTab({
                   {nombreYEspecialidad(c.resumenPaciente.nombre, c.especialidadSolicitada)}
                 </p>
                 {c.motivo && <p className="truncate text-xs text-ink/50">{c.motivo}</p>}
+                <EtiquetaCompartirCaso caso={c} />
                 {(() => {
                   const colega = colegaDelCaso(c, uid, directorio, invitaciones[c.id]);
                   return (
@@ -1793,6 +1798,13 @@ function SalaDelCaso({ interconsulta, onVolver }: { interconsulta: Interconsulta
     try {
       await transicionarEstadoApi(interconsulta.id, siguiente, notaTransicion || undefined);
       setNotaTransicion("");
+      // Al terminar el caso, lo compartido ya no hace falta: se pregunta antes de dejarlo abierto.
+      const sigueCompartiendo = estadoCompartirDelCaso(interconsulta);
+      if (esRemitente && (siguiente === "closed" || siguiente === "cancelled") && (sigueCompartiendo === "vivo" || sigueCompartiendo === "foto_fija")) {
+        if (window.confirm("El caso terminó. ¿Dejar de compartir el expediente del paciente con tu colega?\n\nDejará de verlo y se borran las copias de fotos que compartiste.")) {
+          await compartirExpedienteApi(interconsulta.id, { activo: false });
+        }
+      }
     } catch (err) {
       setError(err instanceof Error ? err.message : "No se pudo cambiar el estado.");
     }

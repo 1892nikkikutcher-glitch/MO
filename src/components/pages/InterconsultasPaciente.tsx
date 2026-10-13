@@ -19,6 +19,7 @@
  * inerte, sin ningún dato real todavía). */
 
 import { useMoConecta } from "@/context/MoConectaContext";
+import EtiquetaCompartirCaso from "./EtiquetaCompartirCaso";
 import { colegaDelCaso } from "@/lib/colegaDelCaso";
 import { useInvitacionesDeCasos } from "@/lib/useInvitacionesDeCasos";
 import { EstadoBadge, nombreYEspecialidad } from "./MoConecta";
@@ -123,6 +124,7 @@ export default function InterconsultasPaciente({
                 </p>
                 {colega.detalle && <p className="truncate text-xs text-ink/60">{colega.detalle}</p>}
                 <p className="truncate text-xs text-ink/50">{nombreYEspecialidad(c.motivo || "Sin motivo", c.especialidadSolicitada)}</p>
+                <EtiquetaCompartirCaso caso={c} />
               </div>
               <EstadoBadge estado={c.estado} />
             </button>

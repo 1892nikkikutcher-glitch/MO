@@ -3,6 +3,7 @@
 import { useEffect, useLayoutEffect, useRef, useState, type Dispatch, type SetStateAction } from "react";
 import NuevoPresupuesto from "./NuevoPresupuesto";
 import PropuestaDesdeOdontograma from "./PropuestaDesdeOdontograma";
+import ExpedienteCompartiendoAviso from "./ExpedienteCompartiendoAviso";
 import PresupuestoImpreso from "./PresupuestoImpreso";
 import PresupuestoTotalImpreso from "./PresupuestoTotalImpreso";
 import NuevaComparativaRehabilitacion from "./NuevaComparativaRehabilitacion";
@@ -1406,6 +1407,14 @@ export default function Expediente({
             : "Sin paciente siguiente en la agenda de esta semana"} →
         </span>
       </div>
+
+      <ExpedienteCompartiendoAviso
+        patientId={patient.id}
+        onAbrirCaso={(interconsultaId) => {
+          verInterconsulta(interconsultaId, { patientId: patient.id, patientName: patient.name });
+          irAPagina("mo-conecta");
+        }}
+      />
 
       {patientAlergias && !esNegacionAlergia(patientAlergias) && (
         <div className="flex items-start gap-3 rounded-2xl border border-danger bg-danger/15 p-4 text-sm text-danger print:hidden">
