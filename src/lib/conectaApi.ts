@@ -220,6 +220,28 @@ export function compartirCalendarioApi(body: { clinicaId: string; recursoId: str
   return llamarApi("/api/conecta/calendarios", { method: "POST", body: JSON.stringify(body) });
 }
 
+export function invitarACalendarioApi(body: {
+  clinicaId: string;
+  recursoId: string;
+  destinatarioNombre?: string;
+  destinatarioCorreo?: string;
+}): Promise<{ calendario: CalendarioCompartidoDoc; enlace: string }> {
+  return llamarApi("/api/conecta/calendarios/invitar", { method: "POST", body: JSON.stringify(body) });
+}
+
+export function calendarioInvitacionPublicaApi(token: string) {
+  return fetch(`/api/conecta/calendarios/invitacion/${token}`).then(async (res) => {
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(data.error || "Invitación no encontrada.");
+    return data;
+  });
+}
+
+export async function reclamarCalendarioApi(token: string) {
+  await renovarSesion();
+  return llamarApi(`/api/conecta/calendarios/invitacion/${token}/reclamar`, { method: "POST" });
+}
+
 export function dejarDeCompartirCalendarioApi(id: string) {
   return llamarApi(`/api/conecta/calendarios/${id}`, { method: "DELETE" });
 }
@@ -236,7 +258,20 @@ export function obtenerInvitacionPublicaApi(token: string) {
   });
 }
 
-export function reclamarInvitacionApi(token: string) {
+/** Al verificar el correo, el ID token que el navegador ya tiene sigue diciendo
+ * "correo sin verificar" hasta que se renueva (dura 1 hora): sin esto el
+ * servidor rechazaba a quien acababa de verificar. Se renueva antes de reclamar. */
+async function renovarSesion() {
+  try {
+    await auth.currentUser?.reload();
+    await auth.currentUser?.getIdToken(true);
+  } catch {
+    // Si no se puede renovar, la llamada siguiente dirá qué falta.
+  }
+}
+
+export async function reclamarInvitacionApi(token: string) {
+  await renovarSesion();
   return llamarApi(`/api/conecta/invitaciones/${token}/reclamar`, { method: "POST" });
 }
 

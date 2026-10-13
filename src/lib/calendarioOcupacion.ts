@@ -11,11 +11,18 @@ export type CalendarioCompartidoDoc = {
   recursoNombre: string;
   remitenteUid: string;
   remitenteNombre: string;
+  /** Vacío mientras la invitación está pendiente (el colega aún no la acepta). */
   destinatarioUid: string;
   destinatarioNombre: string;
-  estado: "activo" | "revocado";
+  /** "pendiente": se invitó por enlace a alguien sin cuenta en MO. */
+  estado: "pendiente" | "activo" | "revocado";
   creadoEl: string;
   revocadoEl?: string;
+  /** Solo en pendientes. Nunca sale del servidor (ver listarCalendarios). */
+  tokenHash?: string;
+  venceEl?: string;
+  destinatarioCorreoNormalizado?: string;
+  aceptadoEl?: string;
 };
 
 export type OcupacionDeCalendario = {

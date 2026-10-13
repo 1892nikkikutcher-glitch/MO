@@ -16,7 +16,15 @@ vi.mock("../../firebaseAdmin", async () => {
 });
 
 import { dbAdmin } from "../../firebaseAdmin";
-import { compartirCalendario, dejarDeCompartirCalendario, listarCalendarios, ocupacionDeCalendario } from "../../conectaCalendarios";
+import {
+  compartirCalendario,
+  dejarDeCompartirCalendario,
+  invitarACalendario,
+  listarCalendarios,
+  obtenerInvitacionCalendarioPublica,
+  ocupacionDeCalendario,
+  reclamarInvitacionCalendario,
+} from "../../conectaCalendarios";
 
 const CLINICA = "clinica-cal-prueba";
 const COLEGA = "uid-colega-cal";
@@ -38,6 +46,9 @@ afterAll(async () => {
   await dbAdmin.recursiveDelete(base());
   const compartidos = await dbAdmin.collection("calendariosCompartidos").where("clinicaId", "==", CLINICA).get();
   await Promise.all(compartidos.docs.map((d) => d.ref.delete()));
+  for (const k of [`calendario_compartir_${CLINICA}`, `calendario_invitar_${CLINICA}`, "calendario_reclamar_uid-nuevo", "calendario_reclamar_uid-otro", "calendario_reclamar_uid-sin-correo"]) {
+    await dbAdmin.collection("rateLimitsConecta").doc(k).delete();
+  }
   await dbAdmin.collection("perfilesProfesionalesPublicos").doc(COLEGA).delete();
   await dbAdmin.collection("perfilesProfesionalesPublicos").doc(CLINICA).delete();
 });
@@ -85,5 +96,65 @@ describe("calendario compartido (servidor + emulador)", () => {
     await expect(compartirCalendario(CLINICA, { clinicaId: CLINICA, recursoId: "no-existe", destinatarioUid: COLEGA })).rejects.toMatchObject({ status: 404 });
     await expect(compartirCalendario(CLINICA, { clinicaId: CLINICA, recursoId: "r1", destinatarioUid: CLINICA })).rejects.toMatchObject({ status: 400 });
     await expect(compartirCalendario(EXTRANO, { clinicaId: CLINICA, recursoId: "r1", destinatarioUid: COLEGA })).rejects.toMatchObject({ status: 403 });
+  });
+});
+
+describe("invitar a un calendario por enlace (colega sin cuenta en MO)", () => {
+  it("la invitación pendiente no da acceso hasta que se acepta con el correo correcto, y se usa una sola vez", async () => {
+    const { calendario, tokenCrudo } = await invitarACalendario(CLINICA, {
+      clinicaId: CLINICA,
+      recursoId: "r1",
+      destinatarioNombre: "Nuevo Colega",
+      destinatarioCorreo: " Nuevo@Mail.com ",
+    });
+    expect(calendario.estado).toBe("pendiente");
+    expect(JSON.stringify(calendario)).not.toContain("tokenHash");
+    expect(JSON.stringify(calendario)).not.toContain(tokenCrudo);
+
+    // Pública: solo datos genéricos.
+    const publica = await obtenerInvitacionCalendarioPublica(tokenCrudo);
+    expect(publica).toMatchObject({ estado: "disponible", recursoNombre: "Dra. Prueba", remitenteNombre: "Dueña Clínica" });
+    expect(JSON.stringify(publica)).not.toContain("nuevo@mail.com");
+
+    // Pendiente: nadie ve horarios todavía.
+    await expect(ocupacionDeCalendario("uid-nuevo", calendario.id, "2026-10-05", "2026-10-11")).rejects.toMatchObject({ status: 410 });
+
+    // Correo sin verificar, o de otra persona: no.
+    await expect(reclamarInvitacionCalendario("uid-nuevo", "nuevo@mail.com", false, tokenCrudo)).rejects.toMatchObject({ status: 403 });
+    await expect(reclamarInvitacionCalendario("uid-otro", "otro@mail.com", true, tokenCrudo)).rejects.toMatchObject({ status: 403 });
+    // El dueño no puede aceptar su propio enlace.
+    await expect(reclamarInvitacionCalendario(CLINICA, "duena@mail.com", true, tokenCrudo)).rejects.toMatchObject({ status: 400 });
+
+    // El correo verificado correcto (sin importar mayúsculas) sí.
+    await reclamarInvitacionCalendario("uid-nuevo", "NUEVO@mail.com", true, tokenCrudo);
+    const vista = await ocupacionDeCalendario("uid-nuevo", calendario.id, "2026-10-05", "2026-10-11");
+    expect(vista.bloques.length).toBeGreaterThan(0);
+    const { conmigo } = await listarCalendarios("uid-nuevo");
+    expect(conmigo).toHaveLength(1);
+    expect(JSON.stringify(conmigo)).not.toContain("tokenHash");
+
+    // Un solo uso: el enlace ya no sirve para nadie más.
+    await expect(reclamarInvitacionCalendario("uid-otro", "nuevo@mail.com", true, tokenCrudo)).rejects.toMatchObject({ status: 404 });
+    await expect(obtenerInvitacionCalendarioPublica(tokenCrudo)).rejects.toMatchObject({ status: 404 });
+  });
+
+  it("sin correo vale quien tenga el enlace, pero vence a los 7 días", async () => {
+    const { calendario, tokenCrudo } = await invitarACalendario(CLINICA, { clinicaId: CLINICA, recursoId: "r1", destinatarioNombre: "Sin Correo" });
+    await dbAdmin.collection("calendariosCompartidos").doc(calendario.id).set({ venceEl: "2020-01-01T00:00:00.000Z" }, { merge: true });
+    expect(await obtenerInvitacionCalendarioPublica(tokenCrudo)).toMatchObject({ estado: "vencida" });
+    await expect(reclamarInvitacionCalendario("uid-sin-correo", "x@y.com", true, tokenCrudo)).rejects.toMatchObject({ status: 410 });
+
+    const nueva = await invitarACalendario(CLINICA, { clinicaId: CLINICA, recursoId: "r1", destinatarioNombre: "Sin Correo 2" });
+    await reclamarInvitacionCalendario("uid-sin-correo", "x@y.com", true, nueva.tokenCrudo);
+    expect((await listarCalendarios("uid-sin-correo")).conmigo).toHaveLength(1);
+  });
+
+  it("invitar otra vez al mismo colega cancela la invitación pendiente anterior", async () => {
+    const a = await invitarACalendario(CLINICA, { clinicaId: CLINICA, recursoId: "r1", destinatarioNombre: "Repetido", destinatarioCorreo: "rep@mail.com" });
+    const b = await invitarACalendario(CLINICA, { clinicaId: CLINICA, recursoId: "r1", destinatarioNombre: "Repetido", destinatarioCorreo: "rep@mail.com" });
+    expect(await obtenerInvitacionCalendarioPublica(a.tokenCrudo)).toMatchObject({ estado: "cancelada" });
+    expect(await obtenerInvitacionCalendarioPublica(b.tokenCrudo)).toMatchObject({ estado: "disponible" });
+    const { mios } = await listarCalendarios(CLINICA);
+    expect(mios.filter((c) => c.estado === "pendiente" && c.destinatarioNombre === "Repetido")).toHaveLength(1);
   });
 });

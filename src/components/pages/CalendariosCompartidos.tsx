@@ -10,7 +10,9 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { usePatientData } from "@/context/PatientDataContext";
 import { useMoConecta } from "@/context/MoConectaContext";
-import { compartirCalendarioApi, dejarDeCompartirCalendarioApi, ocupacionCalendarioApi } from "@/lib/conectaApi";
+import { compartirCalendarioApi, dejarDeCompartirCalendarioApi, invitarACalendarioApi, ocupacionCalendarioApi } from "@/lib/conectaApi";
+import { AtajoColegas, useContactosColegas } from "./ContactosColegas";
+import { manejarCambioNombre } from "@/lib/textoNombre";
 import { useCalendariosCompartidos } from "@/lib/useCalendariosCompartidos";
 import type { CalendarioCompartidoDoc, OcupacionDeCalendario } from "@/lib/calendarioOcupacion";
 import { leerContactosLocales, normalizarNombre } from "@/lib/contactosColegas";
@@ -50,9 +52,67 @@ export function CompartirCalendarioDialog({
   const [error, setError] = useState<string | null>(null);
   const [recienCompartido, setRecienCompartido] = useState<{ nombre: string } | null>(null);
   const [numero, setNumero] = useState("");
+  const { contactos, recordar } = useContactosColegas();
+  const [invitando, setInvitando] = useState(false);
+  const [invNombre, setInvNombre] = useState("");
+  const [invWhatsapp, setInvWhatsapp] = useState("");
+  const [invCorreo, setInvCorreo] = useState("");
+  const [invEnlace, setInvEnlace] = useState<string | null>(null);
+  const [copiado, setCopiado] = useState(false);
 
-  const yaCompartidos = mios.filter((c) => c.recursoId === recurso.id);
+  const delRecurso = mios.filter((c) => c.recursoId === recurso.id);
+  const yaCompartidos = delRecurso.filter((c) => c.estado === "activo");
+  const pendientes = delRecurso.filter((c) => c.estado === "pendiente");
   const idsYaCompartidos = new Set(yaCompartidos.map((c) => c.destinatarioUid));
+
+  async function crearInvitacion() {
+    if (!clinicUid) return;
+    setTrabajando(true);
+    setError(null);
+    try {
+      const { enlace } = await invitarACalendarioApi({
+        clinicaId: clinicUid,
+        recursoId: recurso.id,
+        destinatarioNombre: invNombre.trim() || undefined,
+        destinatarioCorreo: invCorreo.trim() || undefined,
+      });
+      setInvEnlace(enlace);
+      recordar({ nombre: invNombre, whatsapp: invWhatsapp, correo: invCorreo });
+      await refrescar();
+      onCambio?.();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "No se pudo crear la invitación.");
+    } finally {
+      setTrabajando(false);
+    }
+  }
+
+  function enviarInvitacionPorWhatsApp() {
+    if (!invEnlace) return;
+    const saludo = invNombre.trim() ? `Hola ${invNombre.trim().split(" ")[0]}, ` : "Hola, ";
+    const mensaje =
+      `${saludo}te comparto mi calendario «${recurso.nombre}» en MO (solo ves horarios ocupados y libres, no datos de pacientes). ` +
+      `Ábrelo aquí: ${invEnlace}`;
+    window.open(urlWhatsApp(invWhatsapp, mensaje), "_blank");
+  }
+
+  async function copiarEnlace() {
+    if (!invEnlace) return;
+    try {
+      await navigator.clipboard.writeText(invEnlace);
+      setCopiado(true);
+    } catch {
+      // El enlace queda visible para copiarlo a mano.
+    }
+  }
+
+  function nuevaInvitacion() {
+    setInvEnlace(null);
+    setInvNombre("");
+    setInvWhatsapp("");
+    setInvCorreo("");
+    setCopiado(false);
+  }
   const colegas = directorio
     .filter((p) => p.uid !== uid && !idsYaCompartidos.has(p.uid))
     .filter((p) => !busqueda.trim() || normalizarNombre(p.nombreCompleto).includes(normalizarNombre(busqueda)));
@@ -142,6 +202,25 @@ export function CompartirCalendarioDialog({
           </div>
         )}
 
+        {pendientes.length > 0 && (
+          <div className="mb-4">
+            <p className="mb-1 text-xs font-medium text-ink/60">Invitaciones pendientes</p>
+            <ul className="divide-y divide-edge/5 rounded-lg border border-edge/10">
+              {pendientes.map((c) => (
+                <li key={c.id} className="flex items-center justify-between gap-3 px-3 py-2 text-sm text-ink/80">
+                  <span className="truncate">
+                    {c.destinatarioNombre || "Colega sin nombre"}
+                    <span className="ml-2 text-xs text-warning">espera que la acepte</span>
+                  </span>
+                  <button onClick={() => dejar(c)} disabled={trabajando} className="shrink-0 text-xs text-danger hover:underline disabled:opacity-50">
+                    Cancelar
+                  </button>
+                </li>
+              ))}
+            </ul>
+          </div>
+        )}
+
         <p className="mb-1 text-xs font-medium text-ink/60">Compartir con</p>
         <input
           className={inputClass}
@@ -168,6 +247,55 @@ export function CompartirCalendarioDialog({
                 ? "Todavía no hay colegas con perfil en MO Conecta. Invítalo desde MO Conecta → Invitar odontólogo."
                 : "Ningún colega coincide (o ya lo comparte contigo)."}
             </p>
+          )}
+        </div>
+
+        <div className="mt-4 border-t border-edge/10 pt-3">
+          {!invitando ? (
+            <button onClick={() => setInvitando(true)} className="text-xs text-accent hover:underline">
+              ¿Tu colega no está en MO? Invítalo por WhatsApp
+            </button>
+          ) : invEnlace ? (
+            <div className="space-y-2">
+              <p className="text-sm text-success">Invitación lista (vence en 7 días, un solo uso).</p>
+              <input readOnly className={inputClass} value={invEnlace} onFocus={(e) => e.target.select()} />
+              <div className="flex flex-wrap gap-2">
+                <button onClick={enviarInvitacionPorWhatsApp} className={botonPrimario}>
+                  Enviar por WhatsApp
+                </button>
+                <button onClick={copiarEnlace} className={botonSecundario}>
+                  {copiado ? "¡Copiado!" : "Copiar enlace"}
+                </button>
+                <button onClick={nuevaInvitacion} className="text-xs text-ink/50 hover:text-ink">
+                  Invitar a otro colega
+                </button>
+              </div>
+            </div>
+          ) : (
+            <div className="space-y-2">
+              <p className="text-xs text-ink/60">
+                Le mandas un enlace por WhatsApp; al abrirlo crea su cuenta (o inicia sesión) y acepta el calendario.
+              </p>
+              <AtajoColegas
+                contactos={contactos}
+                onElegir={(c) => {
+                  setInvNombre(c.nombre);
+                  setInvWhatsapp(c.whatsapp);
+                  setInvCorreo(c.correo);
+                }}
+              />
+              <input className={inputClass} placeholder="Nombre del colega" value={invNombre} onChange={(e) => manejarCambioNombre(e, setInvNombre)} />
+              <input className={inputClass} type="tel" placeholder="WhatsApp (10 dígitos), opcional" value={invWhatsapp} onChange={(e) => setInvWhatsapp(e.target.value)} />
+              <input className={inputClass} type="email" placeholder="Correo (opcional): si lo pones, solo ese correo puede aceptar" value={invCorreo} onChange={(e) => setInvCorreo(e.target.value)} />
+              <div className="flex gap-2">
+                <button onClick={crearInvitacion} disabled={trabajando} className={botonPrimario}>
+                  {trabajando ? "Creando…" : "Crear invitación"}
+                </button>
+                <button onClick={() => setInvitando(false)} className={botonSecundario}>
+                  Cancelar
+                </button>
+              </div>
+            </div>
           )}
         </div>
 
@@ -392,14 +520,19 @@ export function CalendariosCompartidosTab() {
               <div key={c.id} className="flex items-center justify-between gap-3 rounded-xl border border-edge/10 p-3">
                 <div className="min-w-0">
                   <p className="truncate text-sm font-medium text-ink">{c.recursoNombre}</p>
-                  <p className="truncate text-xs text-ink/50">con {c.destinatarioNombre}</p>
+                  <p className="truncate text-xs text-ink/50">
+                    con {c.destinatarioNombre || "un colega"}
+                    {c.estado === "pendiente" && <span className="ml-2 text-warning">espera que acepte la invitación</span>}
+                  </p>
                 </div>
                 <div className="flex shrink-0 items-center gap-3">
-                  <button onClick={() => setAbierto(c.id)} className="text-xs text-accent hover:underline">
-                    Ver lo que ve
-                  </button>
+                  {c.estado === "activo" && (
+                    <button onClick={() => setAbierto(c.id)} className="text-xs text-accent hover:underline">
+                      Ver lo que ve
+                    </button>
+                  )}
                   <button onClick={() => dejar(c, false)} className="text-xs text-danger hover:underline">
-                    Dejar de compartir
+                    {c.estado === "pendiente" ? "Cancelar invitación" : "Dejar de compartir"}
                   </button>
                 </div>
               </div>

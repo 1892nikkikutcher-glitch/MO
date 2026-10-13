@@ -3,7 +3,10 @@
  * en vivo (se calcula en cada consulta con las citas reales; nada se copia).
  * Todo pasa por el servidor: el colega nunca lee las citas de la clínica. */
 
+import { FieldValue } from "firebase-admin/firestore";
 import { dbAdmin } from "./firebaseAdmin";
+import { hashToken } from "./tokenHashServer";
+import { fechaVencimientoInvitacion, generarTokenInvitacion, invitacionVencida, normalizarCorreo } from "./invitacionesConecta";
 import { ConectaError, aplicarRateLimit, esAdminDeClinica, esMiembroActivoDeClinica, nowISO, sinIndefinidos } from "./conectaServer";
 import {
   bloquesOcupados,
@@ -66,6 +69,118 @@ export async function compartirCalendario(
   return doc;
 }
 
+const sinSecretos = (c: CalendarioCompartidoDoc): CalendarioCompartidoDoc => {
+  const { tokenHash: _t, destinatarioCorreoNormalizado: _c, ...resto } = c;
+  return resto;
+};
+
+/** Comparte un calendario con alguien que todavía no está en MO: crea una
+ * invitación pendiente de UN solo uso (vence en 7 días) y devuelve el token
+ * crudo UNA vez — solo se guarda su hash. Invitar otra vez al mismo colega
+ * cancela la invitación pendiente anterior. */
+export async function invitarACalendario(
+  uid: string,
+  input: { clinicaId: string; recursoId: string; destinatarioNombre?: string; destinatarioCorreo?: string }
+): Promise<{ calendario: CalendarioCompartidoDoc; tokenCrudo: string }> {
+  if (!(await aplicarRateLimit(`calendario_invitar_${uid}`, 20, 60))) {
+    throw new ConectaError(429, "Demasiadas invitaciones — intenta de nuevo más tarde.");
+  }
+  if (!(await perteneceALaClinica(uid, input.clinicaId))) throw new ConectaError(403, "No perteneces a esa clínica.");
+
+  const recursoSnap = await dbAdmin.doc(`users/${input.clinicaId}/recursos/${input.recursoId}`).get();
+  if (!recursoSnap.exists) throw new ConectaError(404, "No existe ese médico o unidad en tu Agenda.");
+  const perfilRemitente = await dbAdmin.collection("perfilesProfesionalesPublicos").doc(uid).get();
+
+  const correo = input.destinatarioCorreo?.trim() ? normalizarCorreo(input.destinatarioCorreo) : undefined;
+  const nombre = (input.destinatarioNombre ?? "").trim();
+
+  // Invitar de nuevo al mismo colega reemplaza la invitación pendiente anterior.
+  const previas = await dbAdmin.collection(COL).where("clinicaId", "==", input.clinicaId).where("estado", "==", "pendiente").get();
+  const mismo = (c: CalendarioCompartidoDoc) =>
+    c.recursoId === input.recursoId &&
+    ((correo && c.destinatarioCorreoNormalizado === correo) ||
+      (!correo && !c.destinatarioCorreoNormalizado && nombre && c.destinatarioNombre.toLowerCase() === nombre.toLowerCase()));
+  await Promise.all(
+    previas.docs.filter((d) => mismo(d.data() as CalendarioCompartidoDoc)).map((d) => d.ref.set({ estado: "revocado", revocadoEl: nowISO() }, { merge: true }))
+  );
+
+  const tokenCrudo = generarTokenInvitacion();
+  const ref = dbAdmin.collection(COL).doc();
+  const doc: CalendarioCompartidoDoc = sinIndefinidos({
+    id: ref.id,
+    clinicaId: input.clinicaId,
+    recursoId: input.recursoId,
+    recursoNombre: (recursoSnap.data() as { nombre?: string }).nombre ?? "",
+    remitenteUid: uid,
+    remitenteNombre: ((perfilRemitente.data() as { nombreCompleto?: string } | undefined)?.nombreCompleto) || "Un colega",
+    destinatarioUid: "",
+    destinatarioNombre: nombre,
+    estado: "pendiente" as const,
+    creadoEl: nowISO(),
+    tokenHash: hashToken(tokenCrudo),
+    venceEl: fechaVencimientoInvitacion(),
+    destinatarioCorreoNormalizado: correo,
+  });
+  await ref.set(doc);
+  return { calendario: sinSecretos(doc), tokenCrudo };
+}
+
+/** Vista pública (sin sesión) de la invitación: solo datos genéricos. */
+export async function obtenerInvitacionCalendarioPublica(tokenCrudo: string) {
+  const snap = await dbAdmin.collection(COL).where("tokenHash", "==", hashToken(tokenCrudo)).limit(1).get();
+  if (snap.empty) throw new ConectaError(404, "Invitación no encontrada.");
+  const c = snap.docs[0].data() as CalendarioCompartidoDoc;
+  const estado =
+    c.estado === "pendiente" ? (c.venceEl && invitacionVencida({ venceEl: c.venceEl }) ? "vencida" : "disponible") : c.estado === "activo" ? "usada" : "cancelada";
+  return { remitenteNombre: c.remitenteNombre, recursoNombre: c.recursoNombre, destinatarioNombre: c.destinatarioNombre || null, estado };
+}
+
+/** El colega acepta con su sesión. Si la invitación llevaba correo, el correo
+ * VERIFICADO de su cuenta debe coincidir; sin correo, vale quien tenga el enlace
+ * (un solo uso, vence en 7 días) — es solo ocupado/libre y el dueño puede
+ * quitarlo cuando quiera. */
+export async function reclamarInvitacionCalendario(
+  uid: string,
+  correoVerificado: string | undefined,
+  emailVerificado: boolean,
+  tokenCrudo: string
+): Promise<{ calendarioId: string }> {
+  if (!(await aplicarRateLimit(`calendario_reclamar_${uid}`, 30, 60))) {
+    throw new ConectaError(429, "Demasiados intentos — intenta de nuevo más tarde.");
+  }
+  if (!emailVerificado) throw new ConectaError(403, "Verifica tu correo electrónico antes de aceptar esta invitación.");
+
+  const q = await dbAdmin.collection(COL).where("tokenHash", "==", hashToken(tokenCrudo)).limit(1).get();
+  if (q.empty) throw new ConectaError(404, "Invitación no encontrada.");
+  const ref = q.docs[0].ref;
+  const perfil = await dbAdmin.collection("perfilesProfesionalesPublicos").doc(uid).get();
+
+  await dbAdmin.runTransaction(async (tx) => {
+    const c = (await tx.get(ref)).data() as CalendarioCompartidoDoc;
+    if (c.estado !== "pendiente") throw new ConectaError(410, "Esta invitación ya no está disponible.");
+    if (c.venceEl && invitacionVencida({ venceEl: c.venceEl })) throw new ConectaError(410, "Esta invitación venció.");
+    if (uid === c.remitenteUid || uid === c.clinicaId) throw new ConectaError(400, "No puedes aceptar tu propio calendario.");
+    if (c.destinatarioCorreoNormalizado && (!correoVerificado || normalizarCorreo(correoVerificado) !== c.destinatarioCorreoNormalizado)) {
+      throw new ConectaError(403, "Esta invitación es para otro correo. Inicia sesión con el correo al que se envió.");
+    }
+    const nombre = ((perfil.data() as { nombreCompleto?: string } | undefined)?.nombreCompleto) || c.destinatarioNombre || correoVerificado || "Colega";
+    tx.set(
+      ref,
+      {
+        estado: "activo",
+        destinatarioUid: uid,
+        destinatarioNombre: nombre,
+        aceptadoEl: nowISO(),
+        tokenHash: FieldValue.delete(),
+        venceEl: FieldValue.delete(),
+        destinatarioCorreoNormalizado: FieldValue.delete(),
+      },
+      { merge: true }
+    );
+  });
+  return { calendarioId: ref.id };
+}
+
 /** Lo que compartí (o comparte mi clínica) y lo que comparten conmigo. */
 export async function listarCalendarios(uid: string): Promise<{ mios: CalendarioCompartidoDoc[]; conmigo: CalendarioCompartidoDoc[] }> {
   const [porRemitente, porClinica, paraMi] = await Promise.all([
@@ -73,13 +188,15 @@ export async function listarCalendarios(uid: string): Promise<{ mios: Calendario
     dbAdmin.collection(COL).where("clinicaId", "==", uid).get(),
     dbAdmin.collection(COL).where("destinatarioUid", "==", uid).get(),
   ]);
-  const activos = (docs: FirebaseFirestore.QueryDocumentSnapshot[]) =>
-    docs.map((d) => d.data() as CalendarioCompartidoDoc).filter((c) => c.estado === "activo");
+  const vigentes = (docs: FirebaseFirestore.QueryDocumentSnapshot[], incluirPendientes: boolean) =>
+    docs
+      .map((d) => d.data() as CalendarioCompartidoDoc)
+      .filter((c) => c.estado === "activo" || (incluirPendientes && c.estado === "pendiente" && !(c.venceEl && invitacionVencida({ venceEl: c.venceEl }))));
   const mios = new Map<string, CalendarioCompartidoDoc>();
-  [...activos(porRemitente.docs), ...activos(porClinica.docs)].forEach((c) => mios.set(c.id, c));
+  [...vigentes(porRemitente.docs, true), ...vigentes(porClinica.docs, true)].forEach((c) => mios.set(c.id, sinSecretos(c)));
   return {
     mios: [...mios.values()].sort((a, b) => b.creadoEl.localeCompare(a.creadoEl)),
-    conmigo: activos(paraMi.docs).sort((a, b) => b.creadoEl.localeCompare(a.creadoEl)),
+    conmigo: vigentes(paraMi.docs, false).map(sinSecretos).sort((a, b) => b.creadoEl.localeCompare(a.creadoEl)),
   };
 }
 

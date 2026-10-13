@@ -105,7 +105,7 @@ export default function Agenda() {
     );
     // Calendarios compartidos de verdad (Compartir calendario) se suman a lo detectado por casos.
     const todos = new Map(porCasos);
-    calendariosMios.forEach((c) => todos.set(c.recursoId, unirColegas(undefined, [...(todos.get(c.recursoId) ?? []), c.destinatarioNombre])));
+    calendariosMios.filter((c) => c.estado === "activo").forEach((c) => todos.set(c.recursoId, unirColegas(undefined, [...(todos.get(c.recursoId) ?? []), c.destinatarioNombre])));
     return todos;
   }, [casosEnviados, citasDeLaClinica, directorio, calendariosMios]);
   // Si este colaborador tiene un límite de calendarios configurado
