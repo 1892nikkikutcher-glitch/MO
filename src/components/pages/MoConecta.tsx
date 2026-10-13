@@ -46,6 +46,7 @@ import type { MensajeInterconsulta } from "@/lib/conectaMensajes";
 import type { SolicitudAcceso } from "@/lib/invitacionesConecta";
 import { colegaDelCaso } from "@/lib/colegaDelCaso";
 import ExpedienteCompartidoVista, { ElegirQueCompartirRapido } from "./ExpedienteCompartidoVista";
+import CompartirExpedientePanel from "./CompartirExpedientePanel";
 import { CalendariosCompartidosTab } from "./CalendariosCompartidos";
 import AvisoAlColega from "./AvisoAlColega";
 import SelectorPacientes from "./SelectorPacientes";
@@ -1908,10 +1909,21 @@ function SalaDelCaso({ interconsulta, onVolver }: { interconsulta: Interconsulta
         </div>
       </div>
 
+      <CompartirExpedientePanel
+        interconsulta={interconsulta}
+        esRemitente={esRemitente}
+        nombreColega={
+          esRemitente
+            ? (interconsulta.destinatarioUid && directorio.find((p) => p.uid === interconsulta.destinatarioUid)?.nombreCompleto) || "tu colega"
+            : directorio.find((p) => p.uid === interconsulta.odontologoRemitenteUid)?.nombreCompleto || "Quien envió el caso"
+        }
+      />
+
       {interconsulta.expedienteCompartido && (
         <ExpedienteCompartidoVista
           expediente={interconsulta.expedienteCompartido}
           cantidadFotos={interconsulta.expedienteCompartido.fotosArchivoIds?.length ?? 0}
+          alDiaDesde={interconsulta.compartirExpediente?.activo ? interconsulta.compartirExpediente.actualizadoEl : undefined}
         />
       )}
 

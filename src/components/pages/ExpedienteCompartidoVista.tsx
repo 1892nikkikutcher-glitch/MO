@@ -50,8 +50,8 @@ export function ElegirSeccionesCompartir({
       <div>
         <p className="text-sm font-medium text-ink">¿Qué más del expediente quieres compartir?</p>
         <p className="mt-0.5 text-xs text-ink/50">
-          Por defecto solo se comparte lo mínimo. Cada parte que marques es una foto fija de hoy: si el expediente
-          cambia después, {nombreColega} no verá el cambio hasta que lo vuelvas a enviar.
+          Por defecto solo se comparte lo mínimo. Lo que marques se mantiene al día mientras lo tengas activado; cuando
+          termine el caso lo desactivas con un botón y {nombreColega} deja de verlo.
         </p>
       </div>
       <div className="space-y-2">
@@ -129,8 +129,8 @@ export function ElegirQueCompartirRapido({
         })}
       </div>
       <p className="mt-2 text-xs text-ink/50">
-        Es una foto fija de hoy: si el expediente cambia, {nombreColega} no lo verá hasta que lo vuelvas a enviar. Nunca se
-        comparte: precios, pagos, teléfono ni dirección del paciente, INE ni foto de perfil.
+        {nombreColega} lo verá al día mientras lo tengas activado; cuando termine el caso lo desactivas con un botón y deja de
+        verlo. Nunca se comparte: precios, pagos, teléfono ni dirección del paciente, INE ni foto de perfil.
       </p>
       <button type="button" onClick={() => setDetalle((v) => !v)} className="mt-1 text-xs text-accent hover:underline">
         {detalle ? "Ocultar" : "Elegir una por una"}
@@ -256,17 +256,23 @@ function fechaLegible(iso: string) {
 export default function ExpedienteCompartidoVista({
   expediente,
   cantidadFotos,
+  alDiaDesde,
 }: {
   expediente: ExpedienteCompartido;
   cantidadFotos: number;
+  /** Si el expediente se mantiene al día: la última vez que se revisó. Ausente = foto fija. */
+  alDiaDesde?: string;
 }) {
   return (
     <div className="space-y-2 rounded-2xl border border-edge/10 bg-surface p-5">
       <div>
         <h3 className="text-sm font-semibold text-ink">Expediente compartido</h3>
         <p className="text-xs text-ink/50">
-          Foto fija tomada el {new Date(expediente.generadoEl).toLocaleString("es-MX")} — es lo que existía al enviar el
-          caso, no se actualiza solo.
+          {alDiaDesde ? (
+            <>Al día: se actualiza solo mientras quien envió el caso lo tenga activado. Última revisión: {new Date(alDiaDesde).toLocaleString("es-MX")}</>
+          ) : (
+            <>Foto fija tomada el {new Date(expediente.generadoEl).toLocaleString("es-MX")} — es lo que existía al enviar el caso, no se actualiza solo.</>
+          )}
         </p>
       </div>
 

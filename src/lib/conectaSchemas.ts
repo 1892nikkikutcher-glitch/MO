@@ -150,6 +150,16 @@ export const invitacionCrearSchema = z
   })
   .strict();
 
+export const compartirExpedienteSchema = z
+  .object({
+    activo: z.boolean(),
+    /** Qué compartir al activar; si se omite se reutiliza lo que ya se compartía. */
+    secciones: z.array(z.enum(seccionesCompartibles)).max(seccionesCompartibles.length).optional(),
+    /** Obligatorio al activar: quien comparte confirma que cuenta con el consentimiento del paciente. */
+    consentimientoPaciente: z.boolean().optional(),
+  })
+  .strict();
+
 export const revocarAccesoSchema = z
   .object({
     uidARevocar: z.string().trim().min(1).max(200),

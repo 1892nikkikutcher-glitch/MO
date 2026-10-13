@@ -324,6 +324,10 @@ export type ArchivoInterconsulta = {
   categoriaClinica: CategoriaArchivoInterconsulta;
   subidoPorUid: string;
   fecha: string;
+  /** Solo en las copias que MO hace de las fotos del expediente compartido: la ruta de la foto
+   * original. Sirve para no copiar dos veces la misma foto al mantener el expediente al día, y
+   * para quitar solo estas copias (nunca archivos que subió una persona) al dejar de compartir. */
+  origenPath?: string;
 };
 
 export type Contrarreferencia = {
@@ -340,7 +344,19 @@ export type Contrarreferencia = {
   esBorrador: boolean;
 };
 
-import type { ExpedienteCompartido } from "./expedienteCompartido";
+import type { ExpedienteCompartido, SeccionCompartible } from "./expedienteCompartido";
+
+/** Si el expediente del paciente se está compartiendo con el colega de este caso. Mientras
+ * `activo`, el servidor mantiene `expedienteCompartido` al día; al desactivarlo se borra
+ * (junto con las copias de fotos) y el colega ya no ve nada del expediente. */
+export type CompartirExpediente = {
+  activo: boolean;
+  /** Qué partes del expediente se comparten (o se compartían, si está desactivado). */
+  secciones: SeccionCompartible[];
+  /** Última vez que el servidor revisó el expediente (ISO). */
+  actualizadoEl: string;
+  desactivadoEl?: string;
+};
 
 export type FuenteInvitacion = "directorio" | "invitacion_enlace";
 
@@ -359,6 +375,9 @@ export type Interconsulta = {
    * enviar, construida en servidor) — ausente si solo se compartió el
    * resumen mínimo de `resumenPaciente`. Ver expedienteCompartido.ts. */
   expedienteCompartido?: ExpedienteCompartido;
+  /** Ausente en casos anteriores a este campo: si traen `expedienteCompartido` es una foto
+   * fija que no se actualiza (se puede activar para mantenerla al día). */
+  compartirExpediente?: CompartirExpediente;
   /** Ausente en interconsultas creadas antes de este campo — el código que
    * lee este valor para decidir transiciones debe resolverlo como
    * "legacy_sin_clasificar" (v3 §14), nunca asumir "aislado_con_retorno" ni

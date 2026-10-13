@@ -124,6 +124,19 @@ export function registrarContrarreferenciaApi(interconsultaId: string, body: Con
   });
 }
 
+/** Activa o desactiva compartir el expediente del paciente con el colega de este caso. */
+export function compartirExpedienteApi(
+  interconsultaId: string,
+  body: { activo: boolean; secciones?: SeccionCompartible[]; consentimientoPaciente?: boolean }
+) {
+  return llamarApi(`/api/conecta/interconsultas/${interconsultaId}/compartir`, { method: "POST", body: JSON.stringify(body) });
+}
+
+/** Pide al servidor revisar el expediente compartido y ponerlo al día (lo limita él mismo). */
+export function refrescarExpedienteApi(interconsultaId: string): Promise<{ actualizado: boolean }> {
+  return llamarApi(`/api/conecta/interconsultas/${interconsultaId}/refrescar-expediente`, { method: "POST" });
+}
+
 export function revocarAccesoApi(interconsultaId: string, uidARevocar: string, motivo?: string) {
   return llamarApi(`/api/conecta/interconsultas/${interconsultaId}/revocar-acceso`, {
     method: "POST",

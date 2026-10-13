@@ -59,7 +59,27 @@ export type CrearInterconsultaInput = {
 /** Foto fija de las partes del expediente elegidas, leídas directo de
  * Firestore con el Admin SDK (nunca lo que mande el cliente). Las fotos
  * clínicas se COPIAN a los archivos de la interconsulta. */
-async function construirExpedienteCompartido(args: {
+/** Separa los archivos del caso en los que son copias de fotos del expediente (las que se
+ * actualizan o se quitan al compartir) y los que subió una persona (nunca se tocan). Las
+ * fotos de casos anteriores a `origenPath` se reconocen por `fotosArchivoIds`. */
+export function separarArchivosDeExpediente(archivos: ArchivoInterconsulta[], idsFotosPrevias: string[] = []) {
+  const ids = new Set(idsFotosPrevias);
+  const esCopia = (a: ArchivoInterconsulta) => Boolean(a.origenPath) || ids.has(a.id);
+  return { otros: archivos.filter((a) => !esCopia(a)), deExpediente: archivos.filter(esCopia) };
+}
+
+/** Plantilla de historia clínica y respuestas del paciente, leídas con el Admin SDK. */
+export async function cargarPlantillaYRespuestas(clinicaId: string, pacienteId: string) {
+  const [templateSnap, respuestasSnap] = await Promise.all([
+    dbAdmin.collection("users").doc(clinicaId).collection("config").doc("historiaClinicaTemplate").get(),
+    dbAdmin.collection("users").doc(clinicaId).collection("pacientes").doc(pacienteId).collection("historiaClinica").doc("respuestas").get(),
+  ]);
+  const template = (templateSnap.exists ? templateSnap.data() : plantillaInicial) as HistoriaClinicaTemplate;
+  const respuestas = (respuestasSnap.exists ? respuestasSnap.data() : respuestasVacias) as RespuestasHistoriaClinica;
+  return { template, respuestas };
+}
+
+export async function construirExpedienteCompartido(args: {
   clinicaId: string;
   pacienteId: string;
   interconsultaId: string;
@@ -68,14 +88,20 @@ async function construirExpedienteCompartido(args: {
   template: HistoriaClinicaTemplate;
   respuestas: RespuestasHistoriaClinica;
   ahora: string;
-}): Promise<{ expediente: ExpedienteCompartido; archivos: ArchivoInterconsulta[] }> {
+  /** Al ACTUALIZAR un caso que ya compartía: sus archivos actuales y los ids de fotos del
+   * expediente de la versión anterior. Las fotos ya copiadas no se copian otra vez; las que
+   * ya no corresponden se devuelven en `archivosQuitados` para que quien llama las borre. */
+  archivosActuales?: ArchivoInterconsulta[];
+  idsFotosPrevias?: string[];
+}): Promise<{ expediente: ExpedienteCompartido; archivos: ArchivoInterconsulta[]; archivosQuitados: ArchivoInterconsulta[] }> {
   const { clinicaId, pacienteId, secciones, ahora } = args;
   const base = dbAdmin.collection("users").doc(clinicaId).collection("pacientes").doc(pacienteId);
   const lista = async <T,>(coleccion: string) =>
     (await base.collection(coleccion).get()).docs.map((d) => ({ ...(d.data() as T), id: d.id }));
 
   const expediente: ExpedienteCompartido = { secciones, generadoEl: ahora };
-  const archivos: ArchivoInterconsulta[] = [];
+  const { otros, deExpediente } = separarArchivosDeExpediente(args.archivosActuales ?? [], args.idsFotosPrevias);
+  let mantenidos: ArchivoInterconsulta[] = [];
 
   const necesitaDiagnosticos = secciones.includes("diagnosticos_plan") || secciones.includes("notas_evolucion");
   const diagnosticos = necesitaDiagnosticos ? await lista<DiagnosticoPaciente>("diagnosticos") : [];
@@ -113,6 +139,11 @@ async function construirExpedienteCompartido(args: {
       // Solo se copian objetos que de verdad cuelgan de ESTE paciente y son JPEG
       // dentro del límite — nunca una ruta arbitraria.
       if (!foto.path.startsWith(`users/${clinicaId}/pacientes/${pacienteId}/fotos/`)) continue;
+      const yaCopiada = deExpediente.find((a) => a.origenPath === foto.path);
+      if (yaCopiada) {
+        mantenidos.push(yaCopiada);
+        continue;
+      }
       try {
         const origen = bucketAdmin.file(foto.path);
         const [meta] = await origen.getMetadata();
@@ -121,7 +152,7 @@ async function construirExpedienteCompartido(args: {
         const archivoId = randomUUID();
         const destino = `interconsultas/${args.interconsultaId}/archivos/${archivoId}.jpg`;
         await origen.copy(bucketAdmin.file(destino));
-        archivos.push(
+        mantenidos.push(
           sinIndefinidos({
             id: archivoId,
             nombreOriginalSaneado: sanearNombreArchivo(foto.name || "fotografia.jpg"),
@@ -131,15 +162,19 @@ async function construirExpedienteCompartido(args: {
             categoriaClinica: "fotografia" as const,
             subidoPorUid: args.remitenteUid,
             fecha: ahora,
+            origenPath: foto.path,
           })
         );
       } catch (err) {
         console.error("No se pudo copiar una fotografía a la interconsulta", err);
       }
     }
-    expediente.fotosArchivoIds = archivos.map((a) => a.id);
+    expediente.fotosArchivoIds = mantenidos.map((a) => a.id);
+  } else {
+    mantenidos = [];
   }
-  return { expediente, archivos };
+  const archivosQuitados = deExpediente.filter((a) => !mantenidos.some((m) => m.id === a.id));
+  return { expediente, archivos: [...otros, ...mantenidos], archivosQuitados };
 }
 
 export async function crearInterconsulta(remitenteUid: string, input: CrearInterconsultaInput): Promise<Interconsulta> {
@@ -155,19 +190,7 @@ export async function crearInterconsulta(remitenteUid: string, input: CrearInter
   if (!pacienteSnap.exists) throw new ConectaError(404, "No existe ese paciente en tu clínica.");
   const paciente = pacienteSnap.data() as Patient;
 
-  const [templateSnap, respuestasSnap] = await Promise.all([
-    dbAdmin.collection("users").doc(input.clinicaRemitenteId).collection("config").doc("historiaClinicaTemplate").get(),
-    dbAdmin
-      .collection("users")
-      .doc(input.clinicaRemitenteId)
-      .collection("pacientes")
-      .doc(input.pacienteId)
-      .collection("historiaClinica")
-      .doc("respuestas")
-      .get(),
-  ]);
-  const template = (templateSnap.exists ? templateSnap.data() : plantillaInicial) as HistoriaClinicaTemplate;
-  const respuestas = (respuestasSnap.exists ? respuestasSnap.data() : respuestasVacias) as RespuestasHistoriaClinica;
+  const { template, respuestas } = await cargarPlantillaYRespuestas(input.clinicaRemitenteId, input.pacienteId);
 
   const resumenPaciente = construirResumenPacienteAutorizado(paciente, template, respuestas, input.informacionMinima);
 
@@ -218,6 +241,7 @@ export async function crearInterconsulta(remitenteUid: string, input: CrearInter
     pacienteId: input.pacienteId,
     resumenPaciente,
     expedienteCompartido: compartido?.expediente,
+    compartirExpediente: compartido ? { activo: true, secciones, actualizadoEl: ahora } : undefined,
     destinatarioUid: input.destinatarioUid,
     destinatarioClinicaId: input.destinatarioClinicaId,
     tipoInterconsulta: input.tipoInterconsulta,
