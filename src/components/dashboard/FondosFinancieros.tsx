@@ -266,7 +266,35 @@ export default function FondosFinancieros() {
           />
           <h2 className="text-sm font-semibold uppercase tracking-wide text-ink">Fondos · Regla de Sobres</h2>
         </div>
-        <div className="flex flex-wrap items-center gap-1.5">
+        <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
+          <div className="flex items-center gap-1">
+            <button
+              onClick={() => setAncla((prev) => navegarVistaFondos(vista, prev, -1))}
+              title="Periodo anterior"
+              aria-label="Periodo anterior"
+              className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg border border-success/40 text-sm text-success transition-colors hover:bg-success/10"
+              style={{ boxShadow: "0 0 12px -2px rgb(var(--success-rgb) / 0.5)" }}
+            >
+              ‹
+            </button>
+            <button
+              onClick={() => setAncla(new Date())}
+              title="Volver a hoy"
+              className="shrink-0 rounded-lg border border-edge/15 px-2.5 py-1 text-[11px] font-semibold text-ink/60 transition-colors hover:bg-surface hover:text-ink"
+            >
+              Hoy
+            </button>
+            <button
+              onClick={() => setAncla((prev) => navegarVistaFondos(vista, prev, 1))}
+              title="Periodo siguiente"
+              aria-label="Periodo siguiente"
+              className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg border border-success/40 text-sm text-success transition-colors hover:bg-success/10"
+              style={{ boxShadow: "0 0 12px -2px rgb(var(--success-rgb) / 0.5)" }}
+            >
+              ›
+            </button>
+          </div>
+          <div className="flex flex-wrap items-center gap-1.5">
           {OPCIONES_VISTA.map((op) => (
             <button
               key={op.id}
@@ -283,38 +311,16 @@ export default function FondosFinancieros() {
               {op.label}
             </button>
           ))}
+          </div>
         </div>
       </div>
-      <div className="mb-5 flex items-center gap-2">
-        <button
-          onClick={() => setAncla(new Date())}
-          title="Volver a hoy"
-          className="shrink-0 rounded-lg border border-edge/15 px-2.5 py-1 text-[11px] font-semibold text-ink/60 transition-colors hover:bg-surface hover:text-ink"
-        >
-          Hoy
-        </button>
-        <button
-          onClick={() => setAncla((prev) => navegarVistaFondos(vista, prev, -1))}
-          title="Periodo anterior"
-          className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg border border-success/40 text-sm text-success transition-colors hover:bg-success/10"
-          style={{ boxShadow: "0 0 12px -2px rgb(var(--success-rgb) / 0.5)" }}
-        >
-          ‹
-        </button>
-        <span className="min-w-0 flex-1 text-xs text-ink/40">
+      <div className="mb-5">
+        <span className="text-xs text-ink/40">
           Reparto fijo de {rangoActivo.label} entre fondos, según cómo pagó el paciente.{" "}
           <button onClick={() => setRevisando(true)} className="text-accent hover:underline">
             ¿No cuadra? Revisar contra los pagos reales
           </button>
         </span>
-        <button
-          onClick={() => setAncla((prev) => navegarVistaFondos(vista, prev, 1))}
-          title="Periodo siguiente"
-          className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg border border-success/40 text-sm text-success transition-colors hover:bg-success/10"
-          style={{ boxShadow: "0 0 12px -2px rgb(var(--success-rgb) / 0.5)" }}
-        >
-          ›
-        </button>
       </div>
 
       <div className="mb-4 flex flex-col items-center rounded-xl border border-accent/30 bg-accent/10 px-4 py-3 text-center">
