@@ -55,17 +55,17 @@ export type PinturaOdontograma = {
 
 /** Con qué se ve una superficie ya guardada, o null si ningún diagnóstico la toca. Los
  * diagnósticos vienen del más nuevo al más viejo: si dos tocan la misma cara, gana el más
- * reciente. `pleno` = la cara se marcó una por una (más intensa que "todo el diente"). */
+ * reciente. */
 function pinturaDeSuperficie(
   pintados: PinturaOdontograma[],
   tooth: number,
   superficie: SuperficieDental
-): { color: ColorOdontograma | undefined; pleno: boolean } | null {
+): { color: ColorOdontograma | undefined } | null {
   for (const p of pintados) {
     if (!p.dientes.includes(tooth)) continue;
     const marcadas = p.superficiesPorDiente?.[tooth] ?? [];
-    if (marcadas.length === 0) return { color: p.color, pleno: false };
-    if (marcadas.includes(superficie)) return { color: p.color, pleno: true };
+    if (marcadas.length === 0) return { color: p.color };
+    if (marcadas.includes(superficie)) return { color: p.color };
   }
   return null;
 }
@@ -110,13 +110,12 @@ function SimboloDiente({
       return { clase: "", style: { fill: `rgb(${colorOdontogramaInfo[colorActual].rgb} / 0.8)` } };
     }
     if (dienteCompleto) {
-      return { clase: "", style: { fill: `rgb(${colorOdontogramaInfo[colorActual].rgb} / 0.6)` } };
+      return { clase: "", style: { fill: `rgb(${colorOdontogramaInfo[colorActual].rgb} / 0.8)` } };
     }
     const guardada = pinturaDeSuperficie(pintados, tooth, superficie);
     if (!guardada) return { clase: rellenoSuperficie(false) };
     if (!guardada.color) return { clase: rellenoSuperficie(true) };
-    const alfa = guardada.pleno ? 0.8 : 0.6;
-    return { clase: "", style: { fill: `rgb(${colorOdontogramaInfo[guardada.color].rgb} / ${alfa})` } };
+    return { clase: "", style: { fill: `rgb(${colorOdontogramaInfo[guardada.color].rgb} / 0.8)` } };
   };
 
   const circulo = estiloDe("oclusal");
