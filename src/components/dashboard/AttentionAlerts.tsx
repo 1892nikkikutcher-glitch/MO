@@ -76,7 +76,7 @@ export default function AttentionAlerts({ rango }: { rango: RangoPeriodo }) {
     cargarNotasPaciente,
   } = usePatientData();
   const [mostrarLaboratorios, setMostrarLaboratorios] = useState(false);
-  const { casosRecibidos, uid: miUidConecta } = useMoConecta();
+  const { casosRecibidos, uid: miUidConecta, novedades: novedadesConecta } = useMoConecta();
   const conectaPorAtender = casosPorAtender(casosRecibidos, miUidConecta).length;
 
   const hoy = new Date();
@@ -151,6 +151,20 @@ export default function AttentionAlerts({ rango }: { rango: RangoPeriodo }) {
       emoji: "🔴",
       texto: `${conectaPorAtender} caso(s) de MO Conecta esperan tu respuesta`,
       prioridad: "alta",
+      categoria: "conecta",
+      onClick: () => irAPagina("mo-conecta"),
+    });
+  }
+
+  if (novedadesConecta.length > 0) {
+    alertas.push({
+      key: "conecta-novedades",
+      emoji: "🟠",
+      texto:
+        novedadesConecta.length === 1
+          ? `MO Conecta: ${novedadesConecta[0].texto}`
+          : `${novedadesConecta.length} novedades en MO Conecta (ej. ${novedadesConecta[0].texto})`,
+      prioridad: "media",
       categoria: "conecta",
       onClick: () => irAPagina("mo-conecta"),
     });

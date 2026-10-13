@@ -386,6 +386,9 @@ export type Interconsulta = {
   creadoEl: string;
   actualizadoEl: string;
   aceptadoEl?: string;
+  /** Cuándo el colega invitado por enlace se unió a MO y recibió acceso (lo fija el
+   * servidor al reclamar la invitación) — alimenta las novedades de quien envió. */
+  colegaSeUnioEl?: string;
   concluidoEl?: string;
 };
 

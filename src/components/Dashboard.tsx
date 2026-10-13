@@ -638,8 +638,8 @@ function DashboardBody({
   esAdmin: boolean;
 }) {
   const { clinicInfo, suscripcion, membresiasDisponibles, seleccionarClinica } = usePatientData();
-  const { casosRecibidos, uid: miUidConecta } = useMoConecta();
-  const porAtenderConecta = casosPorAtender(casosRecibidos, miUidConecta).length;
+  const { casosRecibidos, uid: miUidConecta, novedades: novedadesConecta } = useMoConecta();
+  const porAtenderConecta = casosPorAtender(casosRecibidos, miUidConecta).length + novedadesConecta.length;
   const { resuelto: temaResuelto, preferencia: temaPreferencia, setPreferencia: setTemaPreferencia } = useTheme();
   const isLight = temaResuelto === "light";
   const [mostrarSugerencia, setMostrarSugerencia] = useState(false);

@@ -2,7 +2,7 @@
 
 import { createContext, useContext, useMemo, useState } from "react";
 import { casosPorAtender, pacientesYMedicosConectados, soloDelPaciente } from "@/lib/casosConectados";
-import { AtajoColegas, useContactosColegas } from "./ContactosColegas";
+import { AdministrarColegas, AtajoColegas, useContactosColegas } from "./ContactosColegas";
 import { useMoConecta } from "@/context/MoConectaContext";
 import { usePatientData } from "@/context/PatientDataContext";
 import {
@@ -283,14 +283,16 @@ function ResumenTab({
   onNuevaInterconsulta: () => void;
   onAbrirCaso: (id: string) => void;
 }) {
-  const { perfilPublico, directorio, uid, casosEnviados: todosEnviados, casosRecibidos: todosRecibidos } = useMoConecta();
+  const { perfilPublico, directorio, uid, casosEnviados: todosEnviados, casosRecibidos: todosRecibidos, novedades, marcarNovedadesVistas } = useMoConecta();
   const alcance = useContext(AlcanceContext);
   // Desde el expediente de un paciente solo cuentan los casos ENVIADOS de ese paciente.
   const casosEnviados = alcance ? soloDelPaciente(todosEnviados, uid, alcance.patientId) : todosEnviados;
   const casosRecibidos = alcance ? [] : todosRecibidos;
   const misCasos = [...casosEnviados, ...casosRecibidos];
   const invitaciones = useInvitacionesDeCasos(casosEnviados.filter((c) => !c.destinatarioUid).map((c) => c.id));
-  const conectados = alcance ? null : pacientesYMedicosConectados(misCasos, uid, directorio, invitaciones);
+  const { preferencias } = useContactosColegas();
+  const [administrandoColegas, setAdministrandoColegas] = useState(false);
+  const conectados = alcance ? null : pacientesYMedicosConectados(misCasos, uid, directorio, invitaciones, preferencias.alias);
 
   const activas: InterconsultaEstado[] = ["sent", "received", "accepted", "patient_contacted", "scheduled", "in_treatment"];
   const concluidasEstados: InterconsultaEstado[] = ["completed", "counter_referral_sent", "closed", "cancelled", "rejected"];
@@ -307,6 +309,7 @@ function ResumenTab({
     .slice(0, 5);
 
   const porAtender = alcance ? [] : casosPorAtender(casosRecibidos, uid);
+  const novedadesVisibles = alcance ? [] : novedades;
 
   return (
     <div className="space-y-6">
@@ -329,6 +332,34 @@ function ResumenTab({
                   </span>
                 </span>
                 <span className="shrink-0 text-xs text-accent">Abrir</span>
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {novedadesVisibles.length > 0 && (
+        <div className="rounded-2xl border border-accent/30 bg-accent/10 p-4">
+          <div className="flex items-center justify-between gap-3">
+            <p className="text-sm font-semibold text-ink">
+              {novedadesVisibles.length === 1 ? "1 novedad" : `${novedadesVisibles.length} novedades`} de tus colegas
+            </p>
+            <button onClick={marcarNovedadesVistas} className="shrink-0 text-xs text-accent hover:underline">
+              Marcar como vistas
+            </button>
+          </div>
+          <div className="mt-2 space-y-1.5">
+            {novedadesVisibles.slice(0, 6).map((n) => (
+              <button
+                key={n.id}
+                onClick={() => (n.casoId ? onAbrirCaso(n.casoId) : undefined)}
+                disabled={!n.casoId}
+                className="flex w-full items-center justify-between gap-3 rounded-lg border border-edge/10 bg-surface px-3 py-2 text-left text-sm text-ink enabled:hover:border-accent/40"
+              >
+                <span>{n.texto}</span>
+                <span className="shrink-0 text-xs text-ink/40">
+                  {new Date(n.fecha).toLocaleDateString("es-MX", { day: "2-digit", month: "short" })}
+                </span>
               </button>
             ))}
           </div>
@@ -379,7 +410,12 @@ function ResumenTab({
             </div>
           </div>
           <div className="rounded-2xl border border-edge/10 bg-surface p-5">
-            <h3 className="mb-3 text-sm font-semibold text-ink">Médicos con casos conectados ({conectados.medicos.length})</h3>
+            <div className="mb-3 flex items-center justify-between gap-2">
+              <h3 className="text-sm font-semibold text-ink">Médicos con casos conectados ({conectados.medicos.length})</h3>
+              <button onClick={() => setAdministrandoColegas(true)} className="shrink-0 text-xs text-accent hover:underline">
+                Mis colegas
+              </button>
+            </div>
             <div className="space-y-2">
               {conectados.medicos.map((m) => (
                 <button
@@ -406,6 +442,8 @@ function ResumenTab({
           </div>
         </div>
       )}
+
+      {administrandoColegas && <AdministrarColegas onClose={() => setAdministrandoColegas(false)} />}
 
       {!tieneColegas ? (
         <TarjetaBienvenida onCompletarPerfil={() => onIrATab("perfil")} onInvitar={onNuevaInterconsulta} />

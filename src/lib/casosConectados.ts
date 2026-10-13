@@ -4,7 +4,7 @@
  * lo de ese paciente (ver `soloDelPaciente`). */
 
 import { colegaDelCaso, type ResumenInvitacionDeCaso } from "./colegaDelCaso";
-import { normalizarNombre } from "./contactosColegas";
+import { normalizarNombre, resolverAlias, type PreferenciasContactos } from "./contactosColegas";
 import { capitalizarNombre } from "./textoNombre";
 import type { Interconsulta } from "./moConecta";
 
@@ -40,7 +40,8 @@ export function pacientesYMedicosConectados(
   casos: CasoMinimo[],
   uid: string,
   directorio: { uid: string; nombreCompleto: string }[],
-  invitaciones: Record<string, ResumenInvitacionDeCaso | undefined>
+  invitaciones: Record<string, ResumenInvitacionDeCaso | undefined>,
+  alias: PreferenciasContactos["alias"] = {}
 ): { pacientes: PacienteConectado[]; medicos: MedicoConectado[] } {
   const pacientes = new Map<string, PacienteConectado & { reciente: string }>();
   const medicos = new Map<string, MedicoConectado & { reciente: string }>();
@@ -53,16 +54,19 @@ export function pacientesYMedicosConectados(
     const kp = enviado ? `p:${c.pacienteId}` : `r:${nombrePaciente.toLowerCase()}`;
     const p = pacientes.get(kp) ?? { nombre: nombrePaciente, casos: 0, colegas: [], ultimoCasoId: c.id, reciente: c.actualizadoEl };
     p.casos += 1;
-    p.colegas = sinRepetir(p.colegas, colega.nombre);
+    p.colegas = sinRepetir(p.colegas, colega.pendiente ? resolverAlias(`n:${normalizarNombre(colega.nombre)}`, colega.nombre, alias).nombre : colega.nombre);
     pacientes.set(kp, p);
 
     // Mismo colega = mismo uid; si todavía no acepta, mismo correo con que se le
     // invitó o, en su defecto, mismo nombre (sin acentos ni mayúsculas).
     const otroUid = enviado ? c.destinatarioUid : c.odontologoRemitenteUid;
     const correoInvitado = invitaciones[c.id]?.destinatarioCorreo;
-    const km = otroUid ? `u:${otroUid}` : correoInvitado ? `c:${correoInvitado.toLowerCase()}` : `n:${normalizarNombre(colega.nombre)}`;
+    const kmCrudo = otroUid ? `u:${otroUid}` : correoInvitado ? `c:${correoInvitado.toLowerCase()}` : `n:${normalizarNombre(colega.nombre)}`;
+    // Los pendientes pueden estar unidos a otro colega ("es la misma persona").
+    const oficial = otroUid ? { clave: kmCrudo, nombre: colega.nombre } : resolverAlias(kmCrudo, colega.nombre, alias);
+    const km = oficial.clave;
     const m = medicos.get(km) ?? {
-      nombre: colega.pendiente ? capitalizarNombre(colega.nombre) : colega.nombre,
+      nombre: colega.pendiente ? capitalizarNombre(oficial.nombre) : colega.nombre,
       enviados: 0,
       recibidos: 0,
       pacientes: [],

@@ -63,6 +63,7 @@ describe("aceptar un enlace abre todos los casos enviados juntos", () => {
       const d = (await dbAdmin.collection("interconsultas").doc(id).get()).data()!;
       expect(d.destinatarioUid).toBe("colega-grupo");
       expect(d.participantesAutorizados).toContain("colega-grupo");
+      expect(typeof d.colegaSeUnioEl).toBe("string"); // para avisarle a quien envió
     }
     const ajeno = (await dbAdmin.collection("interconsultas").doc("ic-otro").get()).data()!;
     expect(ajeno.participantesAutorizados).toEqual([OTRO]);

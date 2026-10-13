@@ -10,6 +10,8 @@
 import { createContext, useContext, useEffect, useState, type ReactNode } from "react";
 import { collection, doc, onSnapshot, query, where, type Unsubscribe } from "firebase/firestore";
 import { db } from "@/lib/firebase";
+import { useNovedadesConecta } from "@/lib/useNovedadesConecta";
+import type { Novedad } from "@/lib/novedadesConecta";
 import type { AfiliacionClinica, Interconsulta, PerfilProfesionalPrivado, PerfilProfesionalPublico } from "@/lib/moConecta";
 
 export type PacientePreseleccionado = { patientId: string; patientName: string };
@@ -42,6 +44,10 @@ type MoConectaContextValue = {
    * muestra el módulo completo. */
   alcanceDeExpediente: PacientePreseleccionado | null;
   limpiarAlcanceDeExpediente: () => void;
+  /** Lo que los colegas hicieron con lo que enviaste/compartiste desde la última
+   * vez que lo viste (ver novedadesConecta.ts). */
+  novedades: Novedad[];
+  marcarNovedadesVistas: () => void;
 };
 
 const MoConectaContext = createContext<MoConectaContextValue | null>(null);
@@ -118,6 +124,7 @@ export function MoConectaProvider({ uid, children }: { uid: string; children: Re
 
   const casosEnviados = misCasos.filter((c) => c.odontologoRemitenteUid === uid);
   const casosRecibidos = misCasos.filter((c) => c.odontologoRemitenteUid !== uid);
+  const { novedades, marcarVistas: marcarNovedadesVistas } = useNovedadesConecta(uid, casosEnviados, directorio);
 
   return (
     <MoConectaContext.Provider
@@ -144,6 +151,8 @@ export function MoConectaProvider({ uid, children }: { uid: string; children: Re
         },
         alcanceDeExpediente,
         limpiarAlcanceDeExpediente: () => setAlcanceDeExpediente(null),
+        novedades,
+        marcarNovedadesVistas,
         limpiarInterconsultaPreseleccionada: () => setInterconsultaPreseleccionada(null),
       }}
     >

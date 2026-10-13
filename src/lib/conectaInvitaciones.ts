@@ -223,6 +223,7 @@ export async function reclamarInvitacion(
             destinatarioUid: interconsulta.destinatarioUid ?? uid,
             fuenteInvitacion: "invitacion_enlace",
             invitacionId: l.invitacion.id,
+            colegaSeUnioEl: ahora,
             actualizadoEl: ahora,
           }),
           { merge: true }

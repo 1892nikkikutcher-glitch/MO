@@ -127,3 +127,83 @@ export function escribirContactosLocales(lista: ContactoColega[]): void {
     // Almacenamiento bloqueado (modo privado, etc.): el atajo simplemente no se recuerda.
   }
 }
+
+/** Preferencias de tu agenda de colegas, guardadas en tu cuenta:
+ *  - `ocultos`: colegas que quitaste (por su identidad), para que no reaparezcan
+ *    desde invitaciones viejas;
+ *  - `alias`: "esta persona es la misma que aquella" — junta en los paneles a quien
+ *    se invitó varias veces con nombres distintos. */
+export type PreferenciasContactos = {
+  ocultos: string[];
+  alias: Record<string, { clave: string; nombre: string }>;
+};
+
+export const SIN_PREFERENCIAS: PreferenciasContactos = { ocultos: [], alias: {} };
+
+/** Todas las identidades por las que se puede reconocer a un contacto: su correo,
+ * su WhatsApp y su nombre normalizado. */
+export function clavesDeContacto(c: { nombre?: string; correo?: string; whatsapp?: string }): string[] {
+  const claves: string[] = [];
+  const correo = (c.correo ?? "").trim().toLowerCase();
+  if (correo) claves.push(`c:${correo}`);
+  const tel = telefonoLocal(c.whatsapp ?? "");
+  if (tel) claves.push(`w:${tel}`);
+  const nombre = normalizarNombre(c.nombre ?? "");
+  if (nombre) claves.push(`n:${nombre}`);
+  return claves;
+}
+
+/** Quita de la lista a los colegas que el usuario ocultó. */
+export function aplicarOcultos(lista: ContactoColega[], ocultos: string[]): ContactoColega[] {
+  if (ocultos.length === 0) return lista;
+  const set = new Set(ocultos);
+  return lista.filter((c) => !clavesDeContacto(c).some((k) => set.has(k)));
+}
+
+/** Oculta a un colega (todas sus identidades, salvo las que se indiquen conservar). */
+export function ocultarContacto(prefs: PreferenciasContactos, c: ContactoColega, conservar: string[] = []): PreferenciasContactos {
+  const nuevas = clavesDeContacto(c).filter((k) => !conservar.includes(k));
+  return { ...prefs, ocultos: [...new Set([...prefs.ocultos, ...nuevas])] };
+}
+
+/** Si un colega vuelve a invitarse o a guardarse, deja de estar oculto. */
+export function mostrarContacto(prefs: PreferenciasContactos, c: ContactoColega): PreferenciasContactos {
+  const claves = new Set(clavesDeContacto(c));
+  return { ...prefs, ocultos: prefs.ocultos.filter((k) => !claves.has(k)) };
+}
+
+/** "Es la misma persona": todo lo de `origen` pasa a `destino`. Devuelve las
+ * preferencias nuevas y el contacto destino ya completado con los datos del origen. */
+export function unirComoMismaPersona(
+  prefs: PreferenciasContactos,
+  origen: ContactoColega,
+  destino: ContactoColega
+): { prefs: PreferenciasContactos; destino: ContactoColega } {
+  // Los paneles agrupan por correo (si se invitó con él) o por nombre: a eso apunta el alias.
+  const correoDestino = destino.correo.trim().toLowerCase();
+  const claveDestino = correoDestino ? `c:${correoDestino}` : `n:${normalizarNombre(destino.nombre)}`;
+  const alias = { ...prefs.alias };
+  for (const k of clavesDeContacto(origen)) {
+    if (!clavesDeContacto(destino).includes(k)) alias[k] = { clave: claveDestino, nombre: destino.nombre };
+  }
+  const fusionado: ContactoColega = {
+    nombre: destino.nombre || origen.nombre,
+    whatsapp: destino.whatsapp || origen.whatsapp,
+    correo: destino.correo || origen.correo,
+    ultimoUso: masReciente(destino.ultimoUso, origen.ultimoUso),
+  };
+  const sinOrigen = ocultarContacto({ ...prefs, alias }, origen, clavesDeContacto(fusionado));
+  return { prefs: mostrarContacto(sinOrigen, fusionado), destino: fusionado };
+}
+
+/** Para los paneles: la identidad "oficial" de un colega según los alias. */
+export function resolverAlias(
+  clave: string,
+  nombre: string,
+  alias: PreferenciasContactos["alias"]
+): { clave: string; nombre: string } {
+  const porClave = alias[clave];
+  if (porClave) return porClave;
+  const porNombre = alias[`n:${normalizarNombre(nombre)}`];
+  return porNombre ?? { clave, nombre };
+}
