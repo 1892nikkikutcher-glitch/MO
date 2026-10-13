@@ -19,6 +19,9 @@ describe("mensajeAvisoCaso", () => {
     expect(m.startsWith("Hola Mariana,")).toBe(true);
     expect(m).toContain("Recibidos");
   });
+  it("con varios casos lo dice en plural", () => {
+    expect(mensajeAvisoCaso("Dra. Mariana", 3)).toContain("te envié 3 casos");
+  });
   it("sin nombre sigue siendo un mensaje válido", () => {
     expect(mensajeAvisoCaso("").startsWith("Hola,")).toBe(true);
   });

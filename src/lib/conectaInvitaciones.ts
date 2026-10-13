@@ -27,6 +27,7 @@ export type CrearInvitacionInput = {
    * (nunca se guarda ese número aquí, solo se usa del lado del cliente
    * para armar el mensaje) y todo reclamo exige aprobación manual. */
   destinatarioCorreo?: string;
+  grupoId?: string;
   canal: CanalInvitacion;
 };
 
@@ -73,6 +74,7 @@ export async function crearInvitacion(
     destinatarioNombre: input.destinatarioNombre,
     destinatarioCorreoNormalizado: input.destinatarioCorreo ? normalizarCorreo(input.destinatarioCorreo) : undefined,
     interconsultaId: input.interconsultaId,
+    grupoId: input.grupoId,
     canal: input.canal,
     creadoEl: ahora.toISOString(),
     venceEl: fechaVencimientoInvitacion(ahora),
@@ -143,9 +145,13 @@ export async function obtenerInvitacionPublica(tokenCrudo: string) {
   };
 }
 
-export type ReclamarInvitacionResultado =
+export type ReclamarInvitacionResultado = (
   | { tipo: "acceso_otorgado"; interconsultaId: string }
-  | { tipo: "solicitud_creada"; interconsultaId: string; solicitudId: string };
+  | { tipo: "solicitud_creada"; interconsultaId: string; solicitudId: string }
+) & {
+  /** Otros casos enviados juntos que se procesaron con este mismo enlace. */
+  adicionales?: number;
+};
 
 export async function reclamarInvitacion(
   uid: string,
@@ -164,78 +170,99 @@ export async function reclamarInvitacion(
   const invitacionQuery = await dbAdmin.collection("invitacionesConecta").where("tokenHash", "==", tokenHash).limit(1).get();
   if (invitacionQuery.empty) throw new ConectaError(404, "Invitación no encontrada.");
   const invitacionRef = invitacionQuery.docs[0].ref;
+  const primera = invitacionQuery.docs[0].data() as InvitacionConecta;
+
+  // Hermanas: las invitaciones que el MISMO remitente creó junto con esta (mismo
+  // grupo) — aceptar un enlace abre todos esos casos.
+  let hermanasRefs: FirebaseFirestore.DocumentReference[] = [];
+  if (primera.grupoId) {
+    const grupo = await dbAdmin.collection("invitacionesConecta").where("grupoId", "==", primera.grupoId).get();
+    hermanasRefs = grupo.docs
+      .filter((d) => d.id !== invitacionRef.id && (d.data() as InvitacionConecta).remitenteUid === primera.remitenteUid)
+      .map((d) => d.ref);
+  }
 
   const resultado = await dbAdmin.runTransaction(async (tx) => {
-    const invitacionSnap = await tx.get(invitacionRef);
-    const invitacion = invitacionSnap.data() as InvitacionConecta;
+    // Todas las lecturas primero (Firestore no permite leer después de escribir).
+    const lecturas = await Promise.all(
+      [invitacionRef, ...hermanasRefs].map(async (invRef) => {
+        const invitacion = (await tx.get(invRef)).data() as InvitacionConecta;
+        const interconsultaRef = dbAdmin.collection("interconsultas").doc(invitacion.interconsultaId);
+        const interconsultaSnap = await tx.get(interconsultaRef);
+        // Un solo campo en el where (sin índice compuesto): en la práctica son 0 o 1 documentos por uid.
+        const solicitudes = await tx.get(interconsultaRef.collection("solicitudesAcceso").where("solicitanteUid", "==", uid));
+        return {
+          invRef,
+          invitacion,
+          interconsultaRef,
+          interconsulta: interconsultaSnap.exists ? (interconsultaSnap.data() as Interconsulta) : null,
+          solicitudPendiente: solicitudes.docs.map((d) => d.data() as SolicitudAcceso).find((s) => s.estado === "pendiente"),
+        };
+      })
+    );
 
-    if (invitacion.estado !== "activa") throw new ConectaError(410, "Esta invitación ya no está disponible.");
-    if (invitacionVencida(invitacion)) throw new ConectaError(410, "Esta invitación venció.");
-    if (invitacion.usosActuales >= invitacion.maxUsos) throw new ConectaError(410, "Esta invitación ya fue utilizada.");
-
-    const interconsultaRef = dbAdmin.collection("interconsultas").doc(invitacion.interconsultaId);
-    const interconsultaSnap = await tx.get(interconsultaRef);
-    if (!interconsultaSnap.exists) throw new ConectaError(404, "El caso de esta invitación ya no existe.");
-    const interconsulta = interconsultaSnap.data() as Interconsulta;
+    const [principal, ...hermanas] = lecturas;
+    if (principal.invitacion.estado !== "activa") throw new ConectaError(410, "Esta invitación ya no está disponible.");
+    if (invitacionVencida(principal.invitacion)) throw new ConectaError(410, "Esta invitación venció.");
+    if (principal.invitacion.usosActuales >= principal.invitacion.maxUsos) throw new ConectaError(410, "Esta invitación ya fue utilizada.");
+    if (!principal.interconsulta) throw new ConectaError(404, "El caso de esta invitación ya no existe.");
 
     const ahora = nowISO();
-    const identidadCoincide = coincideIdentidad(invitacion.destinatarioCorreoNormalizado, correoVerificado, emailVerificado);
+    const procesar = (l: (typeof lecturas)[number]) => {
+      const interconsulta = l.interconsulta as Interconsulta;
+      const identidadCoincide = coincideIdentidad(l.invitacion.destinatarioCorreoNormalizado, correoVerificado, emailVerificado);
 
-    if (identidadCoincide) {
-      const participantes = interconsulta.participantesAutorizados.includes(uid)
-        ? interconsulta.participantesAutorizados
-        : [...interconsulta.participantesAutorizados, uid];
-      tx.set(
-        interconsultaRef,
-        sinIndefinidos({
-          participantesAutorizados: participantes,
-          destinatarioUid: interconsulta.destinatarioUid ?? uid,
-          fuenteInvitacion: "invitacion_enlace",
-          invitacionId: invitacion.id,
-          actualizadoEl: ahora,
-        }),
-        { merge: true }
-      );
-      tx.set(invitacionRef, { estado: "reclamada", usosActuales: FieldValue.increment(1) }, { merge: true });
-      return { tipo: "acceso_otorgado" as const, interconsultaId: invitacion.interconsultaId };
-    }
+      if (identidadCoincide) {
+        const participantes = interconsulta.participantesAutorizados.includes(uid)
+          ? interconsulta.participantesAutorizados
+          : [...interconsulta.participantesAutorizados, uid];
+        tx.set(
+          l.interconsultaRef,
+          sinIndefinidos({
+            participantesAutorizados: participantes,
+            destinatarioUid: interconsulta.destinatarioUid ?? uid,
+            fuenteInvitacion: "invitacion_enlace",
+            invitacionId: l.invitacion.id,
+            actualizadoEl: ahora,
+          }),
+          { merge: true }
+        );
+        tx.set(l.invRef, { estado: "reclamada", usosActuales: FieldValue.increment(1) }, { merge: true });
+        return { tipo: "acceso_otorgado" as const, interconsultaId: l.invitacion.interconsultaId };
+      }
 
-    // A diferencia del acceso otorgado (arriba), un correo que NO coincide
-    // nunca marca la invitación como "reclamada" ni cuenta como uso — no se
-    // otorgó ningún acceso real, así que quemar el único uso permitido
-    // dejaría sin forma de reintentar a alguien que simplemente se
-    // equivocó de cuenta (ver "identifícate de nuevo" en la página de
-    // invitación). La invitación sigue "activa" y reintentable hasta que
-    // alguien la reclame de verdad o venza por fecha.
-    // Un solo campo en el where (sin índice compuesto que aprovisionar) —
-    // en la práctica son 0 o 1 documentos por uid, así que filtrar
-    // "pendiente" en memoria es tan barato como un segundo where y no
-    // depende de crear un índice nuevo en Firestore.
-    const solicitudesDeEsteUid = await tx.get(
-      interconsultaRef.collection("solicitudesAcceso").where("solicitanteUid", "==", uid)
-    );
-    const solicitudPendienteExistente = solicitudesDeEsteUid.docs
-      .map((d) => d.data() as SolicitudAcceso)
-      .find((s) => s.estado === "pendiente");
-    if (solicitudPendienteExistente) {
-      return {
-        tipo: "solicitud_creada" as const,
-        interconsultaId: invitacion.interconsultaId,
-        solicitudId: solicitudPendienteExistente.id,
+      // A diferencia del acceso otorgado, un correo que NO coincide nunca marca la
+      // invitación como "reclamada" ni cuenta como uso — no se otorgó ningún acceso
+      // real, así que quemar el único uso dejaría sin forma de reintentar a quien se
+      // equivocó de cuenta. La invitación sigue "activa" hasta que alguien la reclame
+      // de verdad o venza por fecha.
+      if (l.solicitudPendiente) {
+        return { tipo: "solicitud_creada" as const, interconsultaId: l.invitacion.interconsultaId, solicitudId: l.solicitudPendiente.id };
+      }
+      const solicitudRef = l.interconsultaRef.collection("solicitudesAcceso").doc();
+      const solicitud: SolicitudAcceso = {
+        id: solicitudRef.id,
+        solicitanteUid: uid,
+        identidadVerificadaUsada: correoVerificado ? normalizarCorreo(correoVerificado) : "",
+        estado: "pendiente",
+        creadoEl: ahora,
+        venceEl: fechaVencimientoSolicitudAcceso(),
       };
-    }
-
-    const solicitudRef = interconsultaRef.collection("solicitudesAcceso").doc();
-    const solicitud: SolicitudAcceso = {
-      id: solicitudRef.id,
-      solicitanteUid: uid,
-      identidadVerificadaUsada: correoVerificado ? normalizarCorreo(correoVerificado) : "",
-      estado: "pendiente",
-      creadoEl: ahora,
-      venceEl: fechaVencimientoSolicitudAcceso(),
+      tx.set(solicitudRef, solicitud);
+      return { tipo: "solicitud_creada" as const, interconsultaId: l.invitacion.interconsultaId, solicitudId: solicitudRef.id };
     };
-    tx.set(solicitudRef, solicitud);
-    return { tipo: "solicitud_creada" as const, interconsultaId: invitacion.interconsultaId, solicitudId: solicitudRef.id };
+
+    const resultadoPrincipal = procesar(principal);
+    // Las hermanas que ya no estén disponibles simplemente se omiten.
+    const utiles = hermanas.filter(
+      (h) =>
+        h.interconsulta &&
+        h.invitacion.estado === "activa" &&
+        !invitacionVencida(h.invitacion) &&
+        h.invitacion.usosActuales < h.invitacion.maxUsos
+    );
+    utiles.forEach(procesar);
+    return { ...resultadoPrincipal, adicionales: utiles.length } as ReclamarInvitacionResultado;
   });
 
   return resultado;

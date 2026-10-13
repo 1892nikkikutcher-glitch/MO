@@ -1,6 +1,8 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { collection, doc, onSnapshot, setDoc } from "firebase/firestore";
+import { db } from "@/lib/firebase";
 import { useMoConecta } from "@/context/MoConectaContext";
 import { useInvitacionesDeCasos } from "@/lib/useInvitacionesDeCasos";
 import { capitalizarNombre } from "@/lib/textoNombre";
@@ -8,28 +10,75 @@ import {
   contactosDeInvitaciones,
   escribirContactosLocales,
   guardarContacto,
+  idContacto,
   leerContactosLocales,
+  mismoColega,
   telefonoLocal,
   unirContactos,
   type ContactoColega,
 } from "@/lib/contactosColegas";
 
-/** Colegas que ya invitaste (invitaciones previas + agenda de este dispositivo),
- * para llenar de un toque su nombre, WhatsApp y correo en vez de volver a
- * capturarlos en cada interconsulta. */
+/** Tu agenda de colegas: se guarda en TU cuenta (users/{uid}/contactosColegas),
+ * así aparece igual en el celular y en la computadora, con nombre, WhatsApp y
+ * correo. Se suma a lo que ya se sabe de tus invitaciones anteriores y a la
+ * copia de este dispositivo (lo que ya habías capturado antes se sube solo). */
 export function useContactosColegas() {
-  const { casosEnviados } = useMoConecta();
+  const { uid, casosEnviados } = useMoConecta();
   const invitaciones = useInvitacionesDeCasos(casosEnviados.filter((c) => !c.destinatarioUid).map((c) => c.id));
   const [locales, setLocales] = useState<ContactoColega[]>([]);
+  const [nube, setNube] = useState<ContactoColega[] | null>(null);
+  const migrado = useRef(false);
+
   useEffect(() => setLocales(leerContactosLocales()), []);
+
+  useEffect(() => {
+    if (!uid) return;
+    return onSnapshot(
+      collection(db, `users/${uid}/contactosColegas`),
+      (snap) => setNube(snap.docs.map((d) => d.data() as ContactoColega)),
+      (err) => {
+        console.error("No se pudo leer tu agenda de colegas", err);
+        setNube([]);
+      }
+    );
+  }, [uid]);
+
   const contactos = useMemo(
-    () => unirContactos(locales, contactosDeInvitaciones(Object.values(invitaciones))),
-    [locales, invitaciones]
+    () => unirContactos(locales, nube ?? [], contactosDeInvitaciones(Object.values(invitaciones))),
+    [locales, nube, invitaciones]
   );
+
+  // Una sola vez: lo que ya estaba guardado solo en este dispositivo se sube a la cuenta.
+  useEffect(() => {
+    if (!uid || nube === null || migrado.current || locales.length === 0) return;
+    migrado.current = true;
+    locales
+      .filter((l) => !nube.some((n) => mismoColega(n, l) && n.whatsapp === l.whatsapp && n.correo === l.correo))
+      .forEach((l) => {
+        void setDoc(doc(db, `users/${uid}/contactosColegas`, idContacto(l)), l, { merge: true }).catch((e) =>
+          console.error("No se pudo subir un contacto", e)
+        );
+      });
+  }, [uid, nube, locales]);
+
   const recordar = (datos: { nombre: string; whatsapp: string; correo: string }) => {
-    const siguiente = guardarContacto(locales, { ...datos, correo: datos.correo.trim(), ultimoUso: new Date().toISOString() });
+    const nuevo: ContactoColega = {
+      nombre: capitalizarNombre(datos.nombre.trim()),
+      whatsapp: datos.whatsapp.trim(),
+      correo: datos.correo.trim(),
+      ultimoUso: new Date().toISOString(),
+    };
+    if (!nuevo.nombre && !nuevo.correo && !telefonoLocal(nuevo.whatsapp)) return;
+    // Se funde con lo que ya se sabía de ese colega (sin perder su correo o WhatsApp).
+    const fusionado = unirContactos(contactos, [nuevo]).find((c) => mismoColega(c, nuevo)) ?? nuevo;
+    const siguiente = guardarContacto(locales, fusionado);
     setLocales(siguiente);
     escribirContactosLocales(siguiente);
+    if (uid) {
+      void setDoc(doc(db, `users/${uid}/contactosColegas`, idContacto(fusionado)), fusionado, { merge: true }).catch((e) =>
+        console.error("No se pudo guardar el contacto", e)
+      );
+    }
   };
   return { contactos, recordar };
 }

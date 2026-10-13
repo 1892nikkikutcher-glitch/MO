@@ -45,9 +45,16 @@ export function claveContacto(c: Identidad): string {
 
 const masReciente = (a: string, b: string) => (a >= b ? a : b);
 
+/** Id del documento en Firestore (users/{uid}/contactosColegas/{id}): sale de la
+ * identidad del contacto (correo, WhatsApp o nombre) con solo caracteres
+ * seguros, así guardar al mismo colega dos veces actualiza el mismo documento. */
+export function idContacto(c: { nombre?: string; correo?: string; whatsapp?: string }): string {
+  return claveContacto(c).replace(/[^a-z0-9@._-]+/g, "_").slice(0, 150);
+}
+
 /** Dos capturas son el mismo colega si comparten correo o WhatsApp, o si tienen
  * el mismo nombre y a una de las dos le faltan esos datos. */
-function mismoColega(a: ContactoColega, b: ContactoColega): boolean {
+export function mismoColega(a: ContactoColega, b: ContactoColega): boolean {
   const ca = a.correo.trim().toLowerCase();
   const cb = b.correo.trim().toLowerCase();
   if (ca && cb) return ca === cb;

@@ -15,7 +15,7 @@ import { AtajoColegas, useContactosColegas } from "./ContactosColegas";
 import { manejarCambioNombre } from "@/lib/textoNombre";
 import { useCalendariosCompartidos } from "@/lib/useCalendariosCompartidos";
 import type { CalendarioCompartidoDoc, OcupacionDeCalendario } from "@/lib/calendarioOcupacion";
-import { leerContactosLocales, normalizarNombre } from "@/lib/contactosColegas";
+import { normalizarNombre } from "@/lib/contactosColegas";
 import { urlWhatsApp } from "@/lib/avisoWhatsApp";
 import { DIAS_SEMANA, MESES_ABR, addDays, getMonday, timeToMinutes, toISODate } from "@/lib/agendaHelpers";
 import type { Recurso } from "@/lib/patientData";
@@ -124,7 +124,7 @@ export function CompartirCalendarioDialog({
     try {
       await compartirCalendarioApi({ clinicaId: clinicUid, recursoId: recurso.id, destinatarioUid: elegido.uid });
       // El número se busca en los colegas que ya invitaste desde este dispositivo.
-      const guardado = leerContactosLocales().find((c) => normalizarNombre(c.nombre) === normalizarNombre(elegido.nombreCompleto));
+      const guardado = contactos.find((c) => c.whatsapp && normalizarNombre(c.nombre) === normalizarNombre(elegido.nombreCompleto));
       setNumero(guardado?.whatsapp ?? "");
       setRecienCompartido({ nombre: elegido.nombreCompleto });
       setElegido(null);
@@ -285,7 +285,14 @@ export function CompartirCalendarioDialog({
                 }}
               />
               <input className={inputClass} placeholder="Nombre del colega" value={invNombre} onChange={(e) => manejarCambioNombre(e, setInvNombre)} />
-              <input className={inputClass} type="tel" placeholder="WhatsApp (10 dígitos), opcional" value={invWhatsapp} onChange={(e) => setInvWhatsapp(e.target.value)} />
+              <input
+                className={inputClass}
+                type="tel"
+                placeholder="WhatsApp (10 dígitos), opcional"
+                value={invWhatsapp}
+                onChange={(e) => setInvWhatsapp(e.target.value)}
+                onBlur={() => invNombre.trim() && recordar({ nombre: invNombre, whatsapp: invWhatsapp, correo: invCorreo })}
+              />
               <input className={inputClass} type="email" placeholder="Correo (opcional): si lo pones, solo ese correo puede aceptar" value={invCorreo} onChange={(e) => setInvCorreo(e.target.value)} />
               <div className="flex gap-2">
                 <button onClick={crearInvitacion} disabled={trabajando} className={botonPrimario}>

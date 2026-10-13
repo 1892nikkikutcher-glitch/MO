@@ -198,6 +198,8 @@ export type CrearInvitacionBody = {
   interconsultaId: string;
   destinatarioNombre?: string;
   destinatarioCorreo?: string;
+  /** Casos enviados juntos al mismo colega: un solo enlace abre todos. */
+  grupoId?: string;
   canal: "whatsapp" | "correo" | "copiar_enlace";
 };
 

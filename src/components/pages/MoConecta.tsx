@@ -48,6 +48,7 @@ import { colegaDelCaso } from "@/lib/colegaDelCaso";
 import ExpedienteCompartidoVista, { ElegirQueCompartirRapido } from "./ExpedienteCompartidoVista";
 import { CalendariosCompartidosTab } from "./CalendariosCompartidos";
 import AvisoAlColega from "./AvisoAlColega";
+import SelectorPacientes from "./SelectorPacientes";
 import type { SeccionCompartible } from "@/lib/expedienteCompartido";
 import { useInvitacionesDeCasos } from "@/lib/useInvitacionesDeCasos";
 
@@ -76,8 +77,8 @@ function numeroWhatsappCompleto(numero: string): string {
  * que cualquier colega se dé de alta en MO sin pasar primero por "/". Con
  * número de WhatsApp se manda directo a ese contacto; sin él, WhatsApp
  * abre su selector de contactos (mismo comportamiento de antes). */
-function enviarInvitacionPorWhatsApp(nombreDestinatario: string, enlace: string, numeroWhatsapp?: string) {
-  const mensaje = buildMensajeInvitacionConecta(nombreDestinatario || "colega", enlace);
+function enviarInvitacionPorWhatsApp(nombreDestinatario: string, enlace: string, numeroWhatsapp?: string, cantidad = 1) {
+  const mensaje = buildMensajeInvitacionConecta(nombreDestinatario || "colega", enlace, cantidad);
   const numero = numeroWhatsapp ? numeroWhatsappCompleto(numeroWhatsapp) : "";
   const destino = numero ? `https://wa.me/${numero}` : "https://wa.me/";
   window.open(`${destino}?text=${encodeURIComponent(mensaje)}`, "_blank");
@@ -1074,7 +1075,16 @@ function NuevaInterconsultaDialog({
   );
   const [busquedaColega, setBusquedaColega] = useState("");
   const { contactos, recordar } = useContactosColegas();
-  const [pacienteId, setPacienteId] = useState(alcance?.patientId ?? pacientePreseleccionado?.patientId ?? "");
+  const [pacienteIds, setPacienteIds] = useState<string[]>(() => {
+    const inicial = alcance?.patientId ?? pacientePreseleccionado?.patientId;
+    return inicial ? [inicial] : [];
+  });
+  const [progreso, setProgreso] = useState<{ hechos: number; total: number } | null>(null);
+  const [resumen, setResumen] = useState<{
+    creados: { pacienteId: string; nombre: string; interconsultaId: string }[];
+    fallidos: { pacienteId: string; nombre: string; error: string }[];
+    enlace: string | null;
+  } | null>(null);
   const [especialidadSolicitada, setEspecialidadSolicitada] = useState("");
   const [motivo, setMotivo] = useState("");
   const [preguntaClinica, setPreguntaClinica] = useState("");
@@ -1093,58 +1103,90 @@ function NuevaInterconsultaDialog({
   const [enlace, setEnlace] = useState<string | null>(null);
   const [copiado, setCopiado] = useState(false);
 
-  const pacienteSeleccionado = patients.find((p) => p.id === pacienteId);
 
   async function enviar() {
-    if (!clinicUid || !pacienteSeleccionado) return;
+    if (!clinicUid || pacienteIds.length === 0) return;
     setEnviando(true);
     setError(null);
-    try {
-      const { interconsulta } = await crearInterconsultaApi({
-        clinicaRemitenteId: clinicUid,
-        pacienteId,
-        especialidadSolicitada,
-        motivo,
-        preguntaClinica,
-        prioridad,
-        tipoInterconsulta,
-        destinatarioUid: destinatario?.uid,
-        informacionMinima: informacionMinima || undefined,
-        seccionesCompartidas: seccionesCompartidas.length > 0 ? seccionesCompartidas : undefined,
-        consentimiento: {
-          destinatarioTipo: destinatario ? "odontologo_registrado" : "invitacion",
-          destinatarioId: destinatario?.uid,
-          finalidad: "Interconsulta odontológica para valoración/tratamiento del paciente.",
-          informacionCompartida: ["Resumen de historia clínica", "Motivo y pregunta clínica", especialidadSolicitada].filter(
-            Boolean
-          ),
-        },
-      });
-      limpiarPacientePreseleccionado();
+    setProgreso({ hechos: 0, total: pacienteIds.length });
+    // Varios casos a un colega sin cuenta: comparten grupo, así un solo enlace abre todos.
+    const grupoId = !destinatario && pacienteIds.length > 1 ? `g${crypto.randomUUID().replace(/-/g, "")}` : undefined;
+    const creados: { pacienteId: string; nombre: string; interconsultaId: string }[] = [];
+    const fallidos: { pacienteId: string; nombre: string; error: string }[] = [];
+    let enlaceGrupo: string | null = null;
 
-      if (destinatario) {
-        onCreada(interconsulta.id);
-        return;
+    for (const [i, pid] of pacienteIds.entries()) {
+      const nombrePaciente = patients.find((p) => p.id === pid)?.name ?? pid;
+      try {
+        const { interconsulta } = await crearInterconsultaApi({
+          clinicaRemitenteId: clinicUid,
+          pacienteId: pid,
+          especialidadSolicitada,
+          motivo,
+          preguntaClinica,
+          prioridad,
+          tipoInterconsulta,
+          destinatarioUid: destinatario?.uid,
+          informacionMinima: informacionMinima || undefined,
+          seccionesCompartidas: seccionesCompartidas.length > 0 ? seccionesCompartidas : undefined,
+          consentimiento: {
+            destinatarioTipo: destinatario ? "odontologo_registrado" : "invitacion",
+            destinatarioId: destinatario?.uid,
+            finalidad: "Interconsulta odontológica para valoración/tratamiento del paciente.",
+            informacionCompartida: ["Resumen de historia clínica", "Motivo y pregunta clínica", especialidadSolicitada].filter(
+              Boolean
+            ),
+          },
+        });
+        // Sin destinatario del directorio: la invitación se crea de una vez con el
+        // contacto del especialista, en el mismo paso.
+        if (!destinatario) {
+          try {
+            const { enlace: url } = await crearInvitacionApi({
+              interconsultaId: interconsulta.id,
+              destinatarioNombre: nombreEspecialista || undefined,
+              destinatarioCorreo: correoEspecialista.trim() || undefined,
+              grupoId,
+              canal: "copiar_enlace",
+            });
+            enlaceGrupo = enlaceGrupo ?? url;
+          } catch (errInvitacion) {
+            // Sin enlace el caso quedaría creado "para nadie": se cancela para no dejarlo huérfano.
+            transicionarEstadoApi(interconsulta.id, "cancelled").catch(() => {});
+            throw errInvitacion;
+          }
+        }
+        creados.push({ pacienteId: pid, nombre: nombrePaciente, interconsultaId: interconsulta.id });
+      } catch (err) {
+        fallidos.push({
+          pacienteId: pid,
+          nombre: nombrePaciente,
+          error: err instanceof Error ? err.message : "No se pudo crear la interconsulta.",
+        });
       }
-
-      // Sin destinatario del directorio: se crea la invitación de una vez con
-      // el contacto del especialista, en el mismo paso — sin esto, el caso
-      // quedaba creado "para nadie" hasta un segundo clic aparte en la Sala
-      // del Caso para recién ahí generar el enlace.
-      const { enlace: url } = await crearInvitacionApi({
-        interconsultaId: interconsulta.id,
-        destinatarioNombre: nombreEspecialista || undefined,
-        destinatarioCorreo: correoEspecialista.trim() || undefined,
-        canal: "copiar_enlace",
-      });
-      setInterconsultaCreadaId(interconsulta.id);
-      setEnlace(url);
-      recordar({ nombre: nombreEspecialista, whatsapp: whatsappEspecialista, correo: correoEspecialista });
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "No se pudo crear la interconsulta.");
-    } finally {
-      setEnviando(false);
+      setProgreso({ hechos: i + 1, total: pacienteIds.length });
     }
+
+    limpiarPacientePreseleccionado();
+    if (creados.length > 0 && !destinatario) {
+      recordar({ nombre: nombreEspecialista, whatsapp: whatsappEspecialista, correo: correoEspecialista });
+    }
+    setEnviando(false);
+    setProgreso(null);
+
+    if (pacienteIds.length === 1) {
+      // Un solo paciente: igual que siempre.
+      if (fallidos.length > 0) {
+        setError(fallidos[0].error);
+      } else if (destinatario) {
+        onCreada(creados[0].interconsultaId);
+      } else {
+        setInterconsultaCreadaId(creados[0].interconsultaId);
+        setEnlace(enlaceGrupo);
+      }
+      return;
+    }
+    setResumen({ creados, fallidos, enlace: enlaceGrupo });
   }
 
   async function copiarEnlace() {
@@ -1157,6 +1199,99 @@ function NuevaInterconsultaDialog({
       // bloquea el portapapeles.
     }
     registrarEventoApi("invite_shared", { interconsultaId: interconsultaCreadaId ?? undefined }).catch(() => {});
+  }
+
+  if (resumen) {
+    const nombreColega = destinatario?.nombreCompleto ?? (nombreEspecialista || "tu colega");
+    return (
+      <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4">
+        <div className="max-h-[90vh] w-full max-w-md overflow-y-auto rounded-2xl border border-edge/10 bg-modal p-6">
+          <h2 className="mb-1 text-lg font-semibold text-ink">
+            {resumen.creados.length} {resumen.creados.length === 1 ? "caso enviado" : "casos enviados"}
+          </h2>
+          <p className="mb-3 text-sm text-ink/60">A {nombreColega}.</p>
+
+          {resumen.creados.length > 0 && (
+            <ul className="mb-3 divide-y divide-edge/5 rounded-lg border border-edge/10 text-sm text-ink/80">
+              {resumen.creados.map((c) => (
+                <li key={c.interconsultaId} className="px-3 py-1.5">
+                  ✓ {c.nombre}
+                </li>
+              ))}
+            </ul>
+          )}
+
+          {resumen.fallidos.length > 0 && (
+            <div className="mb-3 rounded-lg border border-danger/30 bg-danger/10 p-3 text-sm">
+              <p className="font-medium text-danger">
+                No se pudieron enviar {resumen.fallidos.length} {resumen.fallidos.length === 1 ? "caso" : "casos"}:
+              </p>
+              <ul className="mt-1 space-y-0.5 text-xs text-ink/70">
+                {resumen.fallidos.map((f) => (
+                  <li key={f.pacienteId}>
+                    {f.nombre} — {f.error}
+                  </li>
+                ))}
+              </ul>
+              <button
+                onClick={() => {
+                  setPacienteIds(resumen.fallidos.map((f) => f.pacienteId));
+                  setResumen(null);
+                }}
+                className="mt-2 text-xs text-accent hover:underline"
+              >
+                Volver a intentar con esos
+              </button>
+            </div>
+          )}
+
+          {resumen.creados.length > 0 &&
+            (resumen.enlace ? (
+              <div className="space-y-2">
+                <p className="text-sm text-ink/70">
+                  Un solo enlace abre todos los casos (vence en 7 días, un solo uso). Al abrirlo, si no tiene cuenta en MO
+                  puede crearla ahí mismo.
+                </p>
+                <input readOnly className={inputClass} value={resumen.enlace} onFocus={(e) => e.target.select()} />
+                <div className="flex flex-wrap gap-2">
+                  <button
+                    onClick={() => enviarInvitacionPorWhatsApp(nombreEspecialista, resumen.enlace!, whatsappEspecialista, resumen.creados.length)}
+                    className={botonSecundario}
+                  >
+                    Enviar por WhatsApp
+                  </button>
+                  <button
+                    onClick={async () => {
+                      try {
+                        await navigator.clipboard.writeText(resumen.enlace!);
+                        setCopiado(true);
+                      } catch {
+                        // El enlace queda visible para copiarlo a mano.
+                      }
+                    }}
+                    className={botonSecundario}
+                  >
+                    {copiado ? "¡Copiado!" : "Copiar enlace"}
+                  </button>
+                </div>
+              </div>
+            ) : (
+              <AvisoAlColega nombreColega={nombreColega} cantidad={resumen.creados.length} />
+            ))}
+
+          <div className="mt-5 flex justify-end gap-2">
+            <button onClick={onClose} className={botonSecundario}>
+              Cerrar
+            </button>
+            {resumen.creados.length > 0 && (
+              <button onClick={() => onCreada("")} className={botonPrimario}>
+                Ver mis casos
+              </button>
+            )}
+          </div>
+        </div>
+      </div>
+    );
   }
 
   if (enlace) {
@@ -1305,24 +1440,21 @@ function NuevaInterconsultaDialog({
                   type="tel"
                   value={whatsappEspecialista}
                   onChange={(e) => setWhatsappEspecialista(e.target.value)}
+                  onBlur={() =>
+                    nombreEspecialista.trim() &&
+                    recordar({ nombre: nombreEspecialista, whatsapp: whatsappEspecialista, correo: correoEspecialista })
+                  }
                   placeholder="10 dígitos — para mandarle el enlace directo por WhatsApp"
                 />
               </div>
             </>
           )}
           <div>
-            <label className={labelClass}>Paciente</label>
+            <label className={labelClass}>{alcance ? "Paciente" : "Paciente(s)"}</label>
             {alcance ? (
               <p className="rounded-lg border border-edge/10 bg-field px-3 py-2 text-sm text-ink">{alcance.patientName}</p>
             ) : (
-              <select className={inputClass} value={pacienteId} onChange={(e) => setPacienteId(e.target.value)}>
-                <option value="">Selecciona un paciente…</option>
-                {patients.map((p) => (
-                  <option key={p.id} value={p.id}>
-                    {p.name}
-                  </option>
-                ))}
-              </select>
+              <SelectorPacientes pacientes={patients} seleccionados={pacienteIds} onChange={setPacienteIds} />
             )}
           </div>
           <div>
@@ -1429,7 +1561,9 @@ function NuevaInterconsultaDialog({
                 checked={aceptaConsentimiento}
                 onChange={(e) => setAceptaConsentimiento(e.target.checked)}
               />
-              Cuento con el consentimiento del paciente para compartir esta información con el colega.
+              {pacienteIds.length > 1
+                ? "Cuento con el consentimiento de cada paciente para compartir esta información con el colega."
+                : "Cuento con el consentimiento del paciente para compartir esta información con el colega."}
             </label>
             <details className="mt-1 pl-6 text-xs text-ink/50">
               <summary className="cursor-pointer">Ver aviso</summary>
@@ -1448,12 +1582,18 @@ function NuevaInterconsultaDialog({
             onClick={enviar}
             disabled={
               enviando ||
-              !pacienteId ||
+              pacienteIds.length === 0 ||
               !aceptaConsentimiento
             }
             className={botonPrimario}
           >
-            {enviando ? "Enviando…" : "Enviar interconsulta"}
+            {enviando
+              ? progreso && progreso.total > 1
+                ? `Enviando ${Math.min(progreso.hechos + 1, progreso.total)} de ${progreso.total}…`
+                : "Enviando…"
+              : pacienteIds.length > 1
+                ? `Enviar ${pacienteIds.length} casos`
+                : "Enviar interconsulta"}
           </button>
         </div>
       </div>
@@ -1987,6 +2127,7 @@ function InvitarColegaDialog({ interconsultaId, onClose }: { interconsultaId: st
                 type="tel"
                 value={whatsapp}
                 onChange={(e) => setWhatsapp(e.target.value)}
+                onBlur={() => nombre.trim() && recordar({ nombre, whatsapp, correo })}
                 placeholder="10 dígitos — para enviarle el enlace directo por WhatsApp"
               />
             </div>

@@ -30,6 +30,7 @@ export async function POST(req: NextRequest) {
       interconsultaId: parsed.data.interconsultaId,
       destinatarioNombre: parsed.data.destinatarioNombre,
       destinatarioCorreo: parsed.data.destinatarioCorreo,
+      grupoId: parsed.data.grupoId,
       canal: parsed.data.canal,
     });
     await dbAdmin.collection("eventosCrecimientoConecta").add({

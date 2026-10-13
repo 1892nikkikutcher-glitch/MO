@@ -17,10 +17,10 @@ const primerNombre = (nombre: string) =>
     .trim()
     .split(/\s+/)[0] ?? "";
 
-export function mensajeAvisoCaso(nombreColega: string): string {
+export function mensajeAvisoCaso(nombreColega: string, cantidad = 1): string {
   const n = primerNombre(nombreColega);
-  return (
-    `Hola${n ? ` ${n}` : ""}, te envié un caso por MO Conecta. ` +
-    `Entra a MO → MO Conecta → Interconsultas → Recibidos para verlo y aceptarlo.`
-  );
+  const saludo = `Hola${n ? ` ${n}` : ""}`;
+  return cantidad > 1
+    ? `${saludo}, te envié ${cantidad} casos por MO Conecta. Entra a MO → MO Conecta → Interconsultas → Recibidos para verlos y aceptarlos.`
+    : `${saludo}, te envié un caso por MO Conecta. Entra a MO → MO Conecta → Interconsultas → Recibidos para verlo y aceptarlo.`;
 }

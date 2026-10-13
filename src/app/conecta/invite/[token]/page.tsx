@@ -82,7 +82,7 @@ export default function InvitePage({ params }: { params: Promise<{ token: string
 
 function ReclamarInvitacion({ token }: { token: string }) {
   const [reclamando, setReclamando] = useState(false);
-  const [resultado, setResultado] = useState<{ tipo: string } | null>(null);
+  const [resultado, setResultado] = useState<{ tipo: string; adicionales?: number } | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   async function reclamar() {
@@ -101,7 +101,11 @@ function ReclamarInvitacion({ token }: { token: string }) {
   if (resultado?.tipo === "acceso_otorgado") {
     return (
       <div className="space-y-2">
-        <p className="text-sm text-success">Acceso otorgado — ya puedes ver este caso en MO.</p>
+        <p className="text-sm text-success">
+          {resultado.adicionales
+            ? `Acceso otorgado — ya puedes ver estos ${resultado.adicionales + 1} casos en MO.`
+            : "Acceso otorgado — ya puedes ver este caso en MO."}
+        </p>
         <a href="/" className={`${botonPrimario} block w-full text-center`}>
           Ir a MO Conecta
         </a>

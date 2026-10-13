@@ -30,6 +30,9 @@ export type InvitacionConecta = {
    * a la solicitud de aprobación manual, nunca a acceso automático. */
   destinatarioCorreoNormalizado?: string;
   interconsultaId: string;
+  /** Casos enviados JUNTOS al mismo colega comparten grupo: aceptar uno de los
+   * enlaces abre todos (así no tiene que abrir un enlace por paciente). */
+  grupoId?: string;
   canal: CanalInvitacion;
   creadoEl: string;
   venceEl: string;
@@ -145,8 +148,10 @@ export function existeInvitacionActivaDuplicada(
   );
 }
 
-export function buildMensajeInvitacionConecta(nombreDestinatario: string, enlace: string): string {
-  return `Hola, Dr./Dra. ${nombreDestinatario}. Te envié una interconsulta odontológica segura mediante MO. Puedes revisar la solicitud y responder sin costo en este enlace: ${enlace}. Por privacidad, la información clínica solo estará disponible después de identificarte.`;
+export function buildMensajeInvitacionConecta(nombreDestinatario: string, enlace: string, cantidad = 1): string {
+  const que = cantidad > 1 ? `${cantidad} interconsultas odontológicas seguras` : "una interconsulta odontológica segura";
+  const revisar = cantidad > 1 ? "las solicitudes" : "la solicitud";
+  return `Hola, Dr./Dra. ${nombreDestinatario}. Te envié ${que} mediante MO. Puedes revisar ${revisar} y responder sin costo en este enlace: ${enlace}. Por privacidad, la información clínica solo estará disponible después de identificarte.`;
 }
 
 export function urlInvitacion(tokenCrudo: string, origen: string): string {

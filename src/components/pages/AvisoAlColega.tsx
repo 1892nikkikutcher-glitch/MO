@@ -2,36 +2,26 @@
 
 import { useEffect, useState } from "react";
 import { mensajeAvisoCaso, urlWhatsApp } from "@/lib/avisoWhatsApp";
-import {
-  escribirContactosLocales,
-  guardarContacto,
-  leerContactosLocales,
-  normalizarNombre,
-  telefonoLocal,
-} from "@/lib/contactosColegas";
+import { normalizarNombre } from "@/lib/contactosColegas";
+import { useContactosColegas } from "./ContactosColegas";
 
 /** Para quien envió un caso que el colega todavía no atiende: MO no le avisa
  * solo, así que aquí se abre WhatsApp con el aviso ya escrito. El número se
  * toma de los colegas que ya invitaste desde este dispositivo y se recuerda. */
-export default function AvisoAlColega({ nombreColega }: { nombreColega: string }) {
+export default function AvisoAlColega({ nombreColega, cantidad = 1 }: { nombreColega: string; cantidad?: number }) {
   const [numero, setNumero] = useState("");
+  const { contactos, recordar } = useContactosColegas();
 
   useEffect(() => {
-    const guardado = leerContactosLocales().find((c) => normalizarNombre(c.nombre) === normalizarNombre(nombreColega));
-    if (guardado?.whatsapp) setNumero(guardado.whatsapp);
-  }, [nombreColega]);
+    if (numero) return;
+    const guardado = contactos.find((c) => c.whatsapp && normalizarNombre(c.nombre) === normalizarNombre(nombreColega));
+    if (guardado) setNumero(guardado.whatsapp);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [contactos, nombreColega]);
 
   function avisar() {
-    if (telefonoLocal(numero)) {
-      const lista = guardarContacto(leerContactosLocales(), {
-        nombre: nombreColega,
-        whatsapp: numero,
-        correo: "",
-        ultimoUso: new Date().toISOString(),
-      });
-      escribirContactosLocales(lista);
-    }
-    window.open(urlWhatsApp(numero, mensajeAvisoCaso(nombreColega)), "_blank");
+    recordar({ nombre: nombreColega, whatsapp: numero, correo: "" });
+    window.open(urlWhatsApp(numero, mensajeAvisoCaso(nombreColega, cantidad)), "_blank");
   }
 
   return (
