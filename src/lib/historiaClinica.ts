@@ -379,6 +379,17 @@ export type TipoEvidenciaDiagnostica = (typeof tipoEvidenciaDiagnosticaOptions)[
  * genera un diagnóstico sola: siempre requiere interpretación profesional. */
 export type EvidenciaDiagnostica = { tipo: TipoEvidenciaDiagnostica; referenciaId?: string; descripcion?: string };
 
+/** Color con que se pinta un hallazgo en el odontograma, como en la hoja clínica en
+ * papel: rojo = patología o por tratar (caries, lesiones...), azul = tratamiento ya
+ * realizado o existente (restauraciones, coronas...). */
+export const COLORES_ODONTOGRAMA = ["rojo", "azul"] as const;
+export type ColorOdontograma = (typeof COLORES_ODONTOGRAMA)[number];
+
+export const colorOdontogramaInfo: Record<ColorOdontograma, { etiqueta: string; significado: string; rgb: string }> = {
+  rojo: { etiqueta: "Rojo", significado: "patología o por tratar", rgb: "220 38 38" },
+  azul: { etiqueta: "Azul", significado: "tratamiento realizado", rgb: "37 99 235" },
+};
+
 /** Un diagnóstico anotado sobre uno o varios dientes del odontograma (ej.
  * "Caries de segundo grado clase I" marcado en 3 piezas a la vez). Se
  * guarda en la respuesta de la pregunta tipo "odontograma" como
@@ -417,6 +428,9 @@ export type DiagnosticoOdontograma = {
    * comportamiento de siempre. Puramente aditivo: ningún diagnóstico
    * guardado antes de este campo necesita migración. */
   superficiesPorDiente?: Record<number, SuperficieDental[]>;
+  /** Color con que se pinta en el odontograma. Ausente (diagnósticos anteriores a este
+   * campo) = se pinta en el color neutro de siempre; nunca se asume rojo ni azul. */
+  color?: ColorOdontograma;
 };
 
 /** `entry.estado` para mostrar en UI — nunca inventa "confirmado" para un

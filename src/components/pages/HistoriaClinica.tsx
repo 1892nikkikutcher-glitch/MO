@@ -21,6 +21,8 @@ import {
   resumenAntecedentesPatologicos,
   valorComoValoracionDientes,
   valorOdontogramaComoDiagnosticos,
+  colorOdontogramaInfo,
+  type ColorOdontograma,
   type DiagnosticoOdontograma,
   type EstadoDiagnosticoOdontograma,
   type PreguntaTemplate,
@@ -722,6 +724,7 @@ function OdontogramaDiagnostico({
   const { procedimientos } = usePatientData();
   const [selectedTeeth, setSelectedTeeth] = useState<number[]>([]);
   const [selectedSurfaces, setSelectedSurfaces] = useState<Record<number, SuperficieDental[]>>({});
+  const [colorPintura, setColorPintura] = useState<ColorOdontograma>("rojo");
   const [diagnosticoTexto, setDiagnosticoTexto] = useState("");
   const [tratamientoSugerido, setTratamientoSugerido] = useState("");
   const [editandoId, setEditandoId] = useState<string | null>(null);
@@ -754,6 +757,7 @@ function OdontogramaDiagnostico({
     setEditandoId(entry.id);
     setSelectedTeeth(entry.dientes);
     setSelectedSurfaces(entry.superficiesPorDiente ?? {});
+    setColorPintura(entry.color ?? "rojo");
     setDiagnosticoTexto(entry.diagnostico);
     setTratamientoSugerido(entry.tratamientoSugerido ?? "");
   };
@@ -775,6 +779,7 @@ function OdontogramaDiagnostico({
           id: `diag${Date.now()}`,
           dientes: selectedTeeth,
           superficiesPorDiente: superficiesParaGuardar(selectedSurfaces),
+          color: colorPintura,
           diagnostico,
           tratamientoSugerido: tratamientoSugerido.trim() || undefined,
           fecha: todayISO(),
@@ -789,6 +794,7 @@ function OdontogramaDiagnostico({
                   ...e,
                   dientes: selectedTeeth,
                   superficiesPorDiente: superficiesParaGuardar(selectedSurfaces),
+                  color: colorPintura,
                   diagnostico,
                   tratamientoSugerido: tratamientoSugerido.trim() || undefined,
                   fecha: e.fecha || todayISO(),
@@ -802,6 +808,7 @@ function OdontogramaDiagnostico({
         id: `diag${Date.now()}`,
         dientes: selectedTeeth,
         superficiesPorDiente: superficiesParaGuardar(selectedSurfaces),
+        color: colorPintura,
         diagnostico,
         tratamientoSugerido: tratamientoSugerido.trim() || undefined,
         fecha: todayISO(),
@@ -842,6 +849,14 @@ function OdontogramaDiagnostico({
       >
         <div className="min-w-0 flex-1">
           <p className="text-xs font-semibold text-accent">
+            {entry.color && (
+              <span
+                aria-label={colorOdontogramaInfo[entry.color].etiqueta}
+                title={`${colorOdontogramaInfo[entry.color].etiqueta}: ${colorOdontogramaInfo[entry.color].significado}`}
+                className="mr-1.5 inline-block h-2.5 w-2.5 rounded-full align-middle"
+                style={{ backgroundColor: `rgb(${colorOdontogramaInfo[entry.color].rgb})` }}
+              />
+            )}
             OD{" "}
             {ordenarDientes(entry.dientes).map((d, i) => {
               const superficies = entry.superficiesPorDiente?.[d];
@@ -947,6 +962,13 @@ function OdontogramaDiagnostico({
         selectedSurfaces={selectedSurfaces}
         onToggleTooth={toggleTooth}
         onToggleSurface={toggleSurface}
+        colorActual={colorPintura}
+        onCambiarColor={setColorPintura}
+        // Lo ya guardado también se pinta (menos lo descartado y lo que se está editando,
+        // que se ve en el borrador) — así el odontograma muestra el estado real del paciente.
+        pintados={entries
+          .filter((e) => e.id !== editandoId && e.estado !== "descartado")
+          .map((e) => ({ dientes: e.dientes, superficiesPorDiente: e.superficiesPorDiente, color: e.color }))}
         title=""
       />
 
