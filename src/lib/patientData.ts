@@ -461,7 +461,8 @@ export function pruebaVencida(suscripcion: Pick<SuscripcionPlan, "planActivo" | 
   return suscripcion.planActivo === "prueba" && diasRestantesDePrueba(suscripcion.pruebaIniciadaEl) <= 0;
 }
 
-export type RolClinica = "admin" | "colaborador";
+/** "odontologo" = Cirujano dentista: atiende y edita, pero no elimina ni ve finanzas (ver permisosRol.ts). */
+export type RolClinica = "admin" | "colaborador" | "odontologo";
 
 /** Documento `clinics/{clinicId}` — clinicId es el uid del dueño. */
 export type ClinicInfo = {

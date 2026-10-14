@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { usePatientData } from "@/context/PatientDataContext";
 import type { RolClinica, Recurso } from "@/lib/patientData";
+import { descripcionRolClinica, etiquetaRolClinica } from "@/lib/permisosRol";
 import { manejarCambioNombre } from "@/lib/textoNombre";
 import ConfirmarEliminar from "@/components/ConfirmarEliminar";
 
@@ -233,7 +234,13 @@ export default function Colaboradores() {
         <p>
           Los colaboradores con rol &quot;Colaborador&quot; pueden ver pacientes, agenda, recetas y
           presupuestos, pero <strong>no</strong> ven pagos ni cortes de caja — esa información queda
-          reservada al dueño (rol &quot;Admin&quot;).
+          reservada al dueño (rol &quot;Administrador&quot;).
+        </p>
+        <p className="mt-2">
+          El rol &quot;Cirujano dentista&quot; es para un doctor que trabaja como empleado: atiende y edita
+          pacientes, historia clínica, odontograma, recetas, notas y agenda, pero{" "}
+          <strong>no puede eliminar nada</strong> (ni pacientes, ni citas, ni presupuestos, ni notas) y tampoco ve
+          finanzas. Si solo debe ver su propia agenda, límitalo en &quot;Calendarios que ve&quot;.
         </p>
         <p className="mt-2">
           Puedes invitar con correo, con WhatsApp, o con ambos. <strong>Ojo:</strong> MO solo inicia
@@ -275,10 +282,14 @@ export default function Colaboradores() {
             className={inputClass}
           />
           <select value={rol} onChange={(e) => setRol(e.target.value as RolClinica)} className={inputClass}>
-            <option value="colaborador">Colaborador</option>
-            <option value="admin">Admin</option>
+            <option value="colaborador">{etiquetaRolClinica.colaborador}</option>
+            <option value="odontologo">{etiquetaRolClinica.odontologo}</option>
+            <option value="admin">{etiquetaRolClinica.admin}</option>
           </select>
         </div>
+        <p className="text-xs text-ink/50">
+          <span className="font-semibold text-ink/70">{etiquetaRolClinica[rol]}:</span> {descripcionRolClinica[rol]}
+        </p>
         <button
           onClick={invitar}
           disabled={!puedeInvitar || enviando}
@@ -304,7 +315,7 @@ export default function Colaboradores() {
                 >
                   <div>
                     <span className="font-medium text-ink">{inv.nombre}</span>{" "}
-                    <span className="capitalize text-ink/40">· {inv.role}</span>
+                    <span className="text-ink/40">· {etiquetaRolClinica[inv.role] ?? inv.role}</span>
                     {!inv.email && (
                       <span className="ml-2 font-semibold text-danger">Sin correo — no se detectará sola</span>
                     )}
@@ -404,8 +415,9 @@ export default function Colaboradores() {
                           disabled={esUnoMismo}
                           className="rounded-md border border-edge/10 bg-field px-2 py-1 text-xs text-ink disabled:opacity-40"
                         >
-                          <option value="colaborador">Colaborador</option>
-                          <option value="admin">Admin</option>
+                          <option value="colaborador">{etiquetaRolClinica.colaborador}</option>
+                          <option value="odontologo">{etiquetaRolClinica.odontologo}</option>
+                          <option value="admin">{etiquetaRolClinica.admin}</option>
                         </select>
                       </td>
                       <td className="px-6 py-3">

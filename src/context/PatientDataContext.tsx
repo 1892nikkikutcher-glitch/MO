@@ -84,8 +84,10 @@ import { migrarIdentidadDoctor } from "@/lib/migracionIdentidadDoctor";
 import { estamparNuevos } from "@/lib/autoriaRegistros";
 import { aplicarMovimientosAPagos, controlesPorError, type PropuestaControl } from "@/lib/controlesPorError";
 import { construirFinanzasDesdePagos, type ResultadoRecalculo } from "@/lib/finanzasRecalculo";
+import { puedeEliminarConRol } from "@/lib/permisosRol";
 import {
   archivarYEliminar,
+  fijarEliminacionPermitida,
   marcarEntradaRestaurada,
   restaurarDocumentoDePapelera,
   restaurarFotoDePapelera,
@@ -966,6 +968,8 @@ type PatientDataContextValue = {
   misRecursosVisibles: string[] | null;
   actualizarRecursosVisiblesColaborador: (memberId: string, recursoIds: string[] | null) => Promise<void>;
   puedeVerFinanzas: boolean;
+  /** false para el Cirujano dentista: no elimina pacientes, citas, presupuestos, notas ni fotos. */
+  puedeEliminar: boolean;
   clinicInfo: ClinicInfo | null;
   setClinicInfo: (updater: Updater<ClinicInfo>) => void;
   pendingInvite: ClinicInvite | null;
@@ -1020,6 +1024,11 @@ export function PatientDataProvider({
     necesitaSeleccion,
     seleccionarClinica,
   } = useClinicResolution(uid, userEmail);
+  // Red de seguridad para el Cirujano dentista (ver papeleraFirestore.ts): nada se elimina desde su sesión.
+  useEffect(() => {
+    fijarEliminacionPermitida(puedeEliminarConRol(rol));
+    return () => fijarEliminacionPermitida(true);
+  }, [rol]);
   const [clinicInfo, setClinicInfo] = useClinicInfo(clinicUid);
 
   const [patients, setPatients] = useFirestoreList<Patient>(clinicUid, "pacientes");
@@ -3241,6 +3250,7 @@ export function PatientDataProvider({
         misRecursosVisibles,
         actualizarRecursosVisiblesColaborador,
         puedeVerFinanzas: rol === "admin",
+        puedeEliminar: puedeEliminarConRol(rol),
         clinicInfo,
         setClinicInfo,
         confirmarSalirSinGuardar,

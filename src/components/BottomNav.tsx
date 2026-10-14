@@ -11,6 +11,8 @@
  * pantallas anchas (`lg:`). */
 
 import { useEffect, useRef, useState } from "react";
+import { moduloVisibleParaRol } from "@/lib/permisosRol";
+import type { RolClinica } from "@/lib/patientData";
 import type { LadoNavegacion } from "@/lib/ladoNavegacion";
 import { MO_ES_GRATIS } from "@/lib/planesConfig";
 
@@ -380,7 +382,10 @@ export default function BottomNav({
   onFanAbiertoChange,
   insignias = {},
   lado = "derecha",
+  rol = null,
 }: {
+  /** Rol de quien está en sesión: oculta los módulos que ese rol no usa (ver permisosRol.ts). */
+  rol?: RolClinica | null;
   active: string;
   /** De qué lado de la pantalla va la barra en computadora (en celular no aplica). */
   lado?: LadoNavegacion;
@@ -409,7 +414,8 @@ export default function BottomNav({
     offsetInicio: 0,
     seMovio: false,
   });
-  const fanMaxOffset = navItems.length - 1;
+  const itemsVisibles = navItems.filter((item) => moduloVisibleParaRol(rol, item.id));
+  const fanMaxOffset = itemsVisibles.length - 1;
 
   function seleccionar(item: NavItem) {
     const hasChildren = "children" in item && !!item.children?.length;
@@ -580,7 +586,7 @@ export default function BottomNav({
           }}
           className="flex min-h-0 flex-1 cursor-grab flex-col gap-0.5 overflow-y-auto overscroll-contain [-ms-overflow-style:none] [scroll-snap-type:y_proximity] [scrollbar-width:none] active:cursor-grabbing lg:gap-1 [&::-webkit-scrollbar]:hidden"
         >
-          {navItems.map((item) => {
+          {itemsVisibles.map((item) => {
             const hasChildren = "children" in item && !!item.children?.length;
             const isActiveParent = hasChildren && item.children!.some((c) => c.id === active);
             const isActive = active === item.id || isActiveParent;
@@ -658,7 +664,7 @@ export default function BottomNav({
         style={{ touchAction: "none" }}
         className="fixed bottom-[62px] right-6 z-40 h-px w-px cursor-grab active:cursor-grabbing lg:hidden"
       >
-        {navItems.map((item, i) => {
+        {itemsVisibles.map((item, i) => {
           const hasChildren = "children" in item && !!item.children?.length;
           const isActiveParent = hasChildren && item.children!.some((c) => c.id === active);
           const isActive = active === item.id || isActiveParent;

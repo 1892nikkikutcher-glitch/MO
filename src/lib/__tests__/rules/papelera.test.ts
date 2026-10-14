@@ -16,7 +16,8 @@ let testEnv: RulesTestEnvironment;
 
 const CLINICA = "clinicaDueno"; // el uid del dueño es el id de la clínica
 const ADMIN = "uidAdminColab";
-const ODONTOLOGO = "uidOdontologo";
+const ODONTOLOGO = "uidOdontologo"; // Cirujano dentista: atiende pero no elimina
+const COLABORADOR = "uidColaboradorPapelera"; // colaborador de siempre: sí elimina lo operativo
 const INACTIVO = "uidInactivo";
 const OTRA_CLINICA_ADMIN = "uidAdminOtraClinica";
 const AJENO = "uidAjeno";
@@ -42,6 +43,9 @@ beforeEach(async () => {
     });
     await setDoc(doc(db, `clinicMembers/${CLINICA}_${ODONTOLOGO}`), {
       clinicId: CLINICA, uid: ODONTOLOGO, role: "odontologo", status: "active",
+    });
+    await setDoc(doc(db, `clinicMembers/${CLINICA}_${COLABORADOR}`), {
+      clinicId: CLINICA, uid: COLABORADOR, role: "colaborador", status: "active",
     });
     await setDoc(doc(db, `clinicMembers/${CLINICA}_${INACTIVO}`), {
       clinicId: CLINICA, uid: INACTIVO, role: "odontologo", status: "suspended",
@@ -178,13 +182,26 @@ describe("eliminar con papelera — el batch completo", () => {
     });
   }
 
-  it("un odontólogo elimina una cita y guarda su copia en un solo batch", async () => {
+  it("un colaborador elimina una cita y guarda su copia en un solo batch", async () => {
+    await sembrarCita();
+    const db = testEnv.authenticatedContext(COLABORADOR).firestore();
+    const batch = writeBatch(db);
+    batch.set(doc(db, RUTA), ENTRADA);
+    batch.delete(doc(db, `users/${CLINICA}/citas/c1`));
+    await assertSucceeds(batch.commit());
+  });
+
+  it("un cirujano dentista no puede eliminar la cita: el batch se rechaza y la cita sigue ahí", async () => {
     await sembrarCita();
     const db = testEnv.authenticatedContext(ODONTOLOGO).firestore();
     const batch = writeBatch(db);
     batch.set(doc(db, RUTA), ENTRADA);
     batch.delete(doc(db, `users/${CLINICA}/citas/c1`));
-    await assertSucceeds(batch.commit());
+    await assertFails(batch.commit());
+    await testEnv.withSecurityRulesDisabled(async (ctx) => {
+      const snap = await getDoc(doc(ctx.firestore(), `users/${CLINICA}/citas/c1`));
+      if (!snap.exists()) throw new Error("La cita no debió borrarse");
+    });
   });
 
   it("si la copia no se puede guardar, el batch entero se rechaza y la cita sigue ahí", async () => {

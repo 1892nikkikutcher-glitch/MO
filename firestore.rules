@@ -90,6 +90,13 @@ service cloud.firestore {
     function isClinician(clinicId) {
       return isActiveMember(clinicId) && memberRole(clinicId) in ['odontologo', 'admin'];
     }
+    // "Cirujano dentista" (rol 'odontologo'): atiende, captura y edita lo clínico y lo operativo,
+    // pero NO elimina registros (pacientes, citas, presupuestos, notas, recetas, fotos...). Quien
+    // elimina es el administrador (y el colaborador de siempre, que no cambia). Las eliminaciones
+    // que sí necesitan este permiso son las de la clínica; la Papelera sigue admitiendo crear copias.
+    function puedeBorrar(clinicId) {
+      return isActiveMember(clinicId) && memberRole(clinicId) != 'odontologo';
+    }
 
     // MO: un colaborador puede tener limitado a cuáles recursos (médicos/
     // unidades) de la Agenda puede ver — configurado en Administración >
@@ -226,10 +233,12 @@ service cloud.firestore {
     }
 
     match /users/{ownerId}/pacientes/{patientId} {
-      allow read, write: if isActiveMember(ownerId);
+      allow read, create, update: if isActiveMember(ownerId);
+      allow delete: if puedeBorrar(ownerId);
     }
     match /users/{ownerId}/pacientes/{patientId}/presupuestos/{budgetId} {
-      allow read, write: if isActiveMember(ownerId);
+      allow read, create, update: if isActiveMember(ownerId);
+      allow delete: if puedeBorrar(ownerId);
     }
     // Corrige un hueco pre-existente: esta subcolección nunca tuvo su
     // propio bloque, así que solo el dueño de la cuenta podía usar la
@@ -240,27 +249,33 @@ service cloud.firestore {
     // por migración (no está en escrituraClinicaLocalPermitida) — es
     // administrativa/logística, mismo criterio que presupuestos arriba.
     match /users/{ownerId}/pacientes/{patientId}/laboratorios/{solicitudId} {
-      allow read, write: if isActiveMember(ownerId);
+      allow read, create, update: if isActiveMember(ownerId);
+      allow delete: if puedeBorrar(ownerId);
     }
     match /users/{ownerId}/pacientes/{patientId}/recetas/{recetaId} {
       allow read: if isActiveMember(ownerId);
-      allow write: if isActiveMember(ownerId) && escrituraClinicaLocalPermitida(ownerId, patientId);
+      allow create, update: if isActiveMember(ownerId) && escrituraClinicaLocalPermitida(ownerId, patientId);
+      allow delete: if puedeBorrar(ownerId) && escrituraClinicaLocalPermitida(ownerId, patientId);
     }
     match /users/{ownerId}/pacientes/{patientId}/notasEvolucion/{notaId} {
       allow read: if isActiveMember(ownerId);
-      allow write: if isActiveMember(ownerId) && escrituraClinicaLocalPermitida(ownerId, patientId);
+      allow create, update: if isActiveMember(ownerId) && escrituraClinicaLocalPermitida(ownerId, patientId);
+      allow delete: if puedeBorrar(ownerId) && escrituraClinicaLocalPermitida(ownerId, patientId);
     }
     match /users/{ownerId}/pacientes/{patientId}/diagnosticos/{diagnosticoId} {
       allow read: if isActiveMember(ownerId);
-      allow write: if isActiveMember(ownerId) && escrituraClinicaLocalPermitida(ownerId, patientId);
+      allow create, update: if isActiveMember(ownerId) && escrituraClinicaLocalPermitida(ownerId, patientId);
+      allow delete: if puedeBorrar(ownerId) && escrituraClinicaLocalPermitida(ownerId, patientId);
     }
     match /users/{ownerId}/pacientes/{patientId}/planTratamiento/{planTratamientoItemId} {
       allow read: if isActiveMember(ownerId);
-      allow write: if isActiveMember(ownerId) && escrituraClinicaLocalPermitida(ownerId, patientId);
+      allow create, update: if isActiveMember(ownerId) && escrituraClinicaLocalPermitida(ownerId, patientId);
+      allow delete: if puedeBorrar(ownerId) && escrituraClinicaLocalPermitida(ownerId, patientId);
     }
     match /users/{ownerId}/pacientes/{patientId}/comparativas/{comparativaId} {
       allow read: if isActiveMember(ownerId);
-      allow write: if isActiveMember(ownerId) && escrituraClinicaLocalPermitida(ownerId, patientId);
+      allow create, update: if isActiveMember(ownerId) && escrituraClinicaLocalPermitida(ownerId, patientId);
+      allow delete: if puedeBorrar(ownerId) && escrituraClinicaLocalPermitida(ownerId, patientId);
     }
     match /users/{ownerId}/pacientes/{patientId}/pagos/{pagoId} {
       allow read, write: if isClinicAdmin(ownerId);
@@ -272,10 +287,12 @@ service cloud.firestore {
       allow read, write: if isClinicAdmin(ownerId);
     }
     match /users/{ownerId}/recursos/{recursoId} {
-      allow read, write: if isActiveMember(ownerId);
+      allow read, create, update: if isActiveMember(ownerId);
+      allow delete: if puedeBorrar(ownerId);
     }
     match /users/{ownerId}/citas/{citaId} {
-      allow read, update, delete: if tieneAccesoACita(ownerId, resource.data);
+      allow read, update: if tieneAccesoACita(ownerId, resource.data);
+      allow delete: if tieneAccesoACita(ownerId, resource.data) && puedeBorrar(ownerId);
       allow create: if tieneAccesoACita(ownerId, request.resource.data);
     }
     match /users/{ownerId}/config/{configId} {
@@ -287,13 +304,16 @@ service cloud.firestore {
       allow write: if isClinicAdmin(ownerId);
     }
     match /users/{ownerId}/pacientes/{patientId}/membresias/{membershipId} {
-      allow read, write: if isActiveMember(ownerId);
+      allow read, create, update: if isActiveMember(ownerId);
+      allow delete: if puedeBorrar(ownerId);
     }
     match /users/{ownerId}/personalAsistencia/{personalId} {
-      allow read, write: if isActiveMember(ownerId);
+      allow read, create, update: if isActiveMember(ownerId);
+      allow delete: if puedeBorrar(ownerId);
     }
     match /users/{ownerId}/registrosAsistencia/{registroId} {
-      allow read, write: if isActiveMember(ownerId);
+      allow read, create, update: if isActiveMember(ownerId);
+      allow delete: if puedeBorrar(ownerId);
     }
     match /users/{ownerId}/procedimientos/{procedimientoId} {
       allow read: if isActiveMember(ownerId);
@@ -301,11 +321,13 @@ service cloud.firestore {
     }
     match /users/{ownerId}/pacientes/{patientId}/historiaClinica/{docId} {
       allow read: if isActiveMember(ownerId);
-      allow write: if isActiveMember(ownerId) && escrituraClinicaLocalPermitida(ownerId, patientId);
+      allow create, update: if isActiveMember(ownerId) && escrituraClinicaLocalPermitida(ownerId, patientId);
+      allow delete: if puedeBorrar(ownerId) && escrituraClinicaLocalPermitida(ownerId, patientId);
     }
     match /users/{ownerId}/pacientes/{patientId}/fotos/{docId} {
       allow read: if isActiveMember(ownerId);
-      allow write: if isActiveMember(ownerId) && escrituraClinicaLocalPermitida(ownerId, patientId);
+      allow create, update: if isActiveMember(ownerId) && escrituraClinicaLocalPermitida(ownerId, patientId);
+      allow delete: if puedeBorrar(ownerId) && escrituraClinicaLocalPermitida(ownerId, patientId);
     }
     match /users/{ownerId}/medicamentos/{medicamentoId} {
       allow read: if isActiveMember(ownerId);
@@ -317,52 +339,68 @@ service cloud.firestore {
     // entrar a estos módulos, porque no calzaban con ninguna regla de arriba
     // y caían en la regla base de users/{userId}/** (solo el dueño).
     match /users/{ownerId}/depositosDentales/{id} {
-      allow read, write: if isActiveMember(ownerId);
+      allow read, create, update: if isActiveMember(ownerId);
+      allow delete: if puedeBorrar(ownerId);
     }
     match /users/{ownerId}/articulosFaltantes/{id} {
-      allow read, write: if isActiveMember(ownerId);
+      allow read, create, update: if isActiveMember(ownerId);
+      allow delete: if puedeBorrar(ownerId);
     }
     match /users/{ownerId}/articulosCaducidad/{id} {
-      allow read, write: if isActiveMember(ownerId);
+      allow read, create, update: if isActiveMember(ownerId);
+      allow delete: if puedeBorrar(ownerId);
     }
     match /users/{ownerId}/centrosRadiodiagnostico/{id} {
-      allow read, write: if isActiveMember(ownerId);
+      allow read, create, update: if isActiveMember(ownerId);
+      allow delete: if puedeBorrar(ownerId);
     }
     match /users/{ownerId}/laboratoriosDentales/{id} {
-      allow read, write: if isActiveMember(ownerId);
+      allow read, create, update: if isActiveMember(ownerId);
+      allow delete: if puedeBorrar(ownerId);
     }
     match /users/{ownerId}/laminas/{id} {
-      allow read, write: if isActiveMember(ownerId);
+      allow read, create, update: if isActiveMember(ownerId);
+      allow delete: if puedeBorrar(ownerId);
     }
     match /users/{ownerId}/encuestas/{id} {
-      allow read, write: if isActiveMember(ownerId);
+      allow read, create, update: if isActiveMember(ownerId);
+      allow delete: if puedeBorrar(ownerId);
     }
     match /users/{ownerId}/domiciliaciones/{id} {
-      allow read, write: if isActiveMember(ownerId);
+      allow read, create, update: if isActiveMember(ownerId);
+      allow delete: if puedeBorrar(ownerId);
     }
     match /users/{ownerId}/promociones/{id} {
-      allow read, write: if isActiveMember(ownerId);
+      allow read, create, update: if isActiveMember(ownerId);
+      allow delete: if puedeBorrar(ownerId);
     }
     match /users/{ownerId}/aseguradoras/{id} {
-      allow read, write: if isActiveMember(ownerId);
+      allow read, create, update: if isActiveMember(ownerId);
+      allow delete: if puedeBorrar(ownerId);
     }
     match /users/{ownerId}/empresasRpbi/{id} {
-      allow read, write: if isActiveMember(ownerId);
+      allow read, create, update: if isActiveMember(ownerId);
+      allow delete: if puedeBorrar(ownerId);
     }
     match /users/{ownerId}/contadores/{id} {
-      allow read, write: if isActiveMember(ownerId);
+      allow read, create, update: if isActiveMember(ownerId);
+      allow delete: if puedeBorrar(ownerId);
     }
     match /users/{ownerId}/otsLog/{id} {
-      allow read, write: if isActiveMember(ownerId);
+      allow read, create, update: if isActiveMember(ownerId);
+      allow delete: if puedeBorrar(ownerId);
     }
     match /users/{ownerId}/presupuestosLog/{id} {
-      allow read, write: if isActiveMember(ownerId);
+      allow read, create, update: if isActiveMember(ownerId);
+      allow delete: if puedeBorrar(ownerId);
     }
     match /users/{ownerId}/recetasLog/{id} {
-      allow read, write: if isActiveMember(ownerId);
+      allow read, create, update: if isActiveMember(ownerId);
+      allow delete: if puedeBorrar(ownerId);
     }
     match /users/{ownerId}/pendientes/{id} {
-      allow read, write: if isActiveMember(ownerId);
+      allow read, create, update: if isActiveMember(ownerId);
+      allow delete: if puedeBorrar(ownerId);
     }
     // Financiero — mismo criterio que pagos: solo admin.
     match /users/{ownerId}/pagosEliminados/{id} {

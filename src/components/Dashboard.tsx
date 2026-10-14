@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
+import { etiquetaRolClinica, moduloVisibleParaRol } from "@/lib/permisosRol";
 import { useLadoNavegacion } from "@/lib/useLadoNavegacion";
 import { ladoOpuesto } from "@/lib/ladoNavegacion";
 import { auth } from "@/lib/firebase";
@@ -327,7 +328,7 @@ function InvitePrompt() {
           <span className="font-semibold text-accent">
             {pendingInvite.nombreClinica || "una clínica"}
           </span>{" "}
-          como <span className="capitalize">{pendingInvite.role}</span>.
+          como <span>{etiquetaRolClinica[pendingInvite.role] ?? pendingInvite.role}</span>.
         </p>
         <div className="mt-6 flex gap-3">
           <button
@@ -649,11 +650,12 @@ function DashboardBody({
   onLogout: () => void;
   esAdmin: boolean;
 }) {
-  const { clinicInfo, suscripcion, membresiasDisponibles, seleccionarClinica } = usePatientData();
+  const { clinicInfo, suscripcion, membresiasDisponibles, seleccionarClinica, miRol, puedeEliminar } = usePatientData();
   const { casosRecibidos, uid: miUidConecta, novedades: novedadesConecta } = useMoConecta();
   const porAtenderConecta = casosPorAtender(casosRecibidos, miUidConecta).length + novedadesConecta.length;
   // De qué lado va la barra lateral (solo computadora): preferencia de cada usuario.
   const [ladoNav, setLadoNav] = useLadoNavegacion(miUidConecta);
+  const paginaPermitida = moduloVisibleParaRol(miRol, activePage);
   const { resuelto: temaResuelto, preferencia: temaPreferencia, setPreferencia: setTemaPreferencia } = useTheme();
   const isLight = temaResuelto === "light";
   const [mostrarSugerencia, setMostrarSugerencia] = useState(false);
@@ -742,6 +744,11 @@ function DashboardBody({
   return (
     <PrivacidadProvider>
     <div className="min-h-screen bg-app text-ink">
+      {/* El Cirujano dentista no elimina: se esconden los botones de eliminar (las reglas de Firestore y el
+          candado de papeleraFirestore.ts siguen protegiendo aunque alguno quede a la vista). */}
+      {!puedeEliminar && (
+        <style>{`button[title^="Eliminar"], button[title^="Borrar"], button[aria-label^="Eliminar"], button[aria-label^="Borrar"] { display: none !important; }`}</style>
+      )}
       <main className="min-w-0">
         <header className="relative flex h-16 items-center border-b border-edge/10 bg-nav px-3 text-ink print:hidden sm:px-6">
           {/* Un solo carrusel horizontal para TODO el header — antes las
@@ -834,6 +841,13 @@ function DashboardBody({
           <h1 className="mb-6 text-2xl font-semibold print:hidden">
             {activePage === "inicio" ? "Dashboard Principal" : activeLabel}
           </h1>
+          {!paginaPermitida && (
+            <div className="rounded-2xl border border-edge/10 bg-surface p-10 text-center text-sm text-ink/50">
+              Esta sección no está disponible para tu rol ({miRol ? etiquetaRolClinica[miRol] : ""}). Si la necesitas, pídesela al administrador.
+            </div>
+          )}
+          {paginaPermitida && (
+            <>
           {activePage === "inicio" && <Inicio />}
           {activePage === "panel-admin" && <PanelAdministrador />}
           {activePage === "mo-conecta" && <MoConecta />}
@@ -888,6 +902,8 @@ function DashboardBody({
           {activePage === "administracion-catalogos" && <Catalogos />}
           {activePage === "reportes-encuestas" && <ReporteEncuestas />}
           {!paginasConstruidas.has(activePage) && <ProximamenteStub label={activeLabel} />}
+            </>
+          )}
         </div>
       </main>
 
@@ -898,6 +914,7 @@ function DashboardBody({
         onFanAbiertoChange={setFanAbierto}
         insignias={{ "mo-conecta": porAtenderConecta }}
         lado={ladoNav}
+        rol={miRol}
       />
 
       {showRegistrarPago && (

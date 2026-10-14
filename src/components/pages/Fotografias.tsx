@@ -7,6 +7,7 @@ import { fotosVacias, type FotoPaciente } from "@/lib/patientData";
 import { subirFotoPaciente } from "@/lib/fotosPaciente";
 import { archivarYQuitarFoto } from "@/lib/papeleraFirestore";
 import type { CampoFoto } from "@/lib/papelera";
+import { MENSAJE_ROL_SIN_PERMISO_ELIMINAR } from "@/lib/permisosRol";
 
 function UploadIcon() {
   return (
@@ -271,7 +272,7 @@ function GalleryUploadCard({
 }
 
 export default function Fotografias({ patientId }: { patientId: string }) {
-  const { clinicUid, fotosPorPaciente, setFotosPaciente } = usePatientData();
+  const { clinicUid, fotosPorPaciente, setFotosPaciente, puedeEliminar } = usePatientData();
   const fotos = fotosPorPaciente[patientId] ?? fotosVacias;
 
   const subirYGuardar = async (
@@ -291,6 +292,10 @@ export default function Fotografias({ patientId }: { patientId: string }) {
    * guardar, la foto se queda donde estaba. */
   const quitarFoto = (campo: CampoFoto, foto: FotoPaciente) => {
     if (!clinicUid) return;
+    if (!puedeEliminar) {
+      alert(MENSAJE_ROL_SIN_PERMISO_ELIMINAR);
+      return;
+    }
     archivarYQuitarFoto(clinicUid, patientId, campo, foto).catch((err) => {
       console.error("No se pudo quitar la foto", err);
       alert(

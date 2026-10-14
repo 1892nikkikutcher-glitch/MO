@@ -10,6 +10,7 @@ import {
   writeBatch,
 } from "firebase/firestore";
 import { auth, db } from "./firebase";
+import { MENSAJE_ROL_SIN_PERMISO_ELIMINAR } from "./permisosRol";
 import type { FotoPaciente } from "./patientData";
 import {
   analizarRutaOrigen,
@@ -71,7 +72,28 @@ function avisarFalloPapelera(err: unknown) {
  * MISMO batch — o pasan las dos cosas o ninguna, nunca se pierde un registro
  * por un fallo a medias. Cada llamada comparte un `loteId` (útil cuando una
  * sola acción borra cientos, como "Borrar citas"). */
+/** Lo fija el contexto según el rol de quien está en sesión. Es una red de seguridad: la pantalla ya
+ * esconde o frena las eliminaciones para el Cirujano dentista, y las reglas de Firestore son la
+ * autoridad final — esto evita que una eliminación se "vea" hecha en pantalla sin haberse hecho. */
+let eliminacionPermitida = true;
+export function fijarEliminacionPermitida(permitida: boolean) {
+  eliminacionPermitida = permitida;
+}
+
+let ultimoAvisoPermiso = 0;
+function eliminacionBloqueadaPorRol(): boolean {
+  if (eliminacionPermitida) return false;
+  if (typeof window !== "undefined" && Date.now() - ultimoAvisoPermiso > 5000) {
+    ultimoAvisoPermiso = Date.now();
+    window.alert(MENSAJE_ROL_SIN_PERMISO_ELIMINAR);
+    // La pantalla ya había quitado el registro en local: se recarga para mostrar lo que de verdad hay.
+    setTimeout(() => window.location.reload(), 200);
+  }
+  return true;
+}
+
 export function archivarYEliminar(ruta: string, itemsPedidos: ({ id: string } & Record<string, unknown>)[]) {
+  if (itemsPedidos.length > 0 && eliminacionBloqueadaPorRol()) return;
   const items = itemsPedidos.filter((item) => !esDuplicadoReciente(ruta, item));
   if (items.length === 0) return;
   const origen = analizarRutaOrigen(ruta);
@@ -116,6 +138,7 @@ export function archivarYQuitarFoto(
   campo: CampoFoto,
   foto: FotoPaciente
 ): Promise<void> {
+  if (!eliminacionPermitida) return Promise.reject(new Error(MENSAJE_ROL_SIN_PERMISO_ELIMINAR));
   const ruta = `users/${clinicUid}/pacientes/${patientId}/fotos`;
   const construida = construirEntradaPapelera({
     ruta,
