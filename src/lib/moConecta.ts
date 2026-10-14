@@ -432,6 +432,12 @@ export type EstadoConsentimiento = "vigente" | "revocado" | "vencido";
 
 export const VERSION_AVISO_PRIVACIDAD_CONECTA = "2026-08-v1";
 
+/** Leyenda "Protegido por…" que se muestra en MO Conecta: quién responde por los datos y sobre qué
+ * infraestructura viven (Google Cloud / Firebase cifra los datos guardados y en tránsito). Para
+ * cambiar el nombre basta con editarlo aquí. */
+export const RESPONSABLE_PROTECCION_DATOS_CONECTA = "Sonríe X Todos Dental";
+export const INFRAESTRUCTURA_DATOS_CONECTA = "datos cifrados en Google Cloud (Firebase)";
+
 /** Documento original — INMUTABLE de por vida una vez creado (§7: "no
  * sobrescribas la evidencia original"). Solo `POST /api/conecta/interconsultas`
  * lo crea; nada lo actualiza salvo el campo `estado`, y solo

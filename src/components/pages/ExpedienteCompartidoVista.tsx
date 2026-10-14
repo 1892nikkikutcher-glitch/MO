@@ -9,6 +9,7 @@
 import { useMemo, useState } from "react";
 import OdontogramaSuperficies from "./OdontogramaSuperficies";
 import { ValoracionDientesLectura } from "./ValoracionPorDiente";
+import LeyendaProteccion from "@/components/conecta/LeyendaProteccion";
 import { colorOdontogramaInfo } from "@/lib/historiaClinica";
 import { etiquetaSuperficie } from "@/lib/odontograma";
 import {
@@ -265,7 +266,7 @@ export default function ExpedienteCompartidoVista({
 }) {
   return (
     <div className="space-y-2 rounded-2xl border border-edge/10 bg-surface p-5">
-      <div>
+      <div className="space-y-1">
         <h3 className="text-sm font-semibold text-ink">Expediente compartido</h3>
         <p className="text-xs text-ink/50">
           {alDiaDesde ? (
@@ -274,6 +275,7 @@ export default function ExpedienteCompartidoVista({
             <>Foto fija tomada el {new Date(expediente.generadoEl).toLocaleString("es-MX")} — es lo que existía al enviar el caso, no se actualiza solo.</>
           )}
         </p>
+        <LeyendaProteccion />
       </div>
 
       {expediente.historiaClinica && (

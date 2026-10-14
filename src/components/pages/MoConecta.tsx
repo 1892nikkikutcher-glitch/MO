@@ -48,6 +48,7 @@ import type { SolicitudAcceso } from "@/lib/invitacionesConecta";
 import { colegaDelCaso } from "@/lib/colegaDelCaso";
 import ExpedienteCompartidoVista, { ElegirQueCompartirRapido } from "./ExpedienteCompartidoVista";
 import CompartirExpedientePanel from "./CompartirExpedientePanel";
+import LeyendaProteccion from "@/components/conecta/LeyendaProteccion";
 import EtiquetaCompartirCaso from "./EtiquetaCompartirCaso";
 import { estadoCompartirDelCaso } from "@/lib/compartirExpedienteEstado";
 import { CalendariosCompartidosTab } from "./CalendariosCompartidos";
@@ -168,9 +169,12 @@ export default function MoConecta() {
   return (
     <AlcanceContext.Provider value={alcance}>
     <div className="space-y-6">
-      <p className="max-w-3xl text-sm text-ink/60">
-        Colabora con otros odontólogos, refiere pacientes y recibe contrarreferencias de manera segura.
-      </p>
+      <div className="space-y-1">
+        <p className="max-w-3xl text-sm text-ink/60">
+          Colabora con otros odontólogos, refiere pacientes y recibe contrarreferencias de manera segura.
+        </p>
+        <LeyendaProteccion />
+      </div>
       {alcance && (
         <div className="rounded-lg border border-accent/30 bg-accent/10 px-3 py-2 text-sm text-accent">
           Estás viendo solo la información de <strong>{alcance.patientName}</strong>. Para ver todos los pacientes y

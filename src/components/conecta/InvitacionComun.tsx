@@ -5,6 +5,7 @@
  * de correo mal escrito y verificación de correo. */
 
 import { useState, type FormEvent } from "react";
+import LeyendaProteccion from "./LeyendaProteccion";
 import {
   createUserWithEmailAndPassword,
   sendEmailVerification,
@@ -27,6 +28,7 @@ export function Shell({ children, error }: { children: React.ReactNode; error?: 
       <div className="w-full max-w-md rounded-2xl border border-edge/10 bg-modal p-6">
         <h1 className="mb-4 text-lg font-semibold text-ink">MO Conecta</h1>
         {error ? <p className="text-sm text-danger">{children}</p> : children}
+        <LeyendaProteccion className="mt-5 border-t border-edge/10 pt-3" />
       </div>
     </div>
   );
