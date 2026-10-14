@@ -142,7 +142,9 @@ export default function CompartirExpedientePanel({
 
   // ---- Quien envió el caso: el interruptor ----
   const textoEstado = activo
-    ? `${nombreColega} ve el expediente al día${c?.secciones.length ? `: ${c.secciones.map((s) => etiquetaSeccionCompartible[s]).join(", ")}` : ""}. Última revisión ${haceCuanto(c?.actualizadoEl, ahora) || "ahora"}.`
+    ? `${nombreColega} ve el expediente al día${c?.secciones.length ? `: ${c.secciones.map((s) => etiquetaSeccionCompartible[s]).join(", ")}` : ""}. Última revisión ${haceCuanto(c?.actualizadoEl, ahora) || "ahora"}. ${
+        c?.vistoPorColegaEl ? `Lo abrió ${haceCuanto(c.vistoPorColegaEl, ahora)}.` : "Aún no lo ha abierto."
+      }`
     : c && !c.activo
       ? `Desactivado ${haceCuanto(c.desactivadoEl, ahora)}. ${nombreColega} ya no ve el expediente.`
       : fotoFija

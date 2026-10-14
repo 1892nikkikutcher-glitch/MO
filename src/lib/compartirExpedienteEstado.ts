@@ -35,3 +35,17 @@ export function casosQueComparten(
     return e === "vivo" || e === "foto_fija";
   });
 }
+
+/** Casos enviados por `uid` que ya concluyeron (cerrados, cancelados o rechazados) y todavía
+ * muestran el expediente al colega: lo compartido ya no hace falta y conviene apagarlo. */
+export function casosConcluidosCompartiendo(
+  casos: Pick<Interconsulta, "id" | "odontologoRemitenteUid" | "compartirExpediente" | "expedienteCompartido" | "estado">[],
+  uid: string
+) {
+  return casos.filter((c) => {
+    if (c.odontologoRemitenteUid !== uid) return false;
+    if (c.estado !== "closed" && c.estado !== "cancelled" && c.estado !== "rejected") return false;
+    const e = estadoCompartirDelCaso(c);
+    return e === "vivo" || e === "foto_fija";
+  });
+}

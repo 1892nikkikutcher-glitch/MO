@@ -356,6 +356,9 @@ export type CompartirExpediente = {
   /** Última vez que el servidor revisó el expediente (ISO). */
   actualizadoEl: string;
   desactivadoEl?: string;
+  /** Última vez que el colega abrió el caso con el compartir activo (ISO). Lo fija el servidor;
+   * se borra al volver a activar. Sirve para que quien comparte sepa si de verdad lo ha visto. */
+  vistoPorColegaEl?: string;
 };
 
 export type FuenteInvitacion = "directorio" | "invitacion_enlace";

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { casosQueComparten, estadoCompartirDelCaso } from "../compartirExpedienteEstado";
+import { casosConcluidosCompartiendo, casosQueComparten, estadoCompartirDelCaso } from "../compartirExpedienteEstado";
 
 const exp = { secciones: [], generadoEl: "" } as never;
 const comp = (activo: boolean) => ({ activo, secciones: [], actualizadoEl: "" });
@@ -29,5 +29,24 @@ describe("casosQueComparten", () => {
       "p1"
     );
     expect(r.map((c) => c.id)).toEqual(["vivo", "fija"]);
+  });
+});
+
+describe("casosConcluidosCompartiendo", () => {
+  const caso = (id: string, estado: string, extra: object) => ({ id, odontologoRemitenteUid: "yo", estado: estado as never, ...extra });
+  it("solo los míos que ya concluyeron y todavía muestran el expediente", () => {
+    const r = casosConcluidosCompartiendo(
+      [
+        caso("cerradoVivo", "closed", { compartirExpediente: comp(true), expedienteCompartido: exp }),
+        caso("canceladoFija", "cancelled", { expedienteCompartido: exp }),
+        caso("rechazadoVivo", "rejected", { compartirExpediente: comp(true) }),
+        caso("cerradoApagado", "closed", { compartirExpediente: comp(false) }),
+        caso("cerradoNunca", "closed", {}),
+        caso("enCursoVivo", "accepted", { compartirExpediente: comp(true) }),
+        { ...caso("ajeno", "closed", { compartirExpediente: comp(true) }), odontologoRemitenteUid: "otro" },
+      ],
+      "yo"
+    );
+    expect(r.map((c) => c.id)).toEqual(["cerradoVivo", "canceladoFija", "rechazadoVivo"]);
   });
 });

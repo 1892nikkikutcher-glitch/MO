@@ -24,6 +24,8 @@ import type { ArchivoInterconsulta, ConsentimientoInterconsulta, Interconsulta }
 const ESTADOS_SIN_ACTUALIZAR = ["closed", "cancelled", "rejected"];
 /** Cada cuánto, como mucho, el servidor vuelve a leer el expediente de un mismo caso. */
 export const INTERVALO_MINIMO_MS = 20_000;
+/** Cada cuánto, como mucho, se vuelve a anotar que el colega está viendo el caso. */
+const INTERVALO_VISTA_MS = 60_000;
 
 /** Borra del almacenamiento las copias de fotos que ya no se comparten (solo copias de este
  * caso — nunca una ruta de otro lado). La foto original del paciente no se toca. */
@@ -114,7 +116,13 @@ export async function configurarCompartirExpediente(uid: string, interconsultaId
     {
       expedienteCompartido: sinIndefinidos(expediente),
       archivos,
-      compartirExpediente: { activo: true, secciones, actualizadoEl: ahora, desactivadoEl: FieldValue.delete() },
+      compartirExpediente: {
+        activo: true,
+        secciones,
+        actualizadoEl: ahora,
+        desactivadoEl: FieldValue.delete(),
+        vistoPorColegaEl: FieldValue.delete(),
+      },
       actualizadoEl: ahora,
     },
     { merge: true }
@@ -147,11 +155,24 @@ export async function refrescarExpedienteCompartido(uid: string, interconsultaId
     const ic = snap.data() as Interconsulta;
     if (!ic.participantesAutorizados.includes(uid)) throw new ConectaError(403, "No tienes acceso a esa interconsulta.");
     const c = ic.compartirExpediente;
-    if (!c?.activo || ESTADOS_SIN_ACTUALIZAR.includes(ic.estado)) return null;
-    const hace = Date.now() - Date.parse(c.actualizadoEl);
-    if (Number.isFinite(hace) && hace < INTERVALO_MINIMO_MS) return null;
-    tx.set(ref, { compartirExpediente: { actualizadoEl: ahora } }, { merge: true });
-    return ic;
+    if (!c?.activo) return null;
+
+    // Que el colega abrió el caso se anota aunque el expediente no toque revisarse todavía
+    // (cuando quien abre es quien envió el caso, no cuenta).
+    const haceVista = c.vistoPorColegaEl ? Date.now() - Date.parse(c.vistoPorColegaEl) : Infinity;
+    const anotarVista = uid !== ic.odontologoRemitenteUid && !(haceVista < INTERVALO_VISTA_MS);
+
+    const haceRevision = Date.now() - Date.parse(c.actualizadoEl);
+    const tocaRevisar =
+      !ESTADOS_SIN_ACTUALIZAR.includes(ic.estado) && !(Number.isFinite(haceRevision) && haceRevision < INTERVALO_MINIMO_MS);
+
+    if (!anotarVista && !tocaRevisar) return null;
+    tx.set(
+      ref,
+      { compartirExpediente: { ...(anotarVista ? { vistoPorColegaEl: ahora } : {}), ...(tocaRevisar ? { actualizadoEl: ahora } : {}) } },
+      { merge: true }
+    );
+    return tocaRevisar ? ic : null;
   });
   if (!reclamado) return { actualizado: false };
   const ic = reclamado;

@@ -1632,8 +1632,8 @@ function NuevaInterconsultaDialog({
                 onChange={(e) => setAceptaConsentimiento(e.target.checked)}
               />
               {pacienteIds.length > 1
-                ? "Cuento con el consentimiento de cada paciente para compartir esta información con el colega."
-                : "Cuento con el consentimiento del paciente para compartir esta información con el colega."}
+                ? "Cuento con el consentimiento de cada paciente para compartir esta información con el colega, que la verá al día mientras yo lo tenga activado."
+                : "Cuento con el consentimiento del paciente para compartir esta información con el colega, que la verá al día mientras yo lo tenga activado."}
             </label>
             <details className="mt-1 pl-6 text-xs text-ink/50">
               <summary className="cursor-pointer">Ver aviso</summary>

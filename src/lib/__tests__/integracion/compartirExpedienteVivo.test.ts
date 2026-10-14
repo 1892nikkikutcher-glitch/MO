@@ -16,6 +16,7 @@ vi.mock("../../firebaseAdmin", async () => {
   return { dbAdmin: getFirestore(app), bucketAdmin: getStorage(app).bucket() };
 });
 
+import { FieldValue } from "firebase-admin/firestore";
 import { dbAdmin, bucketAdmin } from "../../firebaseAdmin";
 import { crearInterconsulta } from "../../conectaInterconsultas";
 import { configurarCompartirExpediente, refrescarExpedienteCompartido } from "../../conectaCompartirExpediente";
@@ -123,6 +124,26 @@ describe("compartir el expediente al día y apagarlo", () => {
     expect(despues.expedienteCompartido?.fotosArchivoIds).toEqual(despues.archivos.map((a) => a.id));
   });
 
+  it("anota cuándo el colega abre el caso (aunque no toque revisar), y no cuenta si abre quien comparte", async () => {
+    const id = casoIds[0];
+    await dbAdmin.collection("interconsultas").doc(id).set({ compartirExpediente: { vistoPorColegaEl: FieldValue.delete() } }, { merge: true });
+    expect((await leer(id)).compartirExpediente?.vistoPorColegaEl).toBeUndefined();
+
+    // Quien comparte abre el caso: no cuenta como "lo vio el colega".
+    await envejecer(id);
+    await refrescarExpedienteCompartido(REMITENTE, id);
+    expect((await leer(id)).compartirExpediente?.vistoPorColegaEl).toBeUndefined();
+
+    // El colega abre el caso justo después (la revisión del expediente aún está reciente, no toca): se anota igual.
+    expect(await refrescarExpedienteCompartido(COLEGA, id)).toEqual({ actualizado: false });
+    const vista = (await leer(id)).compartirExpediente?.vistoPorColegaEl;
+    expect(vista).toBeTruthy();
+
+    // Otra apertura inmediata no vuelve a escribir (se limita a una por minuto).
+    await refrescarExpedienteCompartido(COLEGA, id);
+    expect((await leer(id)).compartirExpediente?.vistoPorColegaEl).toBe(vista);
+  });
+
   it("alguien ajeno al caso no puede actualizarlo ni apagarlo; el colega tampoco apagarlo", async () => {
     const id = casoIds[0];
     await expect(refrescarExpedienteCompartido(AJENO, id)).rejects.toMatchObject({ status: 403 });
@@ -157,6 +178,7 @@ describe("compartir el expediente al día y apagarlo", () => {
     const d = await leer(id);
     expect(d.compartirExpediente).toMatchObject({ activo: true, secciones: ["odontograma", "fotos_radiografias"] });
     expect(d.compartirExpediente).not.toHaveProperty("desactivadoEl");
+    expect(d.compartirExpediente).not.toHaveProperty("vistoPorColegaEl"); // al volver a activar se empieza de cero
     expect(d.expedienteCompartido?.odontograma).toHaveLength(2);
     expect(d.archivos).toHaveLength(2);
     const eventos = await dbAdmin.collection("interconsultas").doc(id).collection("eventos").where("tipo", "==", "expediente_compartir_activado").get();

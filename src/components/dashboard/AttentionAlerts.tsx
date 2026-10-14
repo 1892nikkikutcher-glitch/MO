@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import { usePatientData } from "@/context/PatientDataContext";
 import { useMoConecta } from "@/context/MoConectaContext";
 import { casosPorAtender } from "@/lib/casosConectados";
+import { casosConcluidosCompartiendo } from "@/lib/compartirExpedienteEstado";
 import { formatCurrency } from "@/lib/patientData";
 import { agruparLaboratoriosPendientes, parseFechaEntrega, type RangoPeriodo } from "@/lib/dashboardMetrics";
 import {
@@ -76,7 +77,8 @@ export default function AttentionAlerts({ rango }: { rango: RangoPeriodo }) {
     cargarNotasPaciente,
   } = usePatientData();
   const [mostrarLaboratorios, setMostrarLaboratorios] = useState(false);
-  const { casosRecibidos, uid: miUidConecta, novedades: novedadesConecta } = useMoConecta();
+  const { casosRecibidos, casosEnviados, uid: miUidConecta, novedades: novedadesConecta } = useMoConecta();
+  const compartiendoConcluidos = casosConcluidosCompartiendo(casosEnviados, miUidConecta).length;
   const conectaPorAtender = casosPorAtender(casosRecibidos, miUidConecta).length;
 
   const hoy = new Date();
@@ -151,6 +153,20 @@ export default function AttentionAlerts({ rango }: { rango: RangoPeriodo }) {
       emoji: "🔴",
       texto: `${conectaPorAtender} caso(s) de MO Conecta esperan tu respuesta`,
       prioridad: "alta",
+      categoria: "conecta",
+      onClick: () => irAPagina("mo-conecta"),
+    });
+  }
+
+  if (compartiendoConcluidos > 0) {
+    alertas.push({
+      key: "conecta-compartiendo-concluidos",
+      emoji: "🔒",
+      texto:
+        compartiendoConcluidos === 1
+          ? "Un caso de MO Conecta ya concluyó pero sigue compartiendo el expediente — apágalo"
+          : `${compartiendoConcluidos} casos de MO Conecta ya concluyeron pero siguen compartiendo el expediente — apágalos`,
+      prioridad: "media",
       categoria: "conecta",
       onClick: () => irAPagina("mo-conecta"),
     });
