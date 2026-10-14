@@ -444,11 +444,14 @@ function ReciboActions({
   patientName,
   pago,
   onDone,
+  onSolicitarFirma,
 }: {
   patientId: string;
   patientName: string;
   pago: Pago;
   onDone: () => void;
+  /** Si viene y el pago aún no tiene firma, se ofrece pedirla (saldrá en el PDF del recibo). */
+  onSolicitarFirma?: () => void;
 }) {
   const recibo = useReciboPdf(patientId, patientName);
 
@@ -477,37 +480,48 @@ function ReciboActions({
 
       <div>
         <p className="mb-2 text-xs font-medium text-ink/60">Recibo en PDF</p>
-        <button
-          onClick={() => recibo.descargar(pago)}
-          disabled={recibo.ocupado}
-          className="mb-2 w-full rounded-lg border border-accent/60 bg-accent/15 py-2.5 text-sm font-semibold text-accent transition-colors hover:bg-accent/25 disabled:opacity-50"
-        >
-          {recibo.ocupado ? "Generando PDF…" : "Descargar recibo (PDF)"}
-        </button>
-        <div className="flex flex-wrap gap-2">
+        <div className="mb-2 grid grid-cols-2 gap-2">
           <button
             onClick={() => recibo.abrir(pago)}
             disabled={recibo.ocupado}
-            title="Abre el PDF para verlo o imprimirlo"
-            className="flex-1 rounded-lg border border-edge/15 py-2 text-sm font-semibold text-ink/80 transition-colors hover:bg-surface disabled:opacity-50"
+            title="Abre el recibo en PDF para verlo, imprimirlo o guardarlo"
+            className="rounded-lg border border-accent/60 bg-accent/15 py-2.5 text-sm font-semibold text-accent transition-colors hover:bg-accent/25 disabled:opacity-50"
           >
-            Ver / imprimir
+            {recibo.ocupado ? "Generando…" : "Ver recibo (PDF)"}
+          </button>
+          <button
+            onClick={() => recibo.descargar(pago)}
+            disabled={recibo.ocupado}
+            title="Guarda el recibo en PDF en este equipo"
+            className="rounded-lg border border-accent/60 bg-accent/15 py-2.5 text-sm font-semibold text-accent transition-colors hover:bg-accent/25 disabled:opacity-50"
+          >
+            Descargar PDF
+          </button>
+        </div>
+        <div className="grid grid-cols-2 gap-2">
+          <button
+            onClick={() => recibo.enviarWhatsApp(pago)}
+            disabled={recibo.ocupado}
+            className="rounded-lg border border-success/40 py-2 text-sm font-semibold text-success transition-colors hover:bg-success/10 disabled:opacity-50"
+          >
+            Enviar por WhatsApp
           </button>
           <button
             onClick={() => recibo.enviarCorreo(pago)}
             disabled={recibo.ocupado}
-            className="flex-1 rounded-lg border border-info/40 py-2 text-sm font-semibold text-info transition-colors hover:bg-info/10 disabled:opacity-50"
+            className="rounded-lg border border-info/40 py-2 text-sm font-semibold text-info transition-colors hover:bg-info/10 disabled:opacity-50"
           >
             Enviar por mail
           </button>
-          <button
-            onClick={() => recibo.enviarWhatsApp(pago)}
-            disabled={recibo.ocupado}
-            className="flex-1 rounded-lg border border-success/40 py-2 text-sm font-semibold text-success transition-colors hover:bg-success/10 disabled:opacity-50"
-          >
-            Enviar por WhatsApp
-          </button>
         </div>
+        {onSolicitarFirma && !pago.firma && (
+          <button
+            onClick={onSolicitarFirma}
+            className="mt-2 w-full rounded-lg border border-edge/15 py-2 text-sm font-semibold text-ink/80 transition-colors hover:bg-surface"
+          >
+            Solicitar firma del paciente <span className="font-normal text-ink/50">(saldrá en el recibo)</span>
+          </button>
+        )}
       </div>
 
       <button
@@ -544,7 +558,7 @@ export function AgregarPagoDialog({
   const { recursos } = usePatientData();
   const medicosDisponibles = recursos.filter((r) => r.tipo === "medico").map((r) => r.nombre);
 
-  const [paso, setPaso] = useState<"form" | "confirmacion" | "firma" | "recibo">("form");
+  const [paso, setPaso] = useState<"form" | "firma" | "recibo">("form");
   const [pagoGuardado, setPagoGuardado] = useState<Pago | null>(null);
 
   const [medico, setMedico] = useState(medicosDisponibles[0] ?? "");
@@ -618,40 +632,8 @@ export function AgregarPagoDialog({
 
     onSave(pago);
     setPagoGuardado(pago);
-    setPaso("confirmacion");
+    setPaso("recibo");
   };
-
-  if (paso === "confirmacion" && pagoGuardado) {
-    return (
-      <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4 print:hidden">
-        <div className="w-full max-w-md rounded-2xl border border-edge/10 bg-modal p-6">
-          <div className="flex items-center gap-2 text-success">
-            <span className="flex h-8 w-8 items-center justify-center rounded-full bg-success/15 text-lg">
-              ✓
-            </span>
-            <span className="text-sm font-semibold">Pago registrado correctamente</span>
-          </div>
-          <p className="mt-3 text-sm text-ink/60">
-            ¿Deseas cerrar el registro o solicitar la firma del paciente?
-          </p>
-          <div className="mt-6 flex gap-3">
-            <button
-              onClick={() => setPaso("recibo")}
-              className="flex-1 rounded-lg border border-edge/15 py-2.5 text-sm font-semibold text-ink/80 transition-colors hover:bg-surface"
-            >
-              Aceptar
-            </button>
-            <button
-              onClick={() => setPaso("firma")}
-              className="flex-1 rounded-lg border border-accent/60 bg-accent/15 py-2.5 text-sm font-semibold text-accent transition-opacity hover:bg-accent/25"
-            >
-              Solicitar Firma
-            </button>
-          </div>
-        </div>
-      </div>
-    );
-  }
 
   if (paso === "firma" && pagoGuardado) {
     return (
@@ -660,7 +642,7 @@ export function AgregarPagoDialog({
           <h2 className="mb-4 text-lg font-semibold text-ink">Solicitar Firma</h2>
           <FirmaCanvas
             etiqueta="Firma del paciente"
-            onCancel={() => setPaso("confirmacion")}
+            onCancel={() => setPaso("recibo")}
             onSave={(dataUrl) => {
               const actualizado = { ...pagoGuardado, firma: dataUrl };
               setPagoGuardado(actualizado);
@@ -677,7 +659,13 @@ export function AgregarPagoDialog({
     return (
       <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4 print:bg-transparent">
         <div className="w-full max-w-md rounded-2xl border border-edge/10 bg-modal p-6 print:border-none print:bg-transparent print:p-0">
-          <ReciboActions patientId={patientId} patientName={patientName} pago={pagoGuardado} onDone={onClose} />
+          <ReciboActions
+            patientId={patientId}
+            patientName={patientName}
+            pago={pagoGuardado}
+            onDone={onClose}
+            onSolicitarFirma={() => setPaso("firma")}
+          />
         </div>
       </div>
     );
