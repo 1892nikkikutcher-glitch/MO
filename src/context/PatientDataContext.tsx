@@ -94,7 +94,12 @@ import {
   type ResultadoRestauracion,
 } from "@/lib/papeleraFirestore";
 import { analizarRutaOrigen, type EntradaPapelera } from "@/lib/papelera";
-import { aplicarEstatusConMotivo, estatusAdmiteMotivo, type MotivoNoAsistencia } from "@/lib/noAsistencia";
+import {
+  aplicarEstatusConMotivo,
+  estatusAdmiteMotivo,
+  type MotivoNoAsistencia,
+  type OpcionesEstatusCita,
+} from "@/lib/noAsistencia";
 import { estadoRegulacionInicial, type EstadoRegulacionSanitaria } from "@/lib/regulacionSanitaria";
 import { formatosWhatsAppInicial, type FormatosWhatsApp } from "@/lib/formatosWhatsapp";
 import { contratoOrtodonciaInicial, type ContratoOrtodonciaConfig } from "@/lib/contratoOrtodoncia";
@@ -883,7 +888,12 @@ type PatientDataContextValue = {
   /** Cambia solo el estatus de una cita — para registrar desde la nota de
    * evolución que el paciente no llegó, canceló o reagendó, sin tener que
    * salir a Agenda a cambiarlo a mano. */
-  marcarEstatusCita: (citaId: string, estatus: CitaEstatus, motivo?: MotivoNoAsistencia) => void;
+  marcarEstatusCita: (
+    citaId: string,
+    estatus: CitaEstatus,
+    motivo?: MotivoNoAsistencia,
+    opciones?: OpcionesEstatusCita
+  ) => void;
   procedimientos: Procedimiento[];
   setProcedimientos: (updater: Updater<Procedimiento[]>) => void;
   importarCatalogoProcedimientos: (nuevos: Procedimiento[]) => Promise<void>;
@@ -2943,8 +2953,13 @@ export function PatientDataProvider({
     setCitas((prev) => prev.map((c) => (c.id === citaId ? { ...c, horaLlegada: hora } : c)));
   };
 
-  const marcarEstatusCita = (citaId: string, estatus: CitaEstatus, motivo?: MotivoNoAsistencia) => {
-    setCitas((prev) => prev.map((c) => (c.id === citaId ? aplicarEstatusConMotivo(c, estatus, motivo) : c)));
+  const marcarEstatusCita = (
+    citaId: string,
+    estatus: CitaEstatus,
+    motivo?: MotivoNoAsistencia,
+    opciones?: OpcionesEstatusCita
+  ) => {
+    setCitas((prev) => prev.map((c) => (c.id === citaId ? aplicarEstatusConMotivo(c, estatus, motivo, opciones) : c)));
     // Una cita que no se va a atender no debe dejar un presupuesto "pendiente"
     // que nadie puede pagar (infla el saldo del paciente).
     const cita = citas.find((c) => c.id === citaId);

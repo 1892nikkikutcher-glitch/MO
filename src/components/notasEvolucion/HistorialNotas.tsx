@@ -210,8 +210,8 @@ export default function HistorialNotas({ patientId, onContinuarBorrador }: { pat
     | { tipo: "v2"; fecha: string; nota: NotaEvolucionV2 }
     | { tipo: "administrativa"; fecha: string; nota: NotaEvolucionAdministrativa };
   const historial: EntradaHistorial[] = [
-    ...firmadasV2.map((nota): EntradaHistorial => ({ tipo: "v2", fecha: nota.actualizadoEn, nota })),
-    ...administrativas.map((nota): EntradaHistorial => ({ tipo: "administrativa", fecha: nota.creadoEn, nota })),
+    ...firmadasV2.map((nota): EntradaHistorial => ({ tipo: "v2", fecha: nota.actualizadoEn ?? nota.creadoEn ?? "", nota })),
+    ...administrativas.map((nota): EntradaHistorial => ({ tipo: "administrativa", fecha: nota.creadoEn ?? "", nota })),
   ].sort((a, b) => b.fecha.localeCompare(a.fecha));
 
   if (notas.length === 0) {

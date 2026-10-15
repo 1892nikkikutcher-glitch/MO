@@ -9,7 +9,7 @@
 import { useState } from "react";
 import { usePatientData } from "@/context/PatientDataContext";
 import { formatFechaCita, type CitaAgenda } from "@/lib/patientData";
-import { textoNoAsistioDeCita } from "@/lib/agendaHelpers";
+import { textoCancelacionDeCita, textoNoAsistioDeCita } from "@/lib/agendaHelpers";
 import {
   estatusCitaDeMotivo,
   motivoNotaAdministrativaLabel,
@@ -19,6 +19,7 @@ import {
   type PsoapOpcional,
 } from "@/lib/notasEvolucion";
 import {
+  cancelacionTardia,
   estatusAdmiteMotivo,
   razonesNoAsistencia,
   razonNoAsistenciaLabel,
@@ -83,11 +84,36 @@ export default function NotaAdministrativaRapida({
     motivoInicial ?? motivoSugeridoPorEstatus(cita.estatus)
   );
   const [razon, setRazon] = useState<RazonNoAsistencia | null>(cita.razonNoAsistencia ?? null);
-  const [notaLibre, setNotaLibre] = useState(notaLibreSugerida ?? "");
+  // ¿Cancelación fuera de tiempo? Si la cita ya quedó marcada, se respeta; si todavía se va a cancelar
+  // con esta nota, se calcula con la hora de fin de la cita. Se puede corregir con la casilla.
+  const tardiaInicial = cita.estatus === "Cancelada" ? Boolean(cita.canceladaTarde) : cancelacionTardia(cita);
+  const [canceloFueraDeTiempo, setCanceloFueraDeTiempo] = useState(tardiaInicial);
+  const [notaLibre, setNotaLibre] = useState(() => {
+    if (notaLibreSugerida) return notaLibreSugerida;
+    // La leyenda ya viene puesta cuando fue una falta o una cancelación fuera de tiempo (se puede editar).
+    const motivoIni = motivoInicial ?? motivoSugeridoPorEstatus(cita.estatus);
+    if (motivoIni === "no_asistio") return textoNoAsistioDeCita(cita);
+    if (motivoIni === "cancela_paciente" && tardiaInicial) return textoCancelacionDeCita(cita, true);
+    return "";
+  });
   const [mostrarPsoap, setMostrarPsoap] = useState(false);
   const [psoap, setPsoap] = useState<PsoapOpcional>(psoapVacio);
   const [guardando, setGuardando] = useState(false);
   const [error, setError] = useState("");
+
+  const leyendas = [textoNoAsistioDeCita(cita), textoCancelacionDeCita(cita, true), textoCancelacionDeCita(cita, false)];
+  const elegirMotivo = (m: MotivoNotaAdministrativa) => {
+    setMotivo(m);
+    // Solo se reemplaza un texto vacío o una leyenda automática; lo que el médico escribió no se toca.
+    if (notaLibre.trim() && !leyendas.includes(notaLibre.trim())) return;
+    if (m === "no_asistio") setNotaLibre(textoNoAsistioDeCita(cita));
+    else if (m === "cancela_paciente") setNotaLibre(canceloFueraDeTiempo ? textoCancelacionDeCita(cita, true) : "");
+    else setNotaLibre("");
+  };
+  const cambiarFueraDeTiempo = (valor: boolean) => {
+    setCanceloFueraDeTiempo(valor);
+    if (!notaLibre.trim() || leyendas.includes(notaLibre.trim())) setNotaLibre(valor ? textoCancelacionDeCita(cita, true) : "");
+  };
 
   const puedeGuardar = motivo !== null && (motivo !== "otro" || notaLibre.trim().length > 0);
   const estatusDestino = aplicarEstatusAlGuardar && motivo ? estatusCitaDeMotivo(motivo) : null;
@@ -125,8 +151,11 @@ export default function NotaAdministrativaRapida({
       // El motivo (razón) también queda en la propia cita, para verlo en
       // Agenda y reportes sin abrir la nota.
       const estatusFinal = estatusDestino ?? cita.estatus;
-      if (razon && estatusAdmiteMotivo(estatusFinal)) marcarEstatusCita(citaId, estatusFinal, { razon });
-      else if (estatusDestino) marcarEstatusCita(citaId, estatusDestino);
+      // La marca de "canceló fuera de tiempo" solo aplica cuando el motivo es cancelación.
+      const opcionesTardia = estatusFinal === "Cancelada" && motivo === "cancela_paciente" ? { canceladaTarde: canceloFueraDeTiempo } : undefined;
+      const tardiaCambio = opcionesTardia !== undefined && opcionesTardia.canceladaTarde !== Boolean(cita.canceladaTarde);
+      if (razon && estatusAdmiteMotivo(estatusFinal)) marcarEstatusCita(citaId, estatusFinal, { razon }, opcionesTardia);
+      else if (estatusDestino || tardiaCambio) marcarEstatusCita(citaId, estatusDestino ?? estatusFinal, undefined, opcionesTardia);
       onGuardado();
     } catch (err) {
       console.error("No se pudo guardar la nota administrativa", err);
@@ -163,7 +192,7 @@ export default function NotaAdministrativaRapida({
 
       <div className="mt-4 flex flex-wrap gap-2">
         {motivosNotaAdministrativa.map((m) => (
-          <Chip key={m} seleccionado={motivo === m} onClick={() => setMotivo(m)}>
+          <Chip key={m} seleccionado={motivo === m} onClick={() => elegirMotivo(m)}>
             {motivoNotaAdministrativaLabel[m]}
           </Chip>
         ))}
@@ -180,15 +209,36 @@ export default function NotaAdministrativaRapida({
         </div>
       </div>
 
+      {motivo === "cancela_paciente" && (
+        <label className="mt-4 flex cursor-pointer items-start gap-2 text-sm text-ink/80">
+          <input
+            type="checkbox"
+            className="mt-0.5"
+            checked={canceloFueraDeTiempo}
+            onChange={(e) => cambiarFueraDeTiempo(e.target.checked)}
+          />
+          <span>
+            Canceló fuera de tiempo (ya se había agotado el tiempo de la cita)
+            <span className="block text-xs text-ink/50">
+              Queda anotado en la nota y cuenta casi como una falta en las estrellas del paciente.
+            </span>
+          </span>
+        </label>
+      )}
+
       <div className="mt-4">
         <div className="flex items-center justify-between gap-3">
           <label className={labelClass}>
             {motivo === "otro" ? "Describe brevemente el motivo" : "Nota adicional (opcional)"}
           </label>
-          {motivo === "no_asistio" && (
+          {(motivo === "no_asistio" || motivo === "cancela_paciente") && (
             <button
               type="button"
-              onClick={() => setNotaLibre(textoNoAsistioDeCita(cita))}
+              onClick={() =>
+                setNotaLibre(
+                  motivo === "no_asistio" ? textoNoAsistioDeCita(cita) : textoCancelacionDeCita(cita, canceloFueraDeTiempo)
+                )
+              }
               className="mb-1 shrink-0 text-xs font-medium text-accent hover:underline"
               title="Llena el texto con el día, hora y procedimiento de esta cita"
             >

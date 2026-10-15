@@ -4,6 +4,7 @@ import {
   estaDentroDeHorario,
   medicoPreferidoDePaciente,
   textoNoAsistioDeCita,
+  textoCancelacionDeCita,
   toISODate,
 } from "../agendaHelpers";
 
@@ -114,5 +115,17 @@ describe("medicoPreferidoDePaciente", () => {
       { patientId: "pac2", medicoId: "med-Z", fecha: "2026-09-20", estatus: "Atendida" as const },
     ];
     expect(medicoPreferidoDePaciente(citas, "pac1")).toBe("med-A");
+  });
+});
+
+describe("textoCancelacionDeCita", () => {
+  const cita = { fecha: "2026-10-14", horaInicio: "10:00", horaFin: "11:00", tratamientos: ["Limpieza dental"] };
+  it("a tiempo: dice que canceló su cita", () => {
+    expect(textoCancelacionDeCita(cita, false)).toBe("El paciente canceló su cita programada el 14 de octubre de 2026 a las 10:00 hrs para Limpieza dental.");
+  });
+  it("fuera de tiempo: dice que canceló cuando ya se había agotado el tiempo de la cita", () => {
+    const t = textoCancelacionDeCita(cita, true);
+    expect(t).toContain("canceló su cita programada el 14 de octubre de 2026 a las 10:00 hrs para Limpieza dental");
+    expect(t).toContain("después de que ya se había agotado el tiempo de la cita");
   });
 });

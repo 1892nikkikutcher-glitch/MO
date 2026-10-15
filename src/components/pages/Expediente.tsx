@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useLayoutEffect, useRef, useState, type Dispatch, type SetStateAction } from "react";
+import EstrellasPaciente from "@/components/EstrellasPaciente";
 import NuevoPresupuesto from "./NuevoPresupuesto";
 import PropuestaDesdeOdontograma from "./PropuestaDesdeOdontograma";
 import ExpedienteCompartiendoAviso from "./ExpedienteCompartiendoAviso";
@@ -1344,7 +1345,10 @@ export default function Expediente({
               {initials}
             </div>
             <div className="min-w-0 flex-1">
-              <h2 className="text-xl font-semibold text-ink">{formatNombreConEdad(patient.name, patient.birthDate)}</h2>
+              <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
+                <EstrellasPaciente citas={citasPaciente} />
+                <h2 className="text-xl font-semibold text-ink">{formatNombreConEdad(patient.name, patient.birthDate)}</h2>
+              </div>
               <p className="mt-1 text-sm text-ink/50">
                 {patient.phone} · {formatDate(patient.birthDate)}
                 {patient.birthDate && ` · ${formatEdad(patient.birthDate)}`}

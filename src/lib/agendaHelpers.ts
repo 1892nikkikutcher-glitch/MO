@@ -235,6 +235,23 @@ export function textoNoAsistioDeCita(cita: { fecha: string; horaInicio: string; 
   }.`;
 }
 
+/** Frase lista para la nota rápida cuando el paciente cancela. Con `tardia` dice que canceló cuando ya se
+ * había agotado el tiempo de su cita (el lugar quedó reservado y no se pudo ocupar). */
+export function textoCancelacionDeCita(
+  cita: { fecha: string; horaInicio: string; horaFin?: string; tratamientos: string[] },
+  tardia: boolean
+): string {
+  const fecha = new Date(`${cita.fecha}T00:00:00`);
+  const fechaTexto = Number.isNaN(fecha.getTime())
+    ? cita.fecha
+    : `${fecha.getDate()} de ${MESES[fecha.getMonth()]} de ${fecha.getFullYear()}`;
+  const procedimiento = cita.tratamientos.filter(Boolean).join(", ");
+  const cita_ = `su cita programada el ${fechaTexto} a las ${cita.horaInicio} hrs${procedimiento ? ` para ${procedimiento}` : ""}`;
+  return tardia
+    ? `El paciente canceló ${cita_} después de que ya se había agotado el tiempo de la cita (cancelación fuera de tiempo).`
+    : `El paciente canceló ${cita_}.`;
+}
+
 /** El médico asignado en la cita más reciente de este paciente (pasada o
  * futura, la que sea más cercana a hoy en cualquier dirección del
  * tiempo) — para sugerirlo como default al agendar una nueva cita, en vez

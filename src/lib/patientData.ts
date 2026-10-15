@@ -716,6 +716,9 @@ export type CitaAgenda = {
   horaInicio: string;
   horaFin: string;
   estatus: CitaEstatus;
+  /** Solo en citas Canceladas: el paciente canceló cuando ya se había agotado el tiempo de la cita
+   * (cancelación fuera de tiempo). Cuenta casi como una inasistencia en la calificación del paciente. */
+  canceladaTarde?: boolean;
   recurrenciaId: string | null;
   /** Hora real (HH:MM) en que el paciente se presentó — asistencia de
    * pacientes. Se estampa automáticamente al marcar la cita "En espera". */
