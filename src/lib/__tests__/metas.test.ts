@@ -56,3 +56,25 @@ describe("contarPagosEnRango", () => {
     expect(total).toBe(4);
   });
 });
+
+describe("meta diaria", () => {
+  it("sale de la semanal entre los 6 días de atención", async () => {
+    const { metaDiariaDe, metaSemanalDe, DIAS_ATENCION_POR_SEMANA } = await import("../metas");
+    expect(DIAS_ATENCION_POR_SEMANA).toBe(6);
+    expect(metaDiariaDe(80000)).toBeCloseTo(metaSemanalDe(80000) / 6, 6);
+    expect(metaDiariaDe(80000) * 6).toBeCloseTo(metaSemanalDe(80000), 6); // seis días suman la semana
+    expect(metaDiariaDe(0)).toBe(0);
+  });
+
+  it("calcularAvanceMetas trae la diaria primero y cuenta solo lo cobrado hoy", async () => {
+    const { calcularAvanceMetas } = await import("../metas");
+    const hoy = new Date();
+    const iso = (d: Date) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+    const ayer = new Date(hoy.getFullYear(), hoy.getMonth(), hoy.getDate() - 1);
+    const [diaria, ...resto] = calcularAvanceMetas({ [iso(hoy)]: 1000, [iso(ayer)]: 700 }, 80000);
+    expect(diaria.label).toBe("Diaria");
+    expect(diaria.actual).toBe(1000);
+    expect(diaria.porcentaje).toBe(Math.min(100, Math.round((1000 / diaria.meta) * 100)));
+    expect(resto.map((a) => a.label)).toEqual(["Semanal", "Quincenal", "Mensual"]);
+  });
+});

@@ -116,6 +116,14 @@ export function metaSemanalDe(metaMensual: number) {
   return metaMensual / SEMANAS_POR_MES;
 }
 
+/** Días que se atiende por semana (lunes a sábado) — con esto la meta diaria sale de la semanal,
+ * así que seis días de meta diaria siempre suman la meta semanal. */
+export const DIAS_ATENCION_POR_SEMANA = 6;
+
+export function metaDiariaDe(metaMensual: number) {
+  return metaSemanalDe(metaMensual) / DIAS_ATENCION_POR_SEMANA;
+}
+
 export function metaQuincenalDe(metaMensual: number) {
   return metaMensual / 2;
 }
@@ -196,16 +204,20 @@ export function calcularAvanceMetas(porFecha: Record<string, number>, metaMensua
   const hoy = new Date();
   hoy.setHours(23, 59, 59, 999);
 
+  const inicioHoy = new Date(hoy.getFullYear(), hoy.getMonth(), hoy.getDate());
+  const diario = sumarRango(porFecha, inicioHoy, hoy);
   const semanal = sumarRango(porFecha, inicioSemana(hoy), hoy);
   const quincenal = sumarRango(porFecha, inicioQuincena(hoy), hoy);
   const mensual = sumarRango(porFecha, inicioMes(hoy), hoy);
 
+  const metaDiaria = metaDiariaDe(metaMensual);
   const metaSemanal = metaSemanalDe(metaMensual);
   const metaQuincenal = metaQuincenalDe(metaMensual);
 
   const pct = (actual: number, meta: number) => (meta > 0 ? Math.min(100, Math.round((actual / meta) * 100)) : 0);
 
   return [
+    { label: "Diaria", actual: diario, meta: metaDiaria, porcentaje: pct(diario, metaDiaria) },
     { label: "Semanal", actual: semanal, meta: metaSemanal, porcentaje: pct(semanal, metaSemanal) },
     { label: "Quincenal", actual: quincenal, meta: metaQuincenal, porcentaje: pct(quincenal, metaQuincenal) },
     { label: "Mensual", actual: mensual, meta: metaMensual, porcentaje: pct(mensual, metaMensual) },

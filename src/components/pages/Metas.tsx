@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { usePatientData } from "@/context/PatientDataContext";
 import { formatCurrency } from "@/lib/patientData";
-import { metaSemanalDe, metaQuincenalDe } from "@/lib/metas";
+import { metaDiariaDe, metaSemanalDe, metaQuincenalDe, DIAS_ATENCION_POR_SEMANA } from "@/lib/metas";
 
 const inputClass =
   "w-full rounded-lg border border-edge/10 bg-field px-3 py-2 text-sm text-ink placeholder-ink/30 outline-none focus:border-accent/60";
@@ -22,6 +22,7 @@ export default function Metas() {
   }
 
   const metaMensual = Number(valor) || 0;
+  const diaria = metaDiariaDe(metaMensual);
   const semanal = metaSemanalDe(metaMensual);
   const quincenal = metaQuincenalDe(metaMensual);
 
@@ -34,8 +35,8 @@ export default function Metas() {
     <div className="max-w-2xl space-y-4 rounded-2xl border border-edge/10 bg-surface p-6">
       <h3 className="text-sm font-semibold uppercase tracking-wide text-ink/60">Metas de Ingresos</h3>
       <p className="text-xs text-ink/40">
-        Define tu meta mensual y calculamos automáticamente la semanal y la quincenal para que
-        siempre coincidan entre sí. En el Dashboard verás qué porcentaje llevas cumplido de cada una
+        Define tu meta mensual y calculamos automáticamente la semanal, la quincenal y la diaria
+        (la semanal entre {DIAS_ATENCION_POR_SEMANA} días de atención, de lunes a sábado) para que siempre coincidan entre sí. En el Dashboard verás qué porcentaje llevas cumplido de cada una
         con tus ingresos reales.
       </p>
 
@@ -54,7 +55,11 @@ export default function Metas() {
         />
       </div>
 
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+        <div className="rounded-lg border border-edge/10 bg-inset px-4 py-3">
+          <div className="text-[11px] uppercase tracking-wide text-ink/40">Meta diaria (calculada)</div>
+          <div className="mt-1 text-lg font-semibold text-ink">{formatCurrency(Math.round(diaria))}</div>
+        </div>
         <div className="rounded-lg border border-edge/10 bg-inset px-4 py-3">
           <div className="text-[11px] uppercase tracking-wide text-ink/40">Meta semanal (calculada)</div>
           <div className="mt-1 text-lg font-semibold text-ink">{formatCurrency(Math.round(semanal))}</div>
