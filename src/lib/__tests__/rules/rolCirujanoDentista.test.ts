@@ -81,6 +81,19 @@ describe("Cirujano dentista (odontologo)", () => {
     await assertFails(setDoc(doc(db, `${base}/config/finanzas`), { porFecha: { x: 1 } }));
   });
 
+  it.each(["estadisticas", "presupuestosPendientesDetalle", "presupuestosCreadosDetalle", "laboratoriosPendientes", "folioReceta", "vocabularioNotas"])(
+    "puede actualizar el resumen %s que el Inicio y las recetas necesitan",
+    async (nombre) => {
+      await assertSucceeds(setDoc(doc(como(DENTISTA), `${base}/config/${nombre}`), { siguiente: 2 }, { merge: true }));
+    }
+  );
+
+  it("sigue sin poder escribir saldos pendientes ni el perfil del doctor", async () => {
+    const db = como(DENTISTA);
+    await assertFails(setDoc(doc(db, `${base}/config/saldosPendientes`), { porPaciente: {} }, { merge: true }));
+    await assertFails(setDoc(doc(db, `${base}/config/perfilDoctor`), { nombre: "X" }, { merge: true }));
+  });
+
   it("puede guardar la copia en la Papelera pero no leerla ni borrarla", async () => {
     const db = como(DENTISTA);
     await assertSucceeds(setDoc(doc(db, `${base}/papelera/e1`), { tipo: "citas" }));

@@ -295,9 +295,17 @@ service cloud.firestore {
       allow delete: if tieneAccesoACita(ownerId, resource.data) && puedeBorrar(ownerId);
       allow create: if tieneAccesoACita(ownerId, request.resource.data);
     }
+    // Resúmenes que la app actualiza sola al operar (presupuestos creados/pendientes, conteos, folio de
+    // receta, vocabulario de notas). Cualquier miembro activo los escribe; si no, lo que haga un cirujano
+    // dentista o un colaborador nunca se reflejaría en el Inicio y el folio de las recetas se repetiría.
+    // NO incluye finanzas ni saldosPendientes (se calculan con pagos que esos roles no ven): siguen siendo
+    // solo del administrador, igual que el resto de la configuración.
+    function configDeResumen(configId) {
+      return configId in ['estadisticas', 'presupuestosPendientesDetalle', 'presupuestosCreadosDetalle', 'laboratoriosPendientes', 'folioReceta', 'vocabularioNotas'];
+    }
     match /users/{ownerId}/config/{configId} {
       allow read: if isActiveMember(ownerId);
-      allow write: if isClinicAdmin(ownerId);
+      allow write: if isClinicAdmin(ownerId) || (isActiveMember(ownerId) && configDeResumen(configId));
     }
     match /users/{ownerId}/membresiaPlanes/{planId} {
       allow read: if isActiveMember(ownerId);
