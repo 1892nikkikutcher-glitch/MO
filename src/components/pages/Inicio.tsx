@@ -1,6 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
+import PacientesPorProponerCita from "@/components/dashboard/PacientesPorProponerCita";
 import { usePatientData } from "@/context/PatientDataContext";
 import { calcularEdadDetallada, formatCurrency } from "@/lib/patientData";
 import { calcularAvanceMetas } from "@/lib/metas";
@@ -352,6 +353,7 @@ export default function Inicio() {
           Pacientes. */}
       <AttentionAlerts rango={rango} />
       <PendientesConsultorio />
+      <PacientesPorProponerCita />
 
       <SeccionDashboard titulo="Finanzas">
         <FinancialSummary rango={rango} />

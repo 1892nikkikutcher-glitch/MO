@@ -647,7 +647,7 @@ function useClinicResolution(authUid: string, authEmail: string) {
 
 export type NavegacionExpediente = { patientId: string; tab?: string; citaId?: string } | null;
 
-export type NavegacionNuevaCita = { patientId: string; tratamiento: string } | null;
+export type NavegacionNuevaCita = { patientId: string; tratamiento: string; fecha?: string; horaInicio?: string } | null;
 
 type PatientDataContextValue = {
   clinicUid: string | null;
@@ -953,7 +953,9 @@ type PatientDataContextValue = {
   irAExpediente: (patientId: string, tab?: string, citaId?: string) => void;
   consumirNavegacionExpediente: () => void;
   navegacionNuevaCita: NavegacionNuevaCita;
-  sugerirNuevaCita: (patientId: string, tratamiento: string) => void;
+  /** Abre la Agenda con una cita nueva ya llenada; `fecha` ("YYYY-MM-DD") y `horaInicio` ("HH:MM") son opcionales
+   * (sin ellas se usa el momento actual). */
+  sugerirNuevaCita: (patientId: string, tratamiento: string, cuando?: { fecha: string; horaInicio: string }) => void;
   consumirNavegacionNuevaCita: () => void;
   solicitudNuevaCitaBlanco: boolean;
   abrirNuevaCitaDesdeInicio: () => void;
@@ -1507,8 +1509,8 @@ export function PatientDataProvider({
 
   const consumirNavegacionExpediente = () => setNavegacionExpediente(null);
 
-  const sugerirNuevaCita = (patientId: string, tratamiento: string) => {
-    setNavegacionNuevaCita({ patientId, tratamiento });
+  const sugerirNuevaCita = (patientId: string, tratamiento: string, cuando?: { fecha: string; horaInicio: string }) => {
+    setNavegacionNuevaCita({ patientId, tratamiento, ...(cuando ?? {}) });
     onIrAPagina?.("agenda");
   };
 

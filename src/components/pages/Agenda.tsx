@@ -306,16 +306,21 @@ export default function Agenda() {
     consumirNavegacionNuevaCita();
     if (!paciente) return;
     const ahora = new Date();
-    const inicio = Math.min(
-      Math.max(Math.round((ahora.getHours() * 60 + ahora.getMinutes()) / 30) * 30, HOUR_START * 60),
-      HOUR_END * 60 - 30
-    );
+    // Con fecha y hora propuestas (ej. "Pacientes por proponer cita") se usan tal cual; si no, el momento actual.
+    const horaPropuesta = navegacionNuevaCita.horaInicio ? timeToMinutes(navegacionNuevaCita.horaInicio) : null;
+    const inicio =
+      horaPropuesta !== null && Number.isFinite(horaPropuesta)
+        ? horaPropuesta
+        : Math.min(
+            Math.max(Math.round((ahora.getHours() * 60 + ahora.getMinutes()) / 30) * 30, HOUR_START * 60),
+            HOUR_END * 60 - 30
+          );
     setDialogState({
       initial: {
         patientId: paciente.id,
         paciente: paciente.name,
         tratamientos: [navegacionNuevaCita.tratamiento],
-        fecha: toISODate(ahora),
+        fecha: navegacionNuevaCita.fecha ?? toISODate(ahora),
         horaInicio: minutesToTime(inicio),
         horaFin: minutesToTime(inicio + 30),
         recursoId: recursos.find((r) => !recursosOcultos.has(r.id))?.id ?? recursos[0]?.id,
