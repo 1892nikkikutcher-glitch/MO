@@ -1,4 +1,5 @@
 import { capitalizarNombre } from "./textoNombre";
+import type { BloqueAtencion } from "./sedesBloques";
 import type { HorarioPreferente } from "./horarioPreferente";
 import type { PrioridadTratamiento } from "./planTratamiento";
 import { montoMayorQue, redondearDinero } from "./dinero";
@@ -604,6 +605,9 @@ export type Recurso = {
   logoEscuelaUrl?: string;
   /** Imagen de la firma del doctor, para recetas enviadas por medios digitales (PDF/WhatsApp). */
   firmaDigitalUrl?: string;
+  /** Bloques en que este médico atiende (días, horas y sede). Solo tipo "medico"; ausente o vacío = no hay
+   * bloques definidos y la Agenda no le exige ninguno. */
+  bloques?: BloqueAtencion[];
 };
 
 const CAMPOS_IDENTIDAD_DOCTOR = [
@@ -722,6 +726,10 @@ export type CitaAgenda = {
   /** Solo en citas Canceladas: el paciente canceló cuando ya se había agotado el tiempo de la cita
    * (cancelación fuera de tiempo). Cuenta casi como una inasistencia en la calificación del paciente. */
   canceladaTarde?: boolean;
+  /** Sede (config/sedes) donde se atiende esta cita. Se pone al agendarla, a partir del bloque del médico. */
+  sedeId?: string | null;
+  /** Se agendó fuera de los bloques de atención del médico, con la confirmación de quien la capturó. */
+  fueraDeBloque?: boolean;
   recurrenciaId: string | null;
   /** Hora real (HH:MM) en que el paciente se presentó — asistencia de
    * pacientes. Se estampa automáticamente al marcar la cita "En espera". */

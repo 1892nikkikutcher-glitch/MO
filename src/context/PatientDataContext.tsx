@@ -9,6 +9,7 @@ import {
   useState,
   type ReactNode,
 } from "react";
+import { sedesInicial, type Sede, type SedesConfig } from "@/lib/sedesBloques";
 import {
   arrayUnion,
   collection,
@@ -938,6 +939,9 @@ type PatientDataContextValue = {
   setSuscripcion: (updater: Updater<SuscripcionPlan>) => void;
   metas: MetaConfig;
   setMetas: (updater: Updater<MetaConfig>) => void;
+  /** Sedes (consultorios físicos) de la clínica — solo el administrador las edita (config/*). */
+  sedes: Sede[];
+  setSedes: (lista: Sede[]) => void;
   presupuestoGastos: PresupuestoGastosConfig;
   setPresupuestoGastos: (updater: Updater<PresupuestoGastosConfig>) => void;
   finanzas: FinanzasConfig;
@@ -1082,6 +1086,9 @@ export function PatientDataProvider({
     suscripcionInicial
   );
   const [metas, setMetas] = useFirestoreDoc<MetaConfig>(clinicUid, "metas", metaConfigInicial);
+  const [sedesConfig, setSedesConfig] = useFirestoreDoc<SedesConfig>(clinicUid, "sedes", sedesInicial);
+  const sedes = sedesConfig.lista ?? [];
+  const setSedes = (lista: Sede[]) => setSedesConfig({ lista });
   const [presupuestoGastos, setPresupuestoGastos] = useFirestoreDoc<PresupuestoGastosConfig>(
     clinicUid,
     "presupuestoGastos",
@@ -3238,6 +3245,8 @@ export function PatientDataProvider({
         setSuscripcion,
         metas,
         setMetas,
+        sedes,
+        setSedes,
         presupuestoGastos,
         setPresupuestoGastos,
         finanzas,

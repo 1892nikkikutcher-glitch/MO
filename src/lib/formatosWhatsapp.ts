@@ -53,6 +53,24 @@ Forma de pago: {{formaPago}}
 ¡Gracias por su confianza!`,
 };
 
+/** Dónde y con quién es la cita, para el recordatorio: "📍 *Juan Corrales* — Calle… / Le atiende: *Dr. X*".
+ * Vacío si no hay ni sede ni médico. */
+export function ubicacionParaMensaje(datos: { sede?: string; direccion?: string; medico?: string }): string {
+  const lineas: string[] = [];
+  if (datos.sede) lineas.push(`📍 *${datos.sede}*${datos.direccion ? ` — ${datos.direccion}` : ""}`);
+  if (datos.medico) lineas.push(`Le atiende: *${datos.medico}*`);
+  return lineas.join("\n");
+}
+
+/** Plantilla lista para rellenar: si la que tiene guardada la clínica no usa {{sede}} ni {{ubicacion}} (las
+ * anteriores a las sedes no los tienen) y hay una ubicación que decir, se agrega tras el primer párrafo. */
+export function plantillaConUbicacion(plantilla: string, ubicacion: string): string {
+  if (!ubicacion || plantilla.includes("{{ubicacion}}") || plantilla.includes("{{sede}}")) return plantilla;
+  const corte = plantilla.indexOf("\n\n");
+  if (corte === -1) return `${plantilla}\n\n{{ubicacion}}`;
+  return `${plantilla.slice(0, corte)}\n\n{{ubicacion}}${plantilla.slice(corte)}`;
+}
+
 export function renderPlantilla(plantilla: string, vars: Record<string, string>): string {
   return Object.entries(vars).reduce(
     (texto, [clave, valor]) => texto.split(`{{${clave}}}`).join(valor),

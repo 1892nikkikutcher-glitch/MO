@@ -39,6 +39,15 @@ import {
 import AppointmentStatusBadge from "@/components/agenda/AppointmentStatusBadge";
 import AgendaCitaDialog from "@/components/agenda/AgendaCitaDialog";
 import AgendaRecursoDialog from "@/components/agenda/AgendaRecursoDialog";
+import SedesDialog from "@/components/agenda/SedesDialog";
+import {
+  bloquesDelDia,
+  evaluarCitaContraBloques,
+  mensajeFueraDeBloque,
+  nombreDeSede,
+  normalizarBloques,
+  sedeDeCita,
+} from "@/lib/sedesBloques";
 import { useMoConecta } from "@/context/MoConectaContext";
 import { colegasPorRecurso, unirColegas } from "@/lib/calendariosCompartidos";
 import { useCalendariosCompartidos } from "@/lib/useCalendariosCompartidos";
@@ -91,6 +100,9 @@ export default function Agenda() {
     irAPagina,
     procedimientos,
     misRecursosVisibles,
+    miRol,
+    sedes,
+    setSedes,
   } = usePatientData();
   // Calendarios compartidos solos: los recursos cuyas citas se compartieron con
   // un colega por MO Conecta (caso enviado y todavía abierto).
@@ -143,6 +155,13 @@ export default function Agenda() {
   const [recursosOcultos, setRecursosOcultos] = useState<Set<string>>(new Set());
   const [estatusOcultos, setEstatusOcultos] = useState<Set<CitaEstatus>>(new Set());
   const [recursoDialog, setRecursoDialog] = useState<"nuevo" | Recurso | null>(null);
+  const [sedesDialogAbierto, setSedesDialogAbierto] = useState(false);
+  /** "todas" o el id de la sede cuyas citas y bloques se ven. */
+  const [sedeFiltro, setSedeFiltro] = useState<string>("todas");
+  const sedesEnUso = useMemo(
+    () => new Set(recursosDeLaClinica.flatMap((r) => (r.bloques ?? []).map((b) => b.sedeId))),
+    [recursosDeLaClinica]
+  );
   const [recursoParaEliminar, setRecursoParaEliminar] = useState<{ id: string; nombre: string } | null>(null);
   const [dialogState, setDialogState] = useState<{
     initial: Partial<CitaAgenda> & { fecha: string; horaInicio: string };
@@ -243,7 +262,10 @@ export default function Agenda() {
   const citasVisibles = citasEnRango.filter((c) => {
     const idsRecurso = [c.medicoId, c.unidadId, c.recursoId].filter(Boolean) as string[];
     const ocultaPorRecurso = idsRecurso.some((id) => recursosOcultos.has(id));
-    return !ocultaPorRecurso && !estatusOcultos.has(c.estatus);
+    if (ocultaPorRecurso || estatusOcultos.has(c.estatus)) return false;
+    // Con una sede elegida solo se ven las citas de esa sede.
+    if (sedeFiltro !== "todas" && sedeDeCita(c, recursos, sedes)?.id !== sedeFiltro) return false;
+    return true;
   });
 
   const conteoEstatus = citaEstatusOptions.map((e) => ({
@@ -420,6 +442,8 @@ export default function Agenda() {
 
   const moverCita = (citaId: string, nuevaFecha: string, minutosSoltado: number) => {
     let citaMovida: CitaAgenda | null = null;
+    let evaluacionAlMover: ReturnType<typeof evaluarCitaContraBloques> | null = null;
+    let nombreMedicoAlMover = "";
     setCitas((prev) =>
       prev.map((c) => {
         if (c.id !== citaId) return c;
@@ -428,17 +452,35 @@ export default function Agenda() {
           Math.max(Math.round(minutosSoltado / 30) * 30, HOUR_START * 60),
           HOUR_END * 60 - duracion
         );
+        // La sede y la marca de "fuera de bloque" dependen del lugar donde cae, así que se recalculan.
+        const { sedeId: _sedeAnterior, fueraDeBloque: _fueraAnterior, ...sinSede } = c;
+        const medico = recursos.find((r) => r.tipo === "medico" && r.id === (c.medicoId || c.recursoId));
+        const horaFinNueva = minutesToTime(nuevoInicio + duracion);
+        evaluacionAlMover = evaluarCitaContraBloques(normalizarBloques(medico?.bloques), nuevaFecha, minutesToTime(nuevoInicio), horaFinNueva);
+        nombreMedicoAlMover = medico?.nombre ?? "";
         citaMovida = {
-          ...c,
+          ...sinSede,
           fecha: nuevaFecha,
           horaInicio: minutesToTime(nuevoInicio),
-          horaFin: minutesToTime(nuevoInicio + duracion),
+          horaFin: horaFinNueva,
+          ...(evaluacionAlMover.estado === "dentro"
+            ? { sedeId: evaluacionAlMover.bloque.sedeId }
+            : c.sedeId
+              ? { sedeId: c.sedeId }
+              : {}),
+          ...(evaluacionAlMover.estado === "fuera" ? { fueraDeBloque: true } : {}),
         };
         return citaMovida;
       })
     );
     if (citaMovida) {
       const avisos = detectarConflictos(recursos, citas, citaMovida);
+      // Soltarla fuera del bloque del médico no se bloquea (ya se movió), pero se avisa y la cita queda marcada.
+      // (TS no ve la asignación dentro del updater de setCitas, de ahí el cast.)
+      const evaluacion = evaluacionAlMover as ReturnType<typeof evaluarCitaContraBloques> | null;
+      if (evaluacion && evaluacion.estado === "fuera") {
+        avisos.push(mensajeFueraDeBloque(evaluacion, nuevaFecha, nombreMedicoAlMover, sedes));
+      }
       mostrarAvisoConflicto(avisos);
     }
     setDraggingId(null);
@@ -910,6 +952,29 @@ export default function Agenda() {
                       moverCita(citaId, toISODate(dia), minutos);
                     }}
                   >
+                    {recursos
+                      .filter((r) => r.tipo === "medico" && !recursosOcultos.has(r.id))
+                      .flatMap((r) =>
+                        bloquesDelDia(r.bloques, toISODate(dia))
+                          .filter((b) => sedeFiltro === "todas" || b.sedeId === sedeFiltro)
+                          .map((b) => (
+                            <div
+                              key={`${r.id}-${b.id}`}
+                              className="pointer-events-none absolute left-0 right-0 overflow-hidden"
+                              style={{
+                                top: (timeToMinutes(b.inicio) - HOUR_START * 60) * PX_PER_MIN,
+                                height: (timeToMinutes(b.fin) - timeToMinutes(b.inicio)) * PX_PER_MIN,
+                                backgroundColor: hexToRgba(r.color, 0.1),
+                                borderLeft: `2px solid ${hexToRgba(r.color, 0.55)}`,
+                              }}
+                              title={`${r.nombre} atiende en ${nombreDeSede(b.sedeId, sedes) || "su sede"} de ${b.inicio} a ${b.fin}`}
+                            >
+                              <span className="block truncate px-1 text-[9px] font-semibold uppercase tracking-wide text-ink/45">
+                                {nombreDeSede(b.sedeId, sedes)}
+                              </span>
+                            </div>
+                          ))
+                      )}
                     {horario.comidaInicio && horario.comidaFin && (
                       <div
                         className="pointer-events-none absolute left-0 right-0 bg-ink/[0.03]"
@@ -1013,6 +1078,12 @@ export default function Agenda() {
                                   {medico?.nombre}
                                   {medico && unidad ? " · " : ""}
                                   {unidad?.nombre}
+                                  {sedes.length > 0 && sedeDeCita(cita, recursos, sedes) ? ` · ${sedeDeCita(cita, recursos, sedes)?.nombre}` : ""}
+                                </span>
+                              )}
+                              {cita.fueraDeBloque && (
+                                <span title="Se agendó fuera del bloque de atención del médico" className="text-[9px] font-semibold text-warning">
+                                  ⚠ fuera de bloque
                                 </span>
                               )}
                             </div>
@@ -1041,14 +1112,41 @@ export default function Agenda() {
                 ?
               </span>
             </div>
-            <button
-              onClick={() => setRecursoDialog("nuevo")}
-              title="Agregar recurso"
-              className="flex h-6 w-6 items-center justify-center rounded-full border border-accent/40 text-accent transition-colors hover:bg-accent/10"
-            >
-              +
-            </button>
+            <div className="flex items-center gap-1.5">
+              {miRol === "admin" && (
+                <button
+                  onClick={() => setSedesDialogAbierto(true)}
+                  title="Administrar las sedes (consultorios)"
+                  className="rounded-full border border-edge/20 px-2 py-0.5 text-[11px] font-semibold text-ink/60 transition-colors hover:border-accent/40 hover:text-accent"
+                >
+                  Sedes
+                </button>
+              )}
+              <button
+                onClick={() => setRecursoDialog("nuevo")}
+                title="Agregar recurso"
+                className="flex h-6 w-6 items-center justify-center rounded-full border border-accent/40 text-accent transition-colors hover:bg-accent/10"
+              >
+                +
+              </button>
+            </div>
           </div>
+          {sedes.length > 0 && (
+            <div className="mb-3 flex flex-wrap gap-1.5">
+              {[{ id: "todas", nombre: "Todas las sedes" }, ...sedes].map((s) => (
+                <button
+                  key={s.id}
+                  onClick={() => setSedeFiltro(s.id)}
+                  aria-pressed={sedeFiltro === s.id}
+                  className={`rounded-full border px-2.5 py-0.5 text-[11px] font-semibold transition-colors ${
+                    sedeFiltro === s.id ? "border-accent/60 bg-accent/15 text-accent" : "border-edge/15 text-ink/50 hover:bg-field"
+                  }`}
+                >
+                  {s.nombre}
+                </button>
+              ))}
+            </div>
+          )}
           <div className="space-y-1.5">
             {recursos.map((r) => {
               const oculto = recursosOcultos.has(r.id);
@@ -1167,6 +1265,7 @@ export default function Agenda() {
         <AgendaRecursoDialog
           inicial={recursoDialog === "nuevo" ? undefined : recursoDialog}
           coloresEnUso={recursos.map((r) => r.color)}
+          sedes={sedes}
           onClose={() => setRecursoDialog(null)}
           onSave={(datos) => {
             if (recursoDialog === "nuevo") {
@@ -1185,6 +1284,7 @@ export default function Agenda() {
                     porcentajeComision: _comision,
                     consultaExterna: _externa,
                     calendarioCompartidoCon: _compartido,
+                    bloques: _bloques,
                     ...resto
                   } = r;
                   return { ...resto, ...datos };
@@ -1192,6 +1292,19 @@ export default function Agenda() {
               );
             }
             setRecursoDialog(null);
+          }}
+        />
+      )}
+
+      {sedesDialogAbierto && (
+        <SedesDialog
+          sedes={sedes}
+          sedesEnUso={sedesEnUso}
+          onClose={() => setSedesDialogAbierto(false)}
+          onSave={(lista) => {
+            setSedes(lista);
+            if (sedeFiltro !== "todas" && !lista.some((s) => s.id === sedeFiltro)) setSedeFiltro("todas");
+            setSedesDialogAbierto(false);
           }}
         />
       )}

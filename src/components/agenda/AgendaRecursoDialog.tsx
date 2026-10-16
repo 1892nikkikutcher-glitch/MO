@@ -4,15 +4,19 @@ import { useState } from "react";
 import { elegirColorDisponible, RECURSO_COLOR_PALETTE, type Recurso } from "@/lib/patientData";
 import { capitalizarNombre, manejarCambioNombre } from "@/lib/textoNombre";
 import { inputClass } from "@/lib/agendaHelpers";
+import BloquesEditor from "@/components/agenda/BloquesEditor";
+import { errorDeBloque, normalizarBloques, type BloqueAtencion, type Sede } from "@/lib/sedesBloques";
 
 export default function AgendaRecursoDialog({
   inicial,
   coloresEnUso,
+  sedes,
   onClose,
   onSave,
 }: {
   inicial?: Recurso;
   coloresEnUso: string[];
+  sedes: Sede[];
   onClose: () => void;
   onSave: (recurso: {
     nombre: string;
@@ -22,6 +26,7 @@ export default function AgendaRecursoDialog({
     cedulaProfesional?: string;
     consultaExterna?: boolean;
     calendarioCompartidoCon?: string;
+    bloques?: BloqueAtencion[];
   }) => void;
 }) {
   const [nombre, setNombre] = useState(inicial?.nombre ?? "");
@@ -35,11 +40,14 @@ export default function AgendaRecursoDialog({
   const [compartido, setCompartido] = useState(!!inicial?.calendarioCompartidoCon);
   const [compartidoCon, setCompartidoCon] = useState(capitalizarNombre(inicial?.calendarioCompartidoCon ?? ""));
 
-  const puedeGuardar = nombre.trim().length > 0;
+  const [bloques, setBloques] = useState<BloqueAtencion[]>(() => normalizarBloques(inicial?.bloques));
+
+  const bloquesValidos = tipo !== "medico" || bloques.every((b) => !errorDeBloque(b));
+  const puedeGuardar = nombre.trim().length > 0 && bloquesValidos;
 
   return (
     <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/70 p-4">
-      <div className="w-full max-w-sm rounded-2xl border border-edge/10 bg-modal p-6">
+      <div className="max-h-[92vh] w-full max-w-sm overflow-y-auto rounded-2xl border border-edge/10 bg-modal p-6">
         <div className="mb-4 flex items-center justify-between">
           <h3 className="text-base font-semibold text-ink">
             {inicial ? "Editar Recurso" : "Nuevo Recurso"}
@@ -121,6 +129,16 @@ export default function AgendaRecursoDialog({
               />
             </div>
           )}
+          {tipo === "medico" && (
+            <div>
+              <label className="mb-1 block text-xs font-medium text-ink/60">Bloques de atención</label>
+              <p className="mb-1.5 text-[11px] text-ink/40">
+                En qué sede, qué días y de qué hora a qué hora atiende. La Agenda los sombrea y avisa si una cita queda fuera.
+                Déjalo vacío si no quieres restringirlo.
+              </p>
+              <BloquesEditor bloques={bloques} sedes={sedes} onChange={setBloques} />
+            </div>
+          )}
           <div className="space-y-2 rounded-lg border border-edge/10 p-3">
             <label className="flex cursor-pointer items-start gap-2 text-xs text-ink/70">
               <input type="checkbox" className="mt-0.5" checked={consultaExterna} onChange={(e) => setConsultaExterna(e.target.checked)} />
@@ -188,7 +206,9 @@ export default function AgendaRecursoDialog({
                 cedulaProfesional?: string;
                 consultaExterna?: boolean;
                 calendarioCompartidoCon?: string;
+                bloques?: BloqueAtencion[];
               } = { nombre: nombre.trim(), tipo, color };
+              if (tipo === "medico" && bloques.length > 0) datos = { ...datos, bloques: normalizarBloques(bloques) };
               if (consultaExterna) datos = { ...datos, consultaExterna: true };
               // Marcado "compartido" sin escribir con quién: se guarda como
               // "un colega" para que la etiqueta no se pierda.

@@ -1,6 +1,14 @@
 ﻿"use client";
 
 import { useEffect, useState } from "react";
+import {
+  describirBloque,
+  evaluarCitaContraBloques,
+  horariosSeguidos,
+  mensajeFueraDeBloque,
+  nombreDeSede,
+  normalizarBloques,
+} from "@/lib/sedesBloques";
 import EstrellasPaciente from "@/components/EstrellasPaciente";
 import HorarioPreferenteCita from "./HorarioPreferenteCita";
 import { usePatientData } from "@/context/PatientDataContext";
@@ -18,7 +26,7 @@ import {
   type SavedBudget,
   type UnidadSeguimiento,
 } from "@/lib/patientData";
-import { renderPlantilla, formatFechaLarga, formatHora12 } from "@/lib/formatosWhatsapp";
+import { renderPlantilla, formatFechaLarga, formatHora12, plantillaConUbicacion, ubicacionParaMensaje } from "@/lib/formatosWhatsapp";
 import {
   PRESETS_INTERVALO,
   calcularFechaSeguimiento,
@@ -115,6 +123,7 @@ export default function AgendaCitaDialog({
     limpiarPresupuestoDeCita,
     miUid,
     userEmail,
+    sedes,
   } = usePatientData();
   const medicos = recursos.filter((r) => r.tipo === "medico");
   const unidades = recursos.filter((r) => r.tipo === "unidad");
@@ -264,8 +273,44 @@ export default function AgendaCitaDialog({
       ? patients.filter((p) => p.name.toLowerCase().includes(searchText.trim().toLowerCase()))
       : [];
 
+  // ---- Sede y bloques de atención del médico ----
+  const medicoElegido = medicos.find((r) => r.id === medicoId);
+  const bloquesMedico = normalizarBloques(medicoElegido?.bloques);
+  const horaFinCita = horaInicio ? minutesToTime(timeToMinutes(horaInicio) + duracion) : "";
+  const evaluacionBloque =
+    medicoId && fecha && horaInicio
+      ? evaluarCitaContraBloques(bloquesMedico, fecha, horaInicio, horaFinCita)
+      : ({ estado: "sin_bloques" } as const);
+  // Al editar una cita ya agendada, solo se pide autorización si se movió o cambió de médico; marcarla
+  // Atendida, cancelarla, etc. no debe pedirla de nuevo.
+  const cambioElLugar =
+    !isEditing ||
+    fecha !== initial.fecha ||
+    horaInicio !== initial.horaInicio ||
+    duracion !== (timeToMinutes(initial.horaFin ?? initial.horaInicio) - timeToMinutes(initial.horaInicio) || duracion) ||
+    medicoId !== (initial.medicoId ?? initial.recursoId ?? "");
+  const [autorizaFueraDeBloque, setAutorizaFueraDeBloque] = useState(initial.fueraDeBloque === true);
+  const [sedeManual, setSedeManual] = useState(initial.sedeId ?? "");
+  const requiereAutorizacion = evaluacionBloque.estado === "fuera" && cambioElLugar && !autorizaFueraDeBloque;
+  /** Sede de esta cita: la del bloque que la cubre; si no cae en ninguno, la que se elija a mano. */
+  const sedeDeEstaCita = evaluacionBloque.estado === "dentro" ? evaluacionBloque.bloque.sedeId : sedeManual;
+  const bloqueParaSugerir =
+    evaluacionBloque.estado === "dentro"
+      ? evaluacionBloque.bloque
+      : evaluacionBloque.estado === "fuera"
+        ? evaluacionBloque.bloquesDelDia[0]
+        : undefined;
+  const sugerenciasHorario = bloqueParaSugerir
+    ? horariosSeguidos(
+        bloqueParaSugerir,
+        citas.filter((c) => (c.medicoId || c.recursoId) === medicoId && c.fecha === fecha),
+        duracion,
+        initial.id
+      )
+    : [];
+
   const puedeGuardar =
-    (medicoId || unidadId) && fecha && horaInicio && (patientId || searchText.trim().length > 0);
+    (medicoId || unidadId) && fecha && horaInicio && (patientId || searchText.trim().length > 0) && !requiereAutorizacion;
 
   const conflictos =
     fecha && horaInicio && (medicoId || unidadId)
@@ -347,7 +392,12 @@ export default function AgendaCitaDialog({
   const enviarConfirmacion = () => {
     const telefonoLimpio = telefono.replace(/\D/g, "");
     if (!telefonoLimpio || !nombrePacienteActual || !fecha || !horaInicio) return;
-    const texto = renderPlantilla(formatosWhatsapp.confirmacionCita, {
+    const sedeObj = sedes.find((s) => s.id === sedeDeEstaCita);
+    const ubicacion = ubicacionParaMensaje({ sede: sedeObj?.nombre, direccion: sedeObj?.direccion, medico: medicoElegido?.nombre });
+    const texto = renderPlantilla(plantillaConUbicacion(formatosWhatsapp.confirmacionCita, ubicacion), {
+      ubicacion,
+      sede: sedeObj?.nombre ?? "",
+      medico: medicoElegido?.nombre ?? "",
       clinica: clinicInfo?.nombre || "tu clínica",
       paciente: nombrePacienteActual,
       fecha: formatFechaLarga(fecha),
@@ -412,6 +462,9 @@ export default function AgendaCitaDialog({
       seguimientoSecuencia: initial.seguimientoSecuencia,
       seguimientoMotivo: seguimientoAutomatico ? seguimientoMotivo.trim() : undefined,
       origenCita: initial.origenCita ?? "manual",
+      // Sede donde se atiende y, si se agendó fuera de los bloques del médico, la marca para poder revisarlo.
+      ...(sedeDeEstaCita ? { sedeId: sedeDeEstaCita } : {}),
+      ...(evaluacionBloque.estado === "fuera" ? { fueraDeBloque: true } : {}),
       // Motivo de inasistencia: solo si el estatus lo admite (al pasar a
       // Atendida, etc., se descarta solo porque `base` se arma desde cero).
       // Quién agendó la cita (solo al crearla; al editar se conserva el original).
@@ -1166,6 +1219,63 @@ export default function AgendaCitaDialog({
             )}
           </div>
         </div>
+
+        {medicoId && sedes.length > 0 && (
+          <div className="mt-4 space-y-2 rounded-lg border border-edge/10 p-3 text-xs">
+            {evaluacionBloque.estado === "dentro" && (
+              <p className="text-ink/70">
+                <span className="font-semibold text-ink">📍 {nombreDeSede(evaluacionBloque.bloque.sedeId, sedes) || "Sede"}</span>
+                <span className="text-ink/50"> · bloque {describirBloque(evaluacionBloque.bloque, [])}</span>
+              </p>
+            )}
+            {evaluacionBloque.estado === "fuera" && (
+              <div className="space-y-2 rounded-lg border border-warning/30 bg-warning/10 p-2.5 text-warning">
+                <p>⚠️ {mensajeFueraDeBloque(evaluacionBloque, fecha, medicoElegido?.nombre ?? "", sedes)}</p>
+                {cambioElLugar && (
+                  <label className="flex cursor-pointer items-start gap-2 text-ink/80">
+                    <input
+                      type="checkbox"
+                      className="mt-0.5"
+                      checked={autorizaFueraDeBloque}
+                      onChange={(e) => setAutorizaFueraDeBloque(e.target.checked)}
+                    />
+                    <span>Está autorizado agendar aquí, fuera del bloque. Quedará marcada en la agenda.</span>
+                  </label>
+                )}
+              </div>
+            )}
+            {evaluacionBloque.estado !== "dentro" && (
+              <div>
+                <label className="mb-1 block text-xs font-medium text-ink/60">Sede de esta cita</label>
+                <select value={sedeManual} onChange={(e) => setSedeManual(e.target.value)} className={inputClass}>
+                  <option value="">Sin sede</option>
+                  {sedes.map((s) => (
+                    <option key={s.id} value={s.id}>
+                      {s.nombre}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            )}
+            {sugerenciasHorario.length > 0 && (
+              <div className="flex flex-wrap items-center gap-1.5">
+                <span className="text-ink/50">Horarios seguidos, sin dejar huecos:</span>
+                {sugerenciasHorario.map((h) => (
+                  <button
+                    key={h}
+                    type="button"
+                    onClick={() => setHoraInicio(h)}
+                    className={`rounded-full border px-2.5 py-0.5 font-semibold transition-colors ${
+                      horaInicio === h ? "border-accent/60 bg-accent/15 text-accent" : "border-edge/20 text-ink/70 hover:border-accent/40"
+                    }`}
+                  >
+                    {h}
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
 
         {conflictos.length > 0 && (
           <div className="mt-4 space-y-0.5 rounded-lg border border-warning/30 bg-warning/10 p-3 text-xs text-warning">
