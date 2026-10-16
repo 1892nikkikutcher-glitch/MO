@@ -1,6 +1,7 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
+import EstrellasPaciente from "@/components/EstrellasPaciente";
 import Expediente from "./Expediente";
 import FusionarExpedientesDialog from "./FusionarExpedientesDialog";
 import { usePatientData } from "@/context/PatientDataContext";
@@ -305,8 +306,19 @@ function ExpedienteIcon() {
 }
 
 export default function Pacientes() {
-  const { patients, addPatient, importarPacientes, navegacionExpediente, consumirNavegacionExpediente } =
+  const { patients, citas, addPatient, importarPacientes, navegacionExpediente, consumirNavegacionExpediente } =
     usePatientData();
+  // Citas agrupadas por paciente una sola vez, para las estrellas de cada renglón.
+  const citasPorPaciente = useMemo(() => {
+    const mapa = new Map<string, typeof citas>();
+    for (const c of citas) {
+      if (!c.patientId) continue;
+      const lista = mapa.get(c.patientId);
+      if (lista) lista.push(c);
+      else mapa.set(c.patientId, [c]);
+    }
+    return mapa;
+  }, [citas]);
   const [selected, setSelected] = useState<Patient | null>(null);
   const [showNuevoPaciente, setShowNuevoPaciente] = useState(false);
   const [showImportar, setShowImportar] = useState(false);
@@ -503,12 +515,15 @@ export default function Pacientes() {
                 </div>
               </td>
               <td className="px-6 py-4">
-                <button
-                  onClick={() => setSelected(p)}
-                  className="font-medium text-ink transition-colors hover:text-accent"
-                >
-                  {capitalizarNombre(p.name)}
-                </button>
+                <div className="flex flex-wrap items-center gap-x-2.5 gap-y-1">
+                  <EstrellasPaciente citas={citasPorPaciente.get(p.id) ?? []} tamano={14} ocultarSinHistorial />
+                  <button
+                    onClick={() => setSelected(p)}
+                    className="font-medium text-ink transition-colors hover:text-accent"
+                  >
+                    {capitalizarNombre(p.name)}
+                  </button>
+                </div>
               </td>
               <td className="px-6 py-4 text-ink/70">{p.phone}</td>
               <td className="px-6 py-4 text-ink/70">{formatDate(p.birthDate)}</td>

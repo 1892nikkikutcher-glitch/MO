@@ -1,6 +1,7 @@
 ﻿"use client";
 
 import { useEffect, useState } from "react";
+import EstrellasPaciente from "@/components/EstrellasPaciente";
 import HorarioPreferenteCita from "./HorarioPreferenteCita";
 import { usePatientData } from "@/context/PatientDataContext";
 import {
@@ -722,8 +723,11 @@ export default function AgendaCitaDialog({
             <label className="mb-1 block text-xs font-medium text-ink/60">Paciente</label>
             {patientId ? (
               <div className="flex items-center justify-between rounded-lg border border-success/30 bg-success/10 px-3 py-2 text-sm">
-                <span className="text-ink">
-                  {edadPacienteSeleccionado ? `(${edadPacienteSeleccionado.years}) ${searchText}` : searchText}
+                <span className="flex min-w-0 items-center gap-2 text-ink">
+                  <EstrellasPaciente citas={citas.filter((c) => c.patientId === patientId)} tamano={14} />
+                  <span className="truncate">
+                    {edadPacienteSeleccionado ? `(${edadPacienteSeleccionado.years}) ${searchText}` : searchText}
+                  </span>
                 </span>
                 <button
                   onClick={cambiarPaciente}
