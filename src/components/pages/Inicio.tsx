@@ -264,7 +264,7 @@ export default function Inicio() {
     [periodoId, personalizado, anclaFecha, hoyISO]
   );
 
-  const avanceMetas = calcularAvanceMetas(finanzas.porFecha, metas.metaMensual);
+  const avanceMetas = calcularAvanceMetas(finanzas.porFecha, metas.metaMensual, metas.diasAtencion);
 
   const citasDelPeriodo = citas.filter((c) => c.fecha >= rango.desdeISO && c.fecha <= rango.hastaISO);
 

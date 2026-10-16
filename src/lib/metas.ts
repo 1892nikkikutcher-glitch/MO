@@ -6,6 +6,9 @@ import { redondearDinero } from "./dinero";
 
 export type MetaConfig = {
   metaMensual: number;
+  /** Días de la semana en que se atiende (0 = domingo … 6 = sábado), para repartir la meta semanal en
+   * la diaria. Ausente = de lunes a sábado, como siempre. */
+  diasAtencion?: number[];
 };
 
 export const metaConfigInicial: MetaConfig = { metaMensual: 0 };
@@ -116,12 +119,20 @@ export function metaSemanalDe(metaMensual: number) {
   return metaMensual / SEMANAS_POR_MES;
 }
 
-/** Días que se atiende por semana (lunes a sábado) — con esto la meta diaria sale de la semanal,
- * así que seis días de meta diaria siempre suman la meta semanal. */
-export const DIAS_ATENCION_POR_SEMANA = 6;
+/** Días que se atiende por semana si la clínica no eligió otros (lunes a sábado). */
+export const DIAS_DE_ATENCION_INICIALES = [1, 2, 3, 4, 5, 6];
+export const DIAS_ATENCION_POR_SEMANA = DIAS_DE_ATENCION_INICIALES.length;
 
-export function metaDiariaDe(metaMensual: number) {
-  return metaSemanalDe(metaMensual) / DIAS_ATENCION_POR_SEMANA;
+/** Días de atención válidos (0–6, sin repetir, en orden); si no hay ninguno, los de siempre. */
+export function diasDeAtencionDe(dias?: number[] | null): number[] {
+  const limpios = [...new Set((dias ?? []).filter((d) => Number.isInteger(d) && d >= 0 && d <= 6))].sort((a, b) => a - b);
+  return limpios.length > 0 ? limpios : DIAS_DE_ATENCION_INICIALES;
+}
+
+/** La meta diaria sale de la semanal entre los días que se atiende: tantos días de meta diaria como días
+ * de atención siempre suman la meta semanal. */
+export function metaDiariaDe(metaMensual: number, dias?: number[] | null) {
+  return metaSemanalDe(metaMensual) / diasDeAtencionDe(dias).length;
 }
 
 export function metaQuincenalDe(metaMensual: number) {
@@ -200,7 +211,7 @@ export type AvanceMeta = {
   porcentaje: number;
 };
 
-export function calcularAvanceMetas(porFecha: Record<string, number>, metaMensual: number): AvanceMeta[] {
+export function calcularAvanceMetas(porFecha: Record<string, number>, metaMensual: number, diasAtencion?: number[] | null): AvanceMeta[] {
   const hoy = new Date();
   hoy.setHours(23, 59, 59, 999);
 
@@ -210,7 +221,7 @@ export function calcularAvanceMetas(porFecha: Record<string, number>, metaMensua
   const quincenal = sumarRango(porFecha, inicioQuincena(hoy), hoy);
   const mensual = sumarRango(porFecha, inicioMes(hoy), hoy);
 
-  const metaDiaria = metaDiariaDe(metaMensual);
+  const metaDiaria = metaDiariaDe(metaMensual, diasAtencion);
   const metaSemanal = metaSemanalDe(metaMensual);
   const metaQuincenal = metaQuincenalDe(metaMensual);
 

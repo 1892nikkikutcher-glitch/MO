@@ -66,6 +66,17 @@ describe("meta diaria", () => {
     expect(metaDiariaDe(0)).toBe(0);
   });
 
+  it("la meta diaria se reparte entre los días de atención elegidos", async () => {
+    const { metaDiariaDe, metaSemanalDe, diasDeAtencionDe } = await import("../metas");
+    expect(metaDiariaDe(80000, [1, 2, 3, 4, 5])).toBeCloseTo(metaSemanalDe(80000) / 5, 6);
+    expect(metaDiariaDe(80000, [3])).toBeCloseTo(metaSemanalDe(80000), 6);
+    // Sin días válidos (o ausentes) se usa lunes a sábado, como siempre.
+    expect(diasDeAtencionDe(undefined)).toEqual([1, 2, 3, 4, 5, 6]);
+    expect(diasDeAtencionDe([])).toEqual([1, 2, 3, 4, 5, 6]);
+    expect(diasDeAtencionDe([9, -1, 2.5])).toEqual([1, 2, 3, 4, 5, 6]);
+    expect(diasDeAtencionDe([5, 1, 1, 3])).toEqual([1, 3, 5]);
+  });
+
   it("calcularAvanceMetas trae la diaria primero y cuenta solo lo cobrado hoy", async () => {
     const { calcularAvanceMetas } = await import("../metas");
     const hoy = new Date();
