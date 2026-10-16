@@ -1,6 +1,7 @@
 ﻿"use client";
 
 import { useEffect, useState } from "react";
+import HorarioPreferenteCita from "./HorarioPreferenteCita";
 import { usePatientData } from "@/context/PatientDataContext";
 import {
   calcularEdadDetallada,
@@ -980,6 +981,19 @@ export default function AgendaCitaDialog({
               </select>
             </div>
           </div>
+
+          {pacienteSeleccionado && (
+            <HorarioPreferenteCita
+              horario={pacienteSeleccionado.horarioPreferente}
+              fecha={fecha}
+              horaInicio={horaInicio}
+              onGuardar={(nuevo) => updatePatient(pacienteSeleccionado.id, { horarioPreferente: nuevo })}
+              onElegirPropuesta={(f, h) => {
+                setFecha(f);
+                setHoraInicio(h);
+              }}
+            />
+          )}
 
           {!isEditing && (
             <div className={`rounded-lg border border-edge/10 p-3 ${seguimientoAutomatico ? "opacity-40" : ""}`}>

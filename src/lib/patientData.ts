@@ -1,4 +1,5 @@
 import { capitalizarNombre } from "./textoNombre";
+import type { HorarioPreferente } from "./horarioPreferente";
 import type { PrioridadTratamiento } from "./planTratamiento";
 import { montoMayorQue, redondearDinero } from "./dinero";
 import type { MigracionEstado } from "./migracionExpedienteEstado";
@@ -6,6 +7,8 @@ import type { RazonNoAsistencia } from "./noAsistencia";
 
 export type Patient = {
   id: string;
+  /** Cuándo le acomoda venir (días y hora), para saber cuándo proponerle una cita. `null` = sin preferencia. */
+  horarioPreferente?: HorarioPreferente | null;
   name: string;
   phone: string;
   email?: string;

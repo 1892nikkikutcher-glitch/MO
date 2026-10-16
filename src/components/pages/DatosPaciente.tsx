@@ -1,6 +1,8 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import HorarioPreferenteEditor from "@/components/HorarioPreferenteEditor";
+import { normalizarHorarioPreferente, type HorarioPreferente } from "@/lib/horarioPreferente";
 import { calcularEdadDetallada, formatEdad, type Patient } from "@/lib/patientData";
 import { manejarCambioNombre } from "@/lib/textoNombre";
 import { sugerirNivelSocioeconomico } from "@/lib/nivelSocioeconomico";
@@ -99,6 +101,7 @@ export default function DatosPaciente({
   const [recordatorioPrevencion, setRecordatorioPrevencion] = useState(
     patient.recordatorioPrevencion ?? true
   );
+  const [horarioPreferente, setHorarioPreferente] = useState<HorarioPreferente>(patient.horarioPreferente ?? { dias: [] });
   const [comportamientoFrankl, setComportamientoFrankl] = useState(patient.comportamientoFrankl ?? 0);
   const [comportamientoEstrellas, setComportamientoEstrellas] = useState(
     patient.comportamientoEstrellas ?? 0
@@ -147,6 +150,7 @@ export default function DatosPaciente({
     setContactoParentesco(patient.contactoParentesco ?? parentescoOptions[0]);
     setContactoTelefono(patient.contactoTelefono ?? "");
     setRecordatorioPrevencion(patient.recordatorioPrevencion ?? true);
+    setHorarioPreferente(patient.horarioPreferente ?? { dias: [] });
     setComportamientoFrankl(patient.comportamientoFrankl ?? 0);
     setComportamientoEstrellas(patient.comportamientoEstrellas ?? 0);
     setSaved(false);
@@ -219,6 +223,7 @@ export default function DatosPaciente({
       contactoParentesco,
       contactoTelefono,
       recordatorioPrevencion,
+      horarioPreferente: normalizarHorarioPreferente(horarioPreferente),
       comportamientoFrankl,
       comportamientoEstrellas,
     });
@@ -341,6 +346,20 @@ export default function DatosPaciente({
             />
           </Field>
         </div>
+      </CardShell>
+
+      <CardShell title="Horario preferente para sus citas">
+        <p className="mb-3 text-xs text-ink/50">
+          Cuándo le acomoda venir (por ejemplo, después de las 18:00 los lunes, miércoles y viernes). Así sabes cuándo
+          proponerle su próxima cita; se muestra en la agenda al programarla.
+        </p>
+        <HorarioPreferenteEditor
+          valor={horarioPreferente}
+          onChange={(h) => {
+            setHorarioPreferente(h);
+            marcarSinGuardar();
+          }}
+        />
       </CardShell>
 
       <CardShell title="Comportamiento">

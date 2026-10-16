@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useLayoutEffect, useRef, useState, type Dispatch, type SetStateAction } from "react";
+import { describirHorarioPreferente, proximasPropuestasDeCita, type HorarioPreferente } from "@/lib/horarioPreferente";
 import EstrellasPaciente from "@/components/EstrellasPaciente";
 import NuevoPresupuesto from "./NuevoPresupuesto";
 import PropuestaDesdeOdontograma from "./PropuestaDesdeOdontograma";
@@ -972,11 +973,14 @@ function ExpedienteSidePanel({
   citasFuturas,
   ultimaCita,
   sugerirPrevencion,
+  horarioPreferente,
   formatDate,
 }: {
   citasFuturas: CitaAgenda[];
   ultimaCita: CitaAgenda | undefined;
   sugerirPrevencion: boolean;
+  /** Cuándo le acomoda venir (Datos del paciente) — para saber cuándo proponerle su próxima cita. */
+  horarioPreferente?: HorarioPreferente | null;
   formatDate: (date: string) => string;
 }) {
   const hoyISO = toISODate(new Date());
@@ -998,6 +1002,18 @@ function ExpedienteSidePanel({
               {formatDate(ultimaCita.fecha)}
             </span>
           </p>
+        )}
+
+        {describirHorarioPreferente(horarioPreferente) && (
+          <div className="mb-3 rounded-lg border border-edge/10 bg-inset p-3 text-xs text-ink/60">
+            <span className="font-semibold uppercase tracking-wide text-ink/40">Prefiere: </span>
+            {describirHorarioPreferente(horarioPreferente)}
+            {citasFuturas.length === 0 && (
+              <span className="mt-1 block text-ink/50">
+                Próximos días que le acomodan: {proximasPropuestasDeCita(horarioPreferente, new Date(), 3).map((p) => p.etiqueta).join(" · ")}
+              </span>
+            )}
+          </div>
         )}
 
         {mostrarSugerencia && (
@@ -1613,6 +1629,7 @@ export default function Expediente({
           citasFuturas={citasFuturas}
           ultimaCita={ultimaCita}
           sugerirPrevencion={patient.recordatorioPrevencion !== false}
+          horarioPreferente={patient.horarioPreferente}
           formatDate={formatDate}
         />
       </div>
