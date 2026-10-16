@@ -349,6 +349,11 @@ import type { ExpedienteCompartido, SeccionCompartible } from "./expedienteCompa
 /** Si el expediente del paciente se está compartiendo con el colega de este caso. Mientras
  * `activo`, el servidor mantiene `expedienteCompartido` al día; al desactivarlo se borra
  * (junto con las copias de fotos) y el colega ya no ve nada del expediente. */
+/** Qué pasó con el aviso por correo al colega cuando le llegó el caso. "no_configurado" = MO todavía no
+ * tiene correo activado; "agrupado" = ya se le avisó de otros casos enviados hace pocos minutos. */
+export type EstadoAvisoCorreo = "enviado" | "agrupado" | "no_configurado" | "limite" | "fallo";
+export type AvisoCorreoCaso = { estado: EstadoAvisoCorreo; fecha: string };
+
 export type CompartirExpediente = {
   activo: boolean;
   /** Qué partes del expediente se comparten (o se compartían, si está desactivado). */
@@ -381,6 +386,8 @@ export type Interconsulta = {
   /** Ausente en casos anteriores a este campo: si traen `expedienteCompartido` es una foto
    * fija que no se actualiza (se puede activar para mantenerla al día). */
   compartirExpediente?: CompartirExpediente;
+  /** Resultado del aviso por correo al colega (lo anota el servidor al crear el caso o la invitación). */
+  avisoCorreo?: AvisoCorreoCaso;
   /** Ausente en interconsultas creadas antes de este campo — el código que
    * lee este valor para decidir transiciones debe resolverlo como
    * "legacy_sin_clasificar" (v3 §14), nunca asumir "aislado_con_retorno" ni

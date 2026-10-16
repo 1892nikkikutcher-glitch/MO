@@ -214,6 +214,8 @@ export type CrearInvitacionBody = {
   /** Casos enviados juntos al mismo colega: un solo enlace abre todos. */
   grupoId?: string;
   canal: "whatsapp" | "correo" | "copiar_enlace";
+  /** Mandarle además el enlace por correo (si se dio su correo y MO tiene correo activado). */
+  avisarPorCorreo?: boolean;
 };
 
 export function crearInvitacionApi(body: CrearInvitacionBody) {

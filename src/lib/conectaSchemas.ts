@@ -147,6 +147,8 @@ export const invitacionCrearSchema = z
     /** Casos enviados juntos al mismo colega (ver InvitacionConecta.grupoId). */
     grupoId: z.string().trim().min(8).max(64).regex(/^[A-Za-z0-9_-]+$/).optional(),
     canal: z.enum(["whatsapp", "correo", "copiar_enlace"]),
+    /** Mandarle además el enlace por correo (solo si se dio su correo y MO tiene correo configurado). */
+    avisarPorCorreo: z.boolean().optional(),
   })
   .strict();
 

@@ -5,6 +5,7 @@ import { invitacionCrearSchema } from "@/lib/conectaSchemas";
 import { crearInvitacion, resumenInvitacionesDeCasos } from "@/lib/conectaInvitaciones";
 import { urlInvitacion } from "@/lib/invitacionesConecta";
 import { ConectaError, nowISO } from "@/lib/conectaServer";
+import { avisarInvitacionPorCorreo } from "@/lib/conectaAvisoCorreo";
 
 /** A quién se invitó en cada caso (?ids=a,b,c) — solo invitaciones propias. */
 export async function GET(req: NextRequest) {
@@ -41,7 +42,19 @@ export async function POST(req: NextRequest) {
       invitacionId: id,
     });
     const origen = req.nextUrl.origin;
-    return NextResponse.json({ id, enlace: urlInvitacion(tokenCrudo, origen), venceEl });
+    const avisoCorreo =
+      parsed.data.avisarPorCorreo && parsed.data.destinatarioCorreo
+        ? await avisarInvitacionPorCorreo({
+            remitenteUid: sesion.uid,
+            interconsultaId: parsed.data.interconsultaId,
+            correo: parsed.data.destinatarioCorreo,
+            destinatarioNombre: parsed.data.destinatarioNombre,
+            tokenCrudo,
+            origen,
+            venceEl,
+          }).catch(() => null)
+        : null;
+    return NextResponse.json({ id, enlace: urlInvitacion(tokenCrudo, origen), venceEl, avisoCorreo });
   } catch (err) {
     if (err instanceof ConectaError) return NextResponse.json({ error: err.message }, { status: err.status });
     throw err;

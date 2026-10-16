@@ -1222,6 +1222,8 @@ function NuevaInterconsultaDialog({
               destinatarioCorreo: correoEspecialista.trim() || undefined,
               grupoId,
               canal: "copiar_enlace",
+              // Si se dio su correo, MO también le manda el enlace por correo (cuando el correo está activado).
+              avisarPorCorreo: Boolean(correoEspecialista.trim()),
             });
             enlaceGrupo = enlaceGrupo ?? url;
           } catch (errInvitacion) {
@@ -1781,6 +1783,22 @@ function useSolicitudesAcceso(interconsultaId: string) {
   return solicitudes;
 }
 
+/** Qué pasó con el correo de aviso al colega. Si MO no tiene correo activado no se dice nada (solo existe
+ * el aviso por WhatsApp de siempre). */
+function AvisoCorreoDelCaso({ estado }: { estado: NonNullable<Interconsulta["avisoCorreo"]>["estado"] }) {
+  if (estado === "no_configurado") return null;
+  const bien = estado === "enviado" || estado === "agrupado";
+  const texto =
+    estado === "enviado"
+      ? "✉ Se le avisó por correo."
+      : estado === "agrupado"
+        ? "✉ Ya se le había avisado por correo de tus casos recientes."
+        : estado === "limite"
+          ? "No se le avisó por correo (demasiados avisos seguidos). Avísale por WhatsApp."
+          : "No se pudo avisarle por correo. Avísale por WhatsApp.";
+  return <p className={`text-xs ${bien ? "text-success" : "text-warning"}`}>{texto}</p>;
+}
+
 function SalaDelCaso({ interconsulta, onVolver }: { interconsulta: Interconsulta; onVolver: () => void }) {
   const { uid, directorio } = useMoConecta();
   const { irAPagina } = usePatientData();
@@ -2021,6 +2039,10 @@ function SalaDelCaso({ interconsulta, onVolver }: { interconsulta: Interconsulta
           </div>
         )}
       </div>
+
+      {esRemitente && interconsulta.avisoCorreo && (
+        <AvisoCorreoDelCaso estado={interconsulta.avisoCorreo.estado} />
+      )}
 
       {esRemitente && interconsulta.destinatarioUid && interconsulta.estado === "sent" && (
         <AvisoAlColega
