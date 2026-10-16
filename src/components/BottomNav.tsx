@@ -155,6 +155,7 @@ export const navItems = [
       { id: "reportes-pagos", label: "Pagos" },
       { id: "reportes-devoluciones", label: "Devoluciones" },
       { id: "reportes-corte-caja", label: "Corte caja" },
+      { id: "reportes-evaluacion-semanal", label: "Evaluación semanal" },
       { id: "reportes-presupuestos", label: "Presupuestos" },
       { id: "reportes-saldos-pendientes", label: "Saldos pendientes" },
       { id: "reportes-aviso-privacidad", label: "Aviso de privacidad" },
