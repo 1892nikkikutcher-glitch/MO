@@ -37,6 +37,7 @@ export async function GET(req: NextRequest, { params }: Params) {
         "Content-Type": descarga.mimeType,
         "Content-Disposition": contentDisposition(descarga.nombreOriginalSaneado),
         "Referrer-Policy": "no-referrer",
+        "X-Content-Type-Options": "nosniff",
         "Cache-Control": "private, no-store",
       },
     });

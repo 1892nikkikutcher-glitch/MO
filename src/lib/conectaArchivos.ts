@@ -5,7 +5,7 @@
 
 import { randomUUID } from "node:crypto";
 import { dbAdmin, bucketAdmin } from "./firebaseAdmin";
-import { ConectaError, nowISO, sinIndefinidos } from "./conectaServer";
+import { ConectaError, aplicarRateLimit, nowISO, sinIndefinidos } from "./conectaServer";
 import {
   excedeLimitePorInterconsulta,
   sanearNombreArchivo,
@@ -13,6 +13,8 @@ import {
   TAMANIO_MAXIMO_ARCHIVO_BYTES,
 } from "./archivosConecta";
 import type { ArchivoInterconsulta, CategoriaArchivoInterconsulta, Interconsulta } from "./moConecta";
+
+const ID_ARCHIVO = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
 
 const EXTENSION_POR_MIME: Record<string, string> = {
   "image/jpeg": "jpg",
@@ -42,6 +44,9 @@ export async function iniciarSubidaArchivo(
   }
   const extension = EXTENSION_POR_MIME[mimeType];
   if (!extension) throw new ConectaError(400, "Tipo de archivo no permitido.");
+  if (!(await aplicarRateLimit(`archivo_subir_${uid}`, 60, 60))) {
+    throw new ConectaError(429, "Demasiados archivos seguidos — espera unos minutos.");
+  }
 
   const archivoId = randomUUID();
   const storagePath = `interconsultas/${interconsultaId}/archivos/${archivoId}.${extension}`;
@@ -62,8 +67,12 @@ export async function completarSubidaArchivo(
     categoriaClinica: CategoriaArchivoInterconsulta;
   }
 ): Promise<ArchivoInterconsulta> {
-  const prefijoEsperado = `interconsultas/${interconsultaId}/archivos/`;
-  if (!input.storagePath.startsWith(prefijoEsperado)) throw new ConectaError(400, "Ruta de archivo inválida.");
+  // La ruta se calcula aquí con el id y el tipo; la que manda el cliente solo se acepta si coincide, para
+  // que nadie pueda escribir sobre otro archivo del caso ni colarse con una ruta rara.
+  const extension = EXTENSION_POR_MIME[input.mimeType];
+  if (!extension || !ID_ARCHIVO.test(input.archivoId)) throw new ConectaError(400, "Archivo inválido.");
+  const rutaEsperada = `interconsultas/${interconsultaId}/archivos/${input.archivoId}.${extension}`;
+  if (input.storagePath !== rutaEsperada) throw new ConectaError(400, "Ruta de archivo inválida.");
 
   let bytes: Buffer;
   try {
@@ -90,6 +99,9 @@ export async function completarSubidaArchivo(
     }
     if (excedeLimitePorInterconsulta(interconsulta.archivos, bytes.byteLength)) {
       throw new ConectaError(409, "Este caso ya alcanzó el límite de archivos adjuntos.");
+    }
+    if (interconsulta.archivos.some((a) => a.id === input.archivoId)) {
+      throw new ConectaError(409, "Ese archivo ya se subió.");
     }
 
     const nuevoArchivo: ArchivoInterconsulta = sinIndefinidos({

@@ -47,7 +47,8 @@ export function editarPerfilProfesionalApi(uid: string, body: Record<string, unk
   return llamarApi(`/api/conecta/perfiles/${uid}`, { method: "PATCH", body: JSON.stringify(body) });
 }
 
-export async function subirEvidenciaVerificacionApi(uid: string, archivo: File) {
+export async function subirEvidenciaVerificacionApi(uid: string, original: File) {
+  const archivo = await prepararArchivoParaSubir(original);
   const { storagePath } = await llamarApi(`/api/conecta/perfiles/${uid}/evidencia-verificacion`, {
     method: "POST",
     body: JSON.stringify({ mimeType: archivo.type }),
@@ -163,11 +164,62 @@ function archivoABase64(archivo: File): Promise<string> {
   });
 }
 
+/** Vercel rechaza peticiones de más de ~4.5 MB y el archivo viaja en base64 (un tercio más grande): arriba de
+ * este peso la subida fallaba con un error genérico. */
+const PESO_MAXIMO_SUBIDA_BYTES = 3 * 1024 * 1024;
+
+function cargarImagen(archivo: File): Promise<HTMLImageElement> {
+  return new Promise((resolve, reject) => {
+    const url = URL.createObjectURL(archivo);
+    const img = new Image();
+    img.onload = () => {
+      URL.revokeObjectURL(url);
+      resolve(img);
+    };
+    img.onerror = () => {
+      URL.revokeObjectURL(url);
+      reject(new Error("No se pudo leer la imagen."));
+    };
+    img.src = url;
+  });
+}
+
+/** Deja el archivo en un peso que el servidor acepta: una imagen grande se reduce (JPEG, lado mayor de
+ * hasta 2400 px, sin perder lo que importa para ver una radiografía o una foto clínica); un PDF muy pesado
+ * se rechaza con un mensaje claro porque no se puede reducir aquí. */
+async function prepararArchivoParaSubir(archivo: File): Promise<File> {
+  if (archivo.size <= PESO_MAXIMO_SUBIDA_BYTES) return archivo;
+  if (archivo.type === "application/pdf") {
+    throw new Error("El PDF pesa más de 3 MB. Redúcelo o súbelo como imagen.");
+  }
+  if (archivo.type !== "image/jpeg" && archivo.type !== "image/png") return archivo;
+  const img = await cargarImagen(archivo);
+  let lado = Math.min(2400, Math.max(img.naturalWidth, img.naturalHeight));
+  for (let intento = 0; intento < 6; intento++) {
+    const escala = lado / Math.max(img.naturalWidth, img.naturalHeight);
+    const canvas = document.createElement("canvas");
+    canvas.width = Math.max(1, Math.round(img.naturalWidth * escala));
+    canvas.height = Math.max(1, Math.round(img.naturalHeight * escala));
+    const ctx = canvas.getContext("2d");
+    if (!ctx) break;
+    ctx.fillStyle = "#ffffff";
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+    ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+    const blob = await new Promise<Blob | null>((r) => canvas.toBlob(r, "image/jpeg", 0.85));
+    if (blob && blob.size <= PESO_MAXIMO_SUBIDA_BYTES) {
+      return new File([blob], archivo.name.replace(/\.[^.]+$/, "") + ".jpg", { type: "image/jpeg" });
+    }
+    lado = Math.round(lado * 0.8);
+  }
+  throw new Error("La imagen es demasiado pesada. Toma una foto de menor resolución e inténtalo de nuevo.");
+}
+
 export async function subirArchivoInterconsultaApi(
   interconsultaId: string,
-  archivo: File,
+  original: File,
   categoriaClinica: CategoriaArchivoInterconsulta
 ) {
+  const archivo = await prepararArchivoParaSubir(original);
   const { storagePath, archivoId } = await llamarApi(`/api/conecta/interconsultas/${interconsultaId}/archivos`, {
     method: "POST",
     body: JSON.stringify({ mimeType: archivo.type }),

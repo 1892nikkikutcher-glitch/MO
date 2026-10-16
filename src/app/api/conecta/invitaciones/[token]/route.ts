@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { dbAdmin } from "@/lib/firebaseAdmin";
 import { obtenerInvitacionPublica } from "@/lib/conectaInvitaciones";
 import { hashToken } from "@/lib/tokenHashServer";
-import { ConectaError, nowISO } from "@/lib/conectaServer";
+import { ConectaError, aplicarRateLimit, nowISO } from "@/lib/conectaServer";
 
 type Params = { params: Promise<{ token: string }> };
 
@@ -24,7 +24,9 @@ export async function GET(req: NextRequest, { params }: Params) {
     const invitacion = await obtenerInvitacionPublica(token);
 
     const userAgent = req.headers.get("user-agent") ?? "";
-    if (esBotDeVistaPrevia(userAgent)) {
+    // Un enlace real genera un puñado de vistas previas (cada app de mensajería la pide); más que eso
+    // es ruido, así que no se sigue escribiendo en Firestore.
+    if (esBotDeVistaPrevia(userAgent) && (await aplicarRateLimit(`vista_previa_${hashToken(token)}`, 10, 60))) {
       await dbAdmin.collection("eventosCrecimientoConecta").add({
         tipo: "link_preview_detected",
         fecha: nowISO(),

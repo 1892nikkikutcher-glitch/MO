@@ -5,7 +5,7 @@
 
 import { randomUUID } from "node:crypto";
 import { dbAdmin, bucketAdmin } from "./firebaseAdmin";
-import { ConectaError, esMiembroActivoDeClinica, nowISO, sinIndefinidos } from "./conectaServer";
+import { ConectaError, aplicarRateLimit, esMiembroActivoDeClinica, nowISO, sinIndefinidos } from "./conectaServer";
 import { construirResumenPacienteAutorizado } from "./resumenPacienteAutorizado";
 import {
   VERSION_AVISO_PRIVACIDAD_CONECTA,
@@ -180,6 +180,9 @@ export async function construirExpedienteCompartido(args: {
 export async function crearInterconsulta(remitenteUid: string, input: CrearInterconsultaInput): Promise<Interconsulta> {
   const esMiembro = await esMiembroActivoDeClinica(remitenteUid, input.clinicaRemitenteId);
   if (!esMiembro) throw new ConectaError(403, "No perteneces a esa clínica.");
+  if (!(await aplicarRateLimit(`interconsulta_crear_${remitenteUid}`, 60, 60))) {
+    throw new ConectaError(429, "Demasiados casos enviados seguidos — espera unos minutos.");
+  }
 
   const pacienteSnap = await dbAdmin
     .collection("users")

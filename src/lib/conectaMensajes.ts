@@ -3,7 +3,7 @@
  * mensaje → el servidor los sobrescribe con los reales"). */
 
 import { dbAdmin } from "./firebaseAdmin";
-import { ConectaError, nowISO, sinIndefinidos } from "./conectaServer";
+import { ConectaError, aplicarRateLimit, nowISO, sinIndefinidos } from "./conectaServer";
 import type { Interconsulta, PerfilProfesionalPublico } from "./moConecta";
 
 export type MensajeInterconsulta = {
@@ -32,6 +32,9 @@ export async function crearMensaje(uid: string, interconsultaId: string, conteni
   const interconsulta = snap.data() as Interconsulta;
   if (!interconsulta.participantesAutorizados.includes(uid)) {
     throw new ConectaError(403, "No tienes acceso a esa interconsulta.");
+  }
+  if (!(await aplicarRateLimit(`mensaje_${uid}`, 120, 60))) {
+    throw new ConectaError(429, "Demasiados mensajes seguidos — espera unos minutos.");
   }
 
   const perfilSnap = await dbAdmin.collection("perfilesProfesionalesPublicos").doc(uid).get();
