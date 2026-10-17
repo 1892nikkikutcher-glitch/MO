@@ -196,3 +196,17 @@ describe("ubicación en el recordatorio de WhatsApp", () => {
     expect(plantillaConUbicacion("Una sola línea", "📍 *EMSA*")).toBe("Una sola línea\n\n{{ubicacion}}");
   });
 });
+
+describe("número de semana del año", () => {
+  it("dice la semana y el total de semanas del año", async () => {
+    const { semanaConTotalDelAnio } = await import("../fondosFinancieros");
+    // 2026 empieza en jueves: tiene 53 semanas, y la 1 arranca el 29 dic 2025.
+    expect(semanaConTotalDelAnio(new Date(2026, 9, 12))).toEqual({ semana: 42, total: 53 });
+    expect(semanaConTotalDelAnio(new Date(2026, 0, 1))).toEqual({ semana: 1, total: 53 });
+    expect(semanaConTotalDelAnio(new Date(2025, 11, 29))).toEqual({ semana: 1, total: 53 }); // ya es semana 1 de 2026
+    // 2025 tiene 52.
+    expect(semanaConTotalDelAnio(new Date(2025, 5, 18))).toEqual({ semana: 25, total: 52 });
+    // 2024 (bisiesto que empieza en lunes) tiene 52.
+    expect(semanaConTotalDelAnio(new Date(2024, 11, 30))).toEqual({ semana: 1, total: 52 });
+  });
+});

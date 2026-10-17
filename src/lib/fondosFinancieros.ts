@@ -117,6 +117,14 @@ export function semanaDelAnio(fecha: Date): number {
   return Math.ceil(((d.getTime() - inicioAnio.getTime()) / 86_400_000 + 1) / 7);
 }
 
+/** "Semana 25 de 52": el número de la semana y cuántas semanas tiene ese año (52 o 53 según el año ISO). El
+ * 28 de diciembre siempre cae en la última semana del año ISO, de ahí sale el total. */
+export function semanaConTotalDelAnio(fecha: Date): { semana: number; total: number } {
+  const jueves = new Date(fecha.getFullYear(), fecha.getMonth(), fecha.getDate());
+  jueves.setDate(jueves.getDate() + 4 - (jueves.getDay() || 7)); // el jueves decide a qué año ISO pertenece
+  return { semana: semanaDelAnio(fecha), total: semanaDelAnio(new Date(jueves.getFullYear(), 11, 28)) };
+}
+
 /** Título completo del cuadro del total: en Día dice qué día de la semana fue ("Total del día ·
  * sábado 10 oct."), en Semana dice cuál semana del año es ("Total de la semana 41 · 5–11 oct.");
  * quincena y mes no cambian. */

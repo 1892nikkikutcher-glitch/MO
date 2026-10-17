@@ -40,6 +40,7 @@ import AppointmentStatusBadge from "@/components/agenda/AppointmentStatusBadge";
 import AgendaCitaDialog from "@/components/agenda/AgendaCitaDialog";
 import AgendaRecursoDialog from "@/components/agenda/AgendaRecursoDialog";
 import SedesDialog from "@/components/agenda/SedesDialog";
+import { semanaConTotalDelAnio } from "@/lib/fondosFinancieros";
 import {
   bloquesDelDia,
   evaluarCitaContraBloques,
@@ -224,6 +225,8 @@ export default function Agenda() {
   }, [mesActual]);
 
   const hoy = new Date();
+  // Semana que se está viendo: la de la columna de arriba a la izquierda (en Día y 3 días, la del primer día).
+  const semanaDeLaVista = semanaConTotalDelAnio(dias[0] ?? hoy);
 
   const slots = useMemo(() => {
     const arr: number[] = [];
@@ -740,6 +743,14 @@ export default function Agenda() {
           >
             ›
           </button>
+          {vista !== "mes" && (
+            <span
+              title="Número de semana del año (la semana empieza en lunes)"
+              className="whitespace-nowrap rounded-lg border border-edge/10 px-3 py-2 text-sm font-semibold text-ink/70"
+            >
+              Semana {semanaDeLaVista.semana} de {semanaDeLaVista.total}
+            </span>
+          )}
           <button
             onClick={() => {
               const hoy = new Date();
