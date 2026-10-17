@@ -596,7 +596,7 @@ export default function BottomNav({
                 key={item.id}
                 onClick={() => seleccionar(item)}
                 className={`relative flex w-full shrink-0 select-none scroll-my-1 flex-col items-center gap-[3px] rounded-xl px-0.5 py-2 text-center transition-colors [scroll-snap-align:start] lg:py-2.5 ${
-                  isActive ? "bg-accent/10 text-accent" : "text-ink/50 hover:bg-surface hover:text-ink"
+                  isActive ? "glow-activo bg-accent/10 text-accent" : "text-ink/50 hover:bg-surface hover:text-ink"
                 }`}
               >
                 <svg width="19" height="19" viewBox="0 0 24 24" fill="none" className="shrink-0 lg:h-[22px] lg:w-[22px]">
@@ -678,7 +678,7 @@ export default function BottomNav({
                 fanArrastrando ? "" : "transition-[transform,opacity] duration-[380ms] ease-[cubic-bezier(0.25,1.1,0.4,1)]"
               } ${
                 isActive
-                  ? "border-accent/60 bg-accent/20 text-accent"
+                  ? "glow-activo border-accent/60 bg-accent/20 text-accent"
                   : "border-ink/25 bg-modal-solid/70 text-ink/70"
               }`}
             >

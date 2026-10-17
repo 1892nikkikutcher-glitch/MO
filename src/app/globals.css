@@ -310,3 +310,52 @@ select option {
 [data-theme="light"] .bg-accent\/15 { background-color: rgb(245 184 46 / 0.28); }
 [data-theme="light"] .bg-accent\/20 { background-color: rgb(245 184 46 / 0.36); }
 [data-theme="light"] .bg-accent\/25 { background-color: rgb(245 184 46 / 0.42); }
+
+/* ============================================================
+   Resplandores — solo tema claro (el oscuro es plano a propósito).
+   Cálido (dorado): lo activo o la acción principal. Frío (azul): el foco
+   al escribir. Son box-shadow, no desenfoque de fondo: casi no cuestan
+   rendimiento en teléfonos modestos.
+   ============================================================ */
+[data-theme="light"] {
+  --glow-calido: 245 184 46;
+  --glow-frio: 70 130 255;
+}
+
+/* Módulo activo del menú (barra lateral y abanico del celular). */
+[data-theme="light"] .glow-activo {
+  box-shadow:
+    inset 0 0 0 1px rgb(var(--glow-calido) / 0.6),
+    inset 0 0 12px rgb(var(--glow-calido) / 0.28),
+    0 0 14px 1px rgb(var(--glow-calido) / 0.55);
+}
+
+/* Botones principales: el dorado relleno brilla un poco hacia afuera. */
+[data-theme="light"] .bg-accent {
+  box-shadow:
+    inset 0 1.5px 0 rgba(255, 255, 255, 0.75),
+    inset 0 -2px 6px rgba(150, 95, 0, 0.28),
+    0 8px 18px -8px rgba(200, 140, 0, 0.65),
+    0 0 16px 1px rgb(var(--glow-calido) / 0.4);
+}
+
+/* Elegido o seleccionado (chips de días y sedes, "Guardar" de contorno…). */
+[data-theme="light"] .border-accent\/60.bg-accent\/15,
+[data-theme="light"] .border-accent.bg-accent\/15 {
+  box-shadow: 0 0 10px 0 rgb(var(--glow-calido) / 0.45);
+}
+
+/* Foco al escribir: el campo se ilumina en azul en lugar de solo cambiar el borde. */
+[data-theme="light"] input:not([type="checkbox"]):not([type="radio"]):not([type="range"]):focus,
+[data-theme="light"] textarea:focus,
+[data-theme="light"] select:focus {
+  border-color: rgb(var(--glow-frio) / 0.7);
+  box-shadow:
+    0 0 0 3px rgb(var(--glow-frio) / 0.16),
+    0 0 16px 1px rgb(var(--glow-frio) / 0.38);
+}
+[data-theme="light"] input,
+[data-theme="light"] textarea,
+[data-theme="light"] select {
+  transition: box-shadow 0.2s ease, border-color 0.2s ease;
+}
