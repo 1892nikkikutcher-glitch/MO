@@ -159,7 +159,7 @@ export async function construirExpedienteCompartido(args: {
             storagePath: destino,
             mimeType: "image/jpeg",
             tamanioBytes: tamanio,
-            categoriaClinica: "fotografia" as const,
+            categoriaClinica: foto.esRadiografia ? ("radiografia" as const) : ("fotografia" as const),
             subidoPorUid: args.remitenteUid,
             fecha: ahora,
             origenPath: foto.path,

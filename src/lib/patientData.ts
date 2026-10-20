@@ -316,6 +316,9 @@ export type FotosPaciente = {
   perfil?: FotoPaciente | null;
   extraorales: FotoPaciente[];
   intraorales: FotoPaciente[];
+  /** Fotografías de radiografías (panorámicas, periapicales, etc.). Ausente en documentos guardados antes
+   * de este campo. */
+  radiografias?: FotoPaciente[];
   ineFrente?: FotoPaciente | null;
   ineReverso?: FotoPaciente | null;
   /** Fotos anexadas desde una Nota de Evolución (ver SeccionQueEncontraste

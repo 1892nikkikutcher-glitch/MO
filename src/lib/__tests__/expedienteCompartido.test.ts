@@ -138,3 +138,31 @@ describe("citas y fotos", () => {
     expect(r.some((x) => x.id === "perfil")).toBe(false);
   });
 });
+
+describe("radiografías al compartir", () => {
+  const f = (id: string, fecha: string) => ({ id, path: `p/${id}`, name: id, fecha });
+
+  it("las radiografías van primero (más recientes antes) y se marcan como tales", () => {
+    const r = fotosCompartibles({
+      radiografias: [f("rx1", "2026-08-01"), f("rx2", "2026-10-01")],
+      extraorales: [f("e1", "2026-12-01")],
+      intraorales: [f("i1", "2026-11-01")],
+    });
+    expect(r.map((x) => x.id)).toEqual(["rx2", "rx1", "e1", "i1"]);
+    expect(r.slice(0, 2).every((x) => x.esRadiografia === true)).toBe(true);
+    expect(r[2].esRadiografia).toBeUndefined();
+  });
+
+  it("el tope de 8 también aplica, y las radiografías lo llenan antes que las fotos", () => {
+    const r = fotosCompartibles({
+      radiografias: Array.from({ length: 10 }, (_, i) => f(`rx${i}`, `2026-10-${String(i + 10)}`)),
+      extraorales: [f("e1", "2026-12-01")],
+    });
+    expect(r).toHaveLength(MAX_FOTOS_COMPARTIDAS);
+    expect(r.every((x) => x.esRadiografia)).toBe(true);
+  });
+
+  it("sin el campo (expedientes anteriores) sigue funcionando igual", () => {
+    expect(fotosCompartibles({ extraorales: [f("e1", "2026-10-01")] }).map((x) => x.id)).toEqual(["e1"]);
+  });
+});

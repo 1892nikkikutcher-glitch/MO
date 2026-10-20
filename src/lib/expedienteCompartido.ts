@@ -42,7 +42,7 @@ export const etiquetaSeccionCompartible: Record<SeccionCompartible, string> = {
   diagnosticos_plan: "Diagnósticos y plan de tratamiento",
   odontograma: "Odontograma",
   notas_evolucion: "Notas de evolución recientes",
-  fotos_radiografias: "Fotografías clínicas",
+  fotos_radiografias: "Fotografías y radiografías",
   citas: "Citas del paciente (calendario)",
 };
 
@@ -51,7 +51,7 @@ export const descripcionSeccionCompartible: Record<SeccionCompartible, string> =
   diagnosticos_plan: "Diagnósticos activos y tratamientos planeados, sin precios.",
   odontograma: "Diagnósticos marcados en cada pieza dental, pintados en rojo (por tratar) y azul (realizado).",
   notas_evolucion: "Las últimas 5 notas clínicas firmadas (no las administrativas).",
-  fotos_radiografias: "Hasta 8 fotografías clínicas recientes (extraorales e intraorales). Nunca la INE ni la foto de perfil.",
+  fotos_radiografias: "Hasta 8 imágenes recientes: primero las radiografías y después las fotografías clínicas (extraorales e intraorales). Nunca la INE ni la foto de perfil.",
   citas: "Citas pasadas y próximas de este paciente: fecha, hora, estatus y tratamiento. Sin costos ni comentarios.",
 };
 
@@ -269,15 +269,17 @@ export function citasCompartibles(
     }));
 }
 
-/** Las 8 fotos clínicas más recientes (extraorales e intraorales) — jamás la
- * foto de perfil ni la INE. */
+/** Hasta 8 imágenes del expediente — las radiografías primero (las más recientes) y después las fotos
+ * clínicas (extraorales e intraorales, las más recientes) — jamás la foto de perfil ni la INE. */
 export function fotosCompartibles(fotos: {
   extraorales?: { id: string; path: string; name: string; fecha: string }[];
   intraorales?: { id: string; path: string; name: string; fecha: string }[];
-}): { id: string; path: string; name: string; fecha: string }[] {
-  return [...(fotos.extraorales ?? []), ...(fotos.intraorales ?? [])]
-    .sort((a, b) => b.fecha.localeCompare(a.fecha))
-    .slice(0, MAX_FOTOS_COMPARTIDAS);
+  radiografias?: { id: string; path: string; name: string; fecha: string }[];
+}): { id: string; path: string; name: string; fecha: string; esRadiografia?: boolean }[] {
+  const masRecientes = <T extends { fecha: string }>(lista: T[]) => [...lista].sort((a, b) => b.fecha.localeCompare(a.fecha));
+  const radiografias = masRecientes(fotos.radiografias ?? []).map((r) => ({ ...r, esRadiografia: true as const }));
+  const clinicas = masRecientes([...(fotos.extraorales ?? []), ...(fotos.intraorales ?? [])]);
+  return [...radiografias, ...clinicas].slice(0, MAX_FOTOS_COMPARTIDAS);
 }
 
 /** Texto de lo compartido para el registro de consentimiento (lo que el

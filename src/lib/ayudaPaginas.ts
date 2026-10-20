@@ -97,7 +97,7 @@ export const ayudaPaginas: Record<string, AyudaPagina> = {
   },
   "pacientes-Fotografías": {
     titulo: "Expediente — Fotografías",
-    resumen: "Fotos clínicas del paciente: foto de perfil, identificación oficial (INE) y fotos extraorales/intraorales.",
+    resumen: "Fotos clínicas del paciente: foto de perfil, identificación oficial (INE), fotos extraorales/intraorales y fotografías de radiografías.",
     puntos: [
       "\"Subir foto\" abre la galería o cámara del dispositivo; una vez subida, \"Cambiar\" la reemplaza y \"Quitar\" la elimina (con confirmación).",
       "La sección de INE (Frente/Reverso) es para el documento de identidad del paciente, separada de las fotos clínicas.",

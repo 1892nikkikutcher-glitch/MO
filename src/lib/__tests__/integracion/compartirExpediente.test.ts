@@ -196,6 +196,24 @@ describe("compartir parte del expediente (servidor + emulador)", () => {
     if (process.env.SALIDA_PRUEBA) writeFileSync(process.env.SALIDA_PRUEBA, JSON.stringify(guardado, null, 2));
   });
 
+  it("las radiografías van primero y llegan al colega como radiografías", async () => {
+    const pathRx = await subirFoto("radiografias", "rx1.jpg");
+    await base().collection("fotos").doc("datos").set(
+      { radiografias: [{ id: "rx1.jpg", url: "u", name: "panoramica.jpg", fecha: "2026-09-01", path: pathRx }] },
+      { merge: true }
+    );
+    try {
+      const caso = await crearInterconsulta(REMITENTE, { ...entradaBase, seccionesCompartidas: ["fotos_radiografias"] });
+      // Primero la radiografía (aunque sea la más antigua), luego las 3 fotos clínicas.
+      expect(caso.archivos.map((x) => x.categoriaClinica)).toEqual(["radiografia", "fotografia", "fotografia", "fotografia"]);
+      expect(caso.archivos[0].nombreOriginalSaneado).toContain("panoramica");
+      expect(caso.archivos[0].origenPath).toBe(pathRx);
+    } finally {
+      const { FieldValue } = await import("firebase-admin/firestore");
+      await base().collection("fotos").doc("datos").update({ radiografias: FieldValue.delete() });
+    }
+  });
+
   it("un usuario que no es de la clínica no puede compartir ese expediente", async () => {
     await expect(crearInterconsulta("uid-ajeno", { ...entradaBase, seccionesCompartidas: ["historia_clinica"] })).rejects.toThrow(
       /No perteneces a esa clínica/

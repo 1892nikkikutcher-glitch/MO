@@ -292,7 +292,7 @@ export function tiposPorGrupo(): { grupo: GrupoPapelera; tipos: { tipo: string; 
     .map((g) => ({ grupo: g, tipos: mapa.get(g)! }));
 }
 
-export const camposFoto = ["perfil", "ineFrente", "ineReverso", "extraorales", "intraorales"] as const;
+export const camposFoto = ["perfil", "ineFrente", "ineReverso", "extraorales", "intraorales", "radiografias"] as const;
 export type CampoFoto = (typeof camposFoto)[number];
 
 export const etiquetaCampoFoto: Record<CampoFoto, string> = {
@@ -301,6 +301,7 @@ export const etiquetaCampoFoto: Record<CampoFoto, string> = {
   ineReverso: "INE (reverso)",
   extraorales: "Fotografía extraoral",
   intraorales: "Fotografía intraoral",
+  radiografias: "Radiografía",
 };
 
 /** Texto corto para reconocer un registro en la lista. Nunca lanza: si algo

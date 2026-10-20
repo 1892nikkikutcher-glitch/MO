@@ -168,11 +168,20 @@ function GalleryUploadCard({
   fotos,
   onAdd,
   onRemove,
+  ayuda,
+  textoBoton = "Subir fotografía",
+  textoVacio = "Aún no hay fotografías cargadas",
+  imagenCompleta = false,
 }: {
   title: string;
   fotos: FotoPaciente[];
   onAdd: (files: File[]) => Promise<void>;
   onRemove: (foto: FotoPaciente) => void;
+  ayuda?: string;
+  textoBoton?: string;
+  textoVacio?: string;
+  /** Muestra la imagen entera (sin recortar) sobre fondo oscuro: para radiografías. */
+  imagenCompleta?: boolean;
 }) {
   const inputRef = useRef<HTMLInputElement>(null);
   const [fotoAEliminar, setFotoAEliminar] = useState<FotoPaciente | null>(null);
@@ -181,15 +190,18 @@ function GalleryUploadCard({
 
   return (
     <div className="space-y-4 rounded-2xl border border-edge/10 bg-surface p-6">
-      <div className="flex items-center justify-between">
-        <h3 className="text-sm font-semibold uppercase tracking-wide text-ink/60">{title}</h3>
+      <div className="flex items-start justify-between gap-3">
+        <div className="min-w-0 flex-1">
+          <h3 className="text-sm font-semibold uppercase tracking-wide text-ink/60">{title}</h3>
+          {ayuda && <p className="mt-1 text-xs text-ink/40">{ayuda}</p>}
+        </div>
         <button
           onClick={() => inputRef.current?.click()}
           disabled={subiendo}
-          className="flex items-center gap-2 rounded-lg border border-accent/40 px-3 py-1.5 text-xs font-semibold text-accent transition-colors hover:bg-accent/10 disabled:opacity-50"
+          className="flex shrink-0 items-center gap-2 whitespace-nowrap rounded-lg border border-accent/40 px-3 py-1.5 text-xs font-semibold text-accent transition-colors hover:bg-accent/10 disabled:opacity-50"
         >
           <UploadIcon />
-          {subiendo ? "Subiendo…" : "Subir fotografía"}
+          {subiendo ? "Subiendo…" : textoBoton}
         </button>
         <input
           ref={inputRef}
@@ -223,30 +235,33 @@ function GalleryUploadCard({
 
       {fotos.length === 0 ? (
         <div className="rounded-xl border border-dashed border-edge/15 p-8 text-center text-sm text-ink/30">
-          Aún no hay fotografías cargadas
+          {textoVacio}
         </div>
       ) : (
-        <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-4">
+        <div className={imagenCompleta ? "grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3" : "grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-4"}>
           {fotos.map((foto) => (
             <div
               key={foto.id}
-              className="group relative aspect-square overflow-hidden rounded-xl border border-edge/10 bg-inset"
+              className={`group relative overflow-hidden rounded-xl border border-edge/10 bg-inset ${imagenCompleta ? "aspect-[16/9]" : "aspect-square"}`}
             >
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img src={foto.url} alt={foto.name} className="h-full w-full object-cover" />
-              <div className="absolute inset-0 flex items-end justify-end gap-1.5 bg-gradient-to-t from-black/70 via-transparent to-transparent p-2 opacity-0 transition-opacity group-hover:opacity-100">
+              {/* Un toque abre la imagen completa en otra pestaña (para ver el detalle de una radiografía). */}
+              <a href={foto.url} target="_blank" rel="noreferrer" title="Abrir imagen completa" className="block h-full w-full">
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img src={foto.url} alt={foto.name} className={`h-full w-full ${imagenCompleta ? "bg-black object-contain" : "object-cover"}`} />
+              </a>
+              <div className="pointer-events-none absolute inset-0 flex items-end justify-end gap-1.5 bg-gradient-to-t from-black/70 via-transparent to-transparent p-2 opacity-0 transition-opacity group-hover:opacity-100">
                 <a
                   href={foto.url}
                   download={foto.name}
                   title="Descargar"
-                  className="flex h-7 w-7 items-center justify-center rounded-full border border-edge/20 bg-inset text-ink/80 transition-colors hover:border-accent/60 hover:text-accent"
+                  className="pointer-events-auto flex h-7 w-7 items-center justify-center rounded-full border border-edge/20 bg-inset text-ink/80 transition-colors hover:border-accent/60 hover:text-accent"
                 >
                   <DownloadIcon />
                 </a>
                 <button
                   onClick={() => setFotoAEliminar(foto)}
                   title="Eliminar"
-                  className="flex h-7 w-7 items-center justify-center rounded-full border border-edge/20 bg-inset text-ink/80 transition-colors hover:border-danger/60 hover:text-danger"
+                  className="pointer-events-auto flex h-7 w-7 items-center justify-center rounded-full border border-edge/20 bg-inset text-ink/80 transition-colors hover:border-danger/60 hover:text-danger"
                 >
                   <TrashIcon />
                 </button>
@@ -383,6 +398,22 @@ export default function Fotografias({ patientId }: { patientId: string }) {
           setFotosPaciente(patientId, (prev) => ({ ...prev, intraorales: [...prev.intraorales, ...nuevas] }));
         }}
         onRemove={(foto) => quitarFoto("intraorales", foto)}
+      />
+
+      <GalleryUploadCard
+        title="Radiografías"
+        ayuda="Toma una foto de la radiografía (o sube la imagen). Se guarda con más resolución para poder ver el detalle."
+        textoBoton="Subir radiografía"
+        textoVacio="Aún no hay radiografías cargadas"
+        imagenCompleta
+        fotos={fotos.radiografias ?? []}
+        onAdd={async (files) => {
+          const nuevas = await Promise.all(
+            files.map((file) => subirFotoPaciente(clinicUid!, patientId, "radiografias", file, { maxLado: 2400, calidad: 0.9 }))
+          );
+          setFotosPaciente(patientId, (prev) => ({ ...prev, radiografias: [...(prev.radiografias ?? []), ...nuevas] }));
+        }}
+        onRemove={(foto) => quitarFoto("radiografias", foto)}
       />
     </div>
   );
