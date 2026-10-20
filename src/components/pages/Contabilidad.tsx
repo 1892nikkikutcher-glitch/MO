@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import FondosFinancieros from "@/components/dashboard/FondosFinancieros";
 import { moduloVisibleParaRol } from "@/lib/permisosRol";
 import { usePatientData } from "@/context/PatientDataContext";
 import { usePrivacidad } from "@/context/PrivacidadContext";
@@ -154,7 +155,6 @@ const ACCESOS_FINANZAS: { id: string; titulo: string; descripcion: string; soloD
   { id: "administracion-comisiones", titulo: "Comisiones", descripcion: "Lo que corresponde a cada médico." },
   { id: "administracion-metas", titulo: "Metas", descripcion: "Tu meta de ingresos mensual, semanal y diaria.", soloDueno: true },
   { id: "reportes-evaluacion-semanal", titulo: "Evaluación semanal", descripcion: "Horas atendidas, cobros por operador y costos directos.", soloDueno: true },
-  { id: "inicio", titulo: "Fondos financieros", descripcion: "El reparto de tus ingresos en sobres, en el Inicio." },
 ];
 
 export default function Contabilidad() {
@@ -292,6 +292,9 @@ export default function Contabilidad() {
           )}
         </div>
       )}
+
+      {/* La Regla de sobres: cómo se reparten los ingresos por periodo (la misma que se ve en el Inicio). */}
+      <FondosFinancieros />
 
       {puedeVerFinanzas && (
         <div>
