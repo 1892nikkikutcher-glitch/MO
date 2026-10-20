@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { usePatientData } from "@/context/PatientDataContext";
 import { formatCurrency } from "@/lib/patientData";
+import { sumarDias } from "@/lib/evaluacionSemanal";
 
 const inputClass =
   "w-full rounded-lg border border-edge/10 bg-field px-3 py-2 text-sm text-ink outline-none focus:border-accent/60";
@@ -15,6 +16,8 @@ function hoyIso(): string {
 export default function ReporteCorteCaja() {
   const { finanzas, recursos } = usePatientData();
   const [fecha, setFecha] = useState(hoyIso());
+  const hoy = hoyIso();
+  const esHoy = fecha === hoy;
 
   const cobrosBrutos = finanzas.porFecha[fecha] ?? 0;
   const devolucionesMonto = finanzas.devolucionesPorFecha?.[fecha] ?? 0;
@@ -41,12 +44,42 @@ export default function ReporteCorteCaja() {
       <div className="space-y-4">
         <div className="rounded-2xl border border-edge/10 bg-surface p-6">
           <label className="mb-1 block text-xs font-medium text-ink/60">Fecha del corte</label>
-          <input
-            type="date"
-            value={fecha}
-            onChange={(e) => setFecha(e.target.value)}
-            className={`${inputClass} max-w-xs`}
-          />
+          {/* Mismos controles que la Agenda y el Corte diario: día anterior, día siguiente, volver a hoy y elegir fecha. */}
+          <div className="flex flex-wrap items-center gap-2">
+            <button
+              onClick={() => setFecha((d) => sumarDias(d, -1))}
+              aria-label="Día anterior"
+              className="flex h-9 w-9 items-center justify-center rounded-lg border border-success/40 text-base text-success transition-colors hover:bg-success/10"
+              style={{ boxShadow: "0 0 12px -2px rgb(var(--success-rgb) / 0.5)" }}
+            >
+              ‹
+            </button>
+            <button
+              onClick={() => setFecha((d) => sumarDias(d, 1))}
+              disabled={fecha >= hoy}
+              aria-label="Día siguiente"
+              title={fecha >= hoy ? "Hoy es el último día con cobros" : undefined}
+              className="flex h-9 w-9 items-center justify-center rounded-lg border border-success/40 text-base text-success transition-colors hover:bg-success/10 disabled:cursor-not-allowed disabled:opacity-30"
+              style={{ boxShadow: "0 0 12px -2px rgb(var(--success-rgb) / 0.5)" }}
+            >
+              ›
+            </button>
+            <button
+              onClick={() => setFecha(hoy)}
+              disabled={esHoy}
+              className="rounded-lg border border-accent/40 px-3.5 py-2 text-sm font-semibold text-accent transition-colors hover:bg-accent/10 disabled:opacity-40"
+            >
+              Hoy
+            </button>
+            <input
+              type="date"
+              value={fecha}
+              max={hoy}
+              onChange={(e) => e.target.value && setFecha(e.target.value > hoy ? hoy : e.target.value)}
+              aria-label="Elegir fecha"
+              className={`${inputClass} max-w-[11rem]`}
+            />
+          </div>
 
           <div className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-3">
             <div className="rounded-xl border border-edge/10 bg-inset p-5">
