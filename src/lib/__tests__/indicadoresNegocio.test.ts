@@ -201,3 +201,34 @@ describe("indicadores de administración y operación", () => {
     expect(calcularIndicadores(base()).operacion.presupuestos).toBeNull();
   });
 });
+
+describe("horas trabajadas y costo por hora", () => {
+  const bloque = { id: "b", sedeId: "s", dias: [1, 2, 3, 4, 5], inicio: "09:00", fin: "13:00" }; // 22 días hábiles en oct-2026 → 88 h
+  const recursos = [{ id: "m", tipo: "medico", nombre: "Dra. Ana", bloques: [bloque] }];
+  // 10 citas atendidas de 2 horas = 20 h trabajadas (días hábiles distintos, dentro del bloque).
+  const dias = ["05", "06", "07", "08", "09", "12", "13", "14", "15", "16"];
+  const citas = dias.map((d, i) => ({ id: `c${i}`, fecha: `2026-10-${d}`, horaInicio: "09:00", horaFin: "11:00", estatus: "Atendida", medicoId: "m", patientId: `p${i}` }));
+
+  it("costo por hora trabajada y por hora disponible, y utilidad por hora", () => {
+    const f = calcularIndicadores(base({ recursos, citas })).finanzas;
+    // Gastos 30,000 entre 20 h trabajadas y 88 disponibles; utilidad 18,000 entre 20 h.
+    expect(f.costoPorHoraTrabajada).toBe(1500);
+    expect(f.costoPorHoraDisponible).toBeCloseTo(30000 / 88, 1);
+    expect(f.utilidadPorHora).toBe(900);
+    expect(calcularIndicadores(base({ recursos, citas })).operacion.horasAtendidas).toBe(20);
+  });
+
+  it("el costo de la estructura por hora deja fuera insumos y laboratorio", () => {
+    // 30,000 de gastos − 10,000 (insumos 6,000 + laboratorio 4,000) = 20,000 entre 20 h.
+    expect(calcularIndicadores(base({ recursos, citas })).finanzas.costoEstructuraPorHora).toBe(1000);
+  });
+
+  it("sin horas trabajadas no hay costo por hora", () => {
+    const f = calcularIndicadores(base({ recursos, citas: [] })).finanzas;
+    expect(f.costoPorHoraTrabajada).toBeNull();
+    expect(f.costoEstructuraPorHora).toBeNull();
+    expect(f.utilidadPorHora).toBeNull();
+    expect(f.costoPorHoraDisponible).toBeCloseTo(30000 / 88, 1);
+    expect(calcularIndicadores(base()).finanzas.costoPorHoraDisponible).toBeNull(); // sin bloques
+  });
+});

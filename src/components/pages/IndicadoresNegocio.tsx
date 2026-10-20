@@ -4,7 +4,8 @@ import { useMemo, useState } from "react";
 import { usePatientData } from "@/context/PatientDataContext";
 import { usePrivacidad } from "@/context/PrivacidadContext";
 import { formatCurrency } from "@/lib/patientData";
-import { calcularIndicadores, mesDesplazado } from "@/lib/indicadoresNegocio";
+import { calcularIndicadores, diasDelMes, mesDesplazado } from "@/lib/indicadoresNegocio";
+import { rentabilidadPorTratamiento } from "@/lib/rentabilidadTratamientos";
 import { gastoCategoriaOptions, type GastoCategoria } from "@/lib/gastos";
 
 function hoyISO(): string {
@@ -12,7 +13,7 @@ function hoyISO(): string {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
 }
 
-const pct = (n: number) => `${Math.round(n * 100)}%`;
+const pct = (n: number) => `${n < 0 ? "−" : ""}${Math.abs(Math.round(n * 100))}%`;
 const pctConSigno = (n: number) => `${n >= 0 ? "+" : "−"}${Math.abs(Math.round(n * 100))}%`;
 const horas = (n: number) => `${n.toLocaleString("es-MX", { maximumFractionDigits: 1 })} h`;
 
@@ -31,10 +32,11 @@ function Tarjeta({ titulo, valor, detalle, tono, ayuda }: { titulo: string; valo
 
 /** Indicadores empresariales del mes: lo que hay que mirar para saber si el consultorio es negocio sano. */
 export default function IndicadoresNegocio() {
-  const { puedeVerFinanzas, finanzas, gastos, presupuestoGastos, citas, recursos, sedes, patients, saldosPendientes, estadisticas, metas } = usePatientData();
+  const { puedeVerFinanzas, finanzas, gastos, presupuestoGastos, citas, recursos, sedes, patients, saldosPendientes, estadisticas, metas, procedimientos } = usePatientData();
   const { oculto } = usePrivacidad();
   const hoy = hoyISO();
   const [mes, setMes] = useState(() => mesDesplazado(hoy, 0));
+  const [verTodosTratamientos, setVerTodosTratamientos] = useState(false);
 
   const ind = useMemo(
     () =>
@@ -56,6 +58,11 @@ export default function IndicadoresNegocio() {
       }),
     [mes, hoy, finanzas, gastos, presupuestoGastos, citas, recursos, sedes, patients, saldosPendientes, estadisticas, metas]
   );
+
+  const tratamientos = useMemo(() => {
+    const { primero, ultimo } = diasDelMes(mes);
+    return rentabilidadPorTratamiento({ procedimientos, estructuraPorHora: ind.finanzas.costoEstructuraPorHora, citas, primero, ultimo });
+  }, [mes, procedimientos, citas, ind.finanzas.costoEstructuraPorHora]);
 
   if (!puedeVerFinanzas) return null;
 
@@ -202,6 +209,112 @@ export default function IndicadoresNegocio() {
       </div>
 
       <div>
+        <h4 className="mb-2 text-xs font-semibold uppercase tracking-wide text-ink/40">Horas trabajadas y costo por hora</h4>
+        <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+          <Tarjeta
+            titulo="Horas trabajadas"
+            valor={horas(o.horasAtendidas)}
+            detalle={o.horasDisponibles > 0 ? `de ${horas(o.horasDisponibles)} disponibles en los bloques` : "Define los bloques de cada médico en la Agenda"}
+            ayuda="Horas de citas atendidas dentro de los bloques de atención en el mes."
+          />
+          <Tarjeta
+            titulo="Costo por hora trabajada"
+            valor={f.costoPorHoraTrabajada !== null ? $(f.costoPorHoraTrabajada) : "—"}
+            detalle={
+              f.costoPorHoraTrabajada !== null
+                ? `Estructura ${f.costoEstructuraPorHora !== null ? $(f.costoEstructuraPorHora) : "—"} + insumos y laboratorio`
+                : "Sin horas trabajadas en el mes"
+            }
+            ayuda="Todos los gastos del mes entre las horas trabajadas. La estructura es lo mismo sin insumos ni laboratorio: lo que cuesta tener abierto el consultorio cada hora."
+          />
+          <Tarjeta
+            titulo="Ingreso por hora"
+            valor={o.ingresoPorHoraAtendida !== null ? $(o.ingresoPorHoraAtendida) : "—"}
+            detalle={o.ingresoPorHoraAtendida !== null ? "Ingresos netos ÷ horas trabajadas" : "Sin horas trabajadas en el mes"}
+            ayuda="Cuánto produce cada hora de atención: ingresos netos del mes entre las horas trabajadas."
+          />
+          <Tarjeta
+            titulo="Utilidad por hora"
+            valor={f.utilidadPorHora !== null ? $(f.utilidadPorHora) : "—"}
+            detalle={
+              f.utilidadPorHora !== null
+                ? `${$(f.utilidad)} de utilidad del mes${f.costoPorHoraDisponible !== null ? ` · cada hora abierta cuesta ${$(f.costoPorHoraDisponible)}` : ""}`
+                : "Sin horas trabajadas en el mes"
+            }
+            tono={f.utilidadPorHora !== null ? (f.utilidadPorHora < 0 ? "malo" : "ok") : undefined}
+            ayuda="Utilidad del mes entre las horas trabajadas. 'Cada hora abierta cuesta' reparte los gastos entre todas las horas de los bloques, se hayan usado o no."
+          />
+        </div>
+      </div>
+
+      <div>
+        <h4 className="mb-2 text-xs font-semibold uppercase tracking-wide text-ink/40">Costo y utilidad por tratamiento</h4>
+        {tratamientos.length === 0 ? (
+          <p className="rounded-xl border border-dashed border-edge/15 p-4 text-xs text-ink/50">
+            Aún no hay procedimientos. Agrégalos en Administración → Procedimientos y costos.
+          </p>
+        ) : (
+          <>
+            <div className="overflow-x-auto rounded-xl border border-edge/10">
+              <table className="w-full min-w-[820px] text-left text-xs text-ink">
+                <thead className="text-[11px] uppercase tracking-wide text-ink/40">
+                  <tr>
+                    <th className="px-3 py-2 font-medium">Tratamiento</th>
+                    <th className="px-3 py-2 text-right font-medium">Precio</th>
+                    <th className="px-3 py-2 text-right font-medium">Comisión</th>
+                    <th className="px-3 py-2 text-right font-medium">Insumos y lab.</th>
+                    <th className="px-3 py-2 text-right font-medium">Tiempo</th>
+                    <th className="px-3 py-2 text-right font-medium">Estructura</th>
+                    <th className="px-3 py-2 text-right font-medium">Costo total</th>
+                    <th className="px-3 py-2 text-right font-medium">Utilidad</th>
+                    <th className="px-3 py-2 text-right font-medium">Margen</th>
+                    <th className="px-3 py-2 text-right font-medium">Utilidad/hora</th>
+                    <th className="px-3 py-2 text-right font-medium">Veces</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {(verTodosTratamientos ? tratamientos : tratamientos.slice(0, 12)).map((t) => (
+                    <tr key={t.id} className={`border-t border-edge/10 ${t.sinPrecio ? "opacity-50" : ""}`}>
+                      <td className="px-3 py-1.5">
+                        {t.nombre}
+                        {t.sinPrecio && <span className="ml-1.5 text-[10px] text-warning">sin precio</span>}
+                      </td>
+                      <td className="px-3 py-1.5 text-right tabular-nums">{$(t.precio)}</td>
+                      <td className="px-3 py-1.5 text-right tabular-nums">{$(t.comision)}</td>
+                      <td className="px-3 py-1.5 text-right tabular-nums">{$(t.insumos)}</td>
+                      <td className="px-3 py-1.5 text-right tabular-nums">{t.duracionMin} min</td>
+                      <td className="px-3 py-1.5 text-right tabular-nums">{t.costoEstructura !== null ? $(t.costoEstructura) : "—"}</td>
+                      <td className="px-3 py-1.5 text-right tabular-nums">{t.costoTotal !== null ? $(t.costoTotal) : "—"}</td>
+                      <td className={`px-3 py-1.5 text-right font-semibold tabular-nums ${t.sinPrecio || t.utilidad === null ? "" : t.utilidad < 0 ? "text-danger" : "text-success"}`}>
+                        {t.sinPrecio ? "—" : t.utilidad !== null ? $(t.utilidad) : `${$(t.utilidadDirecta)} directa`}
+                      </td>
+                      <td className="px-3 py-1.5 text-right tabular-nums">{!t.sinPrecio && t.margen !== null ? pct(t.margen) : "—"}</td>
+                      <td className="px-3 py-1.5 text-right tabular-nums">{!t.sinPrecio && t.utilidadPorHora !== null ? $(t.utilidadPorHora) : "—"}</td>
+                      <td className="px-3 py-1.5 text-right tabular-nums">{t.veces}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+            {tratamientos.length > 12 && (
+              <button onClick={() => setVerTodosTratamientos((v) => !v)} className="mt-2 text-xs font-semibold text-accent hover:underline">
+                {verTodosTratamientos ? "Ver menos" : `Ver los ${tratamientos.length - 12} restantes`}
+              </button>
+            )}
+            <p className="mt-2 text-[11px] leading-relaxed text-ink/40">
+              Utilidad = precio − comisión del médico − insumos y laboratorio − la parte de la estructura del consultorio (renta, servicios, nómina y demás
+              gastos, sin insumos ni laboratorio) que le toca por el tiempo que ocupa, al costo por hora del mes elegido.{" "}
+              {f.costoEstructuraPorHora === null
+                ? "Este mes no hubo horas trabajadas, así que solo se muestra la utilidad directa. "
+                : ""}
+              Si registras las comisiones de los médicos como gasto de Nómina, esa parte se cuenta dos veces. Los insumos y el laboratorio se capturan en cada
+              procedimiento (Administración → Procedimientos y costos).
+            </p>
+          </>
+        )}
+      </div>
+
+      <div>
         <h4 className="mb-2 text-xs font-semibold uppercase tracking-wide text-ink/40">Administración y operación</h4>
         <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
           <Tarjeta
@@ -223,12 +336,6 @@ export default function IndicadoresNegocio() {
             detalle={o.utilizacionBloques !== null ? `${horas(o.horasAtendidas)} atendidas de ${horas(o.horasDisponibles)} disponibles` : "Define los bloques de cada médico en la Agenda"}
             tono={o.utilizacionBloques !== null ? (o.utilizacionBloques >= 0.7 ? "ok" : "alerta") : undefined}
             ayuda="Horas de citas atendidas dentro de los bloques entre las horas que abren esos bloques en el mes. Con el 70% o más se considera bien aprovechado."
-          />
-          <Tarjeta
-            titulo="Ingreso por hora atendida"
-            valor={o.ingresoPorHoraAtendida !== null ? $(o.ingresoPorHoraAtendida) : "—"}
-            detalle={o.ingresoPorHoraAtendida !== null ? "Ingresos netos ÷ horas atendidas" : "Sin horas atendidas en bloques"}
-            ayuda="Cuánto produce cada hora de atención: ingresos netos del mes entre las horas atendidas dentro de los bloques."
           />
           <Tarjeta
             titulo="Pacientes nuevos"

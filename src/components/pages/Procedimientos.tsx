@@ -158,6 +158,21 @@ function ProcedimientoDialog({
             </div>
           </div>
 
+          <div>
+            <label className="mb-1 block text-xs font-medium text-ink/60">Costo de insumos y laboratorio</label>
+            <input
+              type="number"
+              min={0}
+              value={form.costoInterno ?? 0}
+              onChange={(e) => setForm((prev) => ({ ...prev, costoInterno: Number(e.target.value) || 0 }))}
+              className={inputClass}
+            />
+            <p className="mt-1 text-[11px] text-ink/40">
+              Lo que cuestan los materiales y el laboratorio cada vez que se hace. Con esto y la comisión, Contabilidad y finanzas calcula cuánto
+              deja cada tratamiento.
+            </p>
+          </div>
+
           <label className="flex items-center gap-2 text-sm text-ink/70">
             <input
               type="checkbox"

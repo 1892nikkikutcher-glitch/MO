@@ -2,7 +2,7 @@
  * cuentas por cobrar…) y administración/operación (citas, utilización de bloques, pacientes, presupuestos).
  * Todo puro, sin Firestore ni pantalla. */
 
-import { resumenDeDias, sumarDias } from "./evaluacionSemanal";
+import { CATEGORIAS_COSTO_DIRECTO, resumenDeDias, sumarDias } from "./evaluacionSemanal";
 import type { BloqueAtencion, Sede } from "./sedesBloques";
 import type { Gasto, GastoCategoria } from "./gastos";
 import type { FinanzasConfig, PresupuestosPorEstado } from "./metas";
@@ -84,6 +84,14 @@ export type IndicadoresFinanzas = {
   utilidad: number;
   /** Utilidad entre ingresos netos; `null` si no hubo ingresos. */
   margen: number | null;
+  /** Gastos del mes entre las horas trabajadas; `null` si no hubo horas trabajadas. */
+  costoPorHoraTrabajada: number | null;
+  /** Gastos del mes entre las horas que abren los bloques (lo que cuesta cada hora abierta, se use o no). */
+  costoPorHoraDisponible: number | null;
+  /** Lo que cuesta tener abierto el consultorio por hora trabajada: todos los gastos menos insumos y laboratorio. */
+  costoEstructuraPorHora: number | null;
+  /** Utilidad entre las horas trabajadas. */
+  utilidadPorHora: number | null;
   /** Ingreso mensual necesario para cubrir los gastos fijos con el mismo peso de gasto variable de este mes. */
   puntoEquilibrio: { ingresoNecesario: number; faltan: number; superado: boolean } | null;
   pagos: number;
@@ -103,6 +111,7 @@ export type IndicadoresOperacion = {
   /** Canceladas + no asistió, entre las citas del mes (sin contar reagendadas). */
   tasaPerdida: number | null;
   horasDisponibles: number;
+  /** Horas que se trabajaron: citas atendidas dentro de los bloques. */
   horasAtendidas: number;
   /** Horas atendidas entre las disponibles de los bloques; `null` si no hay bloques. */
   utilizacionBloques: number | null;
@@ -177,6 +186,16 @@ export function calcularIndicadores(e: EntradaIndicadores): Indicadores {
   const top = [...porMedico.entries()].sort((a, b) => b[1] - a[1])[0];
   const concentracionMedico = top && totalMedicos > 0 ? { nombre: top[0], porcentaje: top[1] / totalMedicos } : null;
 
+  // ----- Horas (para el costo por hora) -----
+  const horas = resumenDeDias({ dias, recursos: e.recursos, sedes: e.sedes, citas: e.citas });
+  const horasDisponibles = horas.totales.horasDisponibles;
+  const horasAtendidas = horas.totales.horasAtendidas;
+  const gastosDirectos = redondearDinero(gastosPorCategoria.filter((g) => CATEGORIAS_COSTO_DIRECTO.includes(g.categoria as GastoCategoria)).reduce((a, g) => a + g.monto, 0));
+  const costoPorHoraTrabajada = horasAtendidas > 0 ? redondearDinero(gastos / horasAtendidas) : null;
+  const costoPorHoraDisponible = horasDisponibles > 0 ? redondearDinero(gastos / horasDisponibles) : null;
+  const costoEstructuraPorHora = horasAtendidas > 0 ? redondearDinero((gastos - gastosDirectos) / horasAtendidas) : null;
+  const utilidadPorHora = horasAtendidas > 0 ? redondearDinero(utilidad / horasAtendidas) : null;
+
   // ----- Administración y operación -----
   const citasDelMes = e.citas.filter((c) => c.fecha >= primero && c.fecha <= ultimo);
   const atendidas = citasDelMes.filter((c) => c.estatus === "Atendida").length;
@@ -185,9 +204,6 @@ export function calcularIndicadores(e: EntradaIndicadores): Indicadores {
   const citasAgendadas = citasDelMes.filter((c) => c.estatus !== "Reagendada").length;
   const tasaPerdida = citasAgendadas > 0 ? (canceladas + noAsistio) / citasAgendadas : null;
 
-  const horas = resumenDeDias({ dias, recursos: e.recursos, sedes: e.sedes, citas: e.citas });
-  const horasDisponibles = horas.totales.horasDisponibles;
-  const horasAtendidas = horas.totales.horasAtendidas;
   const utilizacionBloques = horasDisponibles > 0 ? horasAtendidas / horasDisponibles : null;
   const ingresoPorHoraAtendida = horasAtendidas > 0 ? redondearDinero(ingresosNetos / horasAtendidas) : null;
 
@@ -222,6 +238,10 @@ export function calcularIndicadores(e: EntradaIndicadores): Indicadores {
       gastosPorCategoria,
       utilidad,
       margen,
+      costoPorHoraTrabajada,
+      costoPorHoraDisponible,
+      costoEstructuraPorHora,
+      utilidadPorHora,
       puntoEquilibrio,
       pagos,
       ticketPromedio,
