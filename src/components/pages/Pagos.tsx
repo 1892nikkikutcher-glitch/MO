@@ -18,6 +18,7 @@ import FirmaCanvas from "@/components/FirmaCanvas";
 import ReciboPagoPanel from "@/components/ReciboPagoPanel";
 import RegistrarDevolucionDialog from "@/components/RegistrarDevolucionDialog";
 import { calcularDisponibleDevolucion, resumenDesdeDevoluciones } from "@/lib/devolucionesPago";
+import { fechaPagoAIso } from "@/lib/metas";
 
 const formasDePago = ["Efectivo", "Tarjeta de crédito", "Tarjeta de débito", "Transferencia", "Cheque"];
 
@@ -66,7 +67,7 @@ function TrashIcon() {
   );
 }
 
-function EliminarPagoDialog({
+export function EliminarPagoDialog({
   pago,
   onClose,
   onConfirm,
@@ -117,7 +118,7 @@ function EliminarPagoDialog({
   );
 }
 
-function EditarPagoDialog({
+export function EditarPagoDialog({
   pago,
   presupuestos,
   onClose,
@@ -130,6 +131,9 @@ function EditarPagoDialog({
 }) {
   const [lineas, setLineas] = useState<LineaPago[]>(() => pago.lineas.map((l) => ({ ...l })));
   const [formaPago, setFormaPago] = useState(pago.formaPago);
+  const fechaOriginalIso = fechaPagoAIso(pago.fecha) ?? "";
+  const [fechaIso, setFechaIso] = useState(fechaOriginalIso);
+  const hoyIso = new Date().toISOString().slice(0, 10);
   const total = lineas.reduce((sum, l) => sum + l.monto, 0);
   const puedeGuardar = total > 0;
   const tratamientosDisponibles: Tratamiento[] = tratamientosDeDisponibles(presupuestos);
@@ -172,8 +176,19 @@ function EditarPagoDialog({
         <p className="mb-4 text-xs text-ink/40">
           Corrige el monto o el tratamiento de cada concepto, o la forma de pago — por ejemplo, si
           se anotó de menos o de más, se ligó al tratamiento equivocado, o se registró como
-          efectivo un pago que en realidad fue con tarjeta.
+          efectivo un pago que en realidad fue con tarjeta. Si cambias la fecha, el pago pasa al
+          corte y a los reportes del día que elijas.
         </p>
+        <div className="mb-4">
+          <label className="mb-1 block text-xs font-medium text-ink/60">Fecha del pago</label>
+          <input
+            type="date"
+            value={fechaIso}
+            max={hoyIso}
+            onChange={(e) => setFechaIso(e.target.value)}
+            className="w-full rounded-lg border border-edge/10 bg-field px-3 py-2 text-sm text-ink outline-none focus:border-accent/60"
+          />
+        </div>
         <div className="mb-4">
           <label className="mb-1 block text-xs font-medium text-ink/60">Forma de pago</label>
           <select
@@ -251,8 +266,14 @@ function EditarPagoDialog({
             Cancelar
           </button>
           <button
-            onClick={() => puedeGuardar && onSave({ ...pago, lineas, total, formaPago })}
-            disabled={!puedeGuardar}
+            onClick={() => {
+              if (!puedeGuardar) return;
+              // Si no tocó la fecha se conserva el texto original tal cual; si la cambió, se guarda como DD/MM/AAAA.
+              const fecha =
+                fechaIso && fechaIso !== fechaOriginalIso ? `${fechaIso.slice(8, 10)}/${fechaIso.slice(5, 7)}/${fechaIso.slice(0, 4)}` : pago.fecha;
+              onSave({ ...pago, lineas, total, formaPago, fecha });
+            }}
+            disabled={!puedeGuardar || !fechaIso}
             className="flex-1 rounded-lg border border-accent/60 bg-accent/15 py-2.5 text-sm font-semibold text-accent transition-opacity hover:bg-accent/25 disabled:cursor-not-allowed disabled:opacity-40"
           >
             Guardar cambios
@@ -735,6 +756,8 @@ export default function Pagos({
     };
     setPagosEliminados((prev) => [registro, ...prev]);
     setPagos((prev) => prev.filter((p) => p.id !== pago.id));
+    // Ya no es un pago realizado: sale de la bitácora de Reportes → Pagos (queda en "Pagos eliminados").
+    setPagosRealizados((prev) => prev.filter((r) => r.id !== pago.id));
     setPagoAEliminar(null);
   };
 
@@ -763,6 +786,12 @@ export default function Pagos({
   const saldoPendiente = saldoPendienteTratamientos;
 
   const upsertPago = (pago: Pago) => {
+    if (pagos.some((p) => p.id === pago.id)) {
+      // Edición: también se corrige la copia de la bitácora, para que Reportes → Pagos muestre el monto, la forma y la fecha nuevos.
+      setPagos((prev) => prev.map((p) => (p.id === pago.id ? pago : p)));
+      setPagosRealizados((prev) => prev.map((r) => (r.id === pago.id ? { ...r, pago } : r)));
+      return;
+    }
     setPagos((prev) => {
       const existe = prev.some((p) => p.id === pago.id);
       if (existe) return prev.map((p) => (p.id === pago.id ? pago : p));

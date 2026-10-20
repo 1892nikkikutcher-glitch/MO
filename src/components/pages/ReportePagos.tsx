@@ -1,8 +1,11 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { usePatientData } from "@/context/PatientDataContext";
-import { formatCurrency } from "@/lib/patientData";
+import { formatCurrency, type Pago } from "@/lib/patientData";
+import type { PagoRealizado } from "@/lib/pagosRealizados";
+import { calcularDisponibleDevolucion, resumenDesdeDevoluciones } from "@/lib/devolucionesPago";
+import { EditarPagoDialog, EliminarPagoDialog } from "./Pagos";
 import { fechaPagoAIso } from "@/lib/metas";
 import { calcularRangoPeriodo, type PeriodoId } from "@/lib/dashboardMetrics";
 import PeriodSelector from "@/components/dashboard/PeriodSelector";
@@ -13,7 +16,71 @@ import PeriodSelector from "@/components/dashboard/PeriodSelector";
 const PAGOS_REALIZADOS_DESDE = "2026-09-22";
 
 export default function ReportePagos() {
-  const { pagosEliminados, pagosRealizados } = usePatientData();
+  const {
+    pagosEliminados,
+    pagosRealizados,
+    setPagosRealizados,
+    setPagosEliminados,
+    pagosPorPaciente,
+    presupuestosPorPaciente,
+    devolucionesPorPaciente,
+    setPagosPaciente,
+    cargarDatosPaciente,
+    puedeVerFinanzas,
+    userEmail,
+  } = usePatientData();
+
+  // Editar o eliminar desde aquí usa exactamente la misma lógica que la pestaña Pagos del expediente: se abre el
+  // expediente del paciente en segundo plano (lo necesita para recalcular saldos y cortes) y se aplica el cambio.
+  const [accion, setAccion] = useState<{ tipo: "editar" | "eliminar"; registro: PagoRealizado } | null>(null);
+  const [aviso, setAviso] = useState("");
+  const pacienteAccion = accion?.registro.patientId;
+  useEffect(() => {
+    if (pacienteAccion) cargarDatosPaciente(pacienteAccion);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [pacienteAccion]);
+
+  const abrirAccion = (tipo: "editar" | "eliminar", registro: PagoRealizado) => {
+    setAviso("");
+    setAccion({ tipo, registro });
+  };
+  const cerrarAccion = () => setAccion(null);
+
+  const pagosDelPaciente = pacienteAccion ? pagosPorPaciente[pacienteAccion] : undefined;
+  const presupuestosDelPaciente = pacienteAccion ? presupuestosPorPaciente[pacienteAccion] : undefined;
+  const devolucionesDelPaciente = pacienteAccion ? devolucionesPorPaciente[pacienteAccion] ?? [] : [];
+  const pagoVigente: Pago | undefined = accion && pagosDelPaciente ? pagosDelPaciente.find((p) => p.id === accion.registro.id) : undefined;
+  const expedienteListo = !!pagosDelPaciente && !!presupuestosDelPaciente;
+  const tieneDevolucion = (pago: Pago) =>
+    calcularDisponibleDevolucion(pago, resumenDesdeDevoluciones(pago.id, devolucionesDelPaciente)).totalDevuelto > 0;
+
+  const guardarEdicion = (pago: Pago) => {
+    if (!accion) return;
+    setPagosPaciente(accion.registro.patientId, (prev) => prev.map((p) => (p.id === pago.id ? pago : p)));
+    setPagosRealizados((prev) => prev.map((r) => (r.id === pago.id ? { ...r, pago } : r)));
+    setAviso("Pago actualizado. El saldo del paciente y los cortes ya se recalcularon.");
+    cerrarAccion();
+  };
+
+  const eliminarPago = (pago: Pago, motivo: string) => {
+    if (!accion) return;
+    const { patientId, patientName } = accion.registro;
+    // El registro se arma fuera del updater: dentro, React lo corre dos veces en desarrollo y quedaría duplicado.
+    const registro = { id: `pe${Date.now()}`, patientId, patientName, pago, motivo, eliminadoEn: new Date().toISOString(), eliminadoPor: userEmail };
+    setPagosEliminados((prev) => [registro, ...prev]);
+    setPagosPaciente(patientId, (prev) => prev.filter((p) => p.id !== pago.id));
+    setPagosRealizados((prev) => prev.filter((r) => r.id !== pago.id));
+    setAviso("Pago eliminado. Quedó registrado en Pagos eliminados con su motivo.");
+    cerrarAccion();
+  };
+
+  /** El pago ya no está en el expediente (se borró desde allá antes de que la bitácora lo siguiera): solo se limpia la lista. */
+  const quitarRegistroHuerfano = () => {
+    if (!accion) return;
+    setPagosRealizados((prev) => prev.filter((r) => r.id !== accion.registro.id));
+    setAviso("Se quitó de la lista un pago que ya no existía en el expediente.");
+    cerrarAccion();
+  };
 
   const hoy = new Date();
   const [periodoId, setPeriodoId] = useState<PeriodoId>("mes");
@@ -91,6 +158,7 @@ export default function ReportePagos() {
           </p>
         </div>
 
+        {aviso && <p className="mt-2 text-xs text-success">{aviso}</p>}
         {realizadosDelPeriodo.length === 0 ? (
           <div className="mt-3 rounded-2xl border border-dashed border-edge/15 bg-surface p-10 text-center text-sm text-ink/40">
             No hay pagos registrados en este periodo.
@@ -106,6 +174,7 @@ export default function ReportePagos() {
                   <th className="px-6 py-3 font-medium">Médico</th>
                   <th className="px-6 py-3 font-medium">Forma de pago</th>
                   <th className="px-6 py-3 text-right font-medium">Monto</th>
+                  {puedeVerFinanzas && <th className="px-6 py-3 text-right font-medium">Acciones</th>}
                 </tr>
               </thead>
               <tbody>
@@ -121,6 +190,26 @@ export default function ReportePagos() {
                     <td className="px-6 py-3 text-right font-semibold text-success">
                       {formatCurrency(r.pago.total)}
                     </td>
+                    {puedeVerFinanzas && (
+                      <td className="px-6 py-3 text-right">
+                        <div className="ml-auto flex w-fit items-center gap-1.5">
+                          <button
+                            onClick={() => abrirAccion("editar", r)}
+                            title="Editar pago (fecha, forma de pago, monto o tratamiento)"
+                            className="flex h-7 w-7 items-center justify-center rounded-full border border-edge/15 text-ink/50 transition-colors hover:border-accent/50 hover:text-accent"
+                          >
+                            ✎
+                          </button>
+                          <button
+                            onClick={() => abrirAccion("eliminar", r)}
+                            title="Eliminar pago"
+                            className="flex h-7 w-7 items-center justify-center rounded-full border border-danger/20 text-danger/50 transition-colors hover:border-danger/60 hover:text-danger"
+                          >
+                            ✕
+                          </button>
+                        </div>
+                      </td>
+                    )}
                   </tr>
                 ))}
               </tbody>
@@ -132,6 +221,7 @@ export default function ReportePagos() {
                   <td className="px-6 py-3 text-right text-base font-bold text-success">
                     {formatCurrency(totalRealizados)}
                   </td>
+                  {puedeVerFinanzas && <td />}
                 </tr>
               </tfoot>
             </table>
@@ -206,6 +296,50 @@ export default function ReportePagos() {
           </div>
         )}
       </div>
+
+      {accion && !expedienteListo && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4">
+          <div className="rounded-2xl border border-edge/10 bg-modal p-6 text-sm text-ink/70">Abriendo el expediente de {accion.registro.patientName}…</div>
+        </div>
+      )}
+      {accion && expedienteListo && !pagoVigente && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4">
+          <div className="w-full max-w-sm rounded-2xl border border-edge/10 bg-modal p-6">
+            <h3 className="text-base font-semibold text-ink">Este pago ya no está en el expediente</h3>
+            <p className="mt-2 text-sm text-ink/70">
+              El pago de {formatCurrency(accion.registro.pago.total)} de {accion.registro.patientName} se eliminó o se movió desde el expediente, pero seguía en esta lista.
+              Puedes quitarlo de aquí; el dinero y el saldo del paciente no cambian.
+            </p>
+            <div className="mt-6 flex gap-3">
+              <button onClick={cerrarAccion} className="flex-1 rounded-lg border border-edge/15 py-2.5 text-sm font-semibold text-ink/80 hover:bg-surface">
+                Cancelar
+              </button>
+              <button onClick={quitarRegistroHuerfano} className="flex-1 rounded-lg bg-danger py-2.5 text-sm font-semibold text-black hover:opacity-90">
+                Quitar de la lista
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+      {accion && pagoVigente && tieneDevolucion(pagoVigente) && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4">
+          <div className="w-full max-w-sm rounded-2xl border border-edge/10 bg-modal p-6">
+            <h3 className="text-base font-semibold text-ink">Este pago tiene una devolución</h3>
+            <p className="mt-2 text-sm text-ink/70">
+              Ya tiene una devolución registrada, así que no se puede {accion.tipo === "editar" ? "editar" : "eliminar"}. Si hay un error, corrígelo desde el registro de la devolución.
+            </p>
+            <button onClick={cerrarAccion} className="mt-6 w-full rounded-lg border border-edge/15 py-2.5 text-sm font-semibold text-ink/80 hover:bg-surface">
+              Entendido
+            </button>
+          </div>
+        </div>
+      )}
+      {accion?.tipo === "editar" && pagoVigente && presupuestosDelPaciente && !tieneDevolucion(pagoVigente) && (
+        <EditarPagoDialog pago={pagoVigente} presupuestos={presupuestosDelPaciente} onClose={cerrarAccion} onSave={guardarEdicion} />
+      )}
+      {accion?.tipo === "eliminar" && pagoVigente && !tieneDevolucion(pagoVigente) && (
+        <EliminarPagoDialog pago={pagoVigente} onClose={cerrarAccion} onConfirm={(motivo) => eliminarPago(pagoVigente, motivo)} />
+      )}
     </div>
   );
 }

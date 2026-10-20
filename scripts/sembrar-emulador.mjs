@@ -238,6 +238,17 @@ citas.forEach((c) => batch.set(db.doc(`${base}/citas/${c.id}`), c));
 presupuestos.forEach(({ pid, doc }) => batch.set(db.doc(`${base}/pacientes/${pid}/presupuestos/${doc.id}`), doc));
 pagos.forEach(({ pid, doc }) => batch.set(db.doc(`${base}/pacientes/${pid}/pagos/${doc.id}`), doc));
 gastos.forEach((g) => batch.set(db.doc(`${base}/gastos/${g.id}`), g));
+// La bitácora de Reportes → Pagos (copia de cada pago, mismo id) para poder probar editar y eliminar desde el listado.
+pagos.forEach(({ pid, doc }) =>
+  batch.set(db.doc(`${base}/pagosRealizados/${doc.id}`), {
+    id: doc.id,
+    patientId: pid,
+    patientName: pacientes.find((p) => p.id === pid)?.name ?? "",
+    pago: doc,
+    registradoEn: new Date().toISOString(),
+    registradoPor: CORREO_PRUEBA,
+  })
+);
 await batch.commit();
 
 console.log(`Listo: cuenta ${CORREO_PRUEBA} (uid ${uid}) con ${pacientes.length} pacientes, ${citas.length} citas, ${presupuestos.length} presupuestos, ${pagos.length} pagos y ${gastos.length} gastos.`);
