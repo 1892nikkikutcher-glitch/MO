@@ -276,8 +276,9 @@ export default function Procedimientos() {
               <h3 className="mb-2 text-xs font-semibold uppercase tracking-wide text-accent">
                 {grupo.especialidad}
               </h3>
-              <div className="overflow-hidden rounded-2xl border border-edge/10 bg-surface">
-                <div className="grid grid-cols-[1fr_120px_130px_100px_auto] gap-3 border-b border-edge/10 px-4 py-3 text-xs font-semibold uppercase tracking-wide text-ink/40">
+              <div className="overflow-x-auto rounded-2xl border border-edge/10 bg-surface">
+                <div className="min-w-[880px]">
+                <div className="grid grid-cols-[minmax(0,1fr)_120px_130px_100px_230px] gap-3 border-b border-edge/10 px-4 py-3 text-xs font-semibold uppercase tracking-wide text-ink/40">
                   <span>Procedimiento</span>
                   <span>Costo paciente</span>
                   <span>Costo odontólogo</span>
@@ -290,8 +291,8 @@ export default function Procedimientos() {
                     const tieneGuia = Boolean(p.origenPlantillaId);
                     return (
                       <div key={p.id} className={`px-4 py-3 ${activo ? "" : "opacity-50"}`}>
-                        <div className="grid grid-cols-[1fr_120px_130px_100px_auto] items-center gap-3">
-                          <span className="flex items-center gap-2 text-sm font-medium text-ink">
+                        <div className="grid grid-cols-[minmax(0,1fr)_120px_130px_100px_230px] items-center gap-3">
+                          <span className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1 text-sm font-medium text-ink">
                             {p.nombre}
                             {!activo && (
                               <span className="rounded-full bg-ink/10 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-ink/40">
@@ -335,6 +336,7 @@ export default function Procedimientos() {
                       </div>
                     );
                   })}
+                </div>
                 </div>
               </div>
             </div>
