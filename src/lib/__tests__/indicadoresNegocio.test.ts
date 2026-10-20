@@ -258,3 +258,67 @@ describe("gastos fijos y variables por gasto", () => {
     expect(r.gastosPorCategoria.find((g) => g.categoria === "Renta")?.clasificacion).toBe("fijo");
   });
 });
+
+describe("costos, gastos de operación e inversión", () => {
+  const conInversion = base({
+    gastos: [
+      gasto("Insumos", 6000, "2026-10-08"), // costo
+      gasto("Laboratorio", 4000, "2026-10-09"), // costo
+      gasto("Renta", 8000, "2026-10-01"), // gasto
+      gasto("Nómina", 12000, "2026-10-15"), // gasto
+      gasto("Inversión", 30000, "2026-10-12"), // inversión del mes
+      gasto("Inversión", 50000, "2026-03-05"), // inversión de otro mes, mismo año
+      gasto("Inversión", 99999, "2025-12-31"), // año anterior
+    ],
+  });
+  const r = calcularIndicadores(conInversion).finanzas;
+
+  it("separa costos, gastos de operación e inversión", () => {
+    expect(r.costos).toBe(10000);
+    expect(r.gastosOperativos).toBe(20000);
+    expect(r.gastos).toBe(30000); // costos + gastos, sin la inversión
+    expect(r.inversion).toBe(30000);
+  });
+
+  it("la inversión del año suma desde enero hasta el fin del mes elegido", () => {
+    expect(r.inversionDelAnio).toBe(80000);
+    expect(calcularIndicadores({ ...conInversion, mes: "2026-02-10" }).finanzas.inversionDelAnio).toBe(0); // antes de la compra de marzo
+    expect(calcularIndicadores({ ...conInversion, mes: "2026-03-10" }).finanzas.inversionDelAnio).toBe(50000);
+  });
+
+  it("utilidad bruta, utilidad operativa y flujo tras la inversión", () => {
+    // Ingresos netos 48,000.
+    expect(r.utilidadBruta).toBe(38000); // 48,000 − 10,000
+    expect(r.margenBruto).toBeCloseTo(38000 / 48000, 5);
+    expect(r.utilidad).toBe(18000); // 48,000 − 30,000: la inversión no resta
+    expect(r.flujoTrasInversion).toBe(-12000); // 18,000 − 30,000
+  });
+
+  it("la inversión no entra en fijos, variables ni en el punto de equilibrio", () => {
+    expect(r.gastosFijos + r.gastosVariables).toBe(30000);
+    expect(r.gastosPorCategoria.some((g) => g.categoria === "Inversión")).toBe(false);
+  });
+
+  it("un gasto marcado como costo cuenta como costo aunque su categoría sea de gasto", () => {
+    const x = calcularIndicadores(base({ gastos: [{ ...gasto("Nómina", 5000, "2026-10-10"), naturaleza: "costo" }, gasto("Renta", 8000, "2026-10-01")] })).finanzas;
+    expect(x.costos).toBe(5000);
+    expect(x.gastosOperativos).toBe(8000);
+  });
+
+  it("el costo de la estructura por hora deja fuera los costos y la inversión", () => {
+    const bloque = { id: "b", sedeId: "s", dias: [1, 2, 3, 4, 5], inicio: "09:00", fin: "13:00" };
+    const recursos = [{ id: "m", tipo: "medico", nombre: "Dra. Ana", bloques: [bloque] }];
+    const citas = ["05", "06", "07", "08", "09", "12", "13", "14", "15", "16"].map((d, i) => ({
+      id: `c${i}`,
+      fecha: `2026-10-${d}`,
+      horaInicio: "09:00",
+      horaFin: "11:00",
+      estatus: "Atendida",
+      medicoId: "m",
+      patientId: `p${i}`,
+    })); // 20 h trabajadas
+    const x = calcularIndicadores({ ...conInversion, recursos, citas }).finanzas;
+    expect(x.costoEstructuraPorHora).toBe(1000); // (30,000 − 10,000 costos) / 20 h; la inversión no entra
+    expect(x.costoPorHoraTrabajada).toBe(1500);
+  });
+});

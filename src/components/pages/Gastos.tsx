@@ -5,10 +5,15 @@ import { usePatientData } from "@/context/PatientDataContext";
 import {
   calcularFijosYVariables,
   calcularGastosPorCategoria,
+  calcularPorNaturaleza,
   calcularSobresGasto,
   clasificacionDeGasto,
+  etiquetaNaturaleza,
   gastoCategoriaOptions,
+  naturalezaDeGasto,
+  naturalezaGastoOptions,
   type ClasificacionGasto,
+  type NaturalezaGasto,
   type GastoCategoria,
   type Gasto,
   type SobreGasto,
@@ -75,20 +80,43 @@ export default function Gastos() {
   const [tipoManual, setTipoManual] = useState<ClasificacionGasto | null>(null);
   const tipoDeCategoria = (c: GastoCategoria): ClasificacionGasto => clasificacionDeGasto({ categoria: c }, presupuestoGastos.porCategoria);
   const tipo = tipoManual ?? tipoDeCategoria(categoria);
+  // Igual con la naturaleza (costo, gasto o inversión): arranca con la de la categoría y se puede cambiar.
+  const [naturalezaManual, setNaturalezaManual] = useState<NaturalezaGasto | null>(null);
+  const naturaleza = naturalezaManual ?? naturalezaDeGasto({ categoria });
 
   const puedeGuardar = concepto.trim().length > 0 && Number(monto) > 0;
 
   const agregarGasto = () => {
     if (!puedeGuardar) return;
+    // El id se calcula aquí, no dentro de la función de actualización: en desarrollo React la ejecuta dos veces y
+    // cada vuelta escribiría un gasto distinto.
+    const id = `${Date.now()}`;
     setGastos((prev) => [
-      { id: `${Date.now()}`, concepto: concepto.trim(), categoria, monto: Number(monto), fecha, clasificacion: tipo },
+      {
+        id,
+        concepto: concepto.trim(),
+        categoria,
+        monto: Number(monto),
+        fecha,
+        naturaleza,
+        // Una inversión no es fijo ni variable: no se guarda el tipo.
+        ...(naturaleza !== "inversion" ? { clasificacion: tipo } : {}),
+      },
       ...prev,
     ]);
     setConcepto("");
     setMonto("");
     setTipoManual(null);
+    setNaturalezaManual(null);
     setCategoria(gastoCategoriaOptions[0]);
     setFecha(todayIso());
+  };
+
+  /** Cambia un gasto ya registrado de costo a gasto a inversión (y vuelve a empezar). */
+  const alternarNaturaleza = (g: Gasto) => {
+    const orden = naturalezaGastoOptions;
+    const siguiente = orden[(orden.indexOf(naturalezaDeGasto(g)) + 1) % orden.length];
+    setGastos((prev) => prev.map((x) => (x.id === g.id ? { ...x, naturaleza: siguiente } : x)));
   };
 
   /** Cambia un gasto ya registrado de fijo a variable (o al revés). */
@@ -105,12 +133,9 @@ export default function Gastos() {
 
   const hoy = new Date();
   const inicioDelMes = inicioMes(hoy);
-  const gastosDelMes = gastos
-    .filter((g) => {
-      const d = new Date(`${g.fecha}T00:00:00`);
-      return d >= inicioDelMes && d <= hoy;
-    })
-    .reduce((sum, g) => sum + g.monto, 0);
+  const porNaturaleza = calcularPorNaturaleza(gastos, inicioDelMes, hoy);
+  // Costos y gastos de operación; la inversión se muestra aparte y no resta de la utilidad.
+  const gastosDelMes = porNaturaleza.costos + porNaturaleza.gastos;
   const ingresosDelMes = sumarRango(finanzas.porFecha, inicioDelMes, hoy);
   const utilidadDelMes = ingresosDelMes - gastosDelMes;
 
@@ -118,8 +143,9 @@ export default function Gastos() {
   const parte = (n: number) => (gastosDelMes > 0 ? `${Math.round((n / gastosDelMes) * 100)}% de los gastos` : "Sin gastos este mes");
   const gastosPorCategoria = calcularGastosPorCategoria(gastos, inicioDelMes, hoy);
   const sobres = calcularSobresGasto(presupuestoGastos.porCategoria, gastosPorCategoria, ingresosDelMes);
-  const sobresFijos = sobres.filter((s) => s.clasificacion === "fijo");
-  const sobresVariables = sobres.filter((s) => s.clasificacion === "variable");
+  const sobresFijos = sobres.filter((s) => s.categoria !== "Inversión" && s.clasificacion === "fijo");
+  const sobresVariables = sobres.filter((s) => s.categoria !== "Inversión" && s.clasificacion === "variable");
+  const sobresInversion = sobres.filter((s) => s.categoria === "Inversión");
 
   return (
     <div className="space-y-6">
@@ -129,7 +155,7 @@ export default function Gastos() {
           style={{ boxShadow: "inset 3px 0 0 0 #dc2626" }}
         >
           <div className="text-xl font-bold text-ink">{formatCurrency(gastosDelMes)}</div>
-          <div className="mt-1 text-[11px] uppercase tracking-wide text-ink/40">Gastos del Mes</div>
+          <div className="mt-1 text-[11px] uppercase tracking-wide text-ink/40">Costos y Gastos del Mes</div>
         </div>
         {puedeVerFinanzas && (
           <>
@@ -151,6 +177,24 @@ export default function Gastos() {
         )}
       </div>
 
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+        <div className="rounded-xl border border-edge/10 bg-surface p-4" style={{ boxShadow: "inset 3px 0 0 0 #ef4444" }} title="Lo que cuesta dar el servicio: insumos, laboratorio…">
+          <div className="text-xl font-bold text-ink">{formatCurrency(porNaturaleza.costos)}</div>
+          <div className="mt-1 text-[11px] uppercase tracking-wide text-ink/40">Costos del Mes</div>
+          <div className="mt-0.5 text-[11px] text-ink/50">Lo que cuesta dar el servicio: insumos, laboratorio…</div>
+        </div>
+        <div className="rounded-xl border border-edge/10 bg-surface p-4" style={{ boxShadow: "inset 3px 0 0 0 #f97316" }} title="Lo que cuesta operar: renta, nómina, servicios, marketing…">
+          <div className="text-xl font-bold text-ink">{formatCurrency(porNaturaleza.gastos)}</div>
+          <div className="mt-1 text-[11px] uppercase tracking-wide text-ink/40">Gastos del Mes</div>
+          <div className="mt-0.5 text-[11px] text-ink/50">Lo que cuesta operar: renta, nómina, servicios…</div>
+        </div>
+        <div className="rounded-xl border border-edge/10 bg-surface p-4" style={{ boxShadow: "inset 3px 0 0 0 #06b6d4" }} title="Equipo, mobiliario, remodelación: se compra una vez y rinde durante años. No resta de la utilidad del mes.">
+          <div className="text-xl font-bold text-ink">{formatCurrency(porNaturaleza.inversion)}</div>
+          <div className="mt-1 text-[11px] uppercase tracking-wide text-ink/40">Inversión del Mes</div>
+          <div className="mt-0.5 text-[11px] text-ink/50">Equipo, remodelación… no resta de la utilidad</div>
+        </div>
+      </div>
+
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
         <div className="rounded-xl border border-edge/10 bg-surface p-4" style={{ boxShadow: "inset 3px 0 0 0 #f59e0b" }}>
           <div className="text-xl font-bold text-ink">{formatCurrency(gastosFijosDelMes)}</div>
@@ -163,6 +207,7 @@ export default function Gastos() {
           <div className="mt-0.5 text-[11px] text-ink/50">{parte(gastosVariablesDelMes)} · cambian según lo que se trabaja</div>
         </div>
       </div>
+      {/* Costos y gastos de operación; la inversión no entra en fijos ni variables. */}
 
       {puedeVerFinanzas && (
         <div className="space-y-4 rounded-2xl border border-edge/10 bg-surface p-6">
@@ -187,12 +232,20 @@ export default function Gastos() {
               ))}
             </div>
           </div>
+          {sobresInversion.length > 0 && (
+            <div className="space-y-3">
+              <h4 className="text-xs font-semibold uppercase tracking-wide text-ink/40">Inversión</h4>
+              {sobresInversion.map((s) => (
+                <FilaSobre key={s.categoria} sobre={s} />
+              ))}
+            </div>
+          )}
         </div>
       )}
 
       <div className="space-y-3 rounded-2xl border border-edge/10 bg-surface p-6">
         <h3 className="text-sm font-semibold uppercase tracking-wide text-ink/60">Registrar Gasto</h3>
-        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-5">
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-6">
           <input
             type="text"
             value={concepto}
@@ -204,7 +257,8 @@ export default function Gastos() {
             value={categoria}
             onChange={(e) => {
               setCategoria(e.target.value as GastoCategoria);
-              setTipoManual(null); // al cambiar de categoría, el tipo vuelve al de esa categoría
+              setTipoManual(null); // al cambiar de categoría, el tipo y la naturaleza vuelven a los de esa categoría
+              setNaturalezaManual(null);
             }}
             className={inputClass}
           >
@@ -215,12 +269,27 @@ export default function Gastos() {
             ))}
           </select>
           <select
-            value={tipo}
+            value={naturaleza}
+            onChange={(e) => setNaturalezaManual(e.target.value as NaturalezaGasto)}
+            aria-label="Naturaleza del gasto"
+            title="Costo: lo que cuesta dar el servicio. Gasto: lo que cuesta operar. Inversión: equipo o mejoras que rinden durante años."
+            className={inputClass}
+          >
+            {naturalezaGastoOptions.map((n) => (
+              <option key={n} value={n}>
+                {etiquetaNaturaleza[n]}
+              </option>
+            ))}
+          </select>
+          <select
+            value={naturaleza === "inversion" ? "" : tipo}
             onChange={(e) => setTipoManual(e.target.value as ClasificacionGasto)}
+            disabled={naturaleza === "inversion"}
             aria-label="Tipo de gasto"
             title="Fijo: se paga aunque no haya pacientes (renta, nómina…). Variable: cambia según lo que se trabaja (insumos, laboratorio…)."
             className={inputClass}
           >
+            {naturaleza === "inversion" && <option value="">No aplica</option>}
             <option value="fijo">Gasto fijo</option>
             <option value="variable">Gasto variable</option>
           </select>
@@ -256,6 +325,7 @@ export default function Gastos() {
                 <th className="px-6 py-3 font-medium">Fecha</th>
                 <th className="px-6 py-3 font-medium">Concepto</th>
                 <th className="px-6 py-3 font-medium">Categoría</th>
+                <th className="px-6 py-3 font-medium">Naturaleza</th>
                 <th className="px-6 py-3 font-medium">Tipo</th>
                 <th className="px-6 py-3 text-right font-medium">Monto</th>
                 <th className="px-6 py-3 text-right font-medium">Quitar</th>
@@ -273,6 +343,28 @@ export default function Gastos() {
                   </td>
                   <td className="px-6 py-3">
                     {(() => {
+                      const n = naturalezaDeGasto(g);
+                      return (
+                        <button
+                          onClick={() => alternarNaturaleza(g)}
+                          title={`Es ${n === "inversion" ? "una inversión" : n === "costo" ? "un costo" : "un gasto"}. Toca para cambiarlo.`}
+                          className={`rounded-full border px-2 py-0.5 text-[11px] font-semibold transition-colors ${
+                            n === "costo"
+                              ? "border-danger/40 bg-danger/10 text-danger hover:bg-danger/20"
+                              : n === "inversion"
+                                ? "border-success/40 bg-success/10 text-success hover:bg-success/20"
+                                : "border-edge/30 bg-inset text-ink/70 hover:bg-field"
+                          }`}
+                        >
+                          {etiquetaNaturaleza[n]}
+                        </button>
+                      );
+                    })()}
+                  </td>
+                  <td className="px-6 py-3">
+                    {naturalezaDeGasto(g) === "inversion" ? (
+                      <span className="text-xs text-ink/30">—</span>
+                    ) : (() => {
                       const t = clasificacionDeGasto(g, presupuestoGastos.porCategoria);
                       return (
                         <button

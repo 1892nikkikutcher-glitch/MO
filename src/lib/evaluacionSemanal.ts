@@ -4,7 +4,7 @@
 
 import { aMinutos, bloquesDelDia, normalizarBloques, type BloqueAtencion, type Sede } from "./sedesBloques";
 import { fechaPagoAIso } from "./metas";
-import type { Gasto, GastoCategoria } from "./gastos";
+import { naturalezaDeGasto, type Gasto, type GastoCategoria } from "./gastos";
 import type { PagoRealizado } from "./pagosRealizados";
 
 /** Un paciente que llega con hasta estos minutos de retraso cuenta como puntual (la tolerancia que ya
@@ -14,7 +14,7 @@ export const TOLERANCIA_PUNTUALIDAD_MIN = 10;
 export const UMBRAL_OCUPACION = 0.7;
 /** …en cada una de las últimas semanas completas. */
 export const SEMANAS_PARA_CONSISTENCIA = 3;
-/** Gastos que se consideran costo directo de atender; el resto (renta, servicios, marketing…) es indirecto. */
+/** Categorías que por defecto se consideran costo directo de atender (cada gasto puede marcarse distinto). */
 export const CATEGORIAS_COSTO_DIRECTO: GastoCategoria[] = ["Insumos", "Laboratorio"];
 
 type CitaEval = {
@@ -325,6 +325,8 @@ export type CostosSemana = {
   totalDirectos: number;
   indirectos: { categoria: string; monto: number }[];
   totalIndirectos: number;
+  /** Lo invertido en la semana (equipo, remodelación…): no es costo ni gasto, se muestra aparte. */
+  inversion: number;
 };
 
 export function costosDeLaSemana(gastos: Gasto[], lunes: string): CostosSemana {
@@ -332,16 +334,22 @@ export function costosDeLaSemana(gastos: Gasto[], lunes: string): CostosSemana {
   const hasta = sumarDias(lunes, 6);
   const directos = new Map<string, number>();
   const indirectos = new Map<string, number>();
+  let inversion = 0;
   for (const g of gastos) {
     if (!g.fecha || g.fecha < desde || g.fecha > hasta) continue;
-    const destino = CATEGORIAS_COSTO_DIRECTO.includes(g.categoria) ? directos : indirectos;
+    const naturaleza = naturalezaDeGasto(g);
+    if (naturaleza === "inversion") {
+      inversion = Math.round((inversion + (Number(g.monto) || 0)) * 100) / 100;
+      continue;
+    }
+    const destino = naturaleza === "costo" ? directos : indirectos;
     destino.set(g.categoria, Math.round(((destino.get(g.categoria) ?? 0) + (Number(g.monto) || 0)) * 100) / 100);
   }
   const aLista = (m: Map<string, number>) => [...m.entries()].map(([categoria, monto]) => ({ categoria, monto })).sort((a, b) => b.monto - a.monto);
   const sumaLista = (l: { monto: number }[]) => Math.round(l.reduce((a, x) => a + x.monto, 0) * 100) / 100;
   const d = aLista(directos);
   const i = aLista(indirectos);
-  return { directos: d, totalDirectos: sumaLista(d), indirectos: i, totalIndirectos: sumaLista(i) };
+  return { directos: d, totalDirectos: sumaLista(d), indirectos: i, totalIndirectos: sumaLista(i), inversion };
 }
 
 /** Comisión estimada a los médicos: su % por lo que cobraron en la semana (los que no tienen % no suman). */

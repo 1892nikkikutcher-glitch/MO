@@ -224,7 +224,11 @@ export const ayudaPaginas: Record<string, AyudaPagina> = {
   gastos: {
     titulo: "Gastos",
     resumen: "Registro de egresos del consultorio, para tener el panorama financiero completo junto con los ingresos.",
-    puntos: [],
+    puntos: [
+      "Cada gasto es un costo (lo que cuesta dar el servicio: insumos, laboratorio), un gasto (lo que cuesta operar: renta, nómina, servicios) o una inversión (equipo, remodelación). Arranca con el de su categoría; toca la etiqueta de la tabla para cambiarlo.",
+      "La inversión no resta de la utilidad del mes, pero sí del efectivo: aparece aparte.",
+      "Además, cada gasto es fijo (se paga aunque no haya pacientes) o variable (cambia según lo que se trabaja).",
+    ],
   },
   "regulacion-sanitaria": {
     titulo: "Regulación Sanitaria",

@@ -329,9 +329,10 @@ export default function ReporteEvaluacionSemanal() {
           </tbody>
         </table>
         <p className="mt-2 text-[11px] text-ink/50">
-          Se toman como costo directo los gastos de {CATEGORIAS_COSTO_DIRECTO.join(" y ").toLowerCase()} y la comisión de los médicos. Renta, nómina, servicios y marketing
+          Se toman como costo directo los gastos marcados como costo en la pantalla de Gastos (por defecto, {CATEGORIAS_COSTO_DIRECTO.join(" y ").toLowerCase()}) y la comisión de los médicos. Renta, nómina, servicios y marketing
           {costos.totalIndirectos > 0 ? ` (${formatCurrency(costos.totalIndirectos)} esta semana)` : ""} son indirectos y no entran. Los gastos no llevan sede, así que este
           bloque es de toda la clínica.
+          {costos.inversion > 0 ? ` Además se invirtieron ${formatCurrency(costos.inversion)} esta semana (equipo, remodelación…): no es costo ni gasto, así que no entra en el margen.` : ""}
         </p>
       </div>
     </div>

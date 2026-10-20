@@ -2,9 +2,9 @@
  * cuentas por cobrar…) y administración/operación (citas, utilización de bloques, pacientes, presupuestos).
  * Todo puro, sin Firestore ni pantalla. */
 
-import { CATEGORIAS_COSTO_DIRECTO, resumenDeDias, sumarDias } from "./evaluacionSemanal";
+import { resumenDeDias, sumarDias } from "./evaluacionSemanal";
 import type { BloqueAtencion, Sede } from "./sedesBloques";
-import type { Gasto, GastoCategoria } from "./gastos";
+import { naturalezaDeGasto, type Gasto, type GastoCategoria } from "./gastos";
 import type { FinanzasConfig, PresupuestosPorEstado } from "./metas";
 import { redondearDinero } from "./dinero";
 
@@ -83,11 +83,27 @@ export type IndicadoresFinanzas = {
   variacionIngresos: number | null;
   /** Ingresos netos proyectados al cierre del mes (solo si el mes está en curso y ya hay al menos un día). */
   proyeccionCierre: number | null;
+  /** Costos más gastos de operación del mes (la inversión no entra). */
   gastos: number;
+  /** Lo que cuesta dar el servicio: insumos, laboratorio… (gastos marcados como costo). */
+  costos: number;
+  /** Lo que cuesta operar: renta, nómina, servicios, marketing… (gastos marcados como gasto). */
+  gastosOperativos: number;
+  /** Equipo, mobiliario, remodelación… del mes: no resta de la utilidad, sí del efectivo. */
+  inversion: number;
+  /** Inversión de lo que va del año hasta el fin del mes elegido. */
+  inversionDelAnio: number;
   gastosFijos: number;
   gastosVariables: number;
   gastosPorCategoria: GastoDeCategoria[];
+  /** Ingresos netos menos costos. */
+  utilidadBruta: number;
+  /** Utilidad bruta entre ingresos netos; `null` si no hubo ingresos. */
+  margenBruto: number | null;
+  /** Ingresos netos menos costos y gastos de operación (utilidad operativa). */
   utilidad: number;
+  /** Utilidad menos la inversión del mes: lo que de verdad queda en efectivo. */
+  flujoTrasInversion: number;
   /** Utilidad entre ingresos netos; `null` si no hubo ingresos. */
   margen: number | null;
   /** Gastos del mes entre las horas trabajadas; `null` si no hubo horas trabajadas. */
@@ -153,9 +169,18 @@ export function calcularIndicadores(e: EntradaIndicadores): Indicadores {
   const proyeccionCierre = esMesEnCurso && diaDelMes > 0 ? redondearDinero((ingresosNetos / diaDelMes) * dias.length) : null;
 
   const delMes = e.gastos.filter((g) => g.fecha >= primero && g.fecha <= ultimo);
+  // La inversión va aparte: no es un gasto de operación.
+  const inversion = redondearDinero(delMes.filter((g) => naturalezaDeGasto(g) === "inversion").reduce((a, g) => a + (Number(g.monto) || 0), 0));
+  const inicioAnio = `${primero.slice(0, 4)}-01-01`;
+  const inversionDelAnio = redondearDinero(
+    e.gastos.filter((g) => naturalezaDeGasto(g) === "inversion" && g.fecha >= inicioAnio && g.fecha <= ultimo).reduce((a, g) => a + (Number(g.monto) || 0), 0)
+  );
+  const costos = redondearDinero(delMes.filter((g) => naturalezaDeGasto(g) === "costo").reduce((a, g) => a + (Number(g.monto) || 0), 0));
+  const operativos = delMes.filter((g) => naturalezaDeGasto(g) !== "inversion");
+
   // Cada gasto es fijo o variable según lo que se le puso; sin eso, lo de su categoría (por defecto, variable).
   const porCategoria = new Map<string, { monto: number; fijo: number; variable: number }>();
-  for (const g of delMes) {
+  for (const g of operativos) {
     const monto = Number(g.monto) || 0;
     const esFijo = (g.clasificacion ?? e.clasificacionPorCategoria[g.categoria as GastoCategoria] ?? "variable") === "fijo";
     const actual = porCategoria.get(g.categoria) ?? { monto: 0, fijo: 0, variable: 0 };
@@ -175,7 +200,11 @@ export function calcularIndicadores(e: EntradaIndicadores): Indicadores {
   const gastos = redondearDinero(gastosPorCategoria.reduce((a, g) => a + g.monto, 0));
   const gastosFijos = redondearDinero([...porCategoria.values()].reduce((a, v) => a + v.fijo, 0));
   const gastosVariables = redondearDinero(gastos - gastosFijos);
+  const gastosOperativos = redondearDinero(gastos - costos);
+  const utilidadBruta = redondearDinero(ingresosNetos - costos);
+  const margenBruto = ingresosNetos > 0 ? utilidadBruta / ingresosNetos : null;
   const utilidad = redondearDinero(ingresosNetos - gastos);
+  const flujoTrasInversion = redondearDinero(utilidad - inversion);
   const margen = ingresosNetos > 0 ? utilidad / ingresosNetos : null;
 
   // Punto de equilibrio: gastos fijos / (1 − peso del gasto variable sobre el ingreso).
@@ -204,7 +233,7 @@ export function calcularIndicadores(e: EntradaIndicadores): Indicadores {
   const horas = resumenDeDias({ dias, recursos: e.recursos, sedes: e.sedes, citas: e.citas });
   const horasDisponibles = horas.totales.horasDisponibles;
   const horasAtendidas = horas.totales.horasAtendidas;
-  const gastosDirectos = redondearDinero(gastosPorCategoria.filter((g) => CATEGORIAS_COSTO_DIRECTO.includes(g.categoria as GastoCategoria)).reduce((a, g) => a + g.monto, 0));
+  const gastosDirectos = costos;
   const costoPorHoraTrabajada = horasAtendidas > 0 ? redondearDinero(gastos / horasAtendidas) : null;
   const costoPorHoraDisponible = horasDisponibles > 0 ? redondearDinero(gastos / horasDisponibles) : null;
   const costoEstructuraPorHora = horasAtendidas > 0 ? redondearDinero((gastos - gastosDirectos) / horasAtendidas) : null;
@@ -247,10 +276,17 @@ export function calcularIndicadores(e: EntradaIndicadores): Indicadores {
       variacionIngresos,
       proyeccionCierre,
       gastos,
+      costos,
+      gastosOperativos,
+      inversion,
+      inversionDelAnio,
       gastosFijos,
       gastosVariables,
       gastosPorCategoria,
+      utilidadBruta,
+      margenBruto,
       utilidad,
+      flujoTrasInversion,
       margen,
       costoPorHoraTrabajada,
       costoPorHoraDisponible,

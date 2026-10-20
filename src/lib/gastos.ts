@@ -8,6 +8,7 @@ export const gastoCategoriaOptions = [
   "Laboratorio",
   "Marketing",
   "Otro",
+  "Inversión",
 ] as const;
 export type GastoCategoria = (typeof gastoCategoriaOptions)[number];
 
@@ -20,7 +21,50 @@ export type Gasto = {
   fecha: string;
   /** Si este gasto es fijo o variable. Ausente = el de su categoría (Administración → Presupuesto de Gastos). */
   clasificacion?: ClasificacionGasto;
+  /** Si es un costo (lo que cuesta dar el servicio), un gasto (lo que cuesta operar) o una inversión (equipo,
+   * remodelación…). Ausente = el de su categoría. */
+  naturaleza?: NaturalezaGasto;
 };
+
+/** Costo: insumos, laboratorio (lo que cuesta atender). Gasto: renta, nómina, servicios, marketing (lo que cuesta
+ * operar). Inversión: equipo, mobiliario, remodelación (se compra una vez y rinde durante años; no resta de la
+ * utilidad del mes, pero sí del efectivo). */
+export const naturalezaGastoOptions = ["costo", "gasto", "inversion"] as const;
+export type NaturalezaGasto = (typeof naturalezaGastoOptions)[number];
+
+export const etiquetaNaturaleza: Record<NaturalezaGasto, string> = { costo: "Costo", gasto: "Gasto", inversion: "Inversión" };
+
+/** Naturaleza que se le da a cada categoría mientras el gasto no diga otra. */
+const naturalezaPorDefecto: Record<GastoCategoria, NaturalezaGasto> = {
+  Insumos: "costo",
+  Laboratorio: "costo",
+  Renta: "gasto",
+  Nómina: "gasto",
+  Servicios: "gasto",
+  Marketing: "gasto",
+  Otro: "gasto",
+  Inversión: "inversion",
+};
+
+export function naturalezaDeGasto(gasto: Pick<Gasto, "categoria" | "naturaleza">): NaturalezaGasto {
+  if (gasto.naturaleza === "costo" || gasto.naturaleza === "gasto" || gasto.naturaleza === "inversion") return gasto.naturaleza;
+  return naturalezaPorDefecto[gasto.categoria] ?? "gasto";
+}
+
+/** Lo gastado en el rango, separado en costos, gastos de operación e inversión. */
+export function calcularPorNaturaleza(
+  gastos: Gasto[],
+  desde: Date,
+  hasta: Date
+): { costos: number; gastos: number; inversion: number } {
+  const t = { costo: 0, gasto: 0, inversion: 0 };
+  gastos.forEach((g) => {
+    const d = new Date(`${g.fecha}T00:00:00`);
+    if (d < desde || d > hasta) return;
+    t[naturalezaDeGasto(g)] += g.monto;
+  });
+  return { costos: redondearDinero(t.costo), gastos: redondearDinero(t.gasto), inversion: redondearDinero(t.inversion) };
+}
 
 /** Sobres de gasto — clasificación fijo/variable por categoría y un
  * presupuesto mensual (porcentaje del ingreso del mes, o un monto fijo en
@@ -59,6 +103,7 @@ const clasificacionPorDefecto: Record<GastoCategoria, ClasificacionGasto> = {
   Laboratorio: "variable",
   Marketing: "variable",
   Otro: "variable",
+  Inversión: "variable",
 };
 
 export const presupuestoGastosInicial: PresupuestoGastosConfig = {
@@ -79,7 +124,8 @@ export function clasificacionDeGasto(
   return porCategoria[gasto.categoria]?.clasificacion ?? presupuestoGastosInicial.porCategoria[gasto.categoria]?.clasificacion ?? "variable";
 }
 
-/** Lo gastado en el rango, separado en fijo y variable (cada gasto con su propia clasificación). */
+/** Lo gastado en el rango en costos y gastos, separado en fijo y variable (cada gasto con su propia clasificación).
+ * La inversión no cuenta: no es un gasto de operación. */
 export function calcularFijosYVariables(
   gastos: Gasto[],
   porCategoria: Partial<Record<GastoCategoria, { clasificacion: ClasificacionGasto }>>,
@@ -91,6 +137,7 @@ export function calcularFijosYVariables(
   gastos.forEach((g) => {
     const d = new Date(`${g.fecha}T00:00:00`);
     if (d < desde || d > hasta) return;
+    if (naturalezaDeGasto(g) === "inversion") return;
     if (clasificacionDeGasto(g, porCategoria) === "fijo") fijos += g.monto;
     else variables += g.monto;
   });

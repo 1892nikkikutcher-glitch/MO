@@ -207,3 +207,21 @@ describe("¿ya se ocupan de manera consistente?", () => {
     expect(veredictoDeBloques({ hoyISO: HOY, recursos: [{ id: "z", tipo: "medico", nombre: "Z" }], sedes, citas: [] }).estado).toBe("sin_datos");
   });
 });
+
+describe("costos de la semana por naturaleza", () => {
+  it("la inversión va aparte y un gasto marcado como costo cuenta como directo", () => {
+    const c = costosDeLaSemana(
+      [
+        { id: "1", concepto: "x", categoria: "Insumos", monto: 800, fecha: "2026-10-20" },
+        { id: "2", concepto: "x", categoria: "Renta", monto: 5000, fecha: "2026-10-21" },
+        { id: "3", concepto: "x", categoria: "Inversión", monto: 20000, fecha: "2026-10-22" },
+        { id: "4", concepto: "comisiones", categoria: "Nómina", monto: 1200, fecha: "2026-10-23", naturaleza: "costo" },
+      ],
+      LUNES
+    );
+    expect(c.totalDirectos).toBe(2000);
+    expect(c.totalIndirectos).toBe(5000);
+    expect(c.inversion).toBe(20000);
+    expect(c.directos.map((d) => d.categoria).sort()).toEqual(["Insumos", "Nómina"]);
+  });
+});

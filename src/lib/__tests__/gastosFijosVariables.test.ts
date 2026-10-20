@@ -40,3 +40,48 @@ describe("gastos fijos y variables", () => {
     expect(r).toEqual({ fijos: 9000, variables: 2000, total: 11000 });
   });
 });
+
+describe("costos, gastos e inversión", () => {
+  it("cada categoría tiene su naturaleza por defecto", async () => {
+    const { naturalezaDeGasto } = await import("../gastos");
+    expect(naturalezaDeGasto(g("Insumos", 1, "2026-10-01"))).toBe("costo");
+    expect(naturalezaDeGasto(g("Laboratorio", 1, "2026-10-01"))).toBe("costo");
+    expect(naturalezaDeGasto(g("Renta", 1, "2026-10-01"))).toBe("gasto");
+    expect(naturalezaDeGasto(g("Nómina", 1, "2026-10-01"))).toBe("gasto");
+    expect(naturalezaDeGasto(g("Marketing", 1, "2026-10-01"))).toBe("gasto");
+    expect(naturalezaDeGasto(g("Inversión", 1, "2026-10-01"))).toBe("inversion");
+  });
+
+  it("la naturaleza propia del gasto manda sobre la de la categoría", async () => {
+    const { naturalezaDeGasto } = await import("../gastos");
+    expect({ ...g("Insumos", 1, "2026-10-01"), naturaleza: "inversion" as const }).toBeTruthy();
+    expect(naturalezaDeGasto({ categoria: "Insumos", naturaleza: "inversion" })).toBe("inversion");
+    expect(naturalezaDeGasto({ categoria: "Nómina", naturaleza: "costo" })).toBe("costo"); // comisiones como costo
+  });
+
+  it("suma costos, gastos e inversión del rango por separado", async () => {
+    const { calcularPorNaturaleza } = await import("../gastos");
+    const r = calcularPorNaturaleza(
+      [
+        g("Insumos", 3000, "2026-10-05"),
+        g("Renta", 8000, "2026-10-01"),
+        g("Inversión", 25000, "2026-10-10"),
+        { ...g("Nómina", 4000, "2026-10-15"), naturaleza: "costo" },
+        g("Renta", 9999, "2026-09-30"), // otro mes
+      ],
+      new Date("2026-10-01T00:00:00"),
+      new Date("2026-10-31T23:59:59")
+    );
+    expect(r).toEqual({ costos: 7000, gastos: 8000, inversion: 25000 });
+  });
+
+  it("la inversión no cuenta en fijos ni variables", () => {
+    const r = calcularFijosYVariables(
+      [g("Renta", 8000, "2026-10-01"), g("Inversión", 25000, "2026-10-10", "fijo"), g("Insumos", 2000, "2026-10-05")],
+      porCategoria,
+      new Date("2026-10-01T00:00:00"),
+      new Date("2026-10-31T23:59:59")
+    );
+    expect(r).toEqual({ fijos: 8000, variables: 2000, total: 10000 });
+  });
+});

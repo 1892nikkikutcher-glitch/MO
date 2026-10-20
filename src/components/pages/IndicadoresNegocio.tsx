@@ -128,17 +128,43 @@ export default function IndicadoresNegocio() {
             ayuda="Cobros del mes menos devoluciones. La proyección repite el ritmo de los días transcurridos hasta fin de mes."
           />
           <Tarjeta
-            titulo="Gastos"
-            valor={$(f.gastos)}
-            detalle={`Fijos ${$(f.gastosFijos)} · variables ${$(f.gastosVariables)}`}
-            ayuda="Todo lo capturado en Gastos este mes. Fijo o variable según lo que definiste en Administración → Presupuesto de gastos."
+            titulo="Costos"
+            valor={$(f.costos)}
+            detalle={f.ingresosNetos > 0 ? `${pct(f.costos / f.ingresosNetos)} de los ingresos` : "Lo que cuesta dar el servicio"}
+            ayuda="Lo que cuesta dar el servicio: insumos, laboratorio… (gastos marcados como costo en la pantalla de Gastos)."
+          />
+          <Tarjeta
+            titulo="Gastos de operación"
+            valor={$(f.gastosOperativos)}
+            detalle={`Fijos ${$(f.gastosFijos)} · variables ${$(f.gastosVariables)} (con los costos)`}
+            ayuda="Lo que cuesta operar: renta, nómina, servicios, marketing… Fijos y variables suman costos más gastos de operación; la inversión no entra."
+          />
+          <Tarjeta
+            titulo="Inversión"
+            valor={$(f.inversion)}
+            detalle={`En el año: ${$(f.inversionDelAnio)}`}
+            ayuda="Equipo, mobiliario, remodelación… Se compra una vez y rinde durante años, por eso no resta de la utilidad del mes (sí del efectivo)."
+          />
+          <Tarjeta
+            titulo="Utilidad bruta"
+            valor={$(f.utilidadBruta)}
+            detalle={f.margenBruto !== null ? `Margen bruto ${pct(f.margenBruto)} · ingresos − costos` : "Sin ingresos para medir el margen"}
+            tono={f.utilidadBruta < 0 ? "malo" : undefined}
+            ayuda="Ingresos netos menos costos: lo que deja el servicio antes de pagar la operación."
           />
           <Tarjeta
             titulo="Utilidad"
             valor={$(f.utilidad)}
-            detalle={f.margen !== null ? `Margen ${pct(f.margen)} de los ingresos` : "Sin ingresos para medir el margen"}
+            detalle={f.margen !== null ? `Margen ${pct(f.margen)} · ingresos − costos − gastos` : "Sin ingresos para medir el margen"}
             tono={f.utilidad < 0 ? "malo" : f.margen !== null && f.margen < 0.15 ? "alerta" : f.margen !== null ? "ok" : undefined}
-            ayuda="Ingresos netos menos gastos. El margen es la utilidad entre los ingresos netos. Es una utilidad operativa: no incluye impuestos."
+            ayuda="Ingresos netos menos costos y gastos de operación (utilidad operativa). No resta la inversión ni incluye impuestos."
+          />
+          <Tarjeta
+            titulo="Flujo tras inversión"
+            valor={$(f.flujoTrasInversion)}
+            detalle="Utilidad menos lo invertido en el mes"
+            tono={f.flujoTrasInversion < 0 ? "alerta" : f.inversion > 0 ? "ok" : undefined}
+            ayuda="Lo que de verdad queda en efectivo: la utilidad del mes menos la inversión del mes."
           />
           <Tarjeta
             titulo="Punto de equilibrio"
@@ -187,7 +213,7 @@ export default function IndicadoresNegocio() {
             <table className="w-full min-w-[420px] text-left text-xs text-ink">
               <thead className="text-[11px] uppercase tracking-wide text-ink/40">
                 <tr>
-                  <th className="px-3 py-2 font-medium">Estructura de gastos</th>
+                  <th className="px-3 py-2 font-medium">Costos y gastos por categoría</th>
                   <th className="px-3 py-2 font-medium">Tipo</th>
                   <th className="px-3 py-2 text-right font-medium">Monto</th>
                   <th className="px-3 py-2 text-right font-medium">% de ingresos</th>
