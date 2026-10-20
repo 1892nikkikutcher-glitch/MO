@@ -72,7 +72,7 @@ describe("costos, gastos e inversión", () => {
       new Date("2026-10-01T00:00:00"),
       new Date("2026-10-31T23:59:59")
     );
-    expect(r).toEqual({ costos: 7000, gastos: 8000, inversion: 25000 });
+    expect(r).toEqual({ costos: 7000, gastos: 8000, inversion: 25000, financieros: 0 });
   });
 
   it("la inversión no cuenta en fijos ni variables", () => {
@@ -83,5 +83,28 @@ describe("costos, gastos e inversión", () => {
       new Date("2026-10-31T23:59:59")
     );
     expect(r).toEqual({ fijos: 8000, variables: 2000, total: 10000 });
+  });
+});
+
+describe("impuestos e intereses", () => {
+  it("la categoría Impuestos e intereses es financiera y va aparte de costos, gastos e inversión", async () => {
+    const { naturalezaDeGasto, calcularPorNaturaleza } = await import("../gastos");
+    expect(naturalezaDeGasto(g("Impuestos e intereses", 1, "2026-10-01"))).toBe("financiero");
+    const r = calcularPorNaturaleza(
+      [g("Impuestos e intereses", 3000, "2026-10-05"), g("Renta", 8000, "2026-10-01"), { ...g("Otro", 500, "2026-10-06"), naturaleza: "financiero" as const }],
+      new Date("2026-10-01T00:00:00"),
+      new Date("2026-10-31T23:59:59")
+    );
+    expect(r).toEqual({ costos: 0, gastos: 8000, inversion: 0, financieros: 3500 });
+  });
+
+  it("no cuentan como fijos ni variables", () => {
+    const r = calcularFijosYVariables(
+      [g("Renta", 8000, "2026-10-01"), g("Impuestos e intereses", 3000, "2026-10-05")],
+      porCategoria,
+      new Date("2026-10-01T00:00:00"),
+      new Date("2026-10-31T23:59:59")
+    );
+    expect(r).toEqual({ fijos: 8000, variables: 0, total: 8000 });
   });
 });

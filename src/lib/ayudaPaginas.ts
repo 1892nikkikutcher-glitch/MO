@@ -242,7 +242,7 @@ export const ayudaPaginas: Record<string, AyudaPagina> = {
   },
   contabilidad: {
     titulo: "Contabilidad y finanzas",
-    resumen: "Tu contador, el resumen del mes para compartirle, los indicadores del negocio (utilidad, punto de equilibrio, utilización de bloques…), la Regla de sobres y accesos a todo lo financiero.",
+    resumen: "Tu contador, el resumen del mes para compartirle, los indicadores del negocio (ingresos, márgenes, utilidad neta, flujo de efectivo, capital de trabajo, endeudamiento, punto de equilibrio, cobranza y rentabilidad de la inversión; se calculan solos, el balance lo captura el administrador), la Regla de sobres y accesos a todo lo financiero.",
     puntos: [],
   },
   asistencia: {

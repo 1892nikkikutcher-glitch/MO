@@ -338,6 +338,7 @@ export function costosDeLaSemana(gastos: Gasto[], lunes: string): CostosSemana {
   for (const g of gastos) {
     if (!g.fecha || g.fecha < desde || g.fecha > hasta) continue;
     const naturaleza = naturalezaDeGasto(g);
+    if (naturaleza === "financiero") continue; // impuestos e intereses: debajo de la utilidad operativa
     if (naturaleza === "inversion") {
       inversion = Math.round((inversion + (Number(g.monto) || 0)) * 100) / 100;
       continue;

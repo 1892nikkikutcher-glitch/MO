@@ -10,6 +10,7 @@ import {
   type ReactNode,
 } from "react";
 import { sedesInicial, type Sede, type SedesConfig } from "@/lib/sedesBloques";
+import { balanceInicial, type BalanceConsultorio } from "@/lib/balanceConsultorio";
 import {
   arrayUnion,
   collection,
@@ -942,6 +943,9 @@ type PatientDataContextValue = {
   /** Sedes (consultorios físicos) de la clínica — solo el administrador las edita (config/*). */
   sedes: Sede[];
   setSedes: (lista: Sede[]) => void;
+  /** Balance del consultorio (efectivo, deudas…) para capital de trabajo y endeudamiento; solo el administrador lo edita. */
+  balance: BalanceConsultorio;
+  setBalance: (balance: BalanceConsultorio) => void;
   presupuestoGastos: PresupuestoGastosConfig;
   setPresupuestoGastos: (updater: Updater<PresupuestoGastosConfig>) => void;
   finanzas: FinanzasConfig;
@@ -1089,6 +1093,8 @@ export function PatientDataProvider({
   const [sedesConfig, setSedesConfig] = useFirestoreDoc<SedesConfig>(clinicUid, "sedes", sedesInicial);
   const sedes = sedesConfig.lista ?? [];
   const setSedes = (lista: Sede[]) => setSedesConfig({ lista });
+  const [balance, setBalanceDoc] = useFirestoreDoc<BalanceConsultorio>(clinicUid, "balance", balanceInicial);
+  const setBalance = (b: BalanceConsultorio) => setBalanceDoc(b);
   const [presupuestoGastos, setPresupuestoGastos] = useFirestoreDoc<PresupuestoGastosConfig>(
     clinicUid,
     "presupuestoGastos",
@@ -3247,6 +3253,8 @@ export function PatientDataProvider({
         setMetas,
         sedes,
         setSedes,
+        balance,
+        setBalance,
         presupuestoGastos,
         setPresupuestoGastos,
         finanzas,

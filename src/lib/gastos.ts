@@ -9,6 +9,7 @@ export const gastoCategoriaOptions = [
   "Marketing",
   "Otro",
   "Inversión",
+  "Impuestos e intereses",
 ] as const;
 export type GastoCategoria = (typeof gastoCategoriaOptions)[number];
 
@@ -26,13 +27,19 @@ export type Gasto = {
   naturaleza?: NaturalezaGasto;
 };
 
-/** Costo: insumos, laboratorio (lo que cuesta atender). Gasto: renta, nómina, servicios, marketing (lo que cuesta
+/** Impuestos e intereses (financiero): lo que se paga al SAT y a los bancos; quedan debajo de la utilidad operativa.
+ * Costo: insumos, laboratorio (lo que cuesta atender). Gasto: renta, nómina, servicios, marketing (lo que cuesta
  * operar). Inversión: equipo, mobiliario, remodelación (se compra una vez y rinde durante años; no resta de la
  * utilidad del mes, pero sí del efectivo). */
-export const naturalezaGastoOptions = ["costo", "gasto", "inversion"] as const;
+export const naturalezaGastoOptions = ["costo", "gasto", "inversion", "financiero"] as const;
 export type NaturalezaGasto = (typeof naturalezaGastoOptions)[number];
 
-export const etiquetaNaturaleza: Record<NaturalezaGasto, string> = { costo: "Costo", gasto: "Gasto", inversion: "Inversión" };
+export const etiquetaNaturaleza: Record<NaturalezaGasto, string> = {
+  costo: "Costo",
+  gasto: "Gasto",
+  inversion: "Inversión",
+  financiero: "Impuestos e intereses",
+};
 
 /** Naturaleza que se le da a cada categoría mientras el gasto no diga otra. */
 const naturalezaPorDefecto: Record<GastoCategoria, NaturalezaGasto> = {
@@ -44,26 +51,32 @@ const naturalezaPorDefecto: Record<GastoCategoria, NaturalezaGasto> = {
   Marketing: "gasto",
   Otro: "gasto",
   Inversión: "inversion",
+  "Impuestos e intereses": "financiero",
 };
 
 export function naturalezaDeGasto(gasto: Pick<Gasto, "categoria" | "naturaleza">): NaturalezaGasto {
-  if (gasto.naturaleza === "costo" || gasto.naturaleza === "gasto" || gasto.naturaleza === "inversion") return gasto.naturaleza;
+  if ((naturalezaGastoOptions as readonly string[]).includes(gasto.naturaleza ?? "")) return gasto.naturaleza as NaturalezaGasto;
   return naturalezaPorDefecto[gasto.categoria] ?? "gasto";
 }
 
-/** Lo gastado en el rango, separado en costos, gastos de operación e inversión. */
+/** Lo gastado en el rango, separado en costos, gastos de operación, inversión e impuestos e intereses. */
 export function calcularPorNaturaleza(
   gastos: Gasto[],
   desde: Date,
   hasta: Date
-): { costos: number; gastos: number; inversion: number } {
-  const t = { costo: 0, gasto: 0, inversion: 0 };
+): { costos: number; gastos: number; inversion: number; financieros: number } {
+  const t = { costo: 0, gasto: 0, inversion: 0, financiero: 0 };
   gastos.forEach((g) => {
     const d = new Date(`${g.fecha}T00:00:00`);
     if (d < desde || d > hasta) return;
     t[naturalezaDeGasto(g)] += g.monto;
   });
-  return { costos: redondearDinero(t.costo), gastos: redondearDinero(t.gasto), inversion: redondearDinero(t.inversion) };
+  return {
+    costos: redondearDinero(t.costo),
+    gastos: redondearDinero(t.gasto),
+    inversion: redondearDinero(t.inversion),
+    financieros: redondearDinero(t.financiero),
+  };
 }
 
 /** Sobres de gasto — clasificación fijo/variable por categoría y un
@@ -104,6 +117,7 @@ const clasificacionPorDefecto: Record<GastoCategoria, ClasificacionGasto> = {
   Marketing: "variable",
   Otro: "variable",
   Inversión: "variable",
+  "Impuestos e intereses": "variable",
 };
 
 export const presupuestoGastosInicial: PresupuestoGastosConfig = {
@@ -125,7 +139,7 @@ export function clasificacionDeGasto(
 }
 
 /** Lo gastado en el rango en costos y gastos, separado en fijo y variable (cada gasto con su propia clasificación).
- * La inversión no cuenta: no es un gasto de operación. */
+ * La inversión y los impuestos e intereses no cuentan: no son gastos de operación. */
 export function calcularFijosYVariables(
   gastos: Gasto[],
   porCategoria: Partial<Record<GastoCategoria, { clasificacion: ClasificacionGasto }>>,
@@ -137,7 +151,8 @@ export function calcularFijosYVariables(
   gastos.forEach((g) => {
     const d = new Date(`${g.fecha}T00:00:00`);
     if (d < desde || d > hasta) return;
-    if (naturalezaDeGasto(g) === "inversion") return;
+    const n = naturalezaDeGasto(g);
+    if (n === "inversion" || n === "financiero") return;
     if (clasificacionDeGasto(g, porCategoria) === "fijo") fijos += g.monto;
     else variables += g.monto;
   });

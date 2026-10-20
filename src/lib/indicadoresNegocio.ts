@@ -7,6 +7,7 @@ import type { BloqueAtencion, Sede } from "./sedesBloques";
 import { naturalezaDeGasto, type Gasto, type GastoCategoria } from "./gastos";
 import type { FinanzasConfig, PresupuestosPorEstado } from "./metas";
 import { redondearDinero } from "./dinero";
+import { calcularBalance, type BalanceConsultorio, type ResultadoBalance } from "./balanceConsultorio";
 
 type ClasificacionGasto = "fijo" | "variable";
 
@@ -42,6 +43,8 @@ export type EntradaIndicadores = {
   saldos: { totalPresupuestado: number; totalPagado: number }[];
   presupuestosPorEstado?: PresupuestosPorEstado;
   metaMensual: number;
+  /** Lo capturado en el balance (efectivo, deudas…); sin esto, capital de trabajo y endeudamiento quedan sin calcular. */
+  balance?: BalanceConsultorio;
 };
 
 // ---------- Fechas ----------
@@ -102,8 +105,34 @@ export type IndicadoresFinanzas = {
   margenBruto: number | null;
   /** Ingresos netos menos costos y gastos de operación (utilidad operativa). */
   utilidad: number;
-  /** Utilidad menos la inversión del mes: lo que de verdad queda en efectivo. */
+  /** Utilidad menos la inversión del mes. */
   flujoTrasInversion: number;
+  /** Impuestos e intereses del mes (debajo de la utilidad operativa). */
+  financieros: number;
+  /** Utilidad operativa menos impuestos e intereses. */
+  utilidadNeta: number;
+  /** Utilidad neta entre ingresos netos; `null` si no hubo ingresos. */
+  margenNeto: number | null;
+  /** Lo que entró en el mes (cobros netos de devoluciones). */
+  entradasEfectivo: number;
+  /** Lo que salió en el mes: costos, gastos, inversión, impuestos e intereses. */
+  salidasEfectivo: number;
+  /** Entradas menos salidas de efectivo del mes. */
+  flujoEfectivo: number;
+  /** Todo lo registrado como inversión hasta el fin del mes elegido. */
+  inversionAcumulada: number;
+  /** Rendimiento de lo invertido: utilidad neta de los últimos 12 meses entre la inversión acumulada. `null` si no hay inversión. */
+  rentabilidadInversion: {
+    rendimiento: number;
+    utilidadNeta12m: number;
+    mesesConDatos: number;
+    /** Meses que tardaría en recuperarse la inversión con la utilidad neta mensual promedio; `null` si esa utilidad no es positiva. */
+    mesesParaRecuperar: number | null;
+  } | null;
+  /** Cuántos días de cobros equivale lo que te deben (con el promedio diario de los últimos 90 días); `null` si no hubo cobros. */
+  diasDeCobranza: number | null;
+  /** Capital de trabajo, endeudamiento… (con lo capturado en el balance). */
+  balance: ResultadoBalance;
   /** Utilidad entre ingresos netos; `null` si no hubo ingresos. */
   margen: number | null;
   /** Gastos del mes entre las horas trabajadas; `null` si no hubo horas trabajadas. */
@@ -176,7 +205,15 @@ export function calcularIndicadores(e: EntradaIndicadores): Indicadores {
     e.gastos.filter((g) => naturalezaDeGasto(g) === "inversion" && g.fecha >= inicioAnio && g.fecha <= ultimo).reduce((a, g) => a + (Number(g.monto) || 0), 0)
   );
   const costos = redondearDinero(delMes.filter((g) => naturalezaDeGasto(g) === "costo").reduce((a, g) => a + (Number(g.monto) || 0), 0));
-  const operativos = delMes.filter((g) => naturalezaDeGasto(g) !== "inversion");
+  const financieros = redondearDinero(delMes.filter((g) => naturalezaDeGasto(g) === "financiero").reduce((a, g) => a + (Number(g.monto) || 0), 0));
+  const inversionAcumulada = redondearDinero(
+    e.gastos.filter((g) => naturalezaDeGasto(g) === "inversion" && g.fecha <= ultimo).reduce((a, g) => a + (Number(g.monto) || 0), 0)
+  );
+  // Costos y gastos de operación: la inversión y los impuestos e intereses van aparte.
+  const operativos = delMes.filter((g) => {
+    const n = naturalezaDeGasto(g);
+    return n !== "inversion" && n !== "financiero";
+  });
 
   // Cada gasto es fijo o variable según lo que se le puso; sin eso, lo de su categoría (por defecto, variable).
   const porCategoria = new Map<string, { monto: number; fijo: number; variable: number }>();
@@ -206,6 +243,11 @@ export function calcularIndicadores(e: EntradaIndicadores): Indicadores {
   const utilidad = redondearDinero(ingresosNetos - gastos);
   const flujoTrasInversion = redondearDinero(utilidad - inversion);
   const margen = ingresosNetos > 0 ? utilidad / ingresosNetos : null;
+  const utilidadNeta = redondearDinero(utilidad - financieros);
+  const margenNeto = ingresosNetos > 0 ? utilidadNeta / ingresosNetos : null;
+  const entradasEfectivo = ingresosNetos;
+  const salidasEfectivo = redondearDinero(gastos + inversion + financieros);
+  const flujoEfectivo = redondearDinero(entradasEfectivo - salidasEfectivo);
 
   // Punto de equilibrio: gastos fijos / (1 − peso del gasto variable sobre el ingreso).
   let puntoEquilibrio: IndicadoresFinanzas["puntoEquilibrio"] = null;
@@ -222,6 +264,40 @@ export function calcularIndicadores(e: EntradaIndicadores): Indicadores {
 
   const deudas = e.saldos.map((s) => redondearDinero(s.totalPresupuestado - s.totalPagado)).filter((d) => d > 0);
   const cuentasPorCobrar = { total: redondearDinero(deudas.reduce((a, d) => a + d, 0)), pacientes: deudas.length };
+
+  // Cobranza: días de cobros que representa lo que te deben, con el promedio diario de los últimos 90 días.
+  const topeCobranza = e.hoyISO < ultimo ? e.hoyISO : ultimo;
+  const dias90 = Array.from({ length: 90 }, (_, i) => sumarDias(topeCobranza, -i));
+  const cobros90 = redondearDinero(sumaPorFecha(e.finanzas.porFecha, dias90) - sumaPorFecha(e.finanzas.devolucionesPorFecha, dias90));
+  const diasDeCobranza = cobros90 > 0 ? (cuentasPorCobrar.total / (cobros90 / 90)) : null;
+
+  // Rentabilidad de la inversión: utilidad neta de los últimos 12 meses entre lo invertido hasta hoy.
+  let utilidadNeta12m = 0;
+  let mesesConDatos = 0;
+  for (let k = 0; k < 12; k++) {
+    const m = diasDelMes(mesDesplazado(e.mes, -k));
+    const ing = sumaPorFecha(e.finanzas.porFecha, m.dias) - sumaPorFecha(e.finanzas.devolucionesPorFecha, m.dias);
+    const egr = e.gastos
+      .filter((g) => g.fecha >= m.primero && g.fecha <= m.ultimo && naturalezaDeGasto(g) !== "inversion")
+      .reduce((a, g) => a + (Number(g.monto) || 0), 0);
+    if (ing !== 0 || egr !== 0) {
+      mesesConDatos += 1;
+      utilidadNeta12m += ing - egr;
+    }
+  }
+  utilidadNeta12m = redondearDinero(utilidadNeta12m);
+  const promedioMensual = mesesConDatos > 0 ? utilidadNeta12m / mesesConDatos : 0;
+  const rentabilidadInversion =
+    inversionAcumulada > 0
+      ? {
+          rendimiento: utilidadNeta12m / inversionAcumulada,
+          utilidadNeta12m,
+          mesesConDatos,
+          mesesParaRecuperar: promedioMensual > 0 ? inversionAcumulada / promedioMensual : null,
+        }
+      : null;
+
+  const balance = calcularBalance(e.balance, cuentasPorCobrar.total, inversionAcumulada);
 
   const porMedico = new Map<string, number>();
   for (const d of dias) for (const [nombre, monto] of Object.entries(e.finanzas.porFechaYMedico?.[d] ?? {})) porMedico.set(nombre, (porMedico.get(nombre) ?? 0) + monto);
@@ -287,6 +363,16 @@ export function calcularIndicadores(e: EntradaIndicadores): Indicadores {
       margenBruto,
       utilidad,
       flujoTrasInversion,
+      financieros,
+      utilidadNeta,
+      margenNeto,
+      entradasEfectivo,
+      salidasEfectivo,
+      flujoEfectivo,
+      inversionAcumulada,
+      rentabilidadInversion,
+      diasDeCobranza,
+      balance,
       margen,
       costoPorHoraTrabajada,
       costoPorHoraDisponible,

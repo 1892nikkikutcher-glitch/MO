@@ -7,6 +7,7 @@ import { formatCurrency } from "@/lib/patientData";
 import { calcularIndicadores, diasDelMes, mesDesplazado } from "@/lib/indicadoresNegocio";
 import { rentabilidadPorTratamiento } from "@/lib/rentabilidadTratamientos";
 import { gastoCategoriaOptions, type GastoCategoria } from "@/lib/gastos";
+import { balanceInicial, type BalanceConsultorio } from "@/lib/balanceConsultorio";
 
 function hoyISO(): string {
   const d = new Date();
@@ -15,6 +16,7 @@ function hoyISO(): string {
 
 const pct = (n: number) => `${n < 0 ? "−" : ""}${Math.abs(Math.round(n * 100))}%`;
 const pctConSigno = (n: number) => `${n >= 0 ? "+" : "−"}${Math.abs(Math.round(n * 100))}%`;
+const dias = (n: number) => `${n.toLocaleString("es-MX", { maximumFractionDigits: 0 })} ${Math.round(n) === 1 ? "día" : "días"}`;
 const horas = (n: number) => `${n.toLocaleString("es-MX", { maximumFractionDigits: 1 })} h`;
 
 type Tono = "ok" | "alerta" | "malo";
@@ -30,9 +32,87 @@ function Tarjeta({ titulo, valor, detalle, tono, ayuda }: { titulo: string; valo
   );
 }
 
+const CAMPOS_BALANCE: { clave: keyof BalanceConsultorio; titulo: string; ayuda: string }[] = [
+  { clave: "efectivo", titulo: "Efectivo en caja y bancos", ayuda: "Lo que tienes hoy disponible." },
+  { clave: "inventario", titulo: "Inventario de insumos", ayuda: "Materiales en existencia, a lo que costaron." },
+  { clave: "otrosCirculantes", titulo: "Otros activos de corto plazo", ayuda: "Lo que se convierte en dinero en menos de un año (sin contar lo que te deben los pacientes: eso MO lo toma solo)." },
+  { clave: "cuentasPorPagar", titulo: "Cuentas por pagar", ayuda: "Lo que debes a proveedores y laboratorios, a menos de un año." },
+  { clave: "deudaCortoPlazo", titulo: "Deuda a corto plazo", ayuda: "Tarjetas, préstamos y otras deudas a menos de un año." },
+  { clave: "deudaLargoPlazo", titulo: "Deuda a largo plazo", ayuda: "Créditos a más de un año." },
+  { clave: "valorEquipo", titulo: "Valor del equipo y mobiliario", ayuda: "Opcional. Si lo dejas vacío, MO usa todo lo que has registrado como inversión." },
+];
+
+/** Lo que MO no puede saber solo: efectivo en bancos, deudas y lo que se debe a proveedores. Lo demás sale de los datos. */
+function BalanceForm({ balance, onGuardar, editable }: { balance: BalanceConsultorio; onGuardar: (b: BalanceConsultorio) => void; editable: boolean }) {
+  const [valores, setValores] = useState<Record<string, string>>(() =>
+    Object.fromEntries(CAMPOS_BALANCE.map((c) => [c.clave, balance[c.clave] ? String(balance[c.clave]) : ""]))
+  );
+  const [guardado, setGuardado] = useState(false);
+  const guardar = () => {
+    const num = (clave: string) => {
+      const n = Number(valores[clave]);
+      return Number.isFinite(n) && n > 0 ? n : 0;
+    };
+    onGuardar({
+      efectivo: num("efectivo"),
+      inventario: num("inventario"),
+      otrosCirculantes: num("otrosCirculantes"),
+      cuentasPorPagar: num("cuentasPorPagar"),
+      deudaCortoPlazo: num("deudaCortoPlazo"),
+      deudaLargoPlazo: num("deudaLargoPlazo"),
+      valorEquipo: valores.valorEquipo.trim() === "" ? null : num("valorEquipo"),
+      actualizadoEl: new Date().toISOString(),
+    });
+    setGuardado(true);
+  };
+  return (
+    <details className="mt-3 rounded-xl border border-edge/10 bg-inset">
+      <summary className="cursor-pointer list-none px-4 py-3 text-xs font-semibold text-ink/70">
+        Balance del consultorio · {balance.actualizadoEl ? `actualizado el ${new Date(balance.actualizadoEl).toLocaleDateString("es-MX")}` : "sin capturar"}
+        <span className="ml-2 font-normal text-ink/40">lo que se tiene y lo que se debe, para el capital de trabajo y el endeudamiento</span>
+      </summary>
+      <div className="space-y-3 px-4 pb-4">
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
+          {CAMPOS_BALANCE.map((c) => (
+            <label key={c.clave} className="block text-xs text-ink/60" title={c.ayuda}>
+              {c.titulo}
+              <input
+                type="number"
+                min={0}
+                value={valores[c.clave]}
+                disabled={!editable}
+                onChange={(e) => {
+                  setValores((v) => ({ ...v, [c.clave]: e.target.value }));
+                  setGuardado(false);
+                }}
+                placeholder={c.clave === "valorEquipo" ? "Usar lo invertido" : "0"}
+                className="mt-1 w-full rounded-lg border border-edge/10 bg-field px-3 py-2 text-sm text-ink outline-none focus:border-accent/60 disabled:opacity-60"
+              />
+              <span className="mt-0.5 block text-[11px] text-ink/35">{c.ayuda}</span>
+            </label>
+          ))}
+        </div>
+        <p className="text-[11px] text-ink/40">
+          Las cuentas por cobrar (lo que te deben los pacientes) y el equipo (lo registrado como inversión) los toma MO solo. Esto solo lo ve y edita el administrador.
+        </p>
+        {editable ? (
+          <div className="flex items-center gap-3">
+            <button onClick={guardar} className="rounded-lg border border-accent/60 bg-accent/15 px-4 py-2 text-sm font-semibold text-accent transition-opacity hover:bg-accent/25">
+              Guardar balance
+            </button>
+            {guardado && <span className="text-sm text-success">Balance guardado</span>}
+          </div>
+        ) : (
+          <p className="text-[11px] text-warning">Solo el administrador puede cambiar el balance.</p>
+        )}
+      </div>
+    </details>
+  );
+}
+
 /** Indicadores empresariales del mes: lo que hay que mirar para saber si el consultorio es negocio sano. */
 export default function IndicadoresNegocio() {
-  const { puedeVerFinanzas, finanzas, gastos, presupuestoGastos, citas, recursos, sedes, patients, saldosPendientes, estadisticas, metas, procedimientos } = usePatientData();
+  const { puedeVerFinanzas, finanzas, gastos, presupuestoGastos, citas, recursos, sedes, patients, saldosPendientes, estadisticas, metas, procedimientos, balance, setBalance, miRol } = usePatientData();
   const { oculto } = usePrivacidad();
   const hoy = hoyISO();
   const [mes, setMes] = useState(() => mesDesplazado(hoy, 0));
@@ -55,8 +135,9 @@ export default function IndicadoresNegocio() {
         saldos: Object.values(saldosPendientes.porPaciente ?? {}),
         presupuestosPorEstado: estadisticas.presupuestosPorEstado,
         metaMensual: metas.metaMensual,
+        balance,
       }),
-    [mes, hoy, finanzas, gastos, presupuestoGastos, citas, recursos, sedes, patients, saldosPendientes, estadisticas, metas]
+    [mes, hoy, finanzas, gastos, presupuestoGastos, citas, recursos, sedes, patients, saldosPendientes, estadisticas, metas, balance]
   );
 
   const tratamientos = useMemo(() => {
@@ -112,100 +193,183 @@ export default function IndicadoresNegocio() {
         </div>
       </div>
 
-      <div>
-        <h4 className="mb-2 text-xs font-semibold uppercase tracking-wide text-ink/40">Finanzas</h4>
-        <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
-          <Tarjeta
-            titulo="Ingresos netos"
-            valor={$(f.ingresosNetos)}
-            detalle={[
-              f.variacionIngresos !== null ? `${pctConSigno(f.variacionIngresos)} vs mes anterior` : "Sin ingresos el mes anterior",
-              f.proyeccionCierre !== null && f.ingresosNetos > 0 ? `Proyección al cierre: ${$(f.proyeccionCierre)}` : "",
-            ]
-              .filter(Boolean)
-              .join(" · ")}
-            tono={f.variacionIngresos !== null ? (f.variacionIngresos >= 0 ? "ok" : "alerta") : undefined}
-            ayuda="Cobros del mes menos devoluciones. La proyección repite el ritmo de los días transcurridos hasta fin de mes."
-          />
-          <Tarjeta
-            titulo="Costos"
-            valor={$(f.costos)}
-            detalle={f.ingresosNetos > 0 ? `${pct(f.costos / f.ingresosNetos)} de los ingresos` : "Lo que cuesta dar el servicio"}
-            ayuda="Lo que cuesta dar el servicio: insumos, laboratorio… (gastos marcados como costo en la pantalla de Gastos)."
-          />
-          <Tarjeta
-            titulo="Gastos de operación"
-            valor={$(f.gastosOperativos)}
-            detalle={`Fijos ${$(f.gastosFijos)} · variables ${$(f.gastosVariables)} (con los costos)`}
-            ayuda="Lo que cuesta operar: renta, nómina, servicios, marketing… Fijos y variables suman costos más gastos de operación; la inversión no entra."
-          />
-          <Tarjeta
-            titulo="Inversión"
-            valor={$(f.inversion)}
-            detalle={`En el año: ${$(f.inversionDelAnio)}`}
-            ayuda="Equipo, mobiliario, remodelación… Se compra una vez y rinde durante años, por eso no resta de la utilidad del mes (sí del efectivo)."
-          />
-          <Tarjeta
-            titulo="Utilidad bruta"
-            valor={$(f.utilidadBruta)}
-            detalle={f.margenBruto !== null ? `Margen bruto ${pct(f.margenBruto)} · ingresos − costos` : "Sin ingresos para medir el margen"}
-            tono={f.utilidadBruta < 0 ? "malo" : undefined}
-            ayuda="Ingresos netos menos costos: lo que deja el servicio antes de pagar la operación."
-          />
-          <Tarjeta
-            titulo="Utilidad"
-            valor={$(f.utilidad)}
-            detalle={f.margen !== null ? `Margen ${pct(f.margen)} · ingresos − costos − gastos` : "Sin ingresos para medir el margen"}
-            tono={f.utilidad < 0 ? "malo" : f.margen !== null && f.margen < 0.15 ? "alerta" : f.margen !== null ? "ok" : undefined}
-            ayuda="Ingresos netos menos costos y gastos de operación (utilidad operativa). No resta la inversión ni incluye impuestos."
-          />
-          <Tarjeta
-            titulo="Flujo tras inversión"
-            valor={$(f.flujoTrasInversion)}
-            detalle="Utilidad menos lo invertido en el mes"
-            tono={f.flujoTrasInversion < 0 ? "alerta" : f.inversion > 0 ? "ok" : undefined}
-            ayuda="Lo que de verdad queda en efectivo: la utilidad del mes menos la inversión del mes."
-          />
-          <Tarjeta
-            titulo="Punto de equilibrio"
-            valor={f.puntoEquilibrio ? $(f.puntoEquilibrio.ingresoNecesario) : "—"}
-            detalle={
-              f.puntoEquilibrio
-                ? f.puntoEquilibrio.superado
-                  ? "Ya cubriste tus gastos fijos este mes"
-                  : `Te faltan ${$(f.puntoEquilibrio.faltan)} de ingresos`
-                : "Necesita ingresos y gastos fijos del mes"
-            }
-            tono={f.puntoEquilibrio ? (f.puntoEquilibrio.superado ? "ok" : "alerta") : undefined}
-            ayuda="Ingreso mensual con el que se cubren los gastos fijos, suponiendo que los gastos variables pesan lo mismo sobre el ingreso que este mes: fijos ÷ (1 − variables ÷ ingresos)."
-          />
-          <Tarjeta
-            titulo="Ticket promedio"
-            valor={f.ticketPromedio !== null ? $(f.ticketPromedio) : "—"}
-            detalle={`${f.pagos} ${f.pagos === 1 ? "pago" : "pagos"} en el mes`}
-            ayuda="Cobros brutos del mes entre el número de pagos registrados."
-          />
-          <Tarjeta
-            titulo="Cuentas por cobrar"
-            valor={$(f.cuentasPorCobrar.total)}
-            detalle={`${f.cuentasPorCobrar.pacientes} ${f.cuentasPorCobrar.pacientes === 1 ? "paciente debe" : "pacientes deben"} (a hoy)`}
-            tono={f.cuentasPorCobrar.total > 0 ? "alerta" : undefined}
-            ayuda="Suma de lo presupuestado menos lo pagado de quien todavía debe. Sale de Saldos pendientes: refleja la realidad desde que se activó ese resumen."
-          />
-          <Tarjeta
-            titulo="Meta del mes"
-            valor={f.cumplimientoMeta !== null ? pct(f.cumplimientoMeta) : "Sin meta"}
-            detalle={f.cumplimientoMeta !== null ? `de ${$(metas.metaMensual)}` : "Defínela en Administración → Metas"}
-            tono={f.cumplimientoMeta !== null ? (f.cumplimientoMeta >= 1 ? "ok" : undefined) : undefined}
-            ayuda="Ingresos netos del mes entre tu meta mensual."
-          />
-          <Tarjeta
-            titulo="Dependencia de un médico"
-            valor={f.concentracionMedico ? pct(f.concentracionMedico.porcentaje) : "—"}
-            detalle={f.concentracionMedico ? `de lo cobrado lo generó ${f.concentracionMedico.nombre}` : "Sin cobros por médico este mes"}
-            tono={f.concentracionMedico && f.concentracionMedico.porcentaje > 0.7 ? "alerta" : undefined}
-            ayuda="Qué parte de los cobros del mes corresponde al médico que más cobró. Si es muy alta, el negocio depende de una sola persona."
-          />
+      <div className="space-y-5">
+        <div>
+          <h4 className="mb-2 text-xs font-semibold uppercase tracking-wide text-ink/40">1 · Resultados del mes</h4>
+          <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+            <Tarjeta
+              titulo="Ingresos por ventas"
+              valor={$(f.ingresosNetos)}
+              detalle={[
+                f.variacionIngresos !== null ? `${pctConSigno(f.variacionIngresos)} vs mes anterior` : "Sin ingresos el mes anterior",
+                f.proyeccionCierre !== null && f.ingresosNetos > 0 ? `Proyección al cierre: ${$(f.proyeccionCierre)}` : "",
+              ]
+                .filter(Boolean)
+                .join(" · ")}
+              tono={f.variacionIngresos !== null ? (f.variacionIngresos >= 0 ? "ok" : "alerta") : undefined}
+              ayuda="Cuánto genera el consultorio y si crece: cobros del mes menos devoluciones. La proyección repite el ritmo de los días transcurridos hasta fin de mes."
+            />
+            <Tarjeta
+              titulo="Costos directos"
+              valor={$(f.costos)}
+              detalle={f.ingresosNetos > 0 ? `${pct(f.costos / f.ingresosNetos)} de los ingresos` : "Lo que cuesta dar el servicio"}
+              ayuda="Lo que cuesta dar el servicio: insumos, laboratorio… (gastos marcados como costo en la pantalla de Gastos)."
+            />
+            <Tarjeta
+              titulo="Margen bruto"
+              valor={f.margenBruto !== null ? pct(f.margenBruto) : "—"}
+              detalle={`Utilidad bruta ${$(f.utilidadBruta)} · (ventas − costos directos) ÷ ventas`}
+              tono={f.utilidadBruta < 0 ? "malo" : undefined}
+              ayuda="Cuánto queda después de cubrir el costo directo del servicio: (ventas − costos directos) ÷ ventas × 100."
+            />
+            <Tarjeta
+              titulo="Gastos de operación"
+              valor={$(f.gastosOperativos)}
+              detalle={`Con los costos: fijos ${$(f.gastosFijos)} · variables ${$(f.gastosVariables)}`}
+              ayuda="Lo que cuesta operar: renta, nómina, servicios, marketing… Fijos y variables suman costos más gastos de operación; la inversión, los impuestos y los intereses no entran."
+            />
+            <Tarjeta
+              titulo="Utilidad operativa"
+              valor={$(f.utilidad)}
+              detalle={f.margen !== null ? `Margen operativo ${pct(f.margen)} · antes de intereses e impuestos` : "Sin ingresos para medir el margen"}
+              tono={f.utilidad < 0 ? "malo" : f.margen !== null && f.margen < 0.15 ? "alerta" : f.margen !== null ? "ok" : undefined}
+              ayuda="Si la operación es rentable antes de intereses e impuestos: utilidad bruta − gastos de operación. No resta la inversión."
+            />
+            <Tarjeta
+              titulo="Impuestos e intereses"
+              valor={$(f.financieros)}
+              detalle={f.financieros > 0 ? "Lo que se paga al SAT y a los bancos" : "Regístralos en Gastos (categoría Impuestos e intereses)"}
+              ayuda="Impuestos e intereses del mes, capturados en Gastos con la categoría Impuestos e intereses. Quedan debajo de la utilidad operativa."
+            />
+            <Tarjeta
+              titulo="Utilidad neta"
+              valor={$(f.utilidadNeta)}
+              detalle="Utilidad operativa − impuestos e intereses"
+              tono={f.utilidadNeta < 0 ? "malo" : undefined}
+              ayuda="Lo que queda al final: utilidad operativa menos impuestos e intereses."
+            />
+            <Tarjeta
+              titulo="Margen neto"
+              valor={f.margenNeto !== null ? pct(f.margenNeto) : "—"}
+              detalle="Qué parte de cada peso vendido es ganancia final"
+              tono={f.margenNeto !== null ? (f.margenNeto < 0 ? "malo" : f.margenNeto < 0.1 ? "alerta" : "ok") : undefined}
+              ayuda="Utilidad neta ÷ ventas × 100."
+            />
+          </div>
+        </div>
+
+        <div>
+          <h4 className="mb-2 text-xs font-semibold uppercase tracking-wide text-ink/40">2 · Efectivo y balance</h4>
+          <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+            <Tarjeta
+              titulo="Flujo de efectivo"
+              valor={$(f.flujoEfectivo)}
+              detalle={`Entró ${$(f.entradasEfectivo)} · salió ${$(f.salidasEfectivo)}`}
+              tono={f.flujoEfectivo < 0 ? "alerta" : "ok"}
+              ayuda="Cuánto dinero entra y sale de verdad: cobros netos del mes menos todo lo que salió (costos, gastos, inversión, impuestos e intereses). Determina la capacidad de pagar."
+            />
+            <Tarjeta
+              titulo="Capital de trabajo"
+              valor={f.balance.capturado ? $(f.balance.capitalTrabajo) : "—"}
+              detalle={
+                f.balance.capturado
+                  ? `Circulante ${$(f.balance.activoCirculante)} − pasivo ${$(f.balance.pasivoCirculante)}${f.balance.razonCirculante !== null ? ` · liquidez ${f.balance.razonCirculante.toFixed(1)}` : ""}`
+                  : "Captura tu balance (abajo)"
+              }
+              tono={f.balance.capturado ? (f.balance.capitalTrabajo < 0 ? "malo" : "ok") : undefined}
+              ayuda="Qué recursos de corto plazo quedan después de cubrir las obligaciones de corto plazo: activo circulante (efectivo, inventario, otros y lo que te deben los pacientes) − pasivo circulante (proveedores y deudas a menos de un año)."
+            />
+            <Tarjeta
+              titulo="Endeudamiento"
+              valor={f.balance.capturado && f.balance.endeudamiento !== null ? pct(f.balance.endeudamiento) : "—"}
+              detalle={f.balance.capturado ? `Pasivos ${$(f.balance.pasivosTotales)} ÷ activos ${$(f.balance.activosTotales)}` : "Captura tu balance (abajo)"}
+              tono={f.balance.capturado && f.balance.endeudamiento !== null ? (f.balance.endeudamiento > 0.6 ? "malo" : f.balance.endeudamiento > 0.4 ? "alerta" : "ok") : undefined}
+              ayuda="Qué proporción de lo que tienes se financia con deuda y otras obligaciones: pasivos totales ÷ activos totales × 100. El equipo se toma de lo registrado como inversión, salvo que captures su valor."
+            />
+            <Tarjeta
+              titulo="Inversión"
+              valor={$(f.inversion)}
+              detalle={`En el año: ${$(f.inversionDelAnio)} · acumulada: ${$(f.inversionAcumulada)}`}
+              ayuda="Equipo, mobiliario, remodelación… Se compra una vez y rinde durante años, por eso no resta de la utilidad del mes (sí del efectivo)."
+            />
+          </div>
+          <BalanceForm balance={balance} onGuardar={setBalance} editable={miRol === "admin"} />
+        </div>
+
+        <div>
+          <h4 className="mb-2 text-xs font-semibold uppercase tracking-wide text-ink/40">3 · Equilibrio y cobranza</h4>
+          <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+            <Tarjeta
+              titulo="Punto de equilibrio"
+              valor={f.puntoEquilibrio ? $(f.puntoEquilibrio.ingresoNecesario) : "—"}
+              detalle={
+                f.puntoEquilibrio
+                  ? f.puntoEquilibrio.superado
+                    ? "Ya cubriste tus gastos fijos este mes"
+                    : `Te faltan ${$(f.puntoEquilibrio.faltan)} de ingresos`
+                  : "Necesita ingresos y gastos fijos del mes"
+              }
+              tono={f.puntoEquilibrio ? (f.puntoEquilibrio.superado ? "ok" : "alerta") : undefined}
+              ayuda="Cuánto necesitas vender para cubrir tus costos sin ganar ni perder: costos fijos ÷ margen de contribución, es decir fijos ÷ (1 − variables ÷ ingresos)."
+            />
+            <Tarjeta
+              titulo="Cuentas por cobrar"
+              valor={$(f.cuentasPorCobrar.total)}
+              detalle={`${f.cuentasPorCobrar.pacientes} ${f.cuentasPorCobrar.pacientes === 1 ? "paciente debe" : "pacientes deben"} (a hoy)`}
+              tono={f.cuentasPorCobrar.total > 0 ? "alerta" : undefined}
+              ayuda="Cuánto te deben: lo presupuestado menos lo pagado de quien todavía debe. Sale de Saldos pendientes: refleja la realidad desde que se activó ese resumen."
+            />
+            <Tarjeta
+              titulo="Días de cobranza"
+              valor={f.diasDeCobranza !== null ? dias(f.diasDeCobranza) : "—"}
+              detalle={f.diasDeCobranza !== null ? "Lo que te deben, en días de cobros" : "Sin cobros en los últimos 90 días"}
+              tono={f.diasDeCobranza !== null ? (f.diasDeCobranza > 45 ? "malo" : f.diasDeCobranza > 20 ? "alerta" : "ok") : undefined}
+              ayuda="Cuánto tardas en convertir lo que te deben en dinero: cuentas por cobrar ÷ cobros promedio por día de los últimos 90 días. Es una aproximación con tus cobros, no con ventas a crédito."
+            />
+            <Tarjeta
+              titulo="Ticket promedio"
+              valor={f.ticketPromedio !== null ? $(f.ticketPromedio) : "—"}
+              detalle={`${f.pagos} ${f.pagos === 1 ? "pago" : "pagos"} en el mes`}
+              ayuda="Cobros brutos del mes entre el número de pagos registrados."
+            />
+          </div>
+        </div>
+
+        <div>
+          <h4 className="mb-2 text-xs font-semibold uppercase tracking-wide text-ink/40">4 · Rentabilidad de la inversión y metas</h4>
+          <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+            <Tarjeta
+              titulo="Rentabilidad de la inversión"
+              valor={f.rentabilidadInversion ? pct(f.rentabilidadInversion.rendimiento) : "—"}
+              detalle={
+                f.rentabilidadInversion
+                  ? `Utilidad neta de 12 meses ${$(f.rentabilidadInversion.utilidadNeta12m)} (${f.rentabilidadInversion.mesesConDatos} ${f.rentabilidadInversion.mesesConDatos === 1 ? "mes con datos" : "meses con datos"})`
+                  : "Registra tu inversión en Gastos (categoría Inversión)"
+              }
+              tono={f.rentabilidadInversion ? (f.rentabilidadInversion.rendimiento < 0 ? "malo" : "ok") : undefined}
+              ayuda="Qué rendimiento produce el capital invertido: utilidad neta de los últimos 12 meses ÷ inversión acumulada × 100. Con pocos meses de datos se queda corto."
+            />
+            <Tarjeta
+              titulo="Recuperación de la inversión"
+              valor={f.rentabilidadInversion?.mesesParaRecuperar != null ? `${f.rentabilidadInversion.mesesParaRecuperar.toFixed(1)} meses` : "—"}
+              detalle={f.rentabilidadInversion ? `Inversión acumulada ${$(f.inversionAcumulada)}` : "Sin inversión registrada"}
+              ayuda="En cuántos meses se recupera lo invertido con la utilidad neta mensual promedio de los últimos 12 meses."
+            />
+            <Tarjeta
+              titulo="Meta del mes"
+              valor={f.cumplimientoMeta !== null ? pct(f.cumplimientoMeta) : "Sin meta"}
+              detalle={f.cumplimientoMeta !== null ? `de ${$(metas.metaMensual)}` : "Defínela en Administración → Metas"}
+              tono={f.cumplimientoMeta !== null ? (f.cumplimientoMeta >= 1 ? "ok" : undefined) : undefined}
+              ayuda="Ingresos netos del mes entre tu meta mensual."
+            />
+            <Tarjeta
+              titulo="Dependencia de un médico"
+              valor={f.concentracionMedico ? pct(f.concentracionMedico.porcentaje) : "—"}
+              detalle={f.concentracionMedico ? `de lo cobrado lo generó ${f.concentracionMedico.nombre}` : "Sin cobros por médico este mes"}
+              tono={f.concentracionMedico && f.concentracionMedico.porcentaje > 0.7 ? "alerta" : undefined}
+              ayuda="Qué parte de los cobros del mes corresponde al médico que más cobró. Si es muy alta, el negocio depende de una sola persona."
+            />
+          </div>
         </div>
 
         {f.gastosPorCategoria.length > 0 && (

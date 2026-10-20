@@ -322,3 +322,66 @@ describe("costos, gastos de operación e inversión", () => {
     expect(x.costoPorHoraTrabajada).toBe(1500);
   });
 });
+
+describe("indicadores de resultados, efectivo, cobranza y rentabilidad", () => {
+  const conTodo = base({
+    gastos: [
+      gasto("Insumos", 6000, "2026-10-08"), // costo
+      gasto("Laboratorio", 4000, "2026-10-09"), // costo
+      gasto("Renta", 8000, "2026-10-01"), // gasto
+      gasto("Nómina", 12000, "2026-10-15"), // gasto
+      gasto("Impuestos e intereses", 3000, "2026-10-20"), // financiero
+      gasto("Inversión", 30000, "2026-10-12"), // inversión del mes
+      gasto("Inversión", 50000, "2026-03-05"), // inversión anterior
+    ],
+    saldos: [{ totalPresupuestado: 9000, totalPagado: 0 }],
+  });
+  const r = calcularIndicadores(conTodo).finanzas;
+
+  it("utilidad neta y margen neto: debajo de la utilidad operativa van los impuestos e intereses", () => {
+    expect(r.utilidad).toBe(18000); // 48,000 − 30,000 (costos y gastos de operación)
+    expect(r.financieros).toBe(3000);
+    expect(r.utilidadNeta).toBe(15000);
+    expect(r.margenNeto).toBeCloseTo(15000 / 48000, 5);
+    // Los impuestos e intereses no mueven la utilidad operativa ni el gasto de operación.
+    expect(r.gastos).toBe(30000);
+  });
+
+  it("flujo de efectivo: entradas menos todas las salidas, incluida la inversión y los impuestos", () => {
+    expect(r.entradasEfectivo).toBe(48000);
+    expect(r.salidasEfectivo).toBe(63000); // 30,000 + 30,000 inversión + 3,000 impuestos
+    expect(r.flujoEfectivo).toBe(-15000);
+  });
+
+  it("inversión acumulada, rentabilidad y meses para recuperarla", () => {
+    expect(r.inversionAcumulada).toBe(80000);
+    // Meses con datos: octubre (ingresos 48,000 − egresos 33,000 = 15,000) y septiembre (ingresos 35,000, sin gastos en este ejemplo). Las inversiones no cuentan como egreso.
+    expect(r.rentabilidadInversion?.mesesConDatos).toBe(2);
+    expect(r.rentabilidadInversion?.utilidadNeta12m).toBe(15000 + 35000);
+    expect(r.rentabilidadInversion?.rendimiento).toBeCloseTo(50000 / 80000, 5);
+    expect(r.rentabilidadInversion?.mesesParaRecuperar).toBeCloseTo(80000 / 25000, 4);
+  });
+
+  it("sin inversión no hay rentabilidad que calcular", () => {
+    expect(calcularIndicadores(base()).finanzas.rentabilidadInversion).toBeNull();
+  });
+
+  it("días de cobranza: lo que te deben entre el promedio diario de cobros de los últimos 90 días", () => {
+    // Cobros netos 90 días hasta el 20-oct: 20,000 + 30,000 − 2,000 + 40,000 − 5,000 (sept 10) = 83,000 → 922.2 al día; deben 9,000.
+    expect(r.diasDeCobranza).toBeCloseTo(9000 / (83000 / 90), 3);
+    expect(calcularIndicadores(base({ finanzas: { porFecha: {} } })).finanzas.diasDeCobranza).toBeNull();
+  });
+
+  it("capital de trabajo y endeudamiento salen del balance capturado y de lo que se debe cobrar", () => {
+    const x = calcularIndicadores({
+      ...conTodo,
+      balance: { efectivo: 20000, inventario: 5000, otrosCirculantes: 0, cuentasPorPagar: 7000, deudaCortoPlazo: 3000, deudaLargoPlazo: 25000, valorEquipo: null },
+    }).finanzas.balance;
+    expect(x.activoCirculante).toBe(34000); // 20,000 + 5,000 + 9,000 por cobrar
+    expect(x.pasivoCirculante).toBe(10000);
+    expect(x.capitalTrabajo).toBe(24000);
+    expect(x.activosFijos).toBe(80000); // lo invertido
+    expect(x.endeudamiento).toBeCloseTo(35000 / 114000, 5);
+    expect(calcularIndicadores(conTodo).finanzas.balance.capturado).toBe(false);
+  });
+});
