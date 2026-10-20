@@ -328,6 +328,9 @@ export type ArchivoInterconsulta = {
    * original. Sirve para no copiar dos veces la misma foto al mantener el expediente al día, y
    * para quitar solo estas copias (nunca archivos que subió una persona) al dejar de compartir. */
   origenPath?: string;
+  /** En las radiografías del expediente compartido: el tipo y la nota que les puso quien las subió
+   * ("Periapical — dolor en el 46"). */
+  descripcion?: string;
 };
 
 export type Contrarreferencia = {

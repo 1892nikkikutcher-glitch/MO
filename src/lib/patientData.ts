@@ -306,6 +306,10 @@ export type FotoPaciente = {
   name: string;
   /** ISO datetime — cuándo se subió. */
   fecha: string;
+  /** Solo en radiografías: periapical, panorámica, etc. (ver lib/radiografias.ts). Ausente = sin especificar. */
+  tipo?: string;
+  /** Solo en radiografías: nota breve de quien la subió (hasta 300 caracteres). */
+  nota?: string;
 };
 
 /** Documento `users/{clinicUid}/pacientes/{patientId}/fotos/datos` — solo

@@ -2108,8 +2108,11 @@ function SalaDelCaso({ interconsulta, onVolver }: { interconsulta: Interconsulta
         <h3 className="mb-3 text-sm font-semibold text-ink">Archivos</h3>
         <div className="space-y-2">
           {interconsulta.archivos.map((a) => (
-            <div key={a.id} className="flex items-center justify-between rounded-lg border border-edge/10 p-2 text-sm">
-              <span className="truncate text-ink/70">{a.nombreOriginalSaneado}</span>
+            <div key={a.id} className="flex items-center justify-between gap-3 rounded-lg border border-edge/10 p-2 text-sm">
+              <span className="min-w-0">
+                <span className="block truncate text-ink/70">{a.nombreOriginalSaneado}</span>
+                {a.descripcion && <span className="block whitespace-pre-line text-xs text-ink/50">{a.descripcion}</span>}
+              </span>
               <button
                 onClick={() => descargarArchivoInterconsultaApi(interconsulta.id, a.id, a.nombreOriginalSaneado)}
                 className="text-xs text-accent hover:underline"

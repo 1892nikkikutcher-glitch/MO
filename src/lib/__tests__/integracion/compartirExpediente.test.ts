@@ -199,14 +199,17 @@ describe("compartir parte del expediente (servidor + emulador)", () => {
   it("las radiografías van primero y llegan al colega como radiografías", async () => {
     const pathRx = await subirFoto("radiografias", "rx1.jpg");
     await base().collection("fotos").doc("datos").set(
-      { radiografias: [{ id: "rx1.jpg", url: "u", name: "panoramica.jpg", fecha: "2026-09-01", path: pathRx }] },
+      { radiografias: [{ id: "rx1.jpg", url: "u", name: "IMG_2034.jpg", fecha: "2026-09-01", path: pathRx, tipo: "Panorámica", nota: "Valoración inicial" }] },
       { merge: true }
     );
     try {
       const caso = await crearInterconsulta(REMITENTE, { ...entradaBase, seccionesCompartidas: ["fotos_radiografias"] });
       // Primero la radiografía (aunque sea la más antigua), luego las 3 fotos clínicas.
       expect(caso.archivos.map((x) => x.categoriaClinica)).toEqual(["radiografia", "fotografia", "fotografia", "fotografia"]);
-      expect(caso.archivos[0].nombreOriginalSaneado).toContain("panoramica");
+      // El colega recibe el tipo y la nota: en el nombre del archivo y en su descripción.
+      expect(caso.archivos[0].nombreOriginalSaneado).toBe("Radiografía Panorámica (2026-09-01).jpg");
+      expect(caso.archivos[0].descripcion).toBe("Panorámica — Valoración inicial");
+      expect(caso.archivos[1].descripcion).toBeUndefined(); // las fotos clínicas no llevan descripción
       expect(caso.archivos[0].origenPath).toBe(pathRx);
     } finally {
       const { FieldValue } = await import("firebase-admin/firestore");

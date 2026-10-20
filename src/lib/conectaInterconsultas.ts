@@ -4,6 +4,7 @@
  * Nunca escrita directo por el cliente. */
 
 import { randomUUID } from "node:crypto";
+import { descripcionDeRadiografia, nombreCompartidoDeRadiografia } from "./radiografias";
 import { dbAdmin, bucketAdmin } from "./firebaseAdmin";
 import { ConectaError, aplicarRateLimit, esMiembroActivoDeClinica, nowISO, sinIndefinidos } from "./conectaServer";
 import { construirResumenPacienteAutorizado } from "./resumenPacienteAutorizado";
@@ -139,9 +140,18 @@ export async function construirExpedienteCompartido(args: {
       // Solo se copian objetos que de verdad cuelgan de ESTE paciente y son JPEG
       // dentro del límite — nunca una ruta arbitraria.
       if (!foto.path.startsWith(`users/${clinicaId}/pacientes/${pacienteId}/fotos/`)) continue;
+      // De las radiografías viajan también el tipo y la nota (en el nombre y en la descripción del archivo).
+      const descripcion = foto.esRadiografia ? descripcionDeRadiografia(foto) : undefined;
+      const nombreVisible = sanearNombreArchivo(foto.esRadiografia ? nombreCompartidoDeRadiografia(foto) : foto.name || "fotografia.jpg");
       const yaCopiada = deExpediente.find((a) => a.origenPath === foto.path);
       if (yaCopiada) {
-        mantenidos.push(yaCopiada);
+        // Si después se le cambió el tipo o la nota, la copia del colega se pone al día.
+        if (foto.esRadiografia) {
+          const { descripcion: _anterior, ...resto } = yaCopiada;
+          mantenidos.push(sinIndefinidos({ ...resto, nombreOriginalSaneado: nombreVisible, descripcion }));
+        } else {
+          mantenidos.push(yaCopiada);
+        }
         continue;
       }
       try {
@@ -155,7 +165,8 @@ export async function construirExpedienteCompartido(args: {
         mantenidos.push(
           sinIndefinidos({
             id: archivoId,
-            nombreOriginalSaneado: sanearNombreArchivo(foto.name || "fotografia.jpg"),
+            nombreOriginalSaneado: nombreVisible,
+            descripcion,
             storagePath: destino,
             mimeType: "image/jpeg",
             tamanioBytes: tamanio,

@@ -274,8 +274,8 @@ export function citasCompartibles(
 export function fotosCompartibles(fotos: {
   extraorales?: { id: string; path: string; name: string; fecha: string }[];
   intraorales?: { id: string; path: string; name: string; fecha: string }[];
-  radiografias?: { id: string; path: string; name: string; fecha: string }[];
-}): { id: string; path: string; name: string; fecha: string; esRadiografia?: boolean }[] {
+  radiografias?: { id: string; path: string; name: string; fecha: string; tipo?: string; nota?: string }[];
+}): { id: string; path: string; name: string; fecha: string; esRadiografia?: boolean; tipo?: string; nota?: string }[] {
   const masRecientes = <T extends { fecha: string }>(lista: T[]) => [...lista].sort((a, b) => b.fecha.localeCompare(a.fecha));
   const radiografias = masRecientes(fotos.radiografias ?? []).map((r) => ({ ...r, esRadiografia: true as const }));
   const clinicas = masRecientes([...(fotos.extraorales ?? []), ...(fotos.intraorales ?? [])]);
