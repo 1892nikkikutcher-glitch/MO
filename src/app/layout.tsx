@@ -1,6 +1,15 @@
 import type { Metadata, Viewport } from "next";
 import "./globals.css";
+import { Cormorant_Garamond } from "next/font/google";
 import { ThemeProvider } from "@/context/ThemeContext";
+
+// Letra con serifa para los títulos y las cifras grandes del modo oscuro "premium" (ver globals.css).
+const serifa = Cormorant_Garamond({
+  subsets: ["latin"],
+  weight: ["400", "500", "600"],
+  variable: "--font-serifa",
+  display: "swap",
+});
 
 export const metadata: Metadata = {
   title: "MO",
@@ -41,7 +50,7 @@ export default function RootLayout({
   children: React.ReactNode;
 }) {
   return (
-    <html lang="es" suppressHydrationWarning>
+    <html lang="es" suppressHydrationWarning className={serifa.variable}>
       <head>
         <script dangerouslySetInnerHTML={{ __html: scriptAntiDestello }} />
       </head>

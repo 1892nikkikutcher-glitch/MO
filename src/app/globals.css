@@ -359,3 +359,112 @@ select option {
 [data-theme="light"] select {
   transition: box-shadow 0.2s ease, border-color 0.2s ease;
 }
+
+/* ============================================================
+   Modo oscuro "premium": cristal sobre azul casi negro, acento dorado
+   champán y letra con serifa en títulos y cifras. Solo cambia la
+   apariencia: el modo claro y la estructura no se tocan. Todo cuelga de
+   [data-theme="dark"], así que nada de esto aplica en claro.
+   ============================================================ */
+[data-theme="dark"] {
+  --app: #070b13;
+  --surface: rgba(255, 255, 255, 0.045);
+  --surface2: rgba(255, 255, 255, 0.08);
+  --field: rgba(255, 255, 255, 0.05);
+  --inset: rgba(0, 0, 0, 0.28);
+  --modal: #0e1522;
+  --modal-solid: #0e1522;
+  --cita-card-bg: #0f1624;
+  --nav-bg: rgba(7, 11, 19, 0.85);
+  /* Dorado champán en lugar del amarillo vivo. */
+  --accent-rgb: 233 184 114;
+  --accent-2-rgb: 233 184 114;
+  --premium-rgb: 243 211 164;
+  --shadow-card: 0 24px 44px -28px rgba(0, 0, 0, 0.8);
+}
+
+/* Fondo: resplandor cálido de atardecer arriba a la derecha y azul profundo a la izquierda. */
+[data-theme="dark"] .bg-app {
+  background-color: var(--app);
+  background-image:
+    radial-gradient(900px 520px at 88% -8%, rgba(226, 142, 72, 0.3), transparent 62%),
+    radial-gradient(700px 480px at 62% 8%, rgba(120, 78, 120, 0.18), transparent 65%),
+    radial-gradient(800px 600px at 4% 0%, rgba(38, 66, 118, 0.34), transparent 62%);
+  background-attachment: fixed;
+}
+
+/* Tarjetas: cristal oscuro con borde fino y esquinas más redondeadas. Sin desenfoque de fondo (no todos los
+   teléfonos lo dibujan igual): es un velo semitransparente que se ve igual en cualquiera. */
+[data-theme="dark"] .rounded-2xl {
+  border-radius: 1.35rem;
+}
+[data-theme="dark"] .bg-surface.rounded-2xl,
+[data-theme="dark"] .bg-surface.rounded-xl,
+[data-theme="dark"] .bg-surface2.rounded-2xl {
+  border-color: rgba(255, 255, 255, 0.09);
+  background-image: linear-gradient(180deg, rgba(255, 255, 255, 0.05), rgba(255, 255, 255, 0.015));
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.05), var(--shadow-card);
+}
+[data-theme="dark"] .bg-modal.rounded-2xl {
+  border-color: rgba(255, 255, 255, 0.1);
+}
+
+/* Barra superior y menú. */
+[data-theme="dark"] .bg-nav {
+  border-color: rgba(255, 255, 255, 0.08);
+  background-image: linear-gradient(180deg, rgba(255, 255, 255, 0.035), rgba(255, 255, 255, 0));
+}
+
+/* Lo activo y lo principal brilla en dorado champán. */
+[data-theme="dark"] .glow-activo {
+  color: rgb(243 211 164);
+  box-shadow:
+    inset 0 0 0 1px rgba(233, 184, 114, 0.42),
+    inset 0 0 18px rgba(233, 184, 114, 0.07),
+    0 0 22px -6px rgba(233, 184, 114, 0.45);
+}
+[data-theme="dark"] .border-accent\/60.bg-accent\/15,
+[data-theme="dark"] .border-accent.bg-accent\/15 {
+  box-shadow: 0 0 14px -3px rgba(233, 184, 114, 0.4);
+}
+[data-theme="dark"] .bg-accent {
+  box-shadow: 0 0 18px -4px rgba(233, 184, 114, 0.5);
+}
+
+/* Foco al escribir: contorno champán con un resplandor suave. */
+[data-theme="dark"] input:not([type="checkbox"]):not([type="radio"]):not([type="range"]):focus,
+[data-theme="dark"] textarea:focus,
+[data-theme="dark"] select:focus {
+  border-color: rgba(233, 184, 114, 0.65);
+  box-shadow: 0 0 0 3px rgba(233, 184, 114, 0.1), 0 0 16px -2px rgba(233, 184, 114, 0.22);
+}
+[data-theme="dark"] input,
+[data-theme="dark"] textarea,
+[data-theme="dark"] select {
+  transition: box-shadow 0.2s ease, border-color 0.2s ease;
+}
+
+/* Títulos de sección: dorado, mayúsculas con letras espaciadas (como las etiquetas de la imagen). */
+[data-theme="dark"] h3.uppercase {
+  color: rgb(233 184 114 / 0.88);
+  letter-spacing: 0.16em;
+  font-size: 0.72rem;
+  font-weight: 500;
+}
+
+/* Letra con serifa en el título de cada pantalla y en las cifras grandes. */
+[data-theme="dark"] h1 {
+  font-family: var(--font-serifa), Georgia, "Times New Roman", serif;
+  font-weight: 500;
+  font-size: 2.3rem;
+  line-height: 1.1;
+  letter-spacing: 0.003em;
+}
+[data-theme="dark"] .text-xl.font-bold,
+[data-theme="dark"] .text-2xl.font-bold,
+[data-theme="dark"] .font-display {
+  font-family: var(--font-serifa), Georgia, "Times New Roman", serif;
+  font-weight: 500;
+  font-variant-numeric: lining-nums;
+  letter-spacing: 0.005em;
+}
