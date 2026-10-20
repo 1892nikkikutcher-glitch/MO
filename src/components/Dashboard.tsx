@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
+import { fechaDeHoyLarga, msHastaMedianoche, tituloYNombre } from "@/lib/encabezadoClinica";
 import { etiquetaRolClinica, moduloVisibleParaRol } from "@/lib/permisosRol";
 import { useLadoNavegacion } from "@/lib/useLadoNavegacion";
 import { ladoOpuesto } from "@/lib/ladoNavegacion";
@@ -633,6 +634,32 @@ function SelectorTemaModal({
   );
 }
 
+/** Quién administra la clínica, dónde está y la fecha de hoy. La fecha se pone al montar (no en el servidor, para no
+ * chocar con la hidratación) y se refresca sola a medianoche. */
+function IdentidadYFecha({ administrador, ciudad }: { administrador: string; ciudad: string }) {
+  const [hoy, setHoy] = useState<Date | null>(null);
+  useEffect(() => {
+    setHoy(new Date());
+    let temporizador: ReturnType<typeof setTimeout>;
+    const programar = () => {
+      temporizador = setTimeout(() => {
+        setHoy(new Date());
+        programar();
+      }, msHastaMedianoche(new Date()) + 1000);
+    };
+    programar();
+    return () => clearTimeout(temporizador);
+  }, []);
+  const linea2 = [ciudad, hoy ? fechaDeHoyLarga(hoy) : ""].filter(Boolean).join(" · ");
+  if (!administrador && !linea2) return null;
+  return (
+    <div className="hidden min-w-0 shrink-0 flex-col leading-tight sm:flex" suppressHydrationWarning>
+      {administrador && <span className="truncate text-sm font-semibold text-ink/80">{administrador}</span>}
+      {linea2 && <span className="truncate text-[11px] text-ink/50">{linea2}</span>}
+    </div>
+  );
+}
+
 function DashboardBody({
   activePage,
   setActivePage,
@@ -845,6 +872,7 @@ function DashboardBody({
                   <span suppressHydrationWarning>{isLight ? <SunIcon /> : <MoonIcon />}</span>
                 </button>
 
+                <IdentidadYFecha administrador={tituloYNombre(clinicInfo?.administradorTitulo, clinicInfo?.administradorNombre)} ciudad={clinicInfo?.ciudad ?? ""} />
                 <span className="hidden shrink-0 truncate text-sm text-ink/50 sm:inline">{userEmail}</span>
                 {membresiasDisponibles.length > 1 && (
                   <button

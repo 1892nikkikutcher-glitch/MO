@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { usePatientData } from "@/context/PatientDataContext";
 import { editarCampoHorario } from "@/lib/horarioAtencion";
 import { manejarCambioNombre } from "@/lib/textoNombre";
+import { TITULOS_SUGERIDOS, tituloYNombre } from "@/lib/encabezadoClinica";
 
 const inputClass =
   "w-full rounded-lg border border-edge/10 bg-field px-3 py-2 text-sm text-ink outline-none focus:border-accent/60";
@@ -12,6 +13,9 @@ export default function Consultorio() {
   const { clinicInfo, setClinicInfo, horario, setHorario, confirmarHorario, miRol } = usePatientData();
   const [nombre, setNombre] = useState(clinicInfo?.nombre ?? "");
   const [direccion, setDireccion] = useState(clinicInfo?.direccion ?? "");
+  const [ciudad, setCiudad] = useState(clinicInfo?.ciudad ?? "");
+  const [administradorTitulo, setAdministradorTitulo] = useState(clinicInfo?.administradorTitulo ?? "");
+  const [administradorNombre, setAdministradorNombre] = useState(clinicInfo?.administradorNombre ?? "");
   const [telefono, setTelefono] = useState(clinicInfo?.telefono ?? "");
   const [correoContacto, setCorreoContacto] = useState(clinicInfo?.correoContacto ?? "");
   const [rfc, setRfc] = useState(clinicInfo?.rfc ?? "");
@@ -24,6 +28,9 @@ export default function Consultorio() {
   useEffect(() => {
     setNombre(clinicInfo?.nombre ?? "");
     setDireccion(clinicInfo?.direccion ?? "");
+    setCiudad(clinicInfo?.ciudad ?? "");
+    setAdministradorTitulo(clinicInfo?.administradorTitulo ?? "");
+    setAdministradorNombre(clinicInfo?.administradorNombre ?? "");
     setTelefono(clinicInfo?.telefono ?? "");
     setCorreoContacto(clinicInfo?.correoContacto ?? "");
     setRfc(clinicInfo?.rfc ?? "");
@@ -38,6 +45,9 @@ export default function Consultorio() {
       ...prev,
       nombre: nombre.trim(),
       direccion: direccion.trim(),
+      ciudad: ciudad.trim(),
+      administradorTitulo: administradorTitulo.trim(),
+      administradorNombre: administradorNombre.trim(),
       telefono: telefono.trim(),
       correoContacto: correoContacto.trim(),
       rfc: rfc.trim(),
@@ -81,6 +91,61 @@ export default function Consultorio() {
               className={inputClass}
             />
           </div>
+          <div className="sm:col-span-2">
+            <label className="mb-1 block text-xs font-medium text-ink/60">Ciudad o lugar</label>
+            <input
+              type="text"
+              value={ciudad}
+              onChange={(e) => {
+                setCiudad(e.target.value);
+                setGuardado(false);
+              }}
+              placeholder="Ej. Tulancingo, Hgo."
+              disabled={soloLectura}
+              className={inputClass}
+            />
+            <p className="mt-1 text-[11px] text-ink/40">Se muestra en la barra de arriba, junto a la fecha.</p>
+          </div>
+          <div>
+            <label className="mb-1 block text-xs font-medium text-ink/60">Título del administrador</label>
+            <input
+              type="text"
+              list="titulos-administrador"
+              value={administradorTitulo}
+              onChange={(e) => {
+                setAdministradorTitulo(e.target.value);
+                setGuardado(false);
+              }}
+              placeholder="Ej. C.D. o C.D.E.O."
+              disabled={soloLectura}
+              className={inputClass}
+            />
+            <datalist id="titulos-administrador">
+              {TITULOS_SUGERIDOS.map((t) => (
+                <option key={t} value={t} />
+              ))}
+            </datalist>
+          </div>
+          <div>
+            <label className="mb-1 block text-xs font-medium text-ink/60">Nombre del administrador</label>
+            <input
+              type="text"
+              value={administradorNombre}
+              onChange={(e) =>
+                manejarCambioNombre(e, (v) => {
+                  setAdministradorNombre(v);
+                  setGuardado(false);
+                })
+              }
+              placeholder="Ej. Nicolás Medina González"
+              disabled={soloLectura}
+              className={inputClass}
+            />
+          </div>
+          <p className="-mt-2 text-[11px] text-ink/40 sm:col-span-2">
+            Así se verá en la barra de arriba:{" "}
+            <span className="font-semibold text-ink/60">{tituloYNombre(administradorTitulo, administradorNombre) || "—"}</span>
+          </p>
           <div>
             <label className="mb-1 block text-xs font-medium text-ink/60">Teléfono</label>
             <input

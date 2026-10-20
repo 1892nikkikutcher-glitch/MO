@@ -480,6 +480,11 @@ export type ClinicInfo = {
   ownerId: string;
   nombre: string;
   direccion?: string;
+  /** Lugar donde está el consultorio, corto ("Tulancingo, Hgo."): se muestra en la barra superior. */
+  ciudad?: string;
+  /** Quien administra la clínica en la plataforma: título ("C.D.", "C.D.E.O.", "Dr."…) y nombre, para la barra superior. */
+  administradorTitulo?: string;
+  administradorNombre?: string;
   telefono?: string;
   correoContacto?: string;
   rfc?: string;
