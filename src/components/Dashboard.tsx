@@ -720,14 +720,42 @@ function DashboardBody({
     return () => el.removeEventListener("scroll", onScroll);
   }, [necesitaCarrusel]);
 
-  const activeLabel =
-    activePage === "panel-admin"
+  const etiquetaDePagina = (id: string): string =>
+    id === "panel-admin"
       ? "Panel de administrador"
-      : navItems.find((item) => item.id === activePage)?.label ??
-        navItems.flatMap((item) => ("children" in item ? item.children ?? [] : [])).find(
-          (child) => child.id === activePage
-        )?.label ??
-        "";
+      : id === "inicio"
+        ? "Dashboard Principal"
+        : navItems.find((item) => item.id === id)?.label ??
+          navItems.flatMap((item) => ("children" in item ? item.children ?? [] : [])).find((child) => child.id === id)?.label ??
+          "";
+  const activeLabel = etiquetaDePagina(activePage);
+
+  // Historial de páginas para la flecha de regreso: cada vez que se cambia de página (por el menú, un acceso
+  // directo o lo que sea) se guarda de dónde venías; la flecha te regresa ahí.
+  const historialRef = useRef<string[]>([]);
+  const ultimaPaginaRef = useRef(activePage);
+  const regresandoRef = useRef(false);
+  const [paginaAnterior, setPaginaAnterior] = useState<string | null>(null);
+  useEffect(() => {
+    if (ultimaPaginaRef.current === activePage) return;
+    if (regresandoRef.current) {
+      regresandoRef.current = false;
+    } else {
+      historialRef.current.push(ultimaPaginaRef.current);
+      if (historialRef.current.length > 20) historialRef.current.shift();
+    }
+    ultimaPaginaRef.current = activePage;
+    setPaginaAnterior(historialRef.current[historialRef.current.length - 1] ?? null);
+  }, [activePage]);
+  const volverAPaginaAnterior = () => {
+    const destino = historialRef.current.pop() ?? "inicio";
+    regresandoRef.current = true;
+    setPaginaAnterior(historialRef.current[historialRef.current.length - 1] ?? null);
+    setActivePage(destino);
+  };
+  // La flecha sale en las pantallas que se abren desde un submenú (Reportes, Administración, Proveedores).
+  const esPaginaDeSubmenu = navItems.some((item) => "children" in item && item.children?.some((c) => c.id === activePage));
+  const destinoDeRegreso = paginaAnterior ?? "inicio";
 
   // El dueño de la plataforma nunca queda bloqueado por su propio
   // estadoCuenta — si no, una suspensión accidental de su propia clínica lo
@@ -842,9 +870,21 @@ function DashboardBody({
         </header>
 
         <div className={`px-3 py-6 sm:px-6 sm:py-8 ${ladoNav === "izquierda" ? "lg:pl-28" : "lg:pr-28"}`}>
-          <h1 className="mb-6 text-2xl font-semibold print:hidden">
-            {activePage === "inicio" ? "Dashboard Principal" : activeLabel}
-          </h1>
+          <div className="mb-6 flex items-center gap-3 print:hidden">
+            {esPaginaDeSubmenu && (
+              <button
+                onClick={volverAPaginaAnterior}
+                aria-label={`Volver a ${etiquetaDePagina(destinoDeRegreso)}`}
+                title={`Volver a ${etiquetaDePagina(destinoDeRegreso)}`}
+                className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-edge/15 text-ink/70 transition-colors hover:border-accent/40 hover:text-accent"
+              >
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none">
+                  <path d="M19 12H5m0 0 6-6m-6 6 6 6" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
+                </svg>
+              </button>
+            )}
+            <h1 className="text-2xl font-semibold">{activePage === "inicio" ? "Dashboard Principal" : activeLabel}</h1>
+          </div>
           {!paginaPermitida && (
             <div className="rounded-2xl border border-edge/10 bg-surface p-10 text-center text-sm text-ink/50">
               Esta sección no está disponible para tu rol ({miRol ? etiquetaRolClinica[miRol] : ""}). Si la necesitas, pídesela al administrador.
