@@ -124,6 +124,46 @@ describe("compartir el expediente al día y apagarlo", () => {
     expect(despues.expedienteCompartido?.fotosArchivoIds).toEqual(despues.archivos.map((a) => a.id));
   });
 
+  it("al cambiar el tipo o la nota de una radiografía ya compartida, el colega ve el cambio sin que se duplique la copia", async () => {
+    const id = casoIds[0];
+    const rutaRx = `users/${CLINICA}/pacientes/${PACIENTE}/fotos/radiografias/rx1.jpg`;
+    await bucketAdmin.file(rutaRx).save(JPEG, { contentType: "image/jpeg" });
+    const rx = (tipo: string, nota: string) => [{ id: "rx1.jpg", url: "u", name: "IMG_1.jpg", fecha: "2026-10-07", path: rutaRx, tipo, nota }];
+
+    await paciente().collection("fotos").doc("datos").set({ radiografias: rx("Periapical", "uno") }, { merge: true });
+    await envejecer(id);
+    expect(await refrescarExpedienteCompartido(COLEGA, id)).toEqual({ actualizado: true });
+    const primera = (await leer(id)).archivos.find((a) => a.origenPath === rutaRx)!;
+    expect(primera.categoriaClinica).toBe("radiografia");
+    expect(primera.descripcion).toBe("Periapical — uno");
+    const total = (await leer(id)).archivos.length;
+
+    // Solo cambia el tipo y la nota: el archivo es el mismo, pero la copia del colega se pone al día.
+    await paciente().collection("fotos").doc("datos").set({ radiografias: rx("Panorámica", "dos") }, { merge: true });
+    await envejecer(id);
+    expect(await refrescarExpedienteCompartido(COLEGA, id)).toEqual({ actualizado: true });
+    const despues = await leer(id);
+    const segunda = despues.archivos.find((a) => a.origenPath === rutaRx)!;
+    expect(segunda.id).toBe(primera.id);
+    expect(segunda.descripcion).toBe("Panorámica — dos");
+    expect(segunda.nombreOriginalSaneado).toBe("Radiografía Panorámica (2026-10-07).jpg");
+    expect(despues.archivos).toHaveLength(total);
+
+    // Si se vacían el tipo y la nota, también se quitan en la copia.
+    await paciente().collection("fotos").doc("datos").set({ radiografias: [{ id: "rx1.jpg", url: "u", name: "IMG_1.jpg", fecha: "2026-10-07", path: rutaRx }] }, { merge: true });
+    await envejecer(id);
+    await refrescarExpedienteCompartido(COLEGA, id);
+    const sinDatos = (await leer(id)).archivos.find((a) => a.origenPath === rutaRx)!;
+    expect(sinDatos.descripcion).toBeUndefined();
+    expect(sinDatos.nombreOriginalSaneado).toBe("IMG_1.jpg");
+
+    // Se deja el caso como estaba para las pruebas que siguen: sin radiografías.
+    await paciente().collection("fotos").doc("datos").update({ radiografias: FieldValue.delete() });
+    await envejecer(id);
+    await refrescarExpedienteCompartido(COLEGA, id);
+    expect((await leer(id)).archivos.some((a) => a.origenPath === rutaRx)).toBe(false);
+  });
+
   it("anota cuándo el colega abre el caso (aunque no toque revisar), y no cuenta si abre quien comparte", async () => {
     const id = casoIds[0];
     await dbAdmin.collection("interconsultas").doc(id).set({ compartirExpediente: { vistoPorColegaEl: FieldValue.delete() } }, { merge: true });

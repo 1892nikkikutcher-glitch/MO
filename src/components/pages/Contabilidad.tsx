@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { moduloVisibleParaRol } from "@/lib/permisosRol";
 import { usePatientData } from "@/context/PatientDataContext";
 import { usePrivacidad } from "@/context/PrivacidadContext";
 import CandadoPrivacidad from "@/components/CandadoPrivacidad";
@@ -141,8 +142,23 @@ function tituloContador(c: Contador): string {
   return c.despacho || c.contador || "(sin nombre)";
 }
 
+/** Páginas donde vive el dinero de la clínica; esta pantalla las reúne. */
+const ACCESOS_FINANZAS: { id: string; titulo: string; descripcion: string; soloDueno?: boolean }[] = [
+  { id: "gastos", titulo: "Gastos", descripcion: "Captura y revisa los gastos del consultorio." },
+  { id: "administracion-presupuesto-gastos", titulo: "Presupuesto de gastos", descripcion: "Cuánto puedes gastar por categoría." },
+  { id: "reportes-corte-caja", titulo: "Corte de caja", descripcion: "Cobros del día por forma de pago y por médico." },
+  { id: "reportes-corte-diario", titulo: "Corte diario", descripcion: "El cierre de cada día." },
+  { id: "reportes-pagos", titulo: "Pagos", descripcion: "Todos los pagos registrados." },
+  { id: "reportes-devoluciones", titulo: "Devoluciones", descripcion: "Pagos que se devolvieron al paciente." },
+  { id: "reportes-saldos-pendientes", titulo: "Saldos pendientes", descripcion: "Quién debe y cuánto." },
+  { id: "administracion-comisiones", titulo: "Comisiones", descripcion: "Lo que corresponde a cada médico." },
+  { id: "administracion-metas", titulo: "Metas", descripcion: "Tu meta de ingresos mensual, semanal y diaria.", soloDueno: true },
+  { id: "reportes-evaluacion-semanal", titulo: "Evaluación semanal", descripcion: "Horas atendidas, cobros por operador y costos directos.", soloDueno: true },
+  { id: "inicio", titulo: "Fondos financieros", descripcion: "El reparto de tus ingresos en sobres, en el Inicio." },
+];
+
 export default function Contabilidad() {
-  const { contadores, setContadores, puedeVerFinanzas, finanzas, gastos } = usePatientData();
+  const { contadores, setContadores, puedeVerFinanzas, finanzas, gastos, irAPagina, miRol } = usePatientData();
   const { oculto } = usePrivacidad();
   const [editando, setEditando] = useState<Contador | "nuevo" | null>(null);
   const [contadorAEliminar, setContadorAEliminar] = useState<Contador | null>(null);
@@ -274,6 +290,25 @@ export default function Contabilidad() {
               Enviar resumen del mes a {tituloContador(contadorConTelefono)}
             </button>
           )}
+        </div>
+      )}
+
+      {puedeVerFinanzas && (
+        <div>
+          <h3 className="text-sm font-semibold uppercase tracking-wide text-ink/60">Finanzas</h3>
+          <p className="mt-1 text-xs text-ink/40">Todo lo del dinero de la clínica, en un solo lugar.</p>
+          <div className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
+            {ACCESOS_FINANZAS.filter((a) => moduloVisibleParaRol(miRol, a.id) && (!a.soloDueno || miRol === "admin")).map((a) => (
+              <button
+                key={a.id}
+                onClick={() => irAPagina(a.id)}
+                className="rounded-2xl border border-edge/10 bg-surface p-4 text-left transition-colors hover:border-accent/40 hover:bg-surface2"
+              >
+                <div className="text-sm font-semibold text-ink">{a.titulo}</div>
+                <div className="mt-1 text-xs text-ink/50">{a.descripcion}</div>
+              </button>
+            ))}
+          </div>
         </div>
       )}
 

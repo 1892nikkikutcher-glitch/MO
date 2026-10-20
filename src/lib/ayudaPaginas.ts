@@ -237,8 +237,8 @@ export const ayudaPaginas: Record<string, AyudaPagina> = {
     puntos: [],
   },
   contabilidad: {
-    titulo: "Contabilidad",
-    resumen: "Información contable/fiscal del consultorio.",
+    titulo: "Contabilidad y finanzas",
+    resumen: "Tu contador, el resumen del mes para compartirle y accesos a todo lo financiero: gastos, cortes de caja, pagos, saldos, metas y comisiones.",
     puntos: [],
   },
   asistencia: {

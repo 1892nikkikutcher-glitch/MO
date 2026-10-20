@@ -310,7 +310,8 @@ export function etiquetaDeRegistro(tipo: string, datos: DatosRegistro, docId: st
   try {
     if (tipo === "fotos") {
       const base = etiquetaCampoFoto[campo as CampoFoto] ?? "Fotografía";
-      return unir(base, texto(datos.name), fechaCorta(datos.fecha));
+      // Las radiografías traen su tipo ("Radiografía · Periapical · IMG_01.jpg · 12/10/2026").
+      return unir(base, texto(datos.tipo), texto(datos.name), fechaCorta(datos.fecha));
     }
     const definicion = tiposPapelera[tipo];
     const propia = definicion?.etiqueta?.(datos);

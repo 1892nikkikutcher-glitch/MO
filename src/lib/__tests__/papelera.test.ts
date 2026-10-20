@@ -72,6 +72,13 @@ describe("etiquetaDeRegistro", () => {
     expect(e).toBe("INE (frente) · IMG_01.jpg · 12/10/2026");
   });
 
+  it("radiografía: incluye su tipo", () => {
+    expect(etiquetaDeRegistro("fotos", { name: "IMG_02.jpg", fecha: "2026-10-12T10:00:00.000Z", tipo: "Periapical", nota: "46" }, "f2", "radiografias")).toBe(
+      "Radiografía · Periapical · IMG_02.jpg · 12/10/2026"
+    );
+    expect(etiquetaDeRegistro("fotos", { name: "IMG_03.jpg", fecha: "2026-10-12T10:00:00.000Z" }, "f3", "radiografias")).toBe("Radiografía · IMG_03.jpg · 12/10/2026");
+  });
+
   it("tipo sin etiqueta propia usa el primer campo de texto conocido", () => {
     expect(etiquetaDeRegistro("procedimientos", { id: "x", nombre: "Limpieza dental", precio: 600 }, "x")).toBe(
       "Limpieza dental"

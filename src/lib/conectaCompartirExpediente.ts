@@ -200,10 +200,17 @@ export async function refrescarExpedienteCompartido(uid: string, interconsultaId
   });
   const nuevoLimpio = sinIndefinidos(expediente);
   const copiasNuevas = archivos.filter((a) => !archivosAntes.some((x) => x.id === a.id));
+  // Un archivo cuenta como distinto si cambió su id, su nombre o su descripción (el tipo y la nota de una
+  // radiografía): con solo comparar ids, editar la nota no llegaba nunca al colega.
+  const huella = (a: { id: string; nombreOriginalSaneado: string; descripcion?: string }) => ({
+    id: a.id,
+    nombre: a.nombreOriginalSaneado,
+    descripcion: a.descripcion ?? null,
+  });
   const sinCambios =
     ic.expedienteCompartido !== undefined &&
     sonEquivalentes({ ...nuevoLimpio, generadoEl: "" }, { ...ic.expedienteCompartido, generadoEl: "" }) &&
-    sonEquivalentes(archivos.map((a) => a.id), archivosAntes.map((a) => a.id));
+    sonEquivalentes(archivos.map(huella), archivosAntes.map(huella));
 
   // Se escribe solo si nadie desactivó ni reconfiguró el compartir mientras se armaba: la
   // marca de revisión debe seguir siendo la que este proceso reclamó.
