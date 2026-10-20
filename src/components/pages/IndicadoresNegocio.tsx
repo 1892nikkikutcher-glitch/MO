@@ -8,6 +8,8 @@ import { calcularIndicadores, diasDelMes, mesDesplazado } from "@/lib/indicadore
 import { rentabilidadPorTratamiento } from "@/lib/rentabilidadTratamientos";
 import { gastoCategoriaOptions, type GastoCategoria } from "@/lib/gastos";
 import { balanceInicial, type BalanceConsultorio } from "@/lib/balanceConsultorio";
+import { generarEstadosFinancierosPdf } from "@/lib/generarEstadosFinancierosPdf";
+import { descargarBlob } from "@/lib/pdfDocumento";
 
 function hoyISO(): string {
   const d = new Date();
@@ -112,11 +114,13 @@ function BalanceForm({ balance, onGuardar, editable }: { balance: BalanceConsult
 
 /** Indicadores empresariales del mes: lo que hay que mirar para saber si el consultorio es negocio sano. */
 export default function IndicadoresNegocio() {
-  const { puedeVerFinanzas, finanzas, gastos, presupuestoGastos, citas, recursos, sedes, patients, saldosPendientes, estadisticas, metas, procedimientos, balance, setBalance, miRol } = usePatientData();
+  const { puedeVerFinanzas, finanzas, gastos, presupuestoGastos, citas, recursos, sedes, patients, saldosPendientes, estadisticas, metas, procedimientos, balance, setBalance, miRol, clinicInfo, perfilDoctor } = usePatientData();
   const { oculto } = usePrivacidad();
   const hoy = hoyISO();
   const [mes, setMes] = useState(() => mesDesplazado(hoy, 0));
   const [verTodosTratamientos, setVerTodosTratamientos] = useState(false);
+  const [generandoPdf, setGenerandoPdf] = useState(false);
+  const [errorPdf, setErrorPdf] = useState("");
 
   const ind = useMemo(
     () =>
@@ -156,6 +160,25 @@ export default function IndicadoresNegocio() {
     return texto.charAt(0).toUpperCase() + texto.slice(1);
   })();
   const esMesActual = mes === mesDesplazado(hoy, 0);
+  const descargarEstados = async () => {
+    setGenerandoPdf(true);
+    setErrorPdf("");
+    try {
+      const { blob, nombre } = await generarEstadosFinancierosPdf({
+        indicadores: ind,
+        etiquetaMes,
+        clinicaNombre: clinicInfo?.nombre || "",
+        direccion: perfilDoctor.direccionClinica,
+        logoUrl: perfilDoctor.logoClinicaUrl,
+        balance,
+      });
+      descargarBlob(blob, nombre);
+    } catch {
+      setErrorPdf("No se pudo generar el PDF. Intenta de nuevo.");
+    } finally {
+      setGenerandoPdf(false);
+    }
+  };
 
   return (
     <div className="space-y-4">
@@ -190,8 +213,17 @@ export default function IndicadoresNegocio() {
           >
             Este mes
           </button>
+          <button
+            onClick={descargarEstados}
+            disabled={generandoPdf}
+            title="Descargar en PDF el estado de resultados, flujo de efectivo, balance e indicadores de este mes"
+            className="rounded-lg border border-edge/30 px-3.5 py-2 text-sm font-semibold text-ink/80 transition-colors hover:bg-field disabled:opacity-60"
+          >
+            {generandoPdf ? "Generando PDF…" : "Descargar estados financieros (PDF)"}
+          </button>
         </div>
       </div>
+      {errorPdf && <p className="text-sm text-danger">{errorPdf}</p>}
 
       <div className="space-y-5">
         <div>

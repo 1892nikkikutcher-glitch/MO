@@ -1,0 +1,155 @@
+import { describe, expect, it } from "vitest";
+import { ConstructorPdf, dineroPdf, fechaPdf, limpiarTextoPdf, nombreArchivoPdf, porcentajePdf } from "../pdfDocumento";
+import { generarEstadosFinancierosPdf } from "../generarEstadosFinancierosPdf";
+import { generarExpedientePdf, resumenDeNota } from "../generarExpedientePdf";
+import { calcularIndicadores } from "../indicadoresNegocio";
+import { balanceInicial } from "../balanceConsultorio";
+import type { Gasto } from "../gastos";
+import type { CitaAgenda, NotaEvolucion, Patient, Pago, SavedBudget } from "../patientData";
+import type { HistoriaClinicaTemplate } from "../historiaClinica";
+import type { NotaEvolucionAdministrativa } from "../notasEvolucion";
+
+async function textoDe(blob: Blob): Promise<string> {
+  return new TextDecoder("latin1").decode(await blob.arrayBuffer());
+}
+
+describe("formato de PDF", () => {
+  it("da dinero, porcentajes y fechas legibles", () => {
+    expect(dineroPdf(1250)).toBe("$1,250.00");
+    expect(dineroPdf(-300.5)).toBe("-$300.50");
+    expect(dineroPdf(0.004)).toBe("$0.00");
+    expect(porcentajePdf(0.256)).toBe("25.6%");
+    expect(porcentajePdf(null)).toBe("—");
+    expect(fechaPdf("2026-10-05")).toBe("05/10/2026");
+  });
+
+  it("cambia los símbolos que la fuente estándar no dibuja", () => {
+    expect(limpiarTextoPdf("−$300 → ok “x”…")).toBe('-$300 -> ok "x"...');
+  });
+
+  it("arma un nombre de archivo sin acentos ni espacios", () => {
+    expect(nombreArchivoPdf("Expediente", "María del Carmen Peña")).toBe("Expediente_Maria_del_Carmen_Pena.pdf");
+    expect(nombreArchivoPdf("", "")).toBe("documento.pdf");
+  });
+
+  it("pasa de hoja las tablas largas y pone el número de página en todas", async () => {
+    const pdf = new ConstructorPdf({ titulo: "Prueba", clinicaNombre: "Clínica" });
+    await pdf.encabezado();
+    pdf.tabla(
+      [{ titulo: "A" }, { titulo: "B", alinear: "derecha" }],
+      Array.from({ length: 120 }, (_, i) => [`Fila ${i}`, `$${i}`])
+    );
+    expect(pdf.hojas).toBeGreaterThan(2);
+    const total = pdf.hojas;
+    const texto = await textoDe(pdf.finalizar());
+    expect(texto.startsWith("%PDF")).toBe(true);
+    expect(texto).toContain(`Página ${total} de ${total}`);
+  });
+});
+
+const gasto = (categoria: Gasto["categoria"], monto: number, fecha: string, extra: Partial<Gasto> = {}): Gasto => ({ id: `${categoria}${fecha}${monto}`, concepto: "x", categoria, monto, fecha, ...extra });
+
+describe("estados financieros en PDF", () => {
+  const indicadores = calcularIndicadores({
+    mes: "2026-10-15",
+    hoyISO: "2026-10-20",
+    finanzas: {
+      porFecha: { "2026-10-05": 20000, "2026-10-12": 30000 },
+      devolucionesPorFecha: { "2026-10-12": 2000 },
+      pagosCountPorFecha: { "2026-10-05": 8, "2026-10-12": 12 },
+      porFechaYMedico: {},
+    },
+    gastos: [gasto("Renta", 8000, "2026-10-01"), gasto("Insumos", 6000, "2026-10-08"), gasto("Impuestos e intereses", 1500, "2026-10-10")],
+    clasificacionPorCategoria: { Renta: "fijo", Insumos: "variable" },
+    citas: [],
+    recursos: [],
+    sedes: [],
+    pacientes: [],
+    saldos: [],
+    metaMensual: 0,
+    balance: { ...balanceInicial, efectivo: 50000, deudaCortoPlazo: 10000 },
+  });
+
+  it("incluye estado de resultados, flujo, balance e indicadores con las cifras del mes", async () => {
+    const { blob, nombre } = await generarEstadosFinancierosPdf({
+      indicadores,
+      etiquetaMes: "Octubre de 2026",
+      clinicaNombre: "Consultorio Medina",
+      balance: { ...balanceInicial, efectivo: 50000, deudaCortoPlazo: 10000 },
+    });
+    expect(nombre).toBe("Estados_financieros_Octubre_de_2026_Consultorio_Medina.pdf");
+    const texto = await textoDe(blob);
+    expect(texto.startsWith("%PDF")).toBe(true);
+    for (const frag of ["ESTADO DE RESULTADOS", "FLUJO DE EFECTIVO", "SITUACI", "INDICADORES CLAVE", "Utilidad neta", "$48,000.00", "Capital de trabajo"]) {
+      expect(texto).toContain(frag);
+    }
+    // utilidad neta = 48,000 - 6,000 - 8,000 - 1,500
+    expect(indicadores.finanzas.utilidadNeta).toBe(32500);
+    expect(texto).toContain("$32,500.00");
+  });
+
+  it("avisa cuando todavía no se captura el balance", async () => {
+    const { blob } = await generarEstadosFinancierosPdf({
+      indicadores: calcularIndicadores({ ...{ mes: "2026-10-15", hoyISO: "2026-10-20", finanzas: { porFecha: {}, devolucionesPorFecha: {}, pagosCountPorFecha: {}, porFechaYMedico: {} }, gastos: [], clasificacionPorCategoria: {}, citas: [], recursos: [], sedes: [], pacientes: [], saldos: [], metaMensual: 0 } }),
+      etiquetaMes: "Octubre de 2026",
+      clinicaNombre: "X",
+      balance: balanceInicial,
+    });
+    expect(await textoDe(blob)).toContain("Todav");
+  });
+});
+
+describe("expediente en PDF", () => {
+  const patient: Patient = { id: "p1", name: "María del Carmen Paloma", phone: "7751234567", birthDate: "1990-05-10", sexo: "Femenino", email: "m@x.com" };
+  const template: HistoriaClinicaTemplate = {
+    secciones: [
+      {
+        id: "s1",
+        titulo: "Antecedentes Patológicos",
+        preguntas: [
+          { id: "q1", tipo: "sino", etiqueta: "Diabetes", mostrarDetalle: true },
+          { id: "q2", tipo: "sino", etiqueta: "Hipertensión" },
+        ],
+      },
+    ],
+  };
+  const notaV1: NotaEvolucion = { id: "n1", fecha: "2026-09-02", medico: "Dr. Luis", presentacion: "", subjetivo: "Dolor al masticar", objetivo: "Caries profunda en 36", analisis: "Pulpitis", pronostico: "Bueno" };
+  const notaAdmin: NotaEvolucionAdministrativa = { id: "n2", tipo: "administrativa", patientId: "p1", pacienteNombreSnapshot: "x", citaId: "c1", motivo: "No Asistió" as never, registradoPorUid: "u", creadoEn: "2026-09-10T10:00:00.000Z" };
+  const presupuesto: SavedBudget = { id: "b1", folio: "P-001", fecha: "2026-09-02", medico: "Dr. Luis", tipoDePrecio: "", especialidad: "", diagnostico: "", items: [{ id: "i1", procedure: "Endodoncia", price: 3000, teeth: [36], note: "" }], total: 3000, estado: "aceptado" };
+  const pago: Pago = { id: "pg1", fecha: "2026-09-05", medico: "Dr. Luis", formaPago: "Efectivo", lineas: [{ id: "l1", tratamientoId: "i1", folio: null, label: "Endodoncia", monto: 1000 } as never], total: 1000, facturar: false, firma: null };
+  const cita = { id: "c1", folio: "1", recursoId: "r", patientId: "p1", paciente: "x", tratamientos: ["Endodoncia"], comentarios: "", fecha: "2026-09-05", horaInicio: "10:00", horaFin: "11:00", estatus: "Atendida", recurrenciaId: null } as unknown as CitaAgenda;
+  const base = {
+    patient,
+    clinicaNombre: "Consultorio Medina",
+    historiaTemplate: template,
+    historiaRespuestas: { porPregunta: { q1: "si", q1__detalle: "Tipo 2, controlada", q2: "no" }, alergias: "Penicilina" },
+    notas: [notaV1, notaAdmin],
+    citas: [cita],
+    presupuestos: [presupuesto],
+    pagos: [pago],
+    devoluciones: [],
+  };
+
+  it("resume cualquier tipo de nota", () => {
+    expect(resumenDeNota(notaV1)).toMatchObject({ fecha: "2026-09-02", medico: "Dr. Luis" });
+    expect(resumenDeNota(notaV1).texto).toContain("Caries profunda en 36");
+    expect(resumenDeNota(notaAdmin)).toMatchObject({ fecha: "2026-09-10", estado: "Nota administrativa" });
+  });
+
+  it("incluye datos, alergias, notas, citas y finanzas cuando se permite", async () => {
+    const { blob, nombre } = await generarExpedientePdf({ ...base, incluirFinanzas: true });
+    expect(nombre).toBe("Expediente_Maria_del_Carmen_Paloma.pdf");
+    const texto = await textoDe(blob);
+    for (const frag of ["Mar", "Penicilina", "Caries profunda en 36", "HISTORIAL DE CITAS", "PRESUPUESTOS", "P-001", "$2,000.00"]) {
+      expect(texto).toContain(frag);
+    }
+  });
+
+  it("sin permiso de finanzas no sale ni un presupuesto ni un pago", async () => {
+    const { blob } = await generarExpedientePdf({ ...base, incluirFinanzas: false });
+    const texto = await textoDe(blob);
+    expect(texto).not.toContain("PRESUPUESTOS");
+    expect(texto).not.toContain("P-001");
+    expect(texto).not.toContain("Resumen de cuenta");
+  });
+});

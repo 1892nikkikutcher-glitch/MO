@@ -26,6 +26,8 @@ import { useMoConecta } from "@/context/MoConectaContext";
 import { generarPresupuestoPdf } from "@/lib/generarPresupuestoPdf";
 import { generarPresupuestoTotalPdf } from "@/lib/generarPresupuestoTotalPdf";
 import { enviarPdfPorWhatsapp } from "@/lib/enviarPdfWhatsapp";
+import { generarExpedientePdf } from "@/lib/generarExpedientePdf";
+import { descargarBlob } from "@/lib/pdfDocumento";
 import AbrirWhatsAppPrompt from "@/components/AbrirWhatsAppPrompt";
 import AvisoNoCabeEnHoja from "@/components/AvisoNoCabeEnHoja";
 import { slugify } from "@/lib/textoNombre";
@@ -1117,6 +1119,9 @@ export default function Expediente({
     setPagosPaciente,
     devolucionesPorPaciente,
     cargarDatosPaciente,
+    notasEvolucionPorPaciente,
+    clinicInfo,
+    perfilDoctor: perfilClinica,
     citas,
     recursos,
     puedeVerFinanzas,
@@ -1293,6 +1298,34 @@ export default function Expediente({
       ? citasSemanaConPaciente[indiceHoy + 1]
       : null;
 
+  const [generandoPdf, setGenerandoPdf] = useState(false);
+  const [errorPdf, setErrorPdf] = useState("");
+  const descargarExpediente = async () => {
+    setGenerandoPdf(true);
+    setErrorPdf("");
+    try {
+      const { blob, nombre } = await generarExpedientePdf({
+        patient,
+        clinicaNombre: clinicInfo?.nombre || "",
+        direccion: perfilClinica.direccionClinica,
+        logoUrl: perfilClinica.logoClinicaUrl,
+        historiaTemplate: historiaClinicaTemplate,
+        historiaRespuestas: historiaClinicaPorPaciente[patient.id] ?? respuestasVacias,
+        notas: notasEvolucionPorPaciente[patient.id] ?? [],
+        citas,
+        presupuestos,
+        pagos,
+        devoluciones,
+        incluirFinanzas: puedeVerFinanzas,
+      });
+      descargarBlob(blob, nombre);
+    } catch {
+      setErrorPdf("No se pudo generar el PDF. Intenta de nuevo.");
+    } finally {
+      setGenerandoPdf(false);
+    }
+  };
+
   const enviarResumen = () => {
     const edad = calculateAge(patient.birthDate);
     const texto = buildResumenExpediente(
@@ -1371,6 +1404,16 @@ export default function Expediente({
               </p>
             </div>
           </div>
+
+          <button
+            onClick={descargarExpediente}
+            disabled={generandoPdf}
+            title="Descargar el expediente completo en PDF: datos, antecedentes, notas de evolución, citas y pagos"
+            className="flex shrink-0 items-center justify-center gap-2 rounded-lg border border-edge/30 px-3 py-2 text-xs font-semibold text-ink/80 transition-colors hover:bg-field disabled:opacity-60"
+          >
+            {generandoPdf ? "Generando PDF…" : "Descargar expediente (PDF)"}
+          </button>
+          {errorPdf && <span className="text-xs text-danger">{errorPdf}</span>}
 
           <button
             onClick={enviarResumen}
