@@ -66,7 +66,13 @@ const sumaPorFecha = (porFecha: Record<string, number> | undefined, dias: string
   redondearDinero(dias.reduce((acc, d) => acc + (porFecha?.[d] ?? 0), 0));
 
 // ---------- Resultado ----------
-export type GastoDeCategoria = { categoria: string; monto: number; porcentajeDeIngresos: number | null; clasificacion: ClasificacionGasto };
+/** `mixto`: la categoría tiene gastos fijos y variables a la vez. */
+export type GastoDeCategoria = {
+  categoria: string;
+  monto: number;
+  porcentajeDeIngresos: number | null;
+  clasificacion: ClasificacionGasto | "mixto";
+};
 
 export type IndicadoresFinanzas = {
   ingresosBrutos: number;
@@ -147,19 +153,27 @@ export function calcularIndicadores(e: EntradaIndicadores): Indicadores {
   const proyeccionCierre = esMesEnCurso && diaDelMes > 0 ? redondearDinero((ingresosNetos / diaDelMes) * dias.length) : null;
 
   const delMes = e.gastos.filter((g) => g.fecha >= primero && g.fecha <= ultimo);
-  const porCategoria = new Map<string, number>();
-  for (const g of delMes) porCategoria.set(g.categoria, redondearDinero((porCategoria.get(g.categoria) ?? 0) + (Number(g.monto) || 0)));
-  const clasificacionDe = (c: string): ClasificacionGasto => e.clasificacionPorCategoria[c as GastoCategoria] ?? "variable";
+  // Cada gasto es fijo o variable según lo que se le puso; sin eso, lo de su categoría (por defecto, variable).
+  const porCategoria = new Map<string, { monto: number; fijo: number; variable: number }>();
+  for (const g of delMes) {
+    const monto = Number(g.monto) || 0;
+    const esFijo = (g.clasificacion ?? e.clasificacionPorCategoria[g.categoria as GastoCategoria] ?? "variable") === "fijo";
+    const actual = porCategoria.get(g.categoria) ?? { monto: 0, fijo: 0, variable: 0 };
+    actual.monto = redondearDinero(actual.monto + monto);
+    if (esFijo) actual.fijo = redondearDinero(actual.fijo + monto);
+    else actual.variable = redondearDinero(actual.variable + monto);
+    porCategoria.set(g.categoria, actual);
+  }
   const gastosPorCategoria: GastoDeCategoria[] = [...porCategoria.entries()]
-    .map(([categoria, monto]) => ({
+    .map(([categoria, v]) => ({
       categoria,
-      monto,
-      porcentajeDeIngresos: ingresosNetos > 0 ? monto / ingresosNetos : null,
-      clasificacion: clasificacionDe(categoria),
+      monto: v.monto,
+      porcentajeDeIngresos: ingresosNetos > 0 ? v.monto / ingresosNetos : null,
+      clasificacion: (v.fijo > 0 && v.variable > 0 ? "mixto" : v.fijo > 0 ? "fijo" : "variable") as GastoDeCategoria["clasificacion"],
     }))
     .sort((a, b) => b.monto - a.monto);
   const gastos = redondearDinero(gastosPorCategoria.reduce((a, g) => a + g.monto, 0));
-  const gastosFijos = redondearDinero(gastosPorCategoria.filter((g) => g.clasificacion === "fijo").reduce((a, g) => a + g.monto, 0));
+  const gastosFijos = redondearDinero([...porCategoria.values()].reduce((a, v) => a + v.fijo, 0));
   const gastosVariables = redondearDinero(gastos - gastosFijos);
   const utilidad = redondearDinero(ingresosNetos - gastos);
   const margen = ingresosNetos > 0 ? utilidad / ingresosNetos : null;

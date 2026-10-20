@@ -232,3 +232,29 @@ describe("horas trabajadas y costo por hora", () => {
     expect(calcularIndicadores(base()).finanzas.costoPorHoraDisponible).toBeNull(); // sin bloques
   });
 });
+
+describe("gastos fijos y variables por gasto", () => {
+  it("un gasto con su propia clasificación manda sobre la de su categoría", () => {
+    const r = calcularIndicadores(
+      base({
+        gastos: [
+          gasto("Nómina", 10000, "2026-10-02"), // categoría fija
+          { ...gasto("Nómina", 4000, "2026-10-03"), clasificacion: "variable" }, // comisiones: variable
+          { ...gasto("Insumos", 1500, "2026-10-04"), clasificacion: "fijo" }, // suscripción fija de insumos
+          gasto("Insumos", 500, "2026-10-05"), // categoría variable
+        ],
+      })
+    ).finanzas;
+    expect(r.gastosFijos).toBe(11500); // 10,000 + 1,500
+    expect(r.gastosVariables).toBe(4500); // 4,000 + 500
+    // Una categoría con las dos clases se marca como mixta.
+    expect(r.gastosPorCategoria.find((g) => g.categoria === "Nómina")?.clasificacion).toBe("mixto");
+    expect(r.gastosPorCategoria.find((g) => g.categoria === "Insumos")?.clasificacion).toBe("mixto");
+  });
+
+  it("sin clasificación propia se sigue usando la de la categoría", () => {
+    const r = calcularIndicadores(base()).finanzas;
+    expect(r.gastosFijos).toBe(20000);
+    expect(r.gastosPorCategoria.find((g) => g.categoria === "Renta")?.clasificacion).toBe("fijo");
+  });
+});

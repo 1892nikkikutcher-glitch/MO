@@ -18,6 +18,8 @@ export type Gasto = {
   monto: number;
   /** Fecha ISO "YYYY-MM-DD". */
   fecha: string;
+  /** Si este gasto es fijo o variable. Ausente = el de su categoría (Administración → Presupuesto de Gastos). */
+  clasificacion?: ClasificacionGasto;
 };
 
 /** Sobres de gasto — clasificación fijo/variable por categoría y un
@@ -67,6 +69,33 @@ export const presupuestoGastosInicial: PresupuestoGastosConfig = {
     ])
   ) as Record<GastoCategoria, PresupuestoCategoria>,
 };
+
+/** Fijo o variable: lo que se le puso a ese gasto y, si no, lo de su categoría. */
+export function clasificacionDeGasto(
+  gasto: Pick<Gasto, "categoria" | "clasificacion">,
+  porCategoria: Partial<Record<GastoCategoria, { clasificacion: ClasificacionGasto }>>
+): ClasificacionGasto {
+  if (gasto.clasificacion === "fijo" || gasto.clasificacion === "variable") return gasto.clasificacion;
+  return porCategoria[gasto.categoria]?.clasificacion ?? presupuestoGastosInicial.porCategoria[gasto.categoria]?.clasificacion ?? "variable";
+}
+
+/** Lo gastado en el rango, separado en fijo y variable (cada gasto con su propia clasificación). */
+export function calcularFijosYVariables(
+  gastos: Gasto[],
+  porCategoria: Partial<Record<GastoCategoria, { clasificacion: ClasificacionGasto }>>,
+  desde: Date,
+  hasta: Date
+): { fijos: number; variables: number; total: number } {
+  let fijos = 0;
+  let variables = 0;
+  gastos.forEach((g) => {
+    const d = new Date(`${g.fecha}T00:00:00`);
+    if (d < desde || d > hasta) return;
+    if (clasificacionDeGasto(g, porCategoria) === "fijo") fijos += g.monto;
+    else variables += g.monto;
+  });
+  return { fijos: redondearDinero(fijos), variables: redondearDinero(variables), total: redondearDinero(fijos + variables) };
+}
 
 /** Suma de gastos del rango, agrupada por categoría — mismo filtro de fecha
  * inclusive que ya usaba el cálculo de "Gastos del Mes" en Gastos.tsx.
