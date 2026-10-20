@@ -3,6 +3,8 @@
 import { useEffect, useRef, useState } from "react";
 import { usePatientData } from "@/context/PatientDataContext";
 import { formatCurrency } from "@/lib/patientData";
+import { generarSaldosPendientesPdf } from "@/lib/generarSaldosPendientesPdf";
+import { descargarBlob } from "@/lib/pdfDocumento";
 import type { PagosSinLigar, SaldoPendienteEntry } from "@/lib/saldosPendientes";
 import type { PosibleDuplicado, PresupuestoDeCitaNoAtendida } from "@/lib/saldosFalsos";
 import { textoAutoriaPresupuesto } from "@/lib/autoriaRegistros";
@@ -17,7 +19,12 @@ export default function ReporteSaldosPendientes() {
     unirPresupuestoDuplicado,
     corregirControlPorError,
     puedeVerFinanzas,
+    patients,
+    clinicInfo,
+    perfilDoctor,
   } = usePatientData();
+  const [generandoPdf, setGenerandoPdf] = useState(false);
+  const [errorPdf, setErrorPdf] = useState("");
   const [corrigiendoControles, setCorrigiendoControles] = useState(false);
   const [mensajesControl, setMensajesControl] = useState<Record<string, { ok: boolean; texto: string }>>({});
   const [controlesOmitidos, setControlesOmitidos] = useState<Set<string>>(new Set());
@@ -116,6 +123,26 @@ export default function ReporteSaldosPendientes() {
   const lista = Object.values(resultado?.porPaciente ?? saldosPendientes.porPaciente).sort(
     (a, b) => b.totalPresupuestado - b.totalPagado - (a.totalPresupuestado - a.totalPagado)
   );
+  const descargarPdf = async () => {
+    setGenerandoPdf(true);
+    setErrorPdf("");
+    try {
+      const { blob, nombre } = await generarSaldosPendientesPdf({
+        saldos: lista,
+        telefonos: Object.fromEntries(patients.map((p) => [p.id, p.phone])),
+        clinicaNombre: clinicInfo?.nombre || "",
+        direccion: perfilDoctor.direccionClinica,
+        logoUrl: perfilDoctor.logoClinicaUrl,
+        provisional: !resultado,
+        fecha: calculadoEl ?? new Date(),
+      });
+      descargarBlob(blob, nombre);
+    } catch {
+      setErrorPdf("No se pudo generar el PDF. Intenta de nuevo.");
+    } finally {
+      setGenerandoPdf(false);
+    }
+  };
   const totalPendiente = lista.reduce((s, e) => s + (e.totalPresupuestado - e.totalPagado), 0);
 
   return (
@@ -145,7 +172,16 @@ export default function ReporteSaldosPendientes() {
                   : "Recalculando…"
                 : "Volver a calcular"}
             </button>
+            <button
+              onClick={descargarPdf}
+              disabled={generandoPdf || lista.length === 0}
+              title="Descargar la lista de pacientes con saldo en PDF"
+              className="rounded-lg border border-edge/30 px-4 py-2 text-xs font-semibold text-ink/80 transition-colors hover:bg-field disabled:opacity-50"
+            >
+              {generandoPdf ? "Generando PDF…" : "Descargar PDF"}
+            </button>
             {errorRecalculo && <span className="text-xs text-danger">{errorRecalculo}</span>}
+            {errorPdf && <span className="text-xs text-danger">{errorPdf}</span>}
           </div>
         )}
       </div>

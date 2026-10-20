@@ -153,3 +153,32 @@ describe("expediente en PDF", () => {
     expect(texto).not.toContain("Resumen de cuenta");
   });
 });
+
+describe("saldos pendientes en PDF", () => {
+  const entrada = (patientId: string, patientName: string, totalPresupuestado: number, totalPagado: number) => ({ patientId, patientName, totalPresupuestado, totalPagado, actualizadoEn: "" });
+
+  it("lista de mayor a menor deuda, con teléfono y total, sin quien ya pagó todo", async () => {
+    const { generarSaldosPendientesPdf } = await import("../generarSaldosPendientesPdf");
+    const { blob, nombre } = await generarSaldosPendientesPdf({
+      saldos: [entrada("a", "Ana Pérez", 5000, 4000), entrada("b", "Beto Ruiz", 9000, 1000), entrada("c", "Cora Saldada", 2000, 2000)],
+      telefonos: { a: "7751111111", b: "7752222222" },
+      clinicaNombre: "Consultorio Medina",
+      fecha: new Date("2026-10-20T12:00:00"),
+    });
+    expect(nombre).toBe("Saldos_pendientes_2026_10_20_Consultorio_Medina.pdf");
+    const texto = await textoDe(blob);
+    expect(texto).toContain("$9,000.00");
+    expect(texto).toContain("7752222222");
+    expect(texto).toContain("$9,000.00"); // total por cobrar: 8,000 + 1,000
+    expect(texto).not.toContain("Cora");
+    expect(texto.indexOf("Beto")).toBeLessThan(texto.indexOf("Ana"));
+  });
+
+  it("avisa cuando nadie debe y cuando las cifras son provisionales", async () => {
+    const { generarSaldosPendientesPdf } = await import("../generarSaldosPendientesPdf");
+    const { blob } = await generarSaldosPendientesPdf({ saldos: [], telefonos: {}, clinicaNombre: "X", provisional: true });
+    const texto = await textoDe(blob);
+    expect(texto).toContain("Ning");
+    expect(texto).toContain("provisionales");
+  });
+});
