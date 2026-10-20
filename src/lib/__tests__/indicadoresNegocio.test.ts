@@ -1,0 +1,203 @@
+import { describe, expect, it } from "vitest";
+import { calcularIndicadores, diasDelMes, mesDesplazado, type EntradaIndicadores } from "../indicadoresNegocio";
+import type { Gasto } from "../gastos";
+
+const gasto = (categoria: Gasto["categoria"], monto: number, fecha: string): Gasto => ({ id: `${categoria}${fecha}${monto}`, concepto: "x", categoria, monto, fecha });
+
+// Octubre 2026 tiene 31 días; el 1 es jueves. Hoy = 20 (mes en curso).
+const base = (extra: Partial<EntradaIndicadores> = {}): EntradaIndicadores => ({
+  mes: "2026-10-15",
+  hoyISO: "2026-10-20",
+  finanzas: {
+    porFecha: { "2026-10-05": 20000, "2026-10-12": 30000, "2026-09-10": 40000, "2026-11-02": 99999 },
+    devolucionesPorFecha: { "2026-10-12": 2000, "2026-09-10": 5000 },
+    pagosCountPorFecha: { "2026-10-05": 8, "2026-10-12": 12, "2026-09-10": 99 },
+    porFechaYMedico: { "2026-10-05": { "Dra. Ana": 14000, "Dr. Luis": 6000 }, "2026-10-12": { "Dra. Ana": 20000, "Dr. Luis": 10000 } },
+  },
+  gastos: [
+    gasto("Renta", 8000, "2026-10-01"),
+    gasto("Nómina", 12000, "2026-10-15"),
+    gasto("Insumos", 6000, "2026-10-08"),
+    gasto("Laboratorio", 4000, "2026-10-09"),
+    gasto("Renta", 8000, "2026-09-01"), // otro mes
+  ],
+  clasificacionPorCategoria: { Renta: "fijo", Nómina: "fijo", Insumos: "variable", Laboratorio: "variable" },
+  citas: [],
+  recursos: [],
+  sedes: [],
+  pacientes: [],
+  saldos: [],
+  metaMensual: 60000,
+  ...extra,
+});
+
+describe("fechas del mes", () => {
+  it("da los días del mes y desplaza meses", () => {
+    expect(diasDelMes("2026-10-15")).toMatchObject({ primero: "2026-10-01", ultimo: "2026-10-31" });
+    expect(diasDelMes("2026-02-10").dias).toHaveLength(28);
+    expect(diasDelMes("2028-02-10").dias).toHaveLength(29);
+    expect(mesDesplazado("2026-10-15", -1)).toBe("2026-09-01");
+    expect(mesDesplazado("2026-01-15", -1)).toBe("2025-12-01");
+    expect(mesDesplazado("2026-12-15", 1)).toBe("2027-01-01");
+  });
+});
+
+describe("indicadores de finanzas", () => {
+  const r = calcularIndicadores(base()).finanzas;
+
+  it("ingresos netos del mes, sin mezclar otros meses", () => {
+    expect(r.ingresosBrutos).toBe(50000);
+    expect(r.devoluciones).toBe(2000);
+    expect(r.ingresosNetos).toBe(48000);
+  });
+
+  it("compara contra el mes anterior", () => {
+    expect(r.ingresosNetosMesAnterior).toBe(35000);
+    expect(r.variacionIngresos).toBeCloseTo(13000 / 35000, 5);
+    expect(calcularIndicadores(base({ mes: "2026-09-10", hoyISO: "2026-10-20" })).finanzas.variacionIngresos).toBeNull(); // agosto sin ingresos
+  });
+
+  it("proyecta el cierre solo si el mes está en curso", () => {
+    expect(r.proyeccionCierre).toBeCloseTo((48000 / 20) * 31, 0);
+    expect(calcularIndicadores(base({ mes: "2026-09-10" })).finanzas.proyeccionCierre).toBeNull();
+  });
+
+  it("suma gastos del mes y los separa en fijos y variables", () => {
+    expect(r.gastos).toBe(30000);
+    expect(r.gastosFijos).toBe(20000);
+    expect(r.gastosVariables).toBe(10000);
+    expect(r.gastosPorCategoria[0]).toMatchObject({ categoria: "Nómina", monto: 12000, clasificacion: "fijo" }); // de mayor a menor
+    expect(r.gastosPorCategoria.find((g) => g.categoria === "Renta")).toMatchObject({ monto: 8000, clasificacion: "fijo" });
+    expect(r.gastosPorCategoria.find((g) => g.categoria === "Nómina")?.porcentajeDeIngresos).toBeCloseTo(12000 / 48000, 5);
+  });
+
+  it("utilidad y margen", () => {
+    expect(r.utilidad).toBe(18000);
+    expect(r.margen).toBeCloseTo(18000 / 48000, 5);
+  });
+
+  it("punto de equilibrio: fijos entre (1 − peso del gasto variable)", () => {
+    // Variables 10,000 / 48,000 = 20.83% → fijos 20,000 / 0.7917 ≈ 25,263.16
+    expect(r.puntoEquilibrio?.ingresoNecesario).toBeCloseTo(25263.16, 1);
+    expect(r.puntoEquilibrio?.superado).toBe(true);
+    expect(r.puntoEquilibrio?.faltan).toBe(0);
+  });
+
+  it("si todavía no llega al equilibrio, dice cuánto falta", () => {
+    const flojo = calcularIndicadores(base({ finanzas: { ...base().finanzas, porFecha: { "2026-10-05": 15000 }, devolucionesPorFecha: {} } })).finanzas;
+    // Variables 10,000 / 15,000 = 66.7% → fijos 20,000 / 0.3333 = 60,000
+    expect(flojo.puntoEquilibrio?.ingresoNecesario).toBe(60000);
+    expect(flojo.puntoEquilibrio?.superado).toBe(false);
+    expect(flojo.puntoEquilibrio?.faltan).toBe(45000);
+  });
+
+  it("sin ingresos no hay margen ni equilibrio que calcular", () => {
+    const vacio = calcularIndicadores(base({ finanzas: { porFecha: {} } })).finanzas;
+    expect(vacio.margen).toBeNull();
+    expect(vacio.puntoEquilibrio).toBeNull();
+    expect(vacio.ticketPromedio).toBeNull();
+    expect(vacio.utilidad).toBe(-30000);
+  });
+
+  it("si el gasto variable se come todo el ingreso, no hay equilibrio posible", () => {
+    const malo = calcularIndicadores(base({ finanzas: { porFecha: { "2026-10-05": 9000 } } })).finanzas;
+    expect(malo.puntoEquilibrio).toBeNull();
+  });
+
+  it("ticket promedio con los pagos del mes", () => {
+    expect(r.pagos).toBe(20);
+    expect(r.ticketPromedio).toBe(2500);
+  });
+
+  it("cuentas por cobrar: solo a quien todavía debe", () => {
+    const c = calcularIndicadores(
+      base({ saldos: [{ totalPresupuestado: 5000, totalPagado: 2000 }, { totalPresupuestado: 1000, totalPagado: 1000 }, { totalPresupuestado: 800, totalPagado: 900 }] })
+    ).finanzas.cuentasPorCobrar;
+    expect(c).toEqual({ total: 3000, pacientes: 1 });
+  });
+
+  it("cumplimiento de la meta y concentración por médico", () => {
+    expect(r.cumplimientoMeta).toBeCloseTo(48000 / 60000, 5);
+    expect(calcularIndicadores(base({ metaMensual: 0 })).finanzas.cumplimientoMeta).toBeNull();
+    expect(r.concentracionMedico?.nombre).toBe("Dra. Ana");
+    expect(r.concentracionMedico?.porcentaje).toBeCloseTo(34000 / 50000, 5);
+  });
+
+  it("una categoría sin clasificar cuenta como variable", () => {
+    const sin = calcularIndicadores(base({ clasificacionPorCategoria: {} })).finanzas;
+    expect(sin.gastosFijos).toBe(0);
+    expect(sin.puntoEquilibrio).toBeNull(); // sin gastos fijos no hay equilibrio
+  });
+});
+
+describe("indicadores de administración y operación", () => {
+  const cita = (id: string, fecha: string, estatus: string, extra: Record<string, unknown> = {}) => ({ id, fecha, horaInicio: "09:00", horaFin: "10:00", estatus, medicoId: "m", patientId: "p1", ...extra });
+  const bloque = { id: "b", sedeId: "s", dias: [1, 2, 3, 4, 5], inicio: "09:00", fin: "13:00" }; // 4 h por día hábil
+  const recursos = [{ id: "m", tipo: "medico", nombre: "Dra. Ana", bloques: [bloque] }];
+
+  it("cuenta citas y tasa de pérdida (sin contar reagendadas ni otros meses)", () => {
+    const o = calcularIndicadores(
+      base({
+        recursos,
+        citas: [
+          cita("1", "2026-10-05", "Atendida"),
+          cita("2", "2026-10-06", "Atendida", { patientId: "p2" }),
+          cita("3", "2026-10-07", "Cancelada"),
+          cita("4", "2026-10-08", "No Asistió"),
+          cita("5", "2026-10-09", "Reagendada"),
+          cita("6", "2026-09-09", "Atendida"),
+        ],
+      })
+    ).operacion;
+    expect(o).toMatchObject({ citasAgendadas: 4, atendidas: 2, canceladas: 1, noAsistio: 1 });
+    expect(o.tasaPerdida).toBeCloseTo(2 / 4, 5);
+  });
+
+  it("utilización de bloques e ingreso por hora atendida", () => {
+    // Octubre 2026 tiene 22 días hábiles → 88 h disponibles; 2 citas atendidas de 1 h.
+    const o = calcularIndicadores(base({ recursos, citas: [cita("1", "2026-10-05", "Atendida"), cita("2", "2026-10-06", "Atendida")] })).operacion;
+    expect(o.horasDisponibles).toBe(88);
+    expect(o.horasAtendidas).toBe(2);
+    expect(o.utilizacionBloques).toBeCloseTo(2 / 88, 5);
+    expect(o.ingresoPorHoraAtendida).toBe(24000); // 48,000 netos / 2 h
+  });
+
+  it("sin bloques no hay utilización", () => {
+    const o = calcularIndicadores(base({ citas: [cita("1", "2026-10-05", "Atendida")] })).operacion;
+    expect(o.utilizacionBloques).toBeNull();
+  });
+
+  it("pacientes nuevos del mes y activos en los últimos 12 meses", () => {
+    const o = calcularIndicadores(
+      base({
+        pacientes: [{ id: "p1", createdAt: "2026-10-03" }, { id: "p2", createdAt: "2026-10-31" }, { id: "p3", createdAt: "2026-09-30" }, { id: "p4" }],
+        citas: [
+          cita("1", "2026-10-05", "Atendida", { patientId: "p1" }),
+          cita("2", "2026-02-05", "Atendida", { patientId: "p2" }),
+          cita("3", "2025-08-05", "Atendida", { patientId: "p3" }), // hace más de un año
+          cita("4", "2026-10-06", "Cancelada", { patientId: "p4" }),
+          cita("5", "2026-10-25", "Atendida", { patientId: "p5" }), // futura: no cuenta como activo
+        ],
+      })
+    ).operacion;
+    expect(o.pacientesNuevos).toBe(2);
+    expect(o.pacientesActivos).toBe(2); // p1 y p2
+  });
+
+  it("presupuestos: tasa de cierre sobre los ya resueltos, y lo que sigue pendiente", () => {
+    const o = calcularIndicadores(
+      base({
+        presupuestosPorEstado: {
+          pendiente: { cantidad: 4, valor: 12000 },
+          aceptado: { cantidad: 6, valor: 30000 },
+          rechazado: { cantidad: 2, valor: 5000 },
+          expirado: { cantidad: 2, valor: 4000 },
+        },
+      })
+    ).operacion.presupuestos;
+    expect(o?.tasaCierre).toBeCloseTo(6 / 10, 5);
+    expect(o?.pendientes).toBe(4);
+    expect(o?.valorPendiente).toBe(12000);
+    expect(calcularIndicadores(base()).operacion.presupuestos).toBeNull();
+  });
+});

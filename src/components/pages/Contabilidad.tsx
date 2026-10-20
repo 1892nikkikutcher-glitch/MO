@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import FondosFinancieros from "@/components/dashboard/FondosFinancieros";
+import IndicadoresNegocio from "@/components/pages/IndicadoresNegocio";
 import { moduloVisibleParaRol } from "@/lib/permisosRol";
 import { usePatientData } from "@/context/PatientDataContext";
 import { usePrivacidad } from "@/context/PrivacidadContext";
@@ -292,6 +293,9 @@ export default function Contabilidad() {
           )}
         </div>
       )}
+
+      {/* Indicadores empresariales del mes (finanzas y operación). */}
+      <IndicadoresNegocio />
 
       {/* La Regla de sobres: cómo se reparten los ingresos por periodo (la misma que se ve en el Inicio). */}
       <FondosFinancieros />

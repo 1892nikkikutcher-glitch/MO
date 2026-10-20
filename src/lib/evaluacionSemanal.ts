@@ -130,8 +130,13 @@ function solape(aIni: number, aFin: number, bIni: number, bFin: number): number 
 }
 
 export function resumenSemana(entrada: { lunes: string; recursos: RecursoEval[]; sedes: Sede[]; citas: CitaEval[] }): ResumenSemana {
-  const { lunes, recursos, sedes, citas } = entrada;
-  const dias = diasDeLaSemana(lunes);
+  return resumenDeDias({ dias: diasDeLaSemana(entrada.lunes), recursos: entrada.recursos, sedes: entrada.sedes, citas: entrada.citas });
+}
+
+/** Mismo resumen para cualquier rango de días seguidos (una semana, un mes…); `lunes` trae el primer día. */
+export function resumenDeDias(entrada: { dias: string[]; recursos: RecursoEval[]; sedes: Sede[]; citas: CitaEval[] }): ResumenSemana {
+  const { dias, recursos, sedes, citas } = entrada;
+  const lunes = dias[0];
   const medicos = recursos.filter((r) => r.tipo === "medico");
   const filas = new Map<string, FilaBloque>();
   const nombreSede = (id: string) => sedes.find((s) => s.id === id)?.nombre ?? "Sede sin nombre";
@@ -164,7 +169,7 @@ export function resumenSemana(entrada: { lunes: string; recursos: RecursoEval[];
   let tarde = 0;
   let sinDato = 0;
 
-  const enSemana = citas.filter((c) => c.fecha >= dias[0] && c.fecha <= dias[6]);
+  const enSemana = citas.filter((c) => c.fecha >= dias[0] && c.fecha <= dias[dias.length - 1]);
   for (const c of enSemana) {
     const medico = medicos.find((m) => m.id === (c.medicoId || c.recursoId));
     const ini = aMinutos(c.horaInicio);
