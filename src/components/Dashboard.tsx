@@ -55,6 +55,7 @@ import SeguimientoAsistencia from "./pages/SeguimientoAsistencia";
 import ReporteCorteDiario from "./pages/ReporteCorteDiario";
 import ReporteCorteCaja from "./pages/ReporteCorteCaja";
 import ReporteEvaluacionSemanal from "./pages/ReporteEvaluacionSemanal";
+import ReporteCierreDelDia from "./pages/ReporteCierreDelDia";
 import ReporteGraficas from "./pages/ReporteGraficas";
 import ReporteCP from "./pages/ReporteCP";
 import ReporteSaldosPendientes from "./pages/ReporteSaldosPendientes";
@@ -120,6 +121,7 @@ const paginasConstruidas = new Set([
   "reportes-corte-diario",
   "reportes-corte-caja",
   "reportes-evaluacion-semanal",
+  "reportes-cierre-del-dia",
   "reportes-graficas",
   "reportes-cp",
   "reportes-saldos-pendientes",
@@ -896,6 +898,7 @@ function DashboardBody({
           {activePage === "reportes-corte-diario" && <ReporteCorteDiario />}
           {activePage === "reportes-corte-caja" && <ReporteCorteCaja />}
           {activePage === "reportes-evaluacion-semanal" && <ReporteEvaluacionSemanal />}
+          {activePage === "reportes-cierre-del-dia" && <ReporteCierreDelDia />}
           {activePage === "reportes-graficas" && <ReporteGraficas />}
           {activePage === "reportes-cp" && <ReporteCP />}
           {activePage === "reportes-saldos-pendientes" && <ReporteSaldosPendientes />}

@@ -160,6 +160,30 @@ type CitaMinima = {
 
 const ESTATUS_QUE_NO_OCUPAN = new Set(["Cancelada", "Reagendada", "No Asistió"]);
 
+/** Huecos libres de un bloque: los tramos que las citas (las que ocupan lugar) no cubren, en minutos desde la
+ * medianoche. `excluirCitaId` deja fuera la cita que se está editando. */
+export function huecosLibresDelBloque(
+  bloque: BloqueAtencion,
+  citasDelMedicoEseDia: CitaMinima[],
+  excluirCitaId?: string
+): { ini: number; fin: number }[] {
+  const inicioB = aMinutos(bloque.inicio);
+  const finB = aMinutos(bloque.fin);
+  const ocupadas = citasDelMedicoEseDia
+    .filter((c) => !(excluirCitaId && c.id === excluirCitaId) && !ESTATUS_QUE_NO_OCUPAN.has(c.estatus ?? ""))
+    .map((c) => ({ ini: aMinutos(c.horaInicio), fin: aMinutos(c.horaFin) }))
+    .filter((c) => c.fin > inicioB && c.ini < finB)
+    .sort((x, y) => x.ini - y.ini);
+  const huecos: { ini: number; fin: number }[] = [];
+  let cursor = inicioB;
+  for (const o of ocupadas) {
+    if (o.ini > cursor) huecos.push({ ini: cursor, fin: o.ini });
+    cursor = Math.max(cursor, o.fin);
+  }
+  if (cursor < finB) huecos.push({ ini: cursor, fin: finB });
+  return huecos;
+}
+
 /** Horarios para esta cita que no dejan huecos: empezando justo cuando termina otra cita del bloque, o
  * justo antes de la siguiente; si el bloque está vacío, a su inicio. Los pegados a una cita van primero. */
 export function horariosSeguidos(
@@ -171,27 +195,15 @@ export function horariosSeguidos(
 ): string[] {
   const inicioB = aMinutos(bloque.inicio);
   const finB = aMinutos(bloque.fin);
-  const ocupadas = citasDelMedicoEseDia
-    .filter((c) => !(excluirCitaId && c.id === excluirCitaId) && !ESTATUS_QUE_NO_OCUPAN.has(c.estatus ?? ""))
-    .map((c) => ({ ini: aMinutos(c.horaInicio), fin: aMinutos(c.horaFin) }))
-    .filter((c) => c.fin > inicioB && c.ini < finB)
-    .sort((a, b) => a.ini - b.ini);
-
-  // Huecos libres dentro del bloque.
-  const huecos: { ini: number; fin: number }[] = [];
-  let cursor = inicioB;
-  for (const o of ocupadas) {
-    if (o.ini > cursor) huecos.push({ ini: cursor, fin: o.ini });
-    cursor = Math.max(cursor, o.fin);
-  }
-  if (cursor < finB) huecos.push({ ini: cursor, fin: finB });
+  const huecos = huecosLibresDelBloque(bloque, citasDelMedicoEseDia, excluirCitaId);
+  const hayCitas = huecos.length !== 1 || huecos[0].ini !== inicioB || huecos[0].fin !== finB;
 
   // Prioridad 0: pegado a una cita ya agendada (o al inicio del bloque si todavía está vacío); 1: lo demás.
   const candidatos: { inicio: number; prioridad: number }[] = [];
   for (const h of huecos) {
     if (h.fin - h.ini < duracionMin) continue;
     const pegadoAUnaCitaAntes = h.ini !== inicioB;
-    candidatos.push({ inicio: h.ini, prioridad: pegadoAUnaCitaAntes || ocupadas.length === 0 ? 0 : 1 });
+    candidatos.push({ inicio: h.ini, prioridad: pegadoAUnaCitaAntes || !hayCitas ? 0 : 1 });
     const pegadoAUnaCitaDespues = h.fin !== finB;
     if (pegadoAUnaCitaDespues && h.fin - duracionMin !== h.ini) candidatos.push({ inicio: h.fin - duracionMin, prioridad: 0 });
   }
