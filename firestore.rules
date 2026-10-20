@@ -424,6 +424,10 @@ service cloud.firestore {
     match /users/{ownerId}/gastos/{id} {
       allow read, write: if isClinicAdmin(ownerId);
     }
+    // Cashback de pacientes (ganado, usado, transferido): dinero a favor del paciente, solo el administrador lo ve y lo mueve.
+    match /users/{ownerId}/cashbackMovimientos/{id} {
+      allow read, write: if isClinicAdmin(ownerId);
+    }
     match /users/{ownerId}/devolucionesLog/{id} {
       allow read, write: if isClinicAdmin(ownerId);
     }

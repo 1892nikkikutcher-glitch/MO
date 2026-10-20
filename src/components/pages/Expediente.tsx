@@ -21,6 +21,7 @@ import Laboratorios from "./Laboratorios";
 import NotasEvolucionTab from "@/components/notasEvolucion/NotasEvolucionTab";
 import InterconsultasPaciente from "./InterconsultasPaciente";
 import MembresiaTab from "./MembresiaTab";
+import CashbackPaciente from "./CashbackPaciente";
 import { usePatientData } from "@/context/PatientDataContext";
 import { useMoConecta } from "@/context/MoConectaContext";
 import { generarPresupuestoPdf } from "@/lib/generarPresupuestoPdf";
@@ -87,6 +88,7 @@ const expedienteTabs = [
   "Plan de Tratamiento y Presupuesto",
   "Pagos",
   "Membresía",
+  "Cashback",
   "Fotografías",
   "Laboratorios",
   "Listado de Citas",
@@ -1125,6 +1127,7 @@ export default function Expediente({
     citas,
     recursos,
     puedeVerFinanzas,
+    miRol,
     historiaClinicaTemplate,
     historiaClinicaPorPaciente,
     setCambiosSinGuardar,
@@ -1175,7 +1178,8 @@ export default function Expediente({
 
   useEffect(() => {
     if (activeTab === "Pagos" && !puedeVerFinanzas) setActiveTab(expedienteTabs[0]);
-  }, [activeTab, puedeVerFinanzas]);
+    if (activeTab === "Cashback" && miRol !== "admin") setActiveTab(expedienteTabs[0]);
+  }, [activeTab, puedeVerFinanzas, miRol]);
 
   // Carrusel de pestañas con movimiento perpetuo, como un anuncio: se
   // desplaza solo, lento, y se detiene en cuanto el mouse/dedo se acerca —
@@ -1341,7 +1345,7 @@ export default function Expediente({
     window.open(`https://wa.me/${telefono}?text=${encodeURIComponent(texto)}`, "_blank");
   };
 
-  const tabsVisibles = expedienteTabs.filter((tab) => tab !== "Pagos" || puedeVerFinanzas);
+  const tabsVisibles = expedienteTabs.filter((tab) => (tab !== "Pagos" || puedeVerFinanzas) && (tab !== "Cashback" || miRol === "admin"));
 
   return (
     <div className="space-y-6">
@@ -1631,6 +1635,7 @@ export default function Expediente({
               )}
             </div>
           )}
+          {activeTab === "Cashback" && <CashbackPaciente patientId={patient.id} patientName={patient.name} />}
           {activeTab === "Laboratorios" && <Laboratorios patientId={patient.id} />}
           {activeTab === "Notas de Evolución y Seguimiento" && (
             <NotasEvolucionTab patientId={patient.id} citaId={initialCitaId} />
@@ -1658,6 +1663,7 @@ export default function Expediente({
             activeTab !== "Fotografías" &&
             activeTab !== "Pagos" &&
             activeTab !== "Membresía" &&
+            activeTab !== "Cashback" &&
             activeTab !== "Consentimientos Informados" &&
             activeTab !== "Laboratorios" &&
             activeTab !== "Notas de Evolución y Seguimiento" &&

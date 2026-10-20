@@ -385,3 +385,18 @@ describe("indicadores de resultados, efectivo, cobranza y rentabilidad", () => {
     expect(calcularIndicadores(conTodo).finanzas.balance.capturado).toBe(false);
   });
 });
+
+describe("flujo de efectivo y cashback", () => {
+  it("lo pagado con cashback es venta pero no dinero que entró", () => {
+    const e = base({
+      finanzas: {
+        ...base().finanzas,
+        porFechaYFormaPago: { "2026-10-05": { Efectivo: 15000, Cashback: 5000 }, "2026-10-12": { Tarjeta: 30000 } },
+      },
+    });
+    const f = calcularIndicadores(e).finanzas;
+    expect(f.ingresosNetos).toBe(48000);
+    expect(f.entradasEfectivo).toBe(43000);
+    expect(f.flujoEfectivo).toBe(f.entradasEfectivo - f.salidasEfectivo);
+  });
+});

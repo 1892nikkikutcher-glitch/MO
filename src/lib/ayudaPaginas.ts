@@ -88,6 +88,14 @@ export const ayudaPaginas: Record<string, AyudaPagina> = {
       "Aquí ves la vigencia de la membresía activa del paciente y qué beneficios ya usó.",
     ],
   },
+  "pacientes-Cashback": {
+    titulo: "Expediente — Cashback",
+    resumen: "El saldo de cashback del paciente: lo que puede usar, lo que espera tu aprobación y sus movimientos.",
+    puntos: [
+      "Para usarlo, al registrar un pago elige la forma de pago Cashback.",
+      "Desde aquí puedes transferir saldo a un conocido o familiar que ya esté registrado como paciente.",
+    ],
+  },
   "pacientes-Consentimientos Informados": {
     titulo: "Expediente — Consentimientos Informados",
     resumen: "Genera cartas de consentimiento informado ya prellenadas con los datos del paciente y del doctor.",
@@ -174,6 +182,15 @@ export const ayudaPaginas: Record<string, AyudaPagina> = {
     resumen: "Configura los planes de membresía del consultorio y sus beneficios — la asignación a cada paciente se hace desde su expediente.",
     puntos: [
       "Define el precio, vigencia y beneficios incluidos de cada plan aquí; luego se asigna paciente por paciente en la pestaña Membresía de su expediente.",
+    ],
+  },
+  cashback: {
+    titulo: "Cashback",
+    resumen: "Un porcentaje de lo que el paciente paga en sus tratamientos vuelve como saldo para su siguiente tratamiento. Tú apruebas cada cashback.",
+    puntos: [
+      "Define aquí el porcentaje (por ejemplo 3%: $30 por cada $1,000), cuánto dura el saldo y si se puede transferir.",
+      "Cada pago de tratamiento genera un cashback por aprobar: puedes aprobarlo, rechazarlo o cambiar el monto antes.",
+      "El paciente usa su saldo eligiendo Cashback como forma de pago, y puede transferirlo a un conocido o familiar que ya sea paciente (también lo apruebas tú).",
     ],
   },
   educacion: {

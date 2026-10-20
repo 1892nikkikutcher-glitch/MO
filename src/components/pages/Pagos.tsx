@@ -19,6 +19,7 @@ import ReciboPagoPanel from "@/components/ReciboPagoPanel";
 import RegistrarDevolucionDialog from "@/components/RegistrarDevolucionDialog";
 import { calcularDisponibleDevolucion, resumenDesdeDevoluciones } from "@/lib/devolucionesPago";
 import { fechaPagoAIso } from "@/lib/metas";
+import { FORMA_PAGO_CASHBACK } from "@/lib/cashback";
 
 const formasDePago = ["Efectivo", "Tarjeta de crédito", "Tarjeta de débito", "Transferencia", "Cheque"];
 
@@ -380,8 +381,10 @@ export function AgregarPagoDialog({
   // de la clínica (Agenda → Recursos), nunca de una lista genérica — así
   // "Médico" en el recibo es el mismo nombre que alimenta el desglose de
   // ingresos por médico, en vez de un valor que nadie más lee.
-  const { recursos } = usePatientData();
+  const { recursos, saldoCashbackDe } = usePatientData();
   const medicosDisponibles = recursos.filter((r) => r.tipo === "medico").map((r) => r.nombre);
+  const cashbackDisponible = saldoCashbackDe(patientId).disponible;
+  const formasDisponibles = cashbackDisponible > 0 ? [...formasDePago, FORMA_PAGO_CASHBACK] : formasDePago;
 
   const [paso, setPaso] = useState<"form" | "firma" | "recibo">("form");
   const [pagoGuardado, setPagoGuardado] = useState<Pago | null>(null);
@@ -413,7 +416,9 @@ export function AgregarPagoDialog({
   const totalExtras = extras.reduce((sum, e) => sum + e.monto, 0);
   const totalAPagar = totalTratamientosSeleccionados + totalExtras;
 
-  const puedeGuardar = totalAPagar > 0 && medico !== "";
+  const pagaConCashback = formaPago === FORMA_PAGO_CASHBACK;
+  const excedeCashback = pagaConCashback && totalAPagar > cashbackDisponible + 0.001;
+  const puedeGuardar = totalAPagar > 0 && medico !== "" && !excedeCashback;
 
   const handleGuardar = () => {
     if (!puedeGuardar) return;
@@ -544,12 +549,15 @@ export function AgregarPagoDialog({
             <div>
               <label className="mb-1 block text-xs font-medium text-ink/60">Forma de pago</label>
               <select value={formaPago} onChange={(e) => setFormaPago(e.target.value)} className={inputClass}>
-                {formasDePago.map((f) => (
+                {formasDisponibles.map((f) => (
                   <option key={f} value={f}>
-                    {f}
+                    {f === FORMA_PAGO_CASHBACK ? `Cashback (disponible ${formatCurrency(cashbackDisponible)})` : f}
                   </option>
                 ))}
               </select>
+              {excedeCashback && (
+                <p className="mt-1 text-[11px] text-danger">El pago es mayor al cashback disponible ({formatCurrency(cashbackDisponible)}). Baja el monto o elige otra forma de pago.</p>
+              )}
             </div>
           </div>
 

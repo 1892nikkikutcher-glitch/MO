@@ -12,6 +12,14 @@ import {
 import { sedesInicial, type Sede, type SedesConfig } from "@/lib/sedesBloques";
 import { balanceInicial, type BalanceConsultorio } from "@/lib/balanceConsultorio";
 import {
+  cashbackConfigInicial,
+  saldoCashback,
+  sincronizarCashbackConPagos,
+  type CashbackConfig,
+  type MovimientoCashback,
+  type SaldoCashback,
+} from "@/lib/cashback";
+import {
   arrayUnion,
   collection,
   deleteDoc,
@@ -685,7 +693,8 @@ type PatientDataContextValue = {
   presupuestosPorPaciente: Record<string, SavedBudget[]>;
   setPresupuestosPaciente: (patientId: string, updater: Updater<SavedBudget[]>) => void;
   pagosPorPaciente: Record<string, Pago[]>;
-  setPagosPaciente: (patientId: string, updater: Updater<Pago[]>) => void;
+  /** `sinCashback`: el cambio es un movimiento interno (ej. fusionar expedientes), no un cobro nuevo: no genera cashback. */
+  setPagosPaciente: (patientId: string, updater: Updater<Pago[]>, opciones?: { sinCashback?: boolean }) => void;
   recetasPorPaciente: Record<string, Receta[]>;
   setRecetasPaciente: (patientId: string, updater: Updater<Receta[]>) => void;
   laboratoriosPorPaciente: Record<string, SolicitudLaboratorio[]>;
@@ -946,6 +955,14 @@ type PatientDataContextValue = {
   /** Balance del consultorio (efectivo, deudas…) para capital de trabajo y endeudamiento; solo el administrador lo edita. */
   balance: BalanceConsultorio;
   setBalance: (balance: BalanceConsultorio) => void;
+  /** Programa de cashback: porcentaje, vigencia y si se puede transferir. */
+  cashbackConfig: CashbackConfig;
+  setCashbackConfig: (config: CashbackConfig) => void;
+  /** Todos los movimientos de cashback de la clínica (ganado, usado, transferido), solo para el administrador. */
+  cashbackMovimientos: MovimientoCashback[];
+  setCashbackMovimientos: (updater: Updater<MovimientoCashback[]>) => void;
+  /** Saldo de cashback de un paciente: disponible, por aprobar, por vencer. */
+  saldoCashbackDe: (patientId: string) => SaldoCashback;
   presupuestoGastos: PresupuestoGastosConfig;
   setPresupuestoGastos: (updater: Updater<PresupuestoGastosConfig>) => void;
   finanzas: FinanzasConfig;
@@ -1095,6 +1112,10 @@ export function PatientDataProvider({
   const setSedes = (lista: Sede[]) => setSedesConfig({ lista });
   const [balance, setBalanceDoc] = useFirestoreDoc<BalanceConsultorio>(clinicUid, "balance", balanceInicial);
   const setBalance = (b: BalanceConsultorio) => setBalanceDoc(b);
+  const [cashbackConfig, setCashbackConfigDoc] = useFirestoreDoc<CashbackConfig>(clinicUid, "cashback", cashbackConfigInicial);
+  const setCashbackConfig = (c: CashbackConfig) => setCashbackConfigDoc(c);
+  const [cashbackMovimientos, setCashbackMovimientos] = useFirestoreList<MovimientoCashback>(clinicUid, "cashbackMovimientos");
+  const saldoCashbackDe = (patientId: string) => saldoCashback(cashbackMovimientos, patientId, cashbackConfig);
   const [presupuestoGastos, setPresupuestoGastos] = useFirestoreDoc<PresupuestoGastosConfig>(
     clinicUid,
     "presupuestoGastos",
@@ -1955,7 +1976,7 @@ export function PatientDataProvider({
     return { nextConLigas, presupuestosAgregados };
   };
 
-  const setPagosPaciente = (patientId: string, updater: Updater<Pago[]>) => {
+  const setPagosPaciente = (patientId: string, updater: Updater<Pago[]>, opciones?: { sinCashback?: boolean }) => {
     if (!clinicUid) return;
     const prevArr = pagosPorPaciente[patientId] ?? [];
     const generado = resolveUpdater(updater, prevArr);
@@ -1975,6 +1996,11 @@ export function PatientDataProvider({
       ...(presupuestosPorPaciente[patientId] ?? []),
     ];
     registrarSaldoPendiente(patientId, presupuestosActuales, next, devolucionesPorPaciente[patientId] ?? []);
+    if (!opciones?.sinCashback) {
+      const nombrePaciente = patients.find((p) => p.id === patientId)?.name ?? "";
+      const ahoraIso = new Date().toISOString();
+      setCashbackMovimientos((prevMovs) => sincronizarCashbackConPagos(prevMovs, patientId, nombrePaciente, prevArr, next, cashbackConfig, ahoraIso));
+    }
     setPagosPorPacienteState((prev) => ({ ...prev, [patientId]: next }));
   };
 
@@ -2899,7 +2925,15 @@ export function PatientDataProvider({
     fotosResueltas: FotosPaciente;
   }) => {
     setPresupuestosPaciente(sobrevivienteId, (prev) => [...prev, ...(presupuestosPorPaciente[perdedorId] ?? [])]);
-    setPagosPaciente(sobrevivienteId, (prev) => [...prev, ...(pagosPorPaciente[perdedorId] ?? [])]);
+    setPagosPaciente(sobrevivienteId, (prev) => [...prev, ...(pagosPorPaciente[perdedorId] ?? [])], { sinCashback: true });
+    setCashbackMovimientos((prev) =>
+      prev.map((m) => ({
+        ...m,
+        patientId: m.patientId === perdedorId ? sobrevivienteId : m.patientId,
+        patientName: m.patientId === perdedorId ? (patients.find((p) => p.id === sobrevivienteId)?.name ?? m.patientName) : m.patientName,
+        ...(m.destinoId === perdedorId ? { destinoId: sobrevivienteId } : {}),
+      }))
+    );
     setRecetasPaciente(sobrevivienteId, (prev) => [...prev, ...(recetasPorPaciente[perdedorId] ?? [])]);
     setLaboratoriosPaciente(sobrevivienteId, (prev) => [...prev, ...(laboratoriosPorPaciente[perdedorId] ?? [])]);
     setDiagnosticosPaciente(sobrevivienteId, (prev) => [...prev, ...(diagnosticosPorPaciente[perdedorId] ?? [])]);
@@ -3255,6 +3289,11 @@ export function PatientDataProvider({
         setSedes,
         balance,
         setBalance,
+        cashbackConfig,
+        setCashbackConfig,
+        cashbackMovimientos,
+        setCashbackMovimientos,
+        saldoCashbackDe,
         presupuestoGastos,
         setPresupuestoGastos,
         finanzas,

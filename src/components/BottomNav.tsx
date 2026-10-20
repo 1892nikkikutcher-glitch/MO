@@ -140,6 +140,19 @@ export const navItems = [
     ),
   },
   {
+    id: "cashback",
+    label: "Cashback",
+    icon: (
+      <path
+        d="M20 12a8 8 0 1 1-2.3-5.6M20 4v4h-4M9.5 14.5c.6.8 1.5 1.2 2.5 1.2 1.4 0 2.3-.7 2.3-1.7 0-2.3-4.6-1.2-4.6-3.5 0-1 .9-1.7 2.3-1.7 1 0 1.8.4 2.4 1.1M12 7.5v1.1m0 6.9v1.1"
+        stroke="currentColor"
+        strokeWidth="1.8"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+    ),
+  },
+  {
     id: "reportes",
     label: "Reportes",
     icon: (
