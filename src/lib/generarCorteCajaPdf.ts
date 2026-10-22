@@ -2,6 +2,8 @@ import { ConstructorPdf, dineroPdf, fechaPdf, nombreArchivoPdf, porcentajePdf } 
 import { FORMA_PAGO_CASHBACK } from "./cashback";
 
 export type DatosCorteCajaPdf = {
+  /** "Corte de caja" (por defecto) o "Corte diario": el mismo documento, con otro título y nombre de archivo. */
+  titulo?: string;
   /** Día del corte (AAAA-MM-DD). */
   fecha: string;
   cobrosBrutos: number;
@@ -30,13 +32,14 @@ function fechaLarga(iso: string): string {
 /** Corte de caja de un día en PDF: cobros, devoluciones, ingreso neto, desglose por forma de pago y por médico (con su comisión). */
 export async function generarCorteCajaPdf(datos: DatosCorteCajaPdf): Promise<{ blob: Blob; nombre: string }> {
   const neto = Math.round((datos.cobrosBrutos - datos.devoluciones) * 100) / 100;
+  const titulo = datos.titulo ?? "Corte de caja";
   const pdf = new ConstructorPdf({
-    titulo: "Corte de caja",
+    titulo,
     subtitulo: fechaLarga(datos.fecha),
     clinicaNombre: datos.clinicaNombre,
     direccion: datos.direccion,
     logoUrl: datos.logoUrl,
-    pieDePagina: `Corte de caja · ${fechaPdf(datos.fecha)} · Documento confidencial`,
+    pieDePagina: `${titulo} · ${fechaPdf(datos.fecha)} · Documento confidencial`,
   });
   await pdf.encabezado();
 
@@ -117,5 +120,5 @@ export async function generarCorteCajaPdf(datos: DatosCorteCajaPdf): Promise<{ b
     );
   }
 
-  return { blob: pdf.finalizar(), nombre: nombreArchivoPdf("Corte de caja", datos.fecha, datos.clinicaNombre) };
+  return { blob: pdf.finalizar(), nombre: nombreArchivoPdf(titulo, datos.fecha, datos.clinicaNombre) };
 }

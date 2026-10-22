@@ -279,3 +279,26 @@ describe("corte de caja en PDF", () => {
     expect(texto).not.toContain("DESGLOSE POR M");
   });
 });
+
+describe("corte diario en PDF", () => {
+  it("es el mismo corte con título de corte diario y sin secciones de médicos ni de últimos días", async () => {
+    const { generarCorteCajaPdf } = await import("../generarCorteCajaPdf");
+    const { blob, nombre } = await generarCorteCajaPdf({
+      titulo: "Corte diario",
+      fecha: "2026-10-22",
+      cobrosBrutos: 1000,
+      devoluciones: 0,
+      formas: [["Efectivo", 1000]],
+      metodosDevolucion: [],
+      medicos: [],
+      ultimosDias: [],
+      clinicaNombre: "Consultorio Medina",
+    });
+    expect(nombre).toBe("Corte_diario_2026_10_22_Consultorio_Medina.pdf");
+    const texto = await textoDe(blob);
+    expect(texto).toContain("Corte diario");
+    expect(texto).toContain("jueves 22 de octubre de 2026");
+    expect(texto).not.toContain("DESGLOSE POR M");
+    expect(texto).not.toContain("LTIMOS D");
+  });
+});

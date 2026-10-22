@@ -4,6 +4,8 @@ import { useState } from "react";
 import { usePatientData } from "@/context/PatientDataContext";
 import { formatCurrency } from "@/lib/patientData";
 import { sumarDias } from "@/lib/evaluacionSemanal";
+import { generarCorteCajaPdf } from "@/lib/generarCorteCajaPdf";
+import { descargarBlob } from "@/lib/pdfDocumento";
 
 function hoyIso(): string {
   const hoy = new Date();
@@ -17,7 +19,9 @@ function fechaLarga(iso: string): string {
 }
 
 export default function ReporteCorteDiario() {
-  const { finanzas } = usePatientData();
+  const { finanzas, clinicInfo, perfilDoctor } = usePatientData();
+  const [generandoPdf, setGenerandoPdf] = useState(false);
+  const [errorPdf, setErrorPdf] = useState("");
   const hoy = hoyIso();
   const [iso, setIso] = useState(hoy);
   const esHoy = iso === hoy;
@@ -28,6 +32,31 @@ export default function ReporteCorteDiario() {
   const formas = Object.entries(porForma).sort((a, b) => b[1] - a[1]);
   const porMetodoDevolucion = finanzas.devolucionesPorFechaYMetodo?.[iso] ?? {};
   const metodosDevolucion = Object.entries(porMetodoDevolucion).sort((a, b) => b[1] - a[1]);
+
+  const descargarPdf = async () => {
+    setGenerandoPdf(true);
+    setErrorPdf("");
+    try {
+      const { blob, nombre } = await generarCorteCajaPdf({
+        titulo: "Corte diario",
+        fecha: iso,
+        cobrosBrutos,
+        devoluciones,
+        formas,
+        metodosDevolucion,
+        medicos: [],
+        ultimosDias: [],
+        clinicaNombre: clinicInfo?.nombre || "",
+        direccion: perfilDoctor.direccionClinica,
+        logoUrl: perfilDoctor.logoClinicaUrl,
+      });
+      descargarBlob(blob, nombre);
+    } catch {
+      setErrorPdf("No se pudo generar el PDF. Intenta de nuevo.");
+    } finally {
+      setGenerandoPdf(false);
+    }
+  };
 
   return (
     <div className="max-w-xl space-y-6">
@@ -69,6 +98,15 @@ export default function ReporteCorteDiario() {
               aria-label="Elegir fecha"
               className="rounded-lg border border-edge/10 bg-field px-3 py-2 text-sm text-ink outline-none"
             />
+            <button
+              onClick={descargarPdf}
+              disabled={generandoPdf}
+              title="Descargar el corte de este día en PDF"
+              className="rounded-lg border border-edge/30 bg-field px-3.5 py-2 text-sm font-semibold text-ink/90 transition-colors hover:bg-surface2 disabled:opacity-60"
+            >
+              {generandoPdf ? "Generando PDF…" : "Descargar PDF"}
+            </button>
+            {errorPdf && <span className="text-xs text-danger">{errorPdf}</span>}
           </div>
         </div>
         <div className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-3">
