@@ -29,7 +29,7 @@ export function terminosCashback(config: CashbackConfig): string[] {
       : "No puede cambiarse por efectivo, transferirse ni utilizarse para pagar adeudos anteriores."
   );
   t.push("No aplica conjuntamente con promociones, paquetes, membresías, cortesías o tarifas especiales.");
-  t.push("El cashback nuevo se calcula después de descontar el saldo utilizado.");
+  t.push("El Saldo Sonríe nuevo se calcula después de descontar el saldo utilizado.");
   t.push("En cancelaciones o devoluciones se reversará el saldo generado.");
   t.push("La clínica mostrará al paciente su saldo, movimientos y vencimientos.");
   return t;
@@ -47,10 +47,10 @@ export function mensajeSaldoWhatsApp(args: {
   const L: string[] = [`Hola, ${primerNombre}.`];
   const total = saldo.disponible + saldo.porLiberar;
   if (total <= 0) {
-    L.push(`Por el momento no tienes saldo de cashback en ${args.clinica || "tu clínica"}. Con ${num(config.porcentaje)}% de tus pagos elegibles puedes acumular saldo para tus próximas atenciones.`);
+    L.push(`Por el momento no tienes Saldo Sonríe en ${args.clinica || "tu clínica"}. Con ${num(config.porcentaje)}% de tus pagos elegibles puedes acumular saldo para tus próximas atenciones.`);
     return L.join(" ");
   }
-  L.push(`Tienes ${pesos(total)} de saldo de cashback en ${args.clinica || "tu clínica"}${saldo.porLiberar > 0 && saldo.disponible > 0 ? ` (${pesos(saldo.porLiberar)} se liberan mañana)` : saldo.porLiberar > 0 ? " (se libera a partir de mañana)" : ""}.`);
+  L.push(`Tienes ${pesos(total)} disponibles en tu Saldo Sonríe de ${args.clinica || "tu clínica"}${saldo.porLiberar > 0 && saldo.disponible > 0 ? ` (${pesos(saldo.porLiberar)} se liberan mañana)` : saldo.porLiberar > 0 ? " (se libera a partir de mañana)" : ""}.`);
   const cubre: string[] = [];
   if (config.porcentajeMaxCanje > 0) cubre.push(`hasta ${num(config.porcentajeMaxCanje)}% de una atención elegible`);
   if (config.topeCanjePorVisita > 0) cubre.push(`con un máximo de ${pesos(config.topeCanjePorVisita)} por visita`);

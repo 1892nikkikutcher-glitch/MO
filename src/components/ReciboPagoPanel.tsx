@@ -48,7 +48,7 @@ export default function ReciboPagoPanel({
     const total = s.disponible + s.porLiberar;
     if (!cashbackConfig.activo && total <= 0) return "";
     const vence = s.proximoAVencer ? ` · vence el ${s.proximoAVencer.fecha.split("-").reverse().join("/")}` : "";
-    return `Saldo de cashback: $${total.toLocaleString("es-MX", { maximumFractionDigits: 2 })}${vence}`;
+    return `Saldo Sonríe: $${total.toLocaleString("es-MX", { maximumFractionDigits: 2 })}${vence}`;
   };
 
   // Genera el PDF al abrir y cada vez que el pago cambia (por ejemplo, al agregarle la firma).

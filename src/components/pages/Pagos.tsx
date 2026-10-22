@@ -502,7 +502,7 @@ export function AgregarPagoDialog({
         <div className="w-full max-w-md rounded-2xl border border-edge/10 bg-modal p-6 print:border-none print:bg-transparent print:p-0">
           {acumulaHoy > 0 && (
             <p className="mb-4 rounded-lg border border-success/40 bg-success/10 px-3 py-2 text-sm text-success print:hidden">
-              Hoy acumulaste <span className="font-semibold">{formatCurrency(acumulaHoy)}</span> de cashback para tu próxima atención. Se libera a partir de mañana, una vez aprobado.
+              Hoy acumulaste <span className="font-semibold">{formatCurrency(acumulaHoy)}</span> de Saldo Sonríe para tu próxima atención. Se libera a partir de mañana, una vez aprobado.
             </p>
           )}
           <ReciboPagoPanel
@@ -567,23 +567,23 @@ export function AgregarPagoDialog({
               <select value={formaPago} onChange={(e) => setFormaPago(e.target.value)} className={inputClass}>
                 {formasDisponibles.map((f) => (
                   <option key={f} value={f}>
-                    {f === FORMA_PAGO_CASHBACK ? `Cashback (disponible ${formatCurrency(cashbackDisponible)})` : f}
+                    {f === FORMA_PAGO_CASHBACK ? `Saldo Sonríe (disponible ${formatCurrency(cashbackDisponible)})` : f}
                   </option>
                 ))}
               </select>
               {excedeCashback && (
                 <p className="mt-1 text-[11px] text-danger">
-                  Con cashback solo puedes cubrir {formatCurrency(maxCashbackAhora)} (lo menor entre tu saldo de {formatCurrency(cashbackDisponible)}, {cashbackConfig.porcentajeMaxCanje}% de la atención y el tope por visita). Baja el
+                  Con Saldo Sonríe solo puedes cubrir {formatCurrency(maxCashbackAhora)} (lo menor entre tu saldo de {formatCurrency(cashbackDisponible)}, {cashbackConfig.porcentajeMaxCanje}% de la atención y el tope por visita). Baja el
                   monto y cobra el resto en otro pago.
                 </p>
               )}
               {pagaConCashback && !excedeCashback && (
-                <p className="mt-1 text-[11px] text-ink/50">Puedes cubrir hasta {formatCurrency(maxCashbackAhora)} con cashback en esta atención; el resto cóbralo en otro pago.</p>
+                <p className="mt-1 text-[11px] text-ink/50">Puedes cubrir hasta {formatCurrency(maxCashbackAhora)} con Saldo Sonríe en esta atención; el resto cóbralo en otro pago.</p>
               )}
               {cashbackConfig.activo && !pagaConCashback && (
                 <label className="mt-2 flex items-center gap-2 text-xs text-ink/70">
                   <input type="checkbox" checked={sinCashback} onChange={(e) => setSinCashback(e.target.checked)} className="h-4 w-4 rounded border-edge/30" />
-                  Promoción, cortesía o tarifa especial (no genera ni usa cashback)
+                  Promoción, cortesía o tarifa especial (no genera ni usa Saldo Sonríe)
                 </label>
               )}
             </div>

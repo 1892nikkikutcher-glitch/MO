@@ -58,7 +58,7 @@ export async function generarEstadosFinancierosPdf(datos: DatosEstadosFinanciero
   pdf.tabla(
     [{ titulo: "Concepto", ancho: 4 }, monto],
     [
-      ["Entradas: cobros netos de devoluciones y de lo pagado con cashback", dineroPdf(f.entradasEfectivo)],
+      ["Entradas: cobros netos de devoluciones y de lo pagado con Saldo Sonríe", dineroPdf(f.entradasEfectivo)],
       ["(-) Costos directos y gastos de operación", dineroPdf(-f.gastos)],
       ["(-) Inversión del mes", dineroPdf(-f.inversion)],
       ["(-) Impuestos e intereses", dineroPdf(-f.financieros)],

@@ -8,7 +8,10 @@ import { fechaPagoAIso } from "./metas";
 import type { Pago } from "./patientData";
 
 /** Forma de pago con la que se usa el saldo de cashback en un pago. */
-export const FORMA_PAGO_CASHBACK = "Cashback";
+/** Cómo se llama el programa para el paciente y en todas las pantallas. */
+export const NOMBRE_PROGRAMA_CASHBACK = "Saldo Sonríe";
+
+export const FORMA_PAGO_CASHBACK = "Saldo Sonríe";
 
 export type CashbackConfig = {
   activo: boolean;
@@ -88,7 +91,7 @@ export type MovimientoCashback = {
 };
 
 export const etiquetaTipoCashback: Record<TipoMovimientoCashback, string> = {
-  generado: "Cashback ganado",
+  generado: "Saldo ganado",
   canje: "Usado en un pago",
   transferencia: "Transferencia",
 };

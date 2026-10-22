@@ -44,7 +44,7 @@ describe("mensaje de saldo", () => {
 
   it("si no tiene saldo, le cuenta cómo acumular", () => {
     const m = mensajeSaldoWhatsApp({ paciente: "Ana", clinica: "X", saldo: { disponible: 0, porLiberar: 0, proximoAVencer: null }, config: cashbackConfigInicial });
-    expect(m).toContain("no tienes saldo");
+    expect(m).toContain("no tienes Saldo Sonríe");
     expect(m).toContain("5%");
   });
 

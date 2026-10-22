@@ -7,6 +7,7 @@ import type { BloqueAtencion, Sede } from "./sedesBloques";
 import { naturalezaDeGasto, type Gasto, type GastoCategoria } from "./gastos";
 import type { FinanzasConfig, PresupuestosPorEstado } from "./metas";
 import { redondearDinero } from "./dinero";
+import { FORMA_PAGO_CASHBACK } from "./cashback";
 import { calcularBalance, type BalanceConsultorio, type ResultadoBalance } from "./balanceConsultorio";
 
 type ClasificacionGasto = "fijo" | "variable";
@@ -246,7 +247,7 @@ export function calcularIndicadores(e: EntradaIndicadores): Indicadores {
   const utilidadNeta = redondearDinero(utilidad - financieros);
   const margenNeto = ingresosNetos > 0 ? utilidadNeta / ingresosNetos : null;
   // Lo pagado con cashback es venta (cuenta en los ingresos) pero no es dinero que entró: no suma al flujo de efectivo.
-  const pagadoConCashback = redondearDinero(dias.reduce((a, d) => a + (e.finanzas.porFechaYFormaPago?.[d]?.Cashback ?? 0), 0));
+  const pagadoConCashback = redondearDinero(dias.reduce((a, d) => a + (e.finanzas.porFechaYFormaPago?.[d]?.[FORMA_PAGO_CASHBACK] ?? 0), 0));
   const entradasEfectivo = redondearDinero(ingresosNetos - pagadoConCashback);
   const salidasEfectivo = redondearDinero(gastos + inversion + financieros);
   const flujoEfectivo = redondearDinero(entradasEfectivo - salidasEfectivo);

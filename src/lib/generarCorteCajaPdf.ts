@@ -69,7 +69,7 @@ export async function generarCorteCajaPdf(datos: DatosCorteCajaPdf): Promise<{ b
     }
   );
   if (datos.formas.some(([forma]) => forma === FORMA_PAGO_CASHBACK)) {
-    pdf.parrafo("Lo pagado con Cashback cuenta como venta, pero no es dinero que entró a caja.", { gris: true, tamano: 8.5 });
+    pdf.parrafo("Lo pagado con Saldo Sonríe cuenta como venta, pero no es dinero que entró a caja.", { gris: true, tamano: 8.5 });
   }
 
   // ----- Devoluciones -----
