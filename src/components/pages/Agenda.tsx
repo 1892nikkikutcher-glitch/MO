@@ -54,6 +54,26 @@ import { colegasPorRecurso, unirColegas } from "@/lib/calendariosCompartidos";
 import { useCalendariosCompartidos } from "@/lib/useCalendariosCompartidos";
 import { CompartirCalendarioDialog } from "@/components/pages/CalendariosCompartidos";
 
+type VistaAgenda = "semana" | "3dias" | "dia" | "mes";
+const VISTAS_AGENDA = ["semana", "3dias", "dia", "mes"] as const;
+
+/** Preferencia de pantalla guardada en este navegador (nunca en Firestore); si no hay o no es válida, el valor de siempre. */
+function leerPreferencia<T extends string>(clave: string, validos: readonly T[], porDefecto: T): T {
+  try {
+    const guardado = localStorage.getItem(clave);
+    return validos.includes(guardado as T) ? (guardado as T) : porDefecto;
+  } catch {
+    return porDefecto;
+  }
+}
+function guardarPreferencia(clave: string, valor: string) {
+  try {
+    localStorage.setItem(clave, valor);
+  } catch {
+    // almacenamiento no disponible: la preferencia solo dura esta sesión
+  }
+}
+
 
 /** Primera fase de optimización de lecturas: además del listener completo
  * de `citas` en PatientDataContext (que sigue existiendo tal cual, porque
@@ -144,10 +164,19 @@ export default function Agenda() {
   const HOUR_START = Math.min(7, Math.floor(timeToMinutes(horario.apertura || "07:00") / 60));
   const HOUR_END = Math.max(22, Math.ceil(timeToMinutes(horario.cierre || "22:00") / 60));
   const [weekStart, setWeekStart] = useState(() => getMonday(new Date()));
-  const [vista, setVista] = useState<"semana" | "3dias" | "dia" | "mes">("semana");
+  // La vista se recuerda en este equipo; la primera vez arranca en 3 días, que cabe mejor en pantalla.
+  const [vista, setVista] = useState<VistaAgenda>(() => leerPreferencia("mo-agenda-vista", VISTAS_AGENDA, "3dias"));
+  useEffect(() => {
+    guardarPreferencia("mo-agenda-vista", vista);
+  }, [vista]);
   /** Qué recurso determina el color principal de cada tarjeta — ver
    * colorPrincipalCita. El selector "Ver por" (Etapa 3) controla esto. */
-  const [vistaRecurso, setVistaRecurso] = useState<"todos" | "medicos" | "unidades">("todos");
+  const [vistaRecurso, setVistaRecurso] = useState<"todos" | "medicos" | "unidades">(() =>
+    leerPreferencia("mo-agenda-ver-por", ["todos", "medicos", "unidades"] as const, "todos")
+  );
+  useEffect(() => {
+    guardarPreferencia("mo-agenda-ver-por", vistaRecurso);
+  }, [vistaRecurso]);
   const [diaSeleccionado, setDiaSeleccionado] = useState(() => new Date());
   const [mesActual, setMesActual] = useState(() => {
     const d = new Date();
