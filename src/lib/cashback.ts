@@ -12,15 +12,51 @@ export const FORMA_PAGO_CASHBACK = "Cashback";
 
 export type CashbackConfig = {
   activo: boolean;
-  /** 3 = 3% de lo pagado en tratamientos ($30 por cada $1,000). */
+  /** 5 = 5% de lo efectivamente pagado en tratamientos ($50 por cada $1,000). */
   porcentaje: number;
   /** Meses que dura el saldo desde que se aprueba. 0 = no vence. */
   vigenciaMeses: number;
-  /** Si el paciente puede pasar su saldo a otra persona. */
+  /** Si el paciente puede pasar su saldo a otra persona (por defecto no: un beneficio cerrado). */
   transferible: boolean;
+  /** Lo máximo del valor de una atención que se puede cubrir con saldo (20 = 20%). 0 = sin límite. */
+  porcentajeMaxCanje: number;
+  /** Lo máximo de saldo que se usa en una visita, en pesos. 0 = sin límite. */
+  topeCanjePorVisita: number;
+  /** Lo máximo de saldo que un paciente puede tener acumulado, en pesos. 0 = sin límite. */
+  saldoMaximo: number;
+  /** El saldo ganado se puede usar a partir del día siguiente (la siguiente visita), no el mismo día. */
+  liberarSiguienteDia: boolean;
 };
 
-export const cashbackConfigInicial: CashbackConfig = { activo: false, porcentaje: 3, vigenciaMeses: 12, transferible: true };
+export const cashbackConfigInicial: CashbackConfig = {
+  activo: false,
+  porcentaje: 5,
+  vigenciaMeses: 12,
+  transferible: false,
+  porcentajeMaxCanje: 20,
+  topeCanjePorVisita: 500,
+  saldoMaximo: 1000,
+  liberarSiguienteDia: true,
+};
+
+/** La configuración guardada puede ser anterior a algún campo: lo que falte toma el valor de siempre. */
+export function normalizarConfigCashback(guardada: Partial<CashbackConfig> | null | undefined): CashbackConfig {
+  return { ...cashbackConfigInicial, ...(guardada ?? {}) };
+}
+
+/** Lo que se puede cubrir con saldo en una atención: lo menor entre el saldo disponible, el % del valor de la atención y el tope por visita. */
+export function montoMaximoCanje(saldoDisponible: number, valorAtencion: number, config: CashbackConfig): number {
+  const limites = [saldoDisponible];
+  if (config.porcentajeMaxCanje > 0) limites.push(redondearDinero((valorAtencion * config.porcentajeMaxCanje) / 100));
+  if (config.topeCanjePorVisita > 0) limites.push(config.topeCanjePorVisita);
+  return Math.max(0, redondearDinero(Math.min(...limites)));
+}
+
+/** Cuánto más puede acumular un paciente sin pasar del saldo máximo (Infinity si no hay tope). */
+export function espacioParaAcumular(saldo: Pick<SaldoCashback, "disponible" | "porLiberar">, config: CashbackConfig): number {
+  if (!(config.saldoMaximo > 0)) return Infinity;
+  return Math.max(0, redondearDinero(config.saldoMaximo - saldo.disponible - saldo.porLiberar));
+}
 
 export type TipoMovimientoCashback = "generado" | "canje" | "transferencia";
 export type EstadoMovimientoCashback = "pendiente" | "aprobado" | "rechazado";
@@ -70,7 +106,7 @@ export function calcularCashback(base: number, porcentaje: number): number {
 
 /** Lo que cuenta para ganar cashback: lo pagado en tratamientos (no membresías ni conceptos sueltos) y nunca un pago hecho con cashback. */
 export function baseCashbackDePago(pago: Pago): number {
-  if (pago.formaPago === FORMA_PAGO_CASHBACK) return 0;
+  if (pago.formaPago === FORMA_PAGO_CASHBACK || pago.sinCashback) return 0;
   return redondearDinero(pago.lineas.reduce((s, l) => s + (l.tratamientoId ? l.monto : 0), 0));
 }
 
@@ -132,6 +168,8 @@ export function movimientoCanje(pago: Pago, patientId: string, patientName: stri
 export type SaldoCashback = {
   /** Lo que el paciente puede usar hoy. */
   disponible: number;
+  /** Ganado hoy: se puede usar a partir de mañana (la siguiente visita). */
+  porLiberar: number;
   /** Cashback ganado que todavía espera aprobación. */
   porAprobar: number;
   /** Transferencias que ya salieron de su saldo y esperan aprobación. */
@@ -171,6 +209,7 @@ export function saldoCashback(movimientos: MovimientoCashback[], patientId: stri
 
   const lotes: { fecha: string; vence: string; restante: number }[] = [];
   let deficit = 0;
+  const desdeSiguienteDia = config.liberarSiguienteDia !== false;
   for (const e of eventos) {
     if (e.tipo === "credito") {
       lotes.push({ fecha: e.fecha, vence: venceElCashback(e.fecha, config.vigenciaMeses), restante: e.monto });
@@ -180,6 +219,7 @@ export function saldoCashback(movimientos: MovimientoCashback[], patientId: stri
     for (const lote of lotes) {
       if (porDescontar <= 0) break;
       if (lote.restante <= 0 || lote.vence < e.fecha) continue;
+      if (desdeSiguienteDia && lote.fecha >= e.fecha) continue; // lo ganado ese mismo día todavía no se puede usar
       const toma = Math.min(lote.restante, porDescontar);
       lote.restante = redondearDinero(lote.restante - toma);
       porDescontar = redondearDinero(porDescontar - toma);
@@ -188,17 +228,23 @@ export function saldoCashback(movimientos: MovimientoCashback[], patientId: stri
   }
 
   let disponible = 0;
+  let porLiberar = 0;
   let vencido = 0;
   let proximo: { fecha: string; monto: number } | null = null;
   for (const lote of lotes) {
     if (lote.restante <= 0) continue;
     if (lote.vence >= hoyIso) {
+      if (desdeSiguienteDia && lote.fecha >= hoyIso) {
+        porLiberar += lote.restante;
+        continue;
+      }
       disponible += lote.restante;
       if (lote.vence !== "9999-12-31" && (!proximo || lote.vence < proximo.fecha)) proximo = { fecha: lote.vence, monto: lote.restante };
     } else vencido += lote.restante;
   }
   return {
     disponible: redondearDinero(disponible),
+    porLiberar: redondearDinero(porLiberar),
     porAprobar: redondearDinero(porAprobar),
     enTransferencia: redondearDinero(enTransferencia),
     vencido: redondearDinero(vencido),
@@ -285,7 +331,31 @@ export function crearTransferencia(args: {
 // ---------- Seguir a los pagos ----------
 
 const igualesPago = (a: Pago, b: Pago) =>
-  a.total === b.total && a.formaPago === b.formaPago && a.fecha === b.fecha && JSON.stringify(a.lineas) === JSON.stringify(b.lineas);
+  a.total === b.total &&
+  a.formaPago === b.formaPago &&
+  a.fecha === b.fecha &&
+  !!a.sinCashback === !!b.sinCashback &&
+  JSON.stringify(a.lineas) === JSON.stringify(b.lineas);
+
+/** Una devolución del pago baja, en la misma proporción, el cashback que ese pago generó (si se devolvió todo, queda anulado). */
+export function revertirCashbackPorDevolucion(
+  movimientos: MovimientoCashback[],
+  pagoId: string,
+  montoDevuelto: number,
+  totalPago: number,
+  ahoraIso: string
+): MovimientoCashback[] {
+  const generado = movimientos.find((m) => m.id === idCashbackGenerado(pagoId));
+  if (!generado || generado.estado === "rechazado" || !(totalPago > 0) || !(montoDevuelto > 0)) return movimientos;
+  const proporcion = Math.min(1, montoDevuelto / totalPago);
+  const nuevoMonto = redondearDinero(generado.monto * (1 - proporcion));
+  if (generado.estado === "pendiente" && nuevoMonto <= 0) return movimientos.filter((m) => m.id !== generado.id);
+  const actualizado: MovimientoCashback =
+    nuevoMonto <= 0
+      ? { ...generado, estado: "rechazado", nota: "Se devolvió el pago que lo generó", resueltoEn: ahoraIso }
+      : { ...generado, monto: nuevoMonto, nota: "Se ajustó por una devolución del pago", ...(generado.estado === "pendiente" ? { montoCalculado: nuevoMonto } : {}) };
+  return movimientos.map((m) => (m.id === generado.id ? actualizado : m));
+}
 
 /** Pone al día los movimientos de cashback según lo que cambió en los pagos del paciente: un pago nuevo genera su cashback
  * (o descuenta el saldo si se pagó con cashback), uno editado lo recalcula si nadie lo ha resuelto, y uno eliminado lo revierte. */

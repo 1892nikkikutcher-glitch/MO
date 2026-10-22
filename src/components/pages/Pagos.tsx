@@ -19,7 +19,7 @@ import ReciboPagoPanel from "@/components/ReciboPagoPanel";
 import RegistrarDevolucionDialog from "@/components/RegistrarDevolucionDialog";
 import { calcularDisponibleDevolucion, resumenDesdeDevoluciones } from "@/lib/devolucionesPago";
 import { fechaPagoAIso } from "@/lib/metas";
-import { FORMA_PAGO_CASHBACK } from "@/lib/cashback";
+import { FORMA_PAGO_CASHBACK, montoMaximoCanje } from "@/lib/cashback";
 
 const formasDePago = ["Efectivo", "Tarjeta de crédito", "Tarjeta de débito", "Transferencia", "Cheque"];
 
@@ -381,7 +381,7 @@ export function AgregarPagoDialog({
   // de la clínica (Agenda → Recursos), nunca de una lista genérica — así
   // "Médico" en el recibo es el mismo nombre que alimenta el desglose de
   // ingresos por médico, en vez de un valor que nadie más lee.
-  const { recursos, saldoCashbackDe } = usePatientData();
+  const { recursos, saldoCashbackDe, cashbackConfig } = usePatientData();
   const medicosDisponibles = recursos.filter((r) => r.tipo === "medico").map((r) => r.nombre);
   const cashbackDisponible = saldoCashbackDe(patientId).disponible;
   const formasDisponibles = cashbackDisponible > 0 ? [...formasDePago, FORMA_PAGO_CASHBACK] : formasDePago;
@@ -400,6 +400,7 @@ export function AgregarPagoDialog({
   const [extras, setExtras] = useState<{ id: string; label: string; monto: number }[]>([]);
   const [showExtraDialog, setShowExtraDialog] = useState(false);
   const [facturar, setFacturar] = useState(false);
+  const [sinCashback, setSinCashback] = useState(false);
 
   const toggleTratamiento = (t: TratamientoPendiente) => {
     setSeleccionados((prev) => {
@@ -417,7 +418,10 @@ export function AgregarPagoDialog({
   const totalAPagar = totalTratamientosSeleccionados + totalExtras;
 
   const pagaConCashback = formaPago === FORMA_PAGO_CASHBACK;
-  const excedeCashback = pagaConCashback && totalAPagar > cashbackDisponible + 0.001;
+  // Lo que se puede cubrir con saldo: lo menor entre el saldo, el % del valor de los tratamientos que se pagan y el tope por visita.
+  const valorAtencion = seleccionados.reduce((sum, id) => sum + (tratamientosPendientes.find((t) => t.id === id)?.price ?? 0), 0);
+  const maxCashbackAhora = montoMaximoCanje(cashbackDisponible, valorAtencion, cashbackConfig);
+  const excedeCashback = pagaConCashback && totalAPagar > maxCashbackAhora + 0.001;
   const puedeGuardar = totalAPagar > 0 && medico !== "" && !excedeCashback;
 
   const handleGuardar = () => {
@@ -458,6 +462,7 @@ export function AgregarPagoDialog({
       total: totalAPagar,
       facturar,
       firma: null,
+      ...(sinCashback && !pagaConCashback ? { sinCashback: true } : {}),
     };
 
     onSave(pago);
@@ -556,7 +561,19 @@ export function AgregarPagoDialog({
                 ))}
               </select>
               {excedeCashback && (
-                <p className="mt-1 text-[11px] text-danger">El pago es mayor al cashback disponible ({formatCurrency(cashbackDisponible)}). Baja el monto o elige otra forma de pago.</p>
+                <p className="mt-1 text-[11px] text-danger">
+                  Con cashback solo puedes cubrir {formatCurrency(maxCashbackAhora)} (lo menor entre tu saldo de {formatCurrency(cashbackDisponible)}, {cashbackConfig.porcentajeMaxCanje}% de la atención y el tope por visita). Baja el
+                  monto y cobra el resto en otro pago.
+                </p>
+              )}
+              {pagaConCashback && !excedeCashback && (
+                <p className="mt-1 text-[11px] text-ink/50">Puedes cubrir hasta {formatCurrency(maxCashbackAhora)} con cashback en esta atención; el resto cóbralo en otro pago.</p>
+              )}
+              {cashbackConfig.activo && !pagaConCashback && (
+                <label className="mt-2 flex items-center gap-2 text-xs text-ink/70">
+                  <input type="checkbox" checked={sinCashback} onChange={(e) => setSinCashback(e.target.checked)} className="h-4 w-4 rounded border-edge/30" />
+                  Sin cashback (promoción, cortesía o tarifa especial)
+                </label>
               )}
             </div>
           </div>

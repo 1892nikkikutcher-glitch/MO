@@ -8,6 +8,10 @@ import {
   calcularCashback,
   cashbackConfigInicial,
   crearTransferencia,
+  espacioParaAcumular,
+  montoMaximoCanje,
+  normalizarConfigCashback,
+  revertirCashbackPorDevolucion,
   rechazarMovimiento,
   saldoCashback,
   sincronizarCashbackConPagos,
@@ -17,7 +21,7 @@ import {
 } from "../cashback";
 import type { Pago } from "../patientData";
 
-const config: CashbackConfig = { activo: true, porcentaje: 3, vigenciaMeses: 12, transferible: true };
+const config: CashbackConfig = { ...cashbackConfigInicial, activo: true, porcentaje: 3, vigenciaMeses: 12, transferible: true };
 const AHORA = "2026-10-20T12:00:00.000Z";
 const HOY = "2026-10-20";
 
@@ -210,7 +214,77 @@ describe("seguir a los pagos", () => {
     expect(sincronizarCashbackConPagos(movs, "p1", "Ana", [p], [p], config, AHORA)).toBe(movs);
   });
 
-  it("la configuración inicial viene apagada con 3%", () => {
-    expect(cashbackConfigInicial).toMatchObject({ activo: false, porcentaje: 3 });
+  it("la configuración inicial viene apagada con las reglas del Saldo Sonríe", () => {
+    expect(cashbackConfigInicial).toEqual({
+      activo: false,
+      porcentaje: 5,
+      vigenciaMeses: 12,
+      transferible: false,
+      porcentajeMaxCanje: 20,
+      topeCanjePorVisita: 500,
+      saldoMaximo: 1000,
+      liberarSiguienteDia: true,
+    });
+  });
+
+  it("una configuración guardada antes de los campos nuevos los completa con los de siempre", () => {
+    expect(normalizarConfigCashback({ activo: true, porcentaje: 3, vigenciaMeses: 6, transferible: true })).toMatchObject({
+      activo: true,
+      porcentaje: 3,
+      vigenciaMeses: 6,
+      transferible: true,
+      porcentajeMaxCanje: 20,
+      topeCanjePorVisita: 500,
+      saldoMaximo: 1000,
+    });
+    expect(normalizarConfigCashback(undefined)).toEqual(cashbackConfigInicial);
+  });
+});
+
+describe("reglas del Saldo Sonríe", () => {
+  it("el saldo aplicable es el menor entre saldo, 20% de la atención y $500 por visita", () => {
+    // Ejemplo: $400 en el monedero, tratamiento de $1,000 -> solo $200.
+    expect(montoMaximoCanje(400, 1000, cashbackConfigInicial)).toBe(200);
+    expect(montoMaximoCanje(150, 1000, cashbackConfigInicial)).toBe(150);
+    expect(montoMaximoCanje(900, 5000, cashbackConfigInicial)).toBe(500);
+    expect(montoMaximoCanje(900, 5000, { ...cashbackConfigInicial, topeCanjePorVisita: 0, porcentajeMaxCanje: 0 })).toBe(900);
+  });
+
+  it("acumula 5% sobre lo efectivamente pagado, sin contar lo cubierto con saldo", () => {
+    const pagado = pago("a", "20/10/2026", [{ monto: 800 }]);
+    expect(calcularCashback(baseCashbackDePago(pagado), cashbackConfigInicial.porcentaje)).toBe(40);
+    const conSaldo = pago("b", "20/10/2026", [{ monto: 200 }], FORMA_PAGO_CASHBACK);
+    expect(baseCashbackDePago(conSaldo)).toBe(0);
+  });
+
+  it("un pago marcado sin cashback (promoción, cortesía…) no genera nada", () => {
+    const promo = { ...pago("p", "20/10/2026", [{ monto: 1000 }]), sinCashback: true };
+    expect(baseCashbackDePago(promo)).toBe(0);
+    expect(sincronizarCashbackConPagos([], "p1", "Ana", [], [promo], { ...config, activo: true }, AHORA)).toEqual([]);
+  });
+
+  it("el saldo ganado hoy se usa a partir de mañana", () => {
+    const hoy = [mov({ id: "a", monto: 100, fecha: HOY })];
+    const s = saldoCashback(hoy, "p1", cashbackConfigInicial, HOY);
+    expect(s).toMatchObject({ disponible: 0, porLiberar: 100 });
+    expect(saldoCashback(hoy, "p1", cashbackConfigInicial, "2026-10-21")).toMatchObject({ disponible: 100, porLiberar: 0 });
+    expect(saldoCashback(hoy, "p1", { ...cashbackConfigInicial, liberarSiguienteDia: false }, HOY).disponible).toBe(100);
+  });
+
+  it("calcula cuánto más puede acumular antes del tope de $1,000", () => {
+    expect(espacioParaAcumular({ disponible: 700, porLiberar: 100 }, cashbackConfigInicial)).toBe(200);
+    expect(espacioParaAcumular({ disponible: 1200, porLiberar: 0 }, cashbackConfigInicial)).toBe(0);
+    expect(espacioParaAcumular({ disponible: 5000, porLiberar: 0 }, { ...cashbackConfigInicial, saldoMaximo: 0 })).toBe(Infinity);
+  });
+
+  it("una devolución baja el cashback del pago en proporción, y si es total lo anula", () => {
+    const g = mov({ id: "cb-p1", monto: 50, montoCalculado: 50, pagoId: "p1" });
+    const parcial = revertirCashbackPorDevolucion([g], "p1", 250, 1000, AHORA);
+    expect(parcial[0]).toMatchObject({ monto: 37.5, estado: "aprobado" });
+    const total = revertirCashbackPorDevolucion([g], "p1", 1000, 1000, AHORA);
+    expect(total[0]).toMatchObject({ estado: "rechazado", nota: "Se devolvió el pago que lo generó" });
+    const pendiente = mov({ id: "cb-p1", estado: "pendiente", monto: 50, montoCalculado: 50, pagoId: "p1" });
+    expect(revertirCashbackPorDevolucion([pendiente], "p1", 1000, 1000, AHORA)).toEqual([]);
+    expect(revertirCashbackPorDevolucion([g], "otro", 100, 1000, AHORA)).toEqual([g]);
   });
 });

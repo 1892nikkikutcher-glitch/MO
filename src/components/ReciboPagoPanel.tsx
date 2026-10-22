@@ -36,11 +36,20 @@ export default function ReciboPagoPanel({
   /** Encabezado opcional (ej. "Recibo de pago"); sin él se asume que viene del registro de un pago. */
   titulo?: string;
 }) {
-  const { citas, patients, clinicInfo, formatosWhatsapp, perfilDoctor } = usePatientData();
+  const { citas, patients, clinicInfo, formatosWhatsapp, perfilDoctor, saldoCashbackDe, cashbackConfig } = usePatientData();
   const [estado, setEstado] = useState<EstadoPdf>({ tipo: "generando" });
   const [intento, setIntento] = useState(0);
   const [waUrlPendiente, setWaUrlPendiente] = useState<string | null>(null);
   const nombreArchivo = `Recibo_${slugify(patientName)}_${slugify(pago.fecha)}.pdf`;
+
+  /** Una línea con el saldo de cashback del paciente (lo ganado hoy se libera mañana); nada si no tiene ni está activo el programa. */
+  const textoSaldoCashback = () => {
+    const s = saldoCashbackDe(patientId);
+    const total = s.disponible + s.porLiberar;
+    if (!cashbackConfig.activo && total <= 0) return "";
+    const vence = s.proximoAVencer ? ` · vence el ${s.proximoAVencer.fecha.split("-").reverse().join("/")}` : "";
+    return `Saldo de cashback: $${total.toLocaleString("es-MX", { maximumFractionDigits: 2 })}${vence}`;
+  };
 
   // Genera el PDF al abrir y cada vez que el pago cambia (por ejemplo, al agregarle la firma).
   useEffect(() => {
@@ -52,7 +61,7 @@ export default function ReciboPagoPanel({
       pacienteNombre: patientName,
       clinicaNombre: clinicInfo?.nombre || "",
       perfilDoctor,
-      notaPie: buildProximaCitaTexto(citas, patientId, pago.fecha),
+      notaPie: [buildProximaCitaTexto(citas, patientId, pago.fecha), textoSaldoCashback()].filter(Boolean).join("\n"),
     })
       .then((blob) => {
         if (cancelado) return;

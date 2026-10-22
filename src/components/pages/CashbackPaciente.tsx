@@ -4,11 +4,12 @@ import { useState } from "react";
 import { usePatientData } from "@/context/PatientDataContext";
 import { formatCurrency } from "@/lib/patientData";
 import { movimientosDePaciente } from "@/lib/cashback";
+import { mensajeSaldoWhatsApp } from "@/lib/cashbackTextos";
 import { FilaMovimientoCashback, TransferirCashbackDialog, fechaCorta } from "./CashbackComponentes";
 
 /** Pestaña Cashback del expediente: lo que el paciente ha ganado, lo que puede usar y sus movimientos. */
 export default function CashbackPaciente({ patientId, patientName }: { patientId: string; patientName: string }) {
-  const { cashbackConfig, cashbackMovimientos, saldoCashbackDe, irAPagina, miRol } = usePatientData();
+  const { cashbackConfig, cashbackMovimientos, saldoCashbackDe, irAPagina, miRol, patients, clinicInfo } = usePatientData();
   const [transfiriendo, setTransfiriendo] = useState(false);
 
   if (miRol !== "admin") {
@@ -17,6 +18,11 @@ export default function CashbackPaciente({ patientId, patientName }: { patientId
 
   const saldo = saldoCashbackDe(patientId);
   const movimientos = movimientosDePaciente(cashbackMovimientos, patientId);
+  const telefono = (patients.find((p) => p.id === patientId)?.phone ?? "").replace(/\D/g, "");
+  const enviarSaldo = () => {
+    const mensaje = mensajeSaldoWhatsApp({ paciente: patientName, clinica: clinicInfo?.nombre || "", saldo, config: cashbackConfig });
+    window.open(`https://wa.me/${telefono}?text=${encodeURIComponent(mensaje)}`, "_blank");
+  };
 
   return (
     <div className="space-y-5">
@@ -37,7 +43,9 @@ export default function CashbackPaciente({ patientId, patientName }: { patientId
         <div className="rounded-xl border border-edge/10 bg-inset p-4">
           <div className="text-[11px] uppercase tracking-wide text-ink/40">Disponible</div>
           <div className="mt-1 text-xl font-bold text-success">{formatCurrency(saldo.disponible)}</div>
-          <div className="mt-0.5 text-[11px] text-ink/50">Se usa como forma de pago: Cashback</div>
+          <div className="mt-0.5 text-[11px] text-ink/50">
+            {saldo.porLiberar > 0 ? `+ ${formatCurrency(saldo.porLiberar)} que se libera mañana · ` : ""}Se usa como forma de pago: Cashback
+          </div>
         </div>
         <div className="rounded-xl border border-edge/10 bg-inset p-4">
           <div className="text-[11px] uppercase tracking-wide text-ink/40">Por aprobar</div>
@@ -56,15 +64,25 @@ export default function CashbackPaciente({ patientId, patientName }: { patientId
         </div>
       </div>
 
-      {cashbackConfig.transferible && (
+      <div className="flex flex-wrap gap-2">
         <button
-          onClick={() => setTransfiriendo(true)}
-          disabled={saldo.disponible <= 0}
-          className="rounded-lg border border-accent/50 bg-accent/10 px-4 py-2 text-xs font-semibold text-accent hover:bg-accent/20 disabled:cursor-not-allowed disabled:opacity-40"
+          onClick={enviarSaldo}
+          disabled={!telefono}
+          title={telefono ? "Mandarle su saldo, lo que puede cubrir y su vencimiento" : "El paciente no tiene teléfono registrado"}
+          className="rounded-lg border border-success/50 bg-success/10 px-4 py-2 text-xs font-semibold text-success hover:bg-success/20 disabled:cursor-not-allowed disabled:opacity-40"
         >
-          Transferir a un conocido o familiar
+          Enviar su saldo por WhatsApp
         </button>
-      )}
+        {cashbackConfig.transferible && (
+          <button
+            onClick={() => setTransfiriendo(true)}
+            disabled={saldo.disponible <= 0}
+            className="rounded-lg border border-accent/50 bg-accent/10 px-4 py-2 text-xs font-semibold text-accent hover:bg-accent/20 disabled:cursor-not-allowed disabled:opacity-40"
+          >
+            Transferir a un conocido o familiar
+          </button>
+        )}
+      </div>
 
       <div className="rounded-2xl border border-edge/10 bg-surface p-5">
         <h4 className="mb-1 text-xs font-semibold uppercase tracking-wide text-ink/40">Movimientos</h4>

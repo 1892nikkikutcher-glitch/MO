@@ -260,6 +260,8 @@ export type Pago = {
   total: number;
   facturar: boolean;
   firma: string | null;
+  /** Promoción, cortesía, tarifa especial…: este pago no genera cashback. */
+  sinCashback?: boolean;
 };
 
 export type MedicamentoRecetado = {

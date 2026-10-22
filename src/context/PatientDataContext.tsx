@@ -13,6 +13,8 @@ import { sedesInicial, type Sede, type SedesConfig } from "@/lib/sedesBloques";
 import { balanceInicial, type BalanceConsultorio } from "@/lib/balanceConsultorio";
 import {
   cashbackConfigInicial,
+  normalizarConfigCashback,
+  revertirCashbackPorDevolucion,
   saldoCashback,
   sincronizarCashbackConPagos,
   type CashbackConfig,
@@ -1112,7 +1114,8 @@ export function PatientDataProvider({
   const setSedes = (lista: Sede[]) => setSedesConfig({ lista });
   const [balance, setBalanceDoc] = useFirestoreDoc<BalanceConsultorio>(clinicUid, "balance", balanceInicial);
   const setBalance = (b: BalanceConsultorio) => setBalanceDoc(b);
-  const [cashbackConfig, setCashbackConfigDoc] = useFirestoreDoc<CashbackConfig>(clinicUid, "cashback", cashbackConfigInicial);
+  const [cashbackConfigGuardada, setCashbackConfigDoc] = useFirestoreDoc<CashbackConfig>(clinicUid, "cashback", cashbackConfigInicial);
+  const cashbackConfig = normalizarConfigCashback(cashbackConfigGuardada);
   const setCashbackConfig = (c: CashbackConfig) => setCashbackConfigDoc(c);
   const [cashbackMovimientos, setCashbackMovimientos] = useFirestoreList<MovimientoCashback>(clinicUid, "cashbackMovimientos");
   const saldoCashbackDe = (patientId: string) => saldoCashback(cashbackMovimientos, patientId, cashbackConfig);
@@ -2375,6 +2378,12 @@ export function PatientDataProvider({
     // registrado como devuelto — punto final. Nunca se le pide al usuario
     // repetir esta llamada por un fallo posterior de sincronización.
     const { devolucion } = await completarDevolucion(db, clinicUid, devolucionId, input, uid, patientName);
+    // El cashback que generó ese pago baja en la misma proporción en que se devolvió.
+    const pagoDevuelto = (pagosPorPaciente[input.patientId] ?? []).find((p) => p.id === devolucion.pagoOrigenId);
+    if (pagoDevuelto) {
+      const ahoraIso = new Date().toISOString();
+      setCashbackMovimientos((prevMovs) => revertirCashbackPorDevolucion(prevMovs, pagoDevuelto.id, devolucion.monto, pagoDevuelto.total, ahoraIso));
+    }
     let saldoSincronizado = true;
     try {
       // Recompute completo con la devolución ya incluida — devolucionesPorPaciente

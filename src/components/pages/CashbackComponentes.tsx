@@ -9,6 +9,7 @@ import {
   ajustarMontoGenerado,
   aprobarMovimiento,
   crearTransferencia,
+  espacioParaAcumular,
   etiquetaEstadoCashback,
   etiquetaTipoCashback,
   rechazarMovimiento,
@@ -67,9 +68,20 @@ export function FilaMovimientoCashback({ movimiento: m, desdePacienteId, mostrar
   const ahora = () => new Date().toISOString();
 
   const aprobar = () => {
-    const monto = m.tipo === "generado" ? numero(montoTexto) : m.monto;
+    let monto = m.tipo === "generado" ? numero(montoTexto) : m.monto;
     if (!(monto > 0)) return setError("El monto debe ser mayor a 0. Si no corresponde cashback, recházalo.");
-    reemplazar(aprobarMovimiento(m, userEmail, ahora(), monto));
+    let nota: string | undefined;
+    if (m.tipo === "generado") {
+      // Un paciente no puede acumular más del saldo máximo: se aprueba solo lo que cabe.
+      const espacio = espacioParaAcumular(saldoCashback(cashbackMovimientos, m.patientId, cashbackConfig), cashbackConfig);
+      if (espacio <= 0) return setError(`El paciente ya tiene el saldo máximo (${formatCurrency(cashbackConfig.saldoMaximo)}). Recházalo o sube el tope en la configuración.`);
+      if (monto > espacio) {
+        monto = espacio;
+        nota = `Se limitó al saldo máximo acumulable de ${formatCurrency(cashbackConfig.saldoMaximo)}`;
+      }
+    }
+    const aprobado = aprobarMovimiento(m, userEmail, ahora(), monto);
+    reemplazar(nota ? { ...aprobado, nota } : aprobado);
     setError("");
   };
   const rechazar = () => {
