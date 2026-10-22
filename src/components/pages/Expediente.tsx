@@ -1358,40 +1358,6 @@ export default function Expediente({
             <span aria-hidden>←</span> Volver a pacientes
           </button>
           <span className="text-[11px] font-semibold uppercase tracking-[0.16em] text-ink/50">Expediente</span>
-          {/* Paciente anterior y siguiente de la agenda de la semana: juntos, con su leyenda siempre visible
-              (no solo en el tooltip) para que se entienda también en celular. */}
-          <div className="flex items-center gap-2">
-            <button
-              onClick={() => pacienteAnteriorHoy && irAExpediente(pacienteAnteriorHoy.patientId!, activeTab)}
-              disabled={!pacienteAnteriorHoy}
-              aria-label="Paciente anterior de la agenda"
-              title={
-                pacienteAnteriorHoy
-                  ? `Expediente anterior en la agenda de esta semana: ${pacienteAnteriorHoy.paciente} (${formatFechaCita(pacienteAnteriorHoy.fecha)} ${pacienteAnteriorHoy.horaInicio})`
-                  : "No hay un paciente anterior en la agenda de esta semana"
-              }
-              className={`flex h-9 w-9 items-center justify-center rounded-full border text-base font-semibold transition-colors disabled:cursor-not-allowed ${
-                pacienteAnteriorHoy ? "border-accent/50 bg-accent/10 text-accent hover:bg-accent/20" : "border-edge/15 text-ink/30"
-              }`}
-            >
-              ←
-            </button>
-            <button
-              onClick={() => pacienteSiguienteHoy && irAExpediente(pacienteSiguienteHoy.patientId!, activeTab)}
-              disabled={!pacienteSiguienteHoy}
-              aria-label="Paciente siguiente de la agenda"
-              title={
-                pacienteSiguienteHoy
-                  ? `Expediente siguiente en la agenda de esta semana: ${pacienteSiguienteHoy.paciente} (${formatFechaCita(pacienteSiguienteHoy.fecha)} ${pacienteSiguienteHoy.horaInicio})`
-                  : "No hay un paciente siguiente en la agenda de esta semana"
-              }
-              className={`flex h-9 w-9 items-center justify-center rounded-full border text-base font-semibold transition-colors disabled:cursor-not-allowed ${
-                pacienteSiguienteHoy ? "border-accent/50 bg-accent/10 text-accent hover:bg-accent/20" : "border-edge/15 text-ink/30"
-              }`}
-            >
-              →
-            </button>
-          </div>
         </div>
 
         <div className="mt-4 flex flex-wrap items-center gap-x-5 gap-y-4 border-t border-edge/10 pt-4">
@@ -1448,16 +1414,49 @@ export default function Expediente({
           </div>
         </div>
 
-        <div className="mt-4 flex flex-wrap items-center justify-between gap-x-4 gap-y-1 text-[11px] leading-tight">
-          <span className={pacienteAnteriorHoy ? "font-medium text-ink/80" : "text-ink/50"}>
-            ← {pacienteAnteriorHoy
+        {/* Abajo, las flechas quedan en medio de las dos leyendas: a la izquierda el paciente anterior y a la derecha el siguiente. */}
+        <div className="mt-4 grid grid-cols-[1fr_auto_1fr] items-center gap-x-3 gap-y-2 text-[11px] leading-tight">
+          <span className={`${pacienteAnteriorHoy ? "font-medium text-ink/80" : "text-ink/50"}`}>
+            {pacienteAnteriorHoy
               ? `Anterior: ${pacienteAnteriorHoy.paciente} · ${formatFechaCita(pacienteAnteriorHoy.fecha)} ${pacienteAnteriorHoy.horaInicio}`
               : "Sin paciente anterior en la agenda de esta semana"}
           </span>
-          <span className={pacienteSiguienteHoy ? "font-medium text-ink/80" : "text-ink/50"}>
+          <div className="flex items-center gap-2">
+              <button
+                onClick={() => pacienteAnteriorHoy && irAExpediente(pacienteAnteriorHoy.patientId!, activeTab)}
+                disabled={!pacienteAnteriorHoy}
+                aria-label="Paciente anterior de la agenda"
+                title={
+                  pacienteAnteriorHoy
+                    ? `Expediente anterior en la agenda de esta semana: ${pacienteAnteriorHoy.paciente} (${formatFechaCita(pacienteAnteriorHoy.fecha)} ${pacienteAnteriorHoy.horaInicio})`
+                    : "No hay un paciente anterior en la agenda de esta semana"
+                }
+                className={`flex h-9 w-9 items-center justify-center rounded-full border text-base font-semibold transition-colors disabled:cursor-not-allowed ${
+                  pacienteAnteriorHoy ? "border-accent/50 bg-accent/10 text-accent hover:bg-accent/20" : "border-edge/15 text-ink/30"
+                }`}
+              >
+                ←
+              </button>
+              <button
+                onClick={() => pacienteSiguienteHoy && irAExpediente(pacienteSiguienteHoy.patientId!, activeTab)}
+                disabled={!pacienteSiguienteHoy}
+                aria-label="Paciente siguiente de la agenda"
+                title={
+                  pacienteSiguienteHoy
+                    ? `Expediente siguiente en la agenda de esta semana: ${pacienteSiguienteHoy.paciente} (${formatFechaCita(pacienteSiguienteHoy.fecha)} ${pacienteSiguienteHoy.horaInicio})`
+                    : "No hay un paciente siguiente en la agenda de esta semana"
+                }
+                className={`flex h-9 w-9 items-center justify-center rounded-full border text-base font-semibold transition-colors disabled:cursor-not-allowed ${
+                  pacienteSiguienteHoy ? "border-accent/50 bg-accent/10 text-accent hover:bg-accent/20" : "border-edge/15 text-ink/30"
+                }`}
+              >
+                →
+              </button>
+          </div>
+          <span className={`text-right ${pacienteSiguienteHoy ? "font-medium text-ink/80" : "text-ink/50"}`}>
             {pacienteSiguienteHoy
               ? `Siguiente: ${pacienteSiguienteHoy.paciente} · ${formatFechaCita(pacienteSiguienteHoy.fecha)} ${pacienteSiguienteHoy.horaInicio}`
-              : "Sin paciente siguiente en la agenda de esta semana"} →
+              : "Sin paciente siguiente en la agenda de esta semana"}
           </span>
         </div>
       </div>
