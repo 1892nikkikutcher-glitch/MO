@@ -248,3 +248,34 @@ describe("evaluación semanal en PDF", () => {
     }
   });
 });
+
+describe("corte de caja en PDF", () => {
+  const base = {
+    fecha: "2026-10-20",
+    cobrosBrutos: 6000,
+    devoluciones: 500,
+    formas: [["Efectivo", 4000], ["Tarjeta de débito", 1500], ["Cashback", 500]] as [string, number][],
+    metodosDevolucion: [["Efectivo", 500]] as [string, number][],
+    medicos: [{ nombre: "Dra. Ana", monto: 4000, porcentajeComision: 30 }, { nombre: "Dr. Luis", monto: 2000, porcentajeComision: null }],
+    ultimosDias: [["2026-10-20", 6000], ["2026-10-19", 3000]] as [string, number][],
+    clinicaNombre: "Consultorio Medina",
+  };
+
+  it("trae cobros, forma de pago, devoluciones, comisión a pagar y últimos días", async () => {
+    const { generarCorteCajaPdf } = await import("../generarCorteCajaPdf");
+    const { blob, nombre } = await generarCorteCajaPdf(base);
+    expect(nombre).toBe("Corte_de_caja_2026_10_20_Consultorio_Medina.pdf");
+    const texto = await textoDe(blob);
+    for (const frag of ["martes 20 de octubre de 2026", "$5,500.00", "DESGLOSE POR FORMA DE PAGO", "Tarjeta de d", "no es dinero que entr", "DEVOLUCIONES POR M", "$1,200.00", "Sin %", "LTIMOS D"]) {
+      expect(texto).toContain(frag);
+    }
+  });
+
+  it("un día sin cobros lo dice y no pone secciones vacías", async () => {
+    const { generarCorteCajaPdf } = await import("../generarCorteCajaPdf");
+    const { blob } = await generarCorteCajaPdf({ ...base, cobrosBrutos: 0, devoluciones: 0, formas: [], metodosDevolucion: [], medicos: [], ultimosDias: [] });
+    const texto = await textoDe(blob);
+    expect(texto).toContain("No hay pagos registrados");
+    expect(texto).not.toContain("DESGLOSE POR M");
+  });
+});

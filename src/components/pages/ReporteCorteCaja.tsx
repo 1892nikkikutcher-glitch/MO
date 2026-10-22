@@ -4,6 +4,8 @@ import { useState } from "react";
 import { usePatientData } from "@/context/PatientDataContext";
 import { formatCurrency } from "@/lib/patientData";
 import { sumarDias } from "@/lib/evaluacionSemanal";
+import { generarCorteCajaPdf } from "@/lib/generarCorteCajaPdf";
+import { descargarBlob } from "@/lib/pdfDocumento";
 
 const inputClass =
   "w-full rounded-lg border border-edge/10 bg-field px-3 py-2 text-sm text-ink outline-none focus:border-accent/60";
@@ -14,7 +16,9 @@ function hoyIso(): string {
 }
 
 export default function ReporteCorteCaja() {
-  const { finanzas, recursos } = usePatientData();
+  const { finanzas, recursos, clinicInfo, perfilDoctor } = usePatientData();
+  const [generandoPdf, setGenerandoPdf] = useState(false);
+  const [errorPdf, setErrorPdf] = useState("");
   const [fecha, setFecha] = useState(hoyIso());
   const hoy = hoyIso();
   const esHoy = fecha === hoy;
@@ -38,6 +42,30 @@ export default function ReporteCorteCaja() {
     .filter(([, monto]) => monto !== 0)
     .sort((a, b) => b[0].localeCompare(a[0]))
     .slice(0, 10);
+
+  const descargarPdf = async () => {
+    setGenerandoPdf(true);
+    setErrorPdf("");
+    try {
+      const { blob, nombre } = await generarCorteCajaPdf({
+        fecha,
+        cobrosBrutos,
+        devoluciones: devolucionesMonto,
+        formas,
+        metodosDevolucion,
+        medicos: medicos.map(([nombreMedico, monto]) => ({ nombre: nombreMedico, monto, porcentajeComision: medicosPorNombre.get(nombreMedico)?.porcentajeComision ?? null })),
+        ultimosDias,
+        clinicaNombre: clinicInfo?.nombre || "",
+        direccion: perfilDoctor.direccionClinica,
+        logoUrl: perfilDoctor.logoClinicaUrl,
+      });
+      descargarBlob(blob, nombre);
+    } catch {
+      setErrorPdf("No se pudo generar el PDF. Intenta de nuevo.");
+    } finally {
+      setGenerandoPdf(false);
+    }
+  };
 
   return (
     <div className="grid grid-cols-1 gap-6 lg:grid-cols-[1fr_320px]">
@@ -79,6 +107,15 @@ export default function ReporteCorteCaja() {
               aria-label="Elegir fecha"
               className={`${inputClass} max-w-[11rem]`}
             />
+            <button
+              onClick={descargarPdf}
+              disabled={generandoPdf}
+              title="Descargar el corte de este día en PDF"
+              className="rounded-lg border border-edge/30 bg-field px-3.5 py-2 text-sm font-semibold text-ink/90 transition-colors hover:bg-surface2 disabled:opacity-60"
+            >
+              {generandoPdf ? "Generando PDF…" : "Descargar PDF"}
+            </button>
+            {errorPdf && <span className="text-xs text-danger">{errorPdf}</span>}
           </div>
 
           <div className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-3">
