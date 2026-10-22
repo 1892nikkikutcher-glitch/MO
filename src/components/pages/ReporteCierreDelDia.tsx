@@ -4,6 +4,8 @@ import { useMemo, useState } from "react";
 import { usePatientData } from "@/context/PatientDataContext";
 import { armarCierre, duracionLegible, fechaLargaConDia, siguienteDiaDeAtencion, textoDelCierre, type CitaDelCierre } from "@/lib/cierreDelDia";
 import { sumarDias } from "@/lib/evaluacionSemanal";
+import { generarCierreDelDiaPdf } from "@/lib/generarCierreDelDiaPdf";
+import { descargarBlob } from "@/lib/pdfDocumento";
 import { formatFechaLarga, formatHora12, plantillaConUbicacion, renderPlantilla, ubicacionParaMensaje } from "@/lib/formatosWhatsapp";
 
 function hoyISO(): string {
@@ -22,9 +24,11 @@ function Tarjeta({ titulo, valor, detalle, tono }: { titulo: string; valor: stri
 }
 
 export default function ReporteCierreDelDia() {
-  const { citas, setCitas, recursos, sedes, patients, laboratoriosPendientes, saldosPendientes, clinicInfo, formatosWhatsapp } = usePatientData();
+  const { citas, setCitas, recursos, sedes, patients, laboratoriosPendientes, saldosPendientes, clinicInfo, formatosWhatsapp, perfilDoctor } = usePatientData();
   const [fecha, setFecha] = useState(() => siguienteDiaDeAtencion(hoyISO(), recursos, citas));
   const [copiado, setCopiado] = useState(false);
+  const [generandoPdf, setGenerandoPdf] = useState(false);
+  const [errorPdf, setErrorPdf] = useState("");
 
   const cierre = useMemo(
     () =>
@@ -51,6 +55,24 @@ export default function ReporteCierreDelDia() {
   }, [cierre.citas]);
 
   const enviarCierre = () => window.open(`https://wa.me/?text=${encodeURIComponent(texto)}`, "_blank");
+
+  const descargarPdf = async () => {
+    setGenerandoPdf(true);
+    setErrorPdf("");
+    try {
+      const { blob, nombre } = await generarCierreDelDiaPdf({
+        cierre,
+        clinicaNombre: clinicInfo?.nombre || "",
+        direccion: perfilDoctor.direccionClinica,
+        logoUrl: perfilDoctor.logoClinicaUrl,
+      });
+      descargarBlob(blob, nombre);
+    } catch {
+      setErrorPdf("No se pudo generar el PDF. Intenta de nuevo.");
+    } finally {
+      setGenerandoPdf(false);
+    }
+  };
 
   const copiar = async () => {
     try {
@@ -228,7 +250,11 @@ export default function ReporteCierreDelDia() {
       <div className="rounded-2xl border border-edge/10 bg-surface p-5">
         <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
           <h3 className="text-xs font-semibold uppercase tracking-wide text-ink/50">Mensaje del cierre</h3>
-          <div className="flex gap-2">
+          <div className="flex flex-wrap gap-2">
+            {errorPdf && <span className="self-center text-xs text-danger">{errorPdf}</span>}
+            <button onClick={descargarPdf} disabled={generandoPdf} className="rounded-lg border border-edge/30 bg-field px-3 py-1.5 text-xs font-semibold text-ink/90 hover:bg-surface2 disabled:opacity-60">
+              {generandoPdf ? "Generando PDF…" : "Descargar PDF"}
+            </button>
             <button onClick={copiar} className="rounded-lg border border-edge/15 px-3 py-1.5 text-xs font-semibold text-ink/70 hover:bg-field">
               {copiado ? "¡Copiado!" : "Copiar texto"}
             </button>

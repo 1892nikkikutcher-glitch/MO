@@ -182,3 +182,37 @@ describe("saldos pendientes en PDF", () => {
     expect(texto).toContain("provisionales");
   });
 });
+
+describe("cierre del día en PDF", () => {
+  const cierre = {
+    fecha: "2026-10-23",
+    diaNombre: "viernes",
+    citas: [
+      { id: "c1", patientId: "p1", paciente: "Ana Pérez", telefono: "7751111111", horaInicio: "10:00", horaFin: "11:00", duracionMin: 60, motivo: "Endodoncia", estatus: "Confirmada", confirmada: true, medicoNombre: "Dra. Ana", sedeId: "s1", sedeNombre: "Centro", fueraDeBloque: false },
+      { id: "c2", patientId: "p2", paciente: "Beto Ruiz", telefono: "", horaInicio: "11:00", horaFin: "11:30", duracionMin: 30, motivo: "Limpieza", estatus: "Agendada", confirmada: false, medicoNombre: "Dra. Ana", sedeId: "s1", sedeNombre: "Centro", fueraDeBloque: false },
+    ],
+    confirmadas: 1,
+    porConfirmar: 1,
+    espacios: [{ medicoNombre: "Dra. Ana", sedeId: "s1", sedeNombre: "Centro", inicio: "12:00", fin: "13:30", minutos: 90 }],
+    minutosLibres: 90,
+    pendientes: [{ tipo: "sin_telefono" as const, citaId: "c2", paciente: "Beto Ruiz", texto: "No tiene teléfono registrado" }],
+  };
+
+  it("trae resumen, citas por sede y médico, espacios y pendientes", async () => {
+    const { generarCierreDelDiaPdf } = await import("../generarCierreDelDiaPdf");
+    const { blob, nombre } = await generarCierreDelDiaPdf({ cierre, clinicaNombre: "Consultorio Medina" });
+    expect(nombre).toBe("Cierre_del_dia_2026_10_23_Consultorio_Medina.pdf");
+    const texto = await textoDe(blob);
+    for (const frag of ["Cierre del d", "viernes 23 de octubre", "Centro - Dra. Ana", "Ana P", "Por confirmar", "Sin tel", "1 h 30 min", "No tiene tel"]) {
+      expect(texto).toContain(frag);
+    }
+  });
+
+  it("un día sin citas lo dice", async () => {
+    const { generarCierreDelDiaPdf } = await import("../generarCierreDelDiaPdf");
+    const { blob } = await generarCierreDelDiaPdf({ cierre: { ...cierre, citas: [], confirmadas: 0, porConfirmar: 0, espacios: [], minutosLibres: 0, pendientes: [] }, clinicaNombre: "X" });
+    const texto = await textoDe(blob);
+    expect(texto).toContain("No hay citas agendadas");
+    expect(texto).toContain("Sin citas, sin pendientes");
+  });
+});
