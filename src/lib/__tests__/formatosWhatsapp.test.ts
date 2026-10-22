@@ -69,4 +69,10 @@ describe("buildProximaCitaTexto", () => {
     const texto = buildProximaCitaTexto(citas, "p1", "2026-09-04");
     expect(texto).toContain("Aún no tiene una próxima cita agendada");
   });
+
+  it("entiende la fecha del pago en DD/MM/AAAA (como la guardan los pagos) y no escribe NaN", () => {
+    const texto = buildProximaCitaTexto([], "p1", "04/09/2026");
+    expect(texto).not.toContain("NaN");
+    expect(texto).toContain("2027");
+  });
 });

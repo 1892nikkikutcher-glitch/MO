@@ -14,6 +14,14 @@ const nextConfig = {
         source: "/conecta/invite/:token*",
         headers: [{ key: "Referrer-Policy", value: "no-referrer" }],
       },
+      {
+        // La liga del recibo de pago también lleva su token en la URL.
+        source: "/recibo/:token*",
+        headers: [
+          { key: "Referrer-Policy", value: "no-referrer" },
+          { key: "X-Robots-Tag", value: "noindex, nofollow" },
+        ],
+      },
     ];
   },
 };

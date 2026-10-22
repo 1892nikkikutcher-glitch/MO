@@ -6,6 +6,8 @@ import { usePatientData } from "@/context/PatientDataContext";
 import AbrirWhatsAppPrompt from "@/components/AbrirWhatsAppPrompt";
 import { enviarPdfPorWhatsapp } from "@/lib/enviarPdfWhatsapp";
 import { buildProximaCitaTexto, formatosWhatsAppInicial, renderPlantilla } from "@/lib/formatosWhatsapp";
+import { crearEnlaceReciboApi } from "@/lib/recibosCompartidosApi";
+import { mensajeConEnlaceRecibo } from "@/lib/recibosCompartidos";
 import { generarReciboPagoPdf } from "@/lib/generarReciboPagoPdf";
 import { buildReciboTexto, formatCurrency, type Pago } from "@/lib/patientData";
 import { slugify } from "@/lib/textoNombre";
@@ -36,7 +38,9 @@ export default function ReciboPagoPanel({
   /** Encabezado opcional (ej. "Recibo de pago"); sin él se asume que viene del registro de un pago. */
   titulo?: string;
 }) {
-  const { citas, patients, clinicInfo, formatosWhatsapp, perfilDoctor, saldoCashbackDe, cashbackConfig } = usePatientData();
+  const { citas, patients, clinicInfo, formatosWhatsapp, perfilDoctor, saldoCashbackDe, cashbackConfig, clinicUid, miRol } = usePatientData();
+  const [mensajeWa, setMensajeWa] = useState<string | undefined>(undefined);
+  const [creandoEnlace, setCreandoEnlace] = useState(false);
   const [estado, setEstado] = useState<EstadoPdf>({ tipo: "generando" });
   const [intento, setIntento] = useState(0);
   const [waUrlPendiente, setWaUrlPendiente] = useState<string | null>(null);
@@ -110,16 +114,56 @@ export default function ReciboPagoPanel({
       total: formatCurrency(pago.total),
       proximaCita: buildProximaCitaTexto(citas, patientId, pago.fecha),
     });
+    const telefono = patients.find((p) => p.id === patientId)?.phone;
+
+    // Lo normal: se manda una liga para descargar el recibo (el paciente no necesita cuenta). Solo el administrador la puede crear.
+    if (clinicUid && miRol === "admin") {
+      setCreandoEnlace(true);
+      try {
+        const { enlace } = await crearEnlaceReciboApi({
+          clinicaId: clinicUid,
+          pacienteNombre: patientName,
+          clinicaNombre: clinicInfo?.nombre || "",
+          logoClinicaUrl: perfilDoctor.logoClinicaUrl || "",
+          direccionClinica: perfilDoctor.direccionClinica || "",
+          notaPie: [buildProximaCitaTexto(citas, patientId, pago.fecha), textoSaldoCashback()].filter(Boolean).join("\n"),
+          pago: {
+            id: pago.id,
+            fecha: pago.fecha,
+            medico: pago.medico,
+            formaPago: pago.formaPago,
+            total: pago.total,
+            facturar: pago.facturar,
+            // Una firma muy grande no viaja en la liga (el recibo sale igual, sin ella).
+            firma: pago.firma && pago.firma.length <= 400_000 ? pago.firma : null,
+            lineas: pago.lineas.map((l) => ({ id: l.id, label: l.label, monto: l.monto, tratamientoId: l.tratamientoId, folio: l.folio })),
+          },
+        });
+        const numero = (telefono ?? "").replace(/\D/g, "");
+        const texto = mensajeConEnlaceRecibo(caption, enlace);
+        setMensajeWa("El enlace de tu recibo está listo — ábrelo en WhatsApp para enviarlo.");
+        setWaUrlPendiente(`https://wa.me/${numero}?text=${encodeURIComponent(texto)}`);
+        return;
+      } catch (err) {
+        console.error("No se pudo crear el enlace del recibo; se manda el archivo", err);
+      } finally {
+        setCreandoEnlace(false);
+      }
+    }
+
     try {
       // Sin ningún await antes: en celular el menú de compartir debe abrirse en el mismo toque.
       const resultado = await enviarPdfPorWhatsapp({
         blob: listo.blob,
         nombreArchivo: listo.nombre,
-        telefono: patients.find((p) => p.id === patientId)?.phone,
+        telefono,
         caption,
         ventanaPrevia: null,
       });
-      if (resultado.requiereAbrirManualmente) setWaUrlPendiente(resultado.waUrl);
+      if (resultado.requiereAbrirManualmente) {
+        setMensajeWa(undefined);
+        setWaUrlPendiente(resultado.waUrl);
+      }
     } catch (err) {
       console.error("No se pudo compartir el recibo", err);
       alert("No se pudo compartir el recibo. Puedes descargarlo y enviarlo desde WhatsApp.");
@@ -210,10 +254,11 @@ export default function ReciboPagoPanel({
           <button
             type="button"
             onClick={compartirPorWhatsApp}
-            disabled={!listo}
+            disabled={!listo || creandoEnlace}
+            title="Manda por WhatsApp una liga para que el paciente descargue su recibo en PDF"
             className={`${boton} border-success/40 text-success hover:bg-success/10`}
           >
-            Compartir por WhatsApp
+            {creandoEnlace ? "Creando enlace…" : "Compartir por WhatsApp"}
           </button>
           <button
             type="button"
@@ -247,7 +292,7 @@ export default function ReciboPagoPanel({
           un elemento "fixed" queda recortado o escondido y no se podía abrir WhatsApp. */}
       {waUrlPendiente &&
         typeof document !== "undefined" &&
-        createPortal(<AbrirWhatsAppPrompt waUrl={waUrlPendiente} onCerrar={() => setWaUrlPendiente(null)} />, document.body)}
+        createPortal(<AbrirWhatsAppPrompt waUrl={waUrlPendiente} mensaje={mensajeWa} onCerrar={() => setWaUrlPendiente(null)} />, document.body)}
     </div>
   );
 }

@@ -3,6 +3,7 @@
  * datos reales de la cita antes de enviarse. */
 
 import type { CitaAgenda } from "@/lib/patientData";
+import { fechaPagoAIso } from "./metas";
 
 export type FormatosWhatsApp = {
   confirmacionCita: string;
@@ -137,7 +138,8 @@ export function buildProximaCitaTexto(citas: CitaAgenda[], patientId: string, fe
     return `\n\nSu próxima cita es el ${formatFechaLarga(proxima.fecha)} a las ${formatHora12(proxima.horaInicio)}.`;
   }
 
-  const tentativa = sumarMeses(fechaPago, 6);
+  // Los pagos guardan la fecha como DD/MM/AAAA (también llega en ISO); si no se entiende, se cuenta desde hoy.
+  const tentativa = sumarMeses(fechaPagoAIso(fechaPago) ?? hoyISO, 6);
   return `\n\nAún no tiene una próxima cita agendada — le sugerimos un control aproximadamente el ${formatFechaLarga(
     tentativa
   )} (6 meses después de esta visita). Contáctenos para agendarla.`;
