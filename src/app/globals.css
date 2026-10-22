@@ -468,3 +468,18 @@ select option {
   font-variant-numeric: lining-nums;
   letter-spacing: 0.005em;
 }
+
+/* Modo claro: los textos con poca opacidad (etiquetas, apoyos, textos secundarios) se perdían sobre el vidrio.
+   Se suben un escalón de contraste; el modo oscuro no se toca. */
+[data-theme="light"] .text-ink\/30 {
+  color: rgb(var(--ink-rgb) / 0.5);
+}
+[data-theme="light"] .text-ink\/40 {
+  color: rgb(var(--ink-rgb) / 0.62);
+}
+[data-theme="light"] .text-ink\/50 {
+  color: rgb(var(--ink-rgb) / 0.72);
+}
+[data-theme="light"] .text-ink\/60 {
+  color: rgb(var(--ink-rgb) / 0.78);
+}

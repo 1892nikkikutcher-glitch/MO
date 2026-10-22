@@ -1349,130 +1349,117 @@ export default function Expediente({
 
   return (
     <div className="space-y-6">
-      <div className="print:hidden">
-        <p className="text-sm font-semibold uppercase tracking-wide text-ink/40">Expediente</p>
-        <button
-          onClick={volverAPacientes}
-          className="mt-1 flex items-center gap-2 text-sm font-medium text-accent hover:text-accent"
-        >
-          ← Volver a pacientes
-        </button>
-      </div>
+      <div className="rounded-2xl border border-edge/10 bg-surface p-4 shadow-[var(--shadow-card)] sm:p-5 print:hidden">
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <button
+            onClick={volverAPacientes}
+            className="flex items-center gap-2 rounded-full border border-edge/20 bg-field px-3.5 py-1.5 text-xs font-semibold text-ink/80 transition-colors hover:border-accent/50 hover:text-accent"
+          >
+            <span aria-hidden>←</span> Volver a pacientes
+          </button>
+          <span className="text-[11px] font-semibold uppercase tracking-[0.16em] text-ink/50">Expediente</span>
+          {/* Paciente anterior y siguiente de la agenda de la semana: juntos, con su leyenda siempre visible
+              (no solo en el tooltip) para que se entienda también en celular. */}
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => pacienteAnteriorHoy && irAExpediente(pacienteAnteriorHoy.patientId!, activeTab)}
+              disabled={!pacienteAnteriorHoy}
+              aria-label="Paciente anterior de la agenda"
+              title={
+                pacienteAnteriorHoy
+                  ? `Expediente anterior en la agenda de esta semana: ${pacienteAnteriorHoy.paciente} (${formatFechaCita(pacienteAnteriorHoy.fecha)} ${pacienteAnteriorHoy.horaInicio})`
+                  : "No hay un paciente anterior en la agenda de esta semana"
+              }
+              className={`flex h-9 w-9 items-center justify-center rounded-full border text-base font-semibold transition-colors disabled:cursor-not-allowed ${
+                pacienteAnteriorHoy ? "border-accent/50 bg-accent/10 text-accent hover:bg-accent/20" : "border-edge/15 text-ink/30"
+              }`}
+            >
+              ←
+            </button>
+            <button
+              onClick={() => pacienteSiguienteHoy && irAExpediente(pacienteSiguienteHoy.patientId!, activeTab)}
+              disabled={!pacienteSiguienteHoy}
+              aria-label="Paciente siguiente de la agenda"
+              title={
+                pacienteSiguienteHoy
+                  ? `Expediente siguiente en la agenda de esta semana: ${pacienteSiguienteHoy.paciente} (${formatFechaCita(pacienteSiguienteHoy.fecha)} ${pacienteSiguienteHoy.horaInicio})`
+                  : "No hay un paciente siguiente en la agenda de esta semana"
+              }
+              className={`flex h-9 w-9 items-center justify-center rounded-full border text-base font-semibold transition-colors disabled:cursor-not-allowed ${
+                pacienteSiguienteHoy ? "border-accent/50 bg-accent/10 text-accent hover:bg-accent/20" : "border-edge/15 text-ink/30"
+              }`}
+            >
+              →
+            </button>
+          </div>
+        </div>
 
-      {/* Orden pedido: flecha — información del paciente — enviar resumen —
-          flecha. Las flechas quedan fijas en los extremos (justify-between)
-          sin ocupar más que su propio botón, para no exprimir el nombre del
-          paciente — la leyenda de a quién llevan va en una línea aparte,
-          debajo, a todo lo ancho. Naranja neón = activa (hay paciente),
-          rosa neón = inactiva (no hay) — leyenda siempre visible (no solo
-          tooltip) para que quede claro en ambos casos, incluso en celular. */}
-      <div className="flex items-center justify-between gap-3 print:hidden">
-        <button
-          onClick={() => pacienteAnteriorHoy && irAExpediente(pacienteAnteriorHoy.patientId!, activeTab)}
-          disabled={!pacienteAnteriorHoy}
-          title={
-            pacienteAnteriorHoy
-              ? `Expediente anterior en la agenda de esta semana: ${pacienteAnteriorHoy.paciente} (${formatFechaCita(pacienteAnteriorHoy.fecha)} ${pacienteAnteriorHoy.horaInicio})`
-              : "No hay un paciente anterior en la agenda de esta semana"
-          }
-          style={{
-            boxShadow: pacienteAnteriorHoy
-              ? "0 0 12px -2px rgb(var(--accent-rgb) / 0.6)"
-              : "0 0 12px -2px rgb(244 114 182 / 0.6)",
-          }}
-          className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border text-lg transition-colors disabled:cursor-not-allowed ${
-            pacienteAnteriorHoy
-              ? "border-accent/40 text-accent hover:bg-accent/15"
-              : "border-pink-400/50 text-pink-400"
-          }`}
-        >
-          ←
-        </button>
-
-        <div className="flex min-w-0 flex-1 flex-wrap items-center justify-center gap-4">
-          <div className="flex w-full items-center gap-4 lg:w-auto lg:min-w-0 lg:flex-1">
+        <div className="mt-4 flex flex-wrap items-center gap-x-5 gap-y-4 border-t border-edge/10 pt-4">
+          <div className="flex min-w-0 flex-1 items-center gap-4 sm:min-w-[18rem]">
             <div
-              className="flex h-16 w-16 shrink-0 items-center justify-center rounded-full text-lg font-bold text-black"
+              className="flex h-[4.5rem] w-[4.5rem] shrink-0 items-center justify-center rounded-full text-xl font-bold text-black ring-4 ring-white/40"
               style={{ backgroundColor: avatarColor }}
             >
               {initials}
             </div>
             <div className="min-w-0 flex-1">
               <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
+                <h2 className="text-2xl font-semibold leading-tight text-ink">{formatNombreConEdad(patient.name, patient.birthDate)}</h2>
                 <EstrellasPaciente citas={citasPaciente} />
-                <h2 className="text-xl font-semibold text-ink">{formatNombreConEdad(patient.name, patient.birthDate)}</h2>
               </div>
-              <p className="mt-1 text-sm text-ink/50">
-                {patient.phone} · {formatDate(patient.birthDate)}
-                {patient.birthDate && ` · ${formatEdad(patient.birthDate)}`}
-              </p>
+              <div className="mt-2 flex flex-wrap gap-2 text-xs text-ink/80">
+                {patient.phone && <span className="rounded-full border border-edge/15 bg-field px-2.5 py-1">📞 {patient.phone}</span>}
+                {patient.birthDate && (
+                  <span className="rounded-full border border-edge/15 bg-field px-2.5 py-1">
+                    🎂 {formatDate(patient.birthDate)} · {formatEdad(patient.birthDate)}
+                  </span>
+                )}
+              </div>
             </div>
           </div>
 
-          <button
-            onClick={descargarExpediente}
-            disabled={generandoPdf}
-            title="Descargar el expediente completo en PDF: datos, antecedentes, notas de evolución, citas y pagos"
-            className="flex shrink-0 items-center justify-center gap-2 rounded-lg border border-edge/30 px-3 py-2 text-xs font-semibold text-ink/80 transition-colors hover:bg-field disabled:opacity-60"
-          >
-            {generandoPdf ? "Generando PDF…" : "Descargar expediente (PDF)"}
-          </button>
-          {errorPdf && <span className="text-xs text-danger">{errorPdf}</span>}
+          <div className="flex flex-wrap items-center gap-2">
+            <button
+              onClick={descargarExpediente}
+              disabled={generandoPdf}
+              title="Descargar el expediente completo en PDF: datos, antecedentes, notas de evolución, citas y pagos"
+              className="flex shrink-0 items-center justify-center gap-2 rounded-lg border border-edge/30 bg-field px-3 py-2 text-xs font-semibold text-ink/90 transition-colors hover:bg-surface2 disabled:opacity-60"
+            >
+              {generandoPdf ? "Generando PDF…" : "Descargar expediente (PDF)"}
+            </button>
+            {errorPdf && <span className="text-xs text-danger">{errorPdf}</span>}
 
-          <button
-            onClick={enviarResumen}
-            title="Enviar resumen del expediente al paciente por WhatsApp"
-            style={{ boxShadow: "0 0 14px -2px rgb(var(--success-rgb) / 0.7)" }}
-            className="flex shrink-0 items-center justify-center gap-2 rounded-lg border border-success/40 px-3 py-2 text-xs font-semibold text-success transition-colors hover:bg-success/10"
-          >
-            <WhatsAppIcon />
-            Enviar resumen al paciente
-          </button>
+            <button
+              onClick={enviarResumen}
+              title="Enviar resumen del expediente al paciente por WhatsApp"
+              className="flex shrink-0 items-center justify-center gap-2 rounded-lg border border-success/50 bg-success/10 px-3 py-2 text-xs font-semibold text-success transition-colors hover:bg-success/20"
+            >
+              <WhatsAppIcon />
+              Enviar resumen al paciente
+            </button>
 
-          <button
-            onClick={() => setActiveTab("MO Conecta")}
-            title="Ver interconsultas de este paciente en MO Conecta"
-            style={{ boxShadow: "0 0 14px -2px rgb(var(--accent-rgb) / 0.7)" }}
-            className="flex shrink-0 items-center justify-center gap-2 rounded-lg border border-accent/40 px-3 py-2 text-xs font-semibold text-accent transition-colors hover:bg-accent/10"
-          >
-            MO Conecta
-          </button>
+            <button
+              onClick={() => setActiveTab("MO Conecta")}
+              title="Ver interconsultas de este paciente en MO Conecta"
+              className="flex shrink-0 items-center justify-center gap-2 rounded-lg border border-accent/50 bg-accent/10 px-3 py-2 text-xs font-semibold text-accent transition-colors hover:bg-accent/20"
+            >
+              MO Conecta
+            </button>
+          </div>
         </div>
 
-        <button
-          onClick={() => pacienteSiguienteHoy && irAExpediente(pacienteSiguienteHoy.patientId!, activeTab)}
-          disabled={!pacienteSiguienteHoy}
-          title={
-            pacienteSiguienteHoy
-              ? `Expediente siguiente en la agenda de esta semana: ${pacienteSiguienteHoy.paciente} (${formatFechaCita(pacienteSiguienteHoy.fecha)} ${pacienteSiguienteHoy.horaInicio})`
-              : "No hay un paciente siguiente en la agenda de esta semana"
-          }
-          style={{
-            boxShadow: pacienteSiguienteHoy
-              ? "0 0 12px -2px rgb(var(--accent-rgb) / 0.6)"
-              : "0 0 12px -2px rgb(244 114 182 / 0.6)",
-          }}
-          className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border text-lg transition-colors disabled:cursor-not-allowed ${
-            pacienteSiguienteHoy
-              ? "border-accent/40 text-accent hover:bg-accent/15"
-              : "border-pink-400/50 text-pink-400"
-          }`}
-        >
-          →
-        </button>
-      </div>
-
-      <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-1 text-[11px] leading-tight print:hidden">
-        <span className={pacienteAnteriorHoy ? "text-accent/80" : "text-pink-400/80"}>
-          ← {pacienteAnteriorHoy
-            ? `Anterior: ${pacienteAnteriorHoy.paciente} · ${formatFechaCita(pacienteAnteriorHoy.fecha)} ${pacienteAnteriorHoy.horaInicio}`
-            : "Sin paciente anterior en la agenda de esta semana"}
-        </span>
-        <span className={pacienteSiguienteHoy ? "text-accent/80" : "text-pink-400/80"}>
-          {pacienteSiguienteHoy
-            ? `Siguiente: ${pacienteSiguienteHoy.paciente} · ${formatFechaCita(pacienteSiguienteHoy.fecha)} ${pacienteSiguienteHoy.horaInicio}`
-            : "Sin paciente siguiente en la agenda de esta semana"} →
-        </span>
+        <div className="mt-4 flex flex-wrap items-center justify-between gap-x-4 gap-y-1 text-[11px] leading-tight">
+          <span className={pacienteAnteriorHoy ? "font-medium text-ink/80" : "text-ink/50"}>
+            ← {pacienteAnteriorHoy
+              ? `Anterior: ${pacienteAnteriorHoy.paciente} · ${formatFechaCita(pacienteAnteriorHoy.fecha)} ${pacienteAnteriorHoy.horaInicio}`
+              : "Sin paciente anterior en la agenda de esta semana"}
+          </span>
+          <span className={pacienteSiguienteHoy ? "font-medium text-ink/80" : "text-ink/50"}>
+            {pacienteSiguienteHoy
+              ? `Siguiente: ${pacienteSiguienteHoy.paciente} · ${formatFechaCita(pacienteSiguienteHoy.fecha)} ${pacienteSiguienteHoy.horaInicio}`
+              : "Sin paciente siguiente en la agenda de esta semana"} →
+          </span>
+        </div>
       </div>
 
       <ExpedienteCompartiendoAviso
