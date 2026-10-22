@@ -6,6 +6,8 @@ import { formatCurrency, type Pago } from "@/lib/patientData";
 import type { PagoRealizado } from "@/lib/pagosRealizados";
 import { calcularDisponibleDevolucion, resumenDesdeDevoluciones } from "@/lib/devolucionesPago";
 import { EditarPagoDialog, EliminarPagoDialog } from "./Pagos";
+import { generarPagosPdf } from "@/lib/generarPagosPdf";
+import { descargarBlob } from "@/lib/pdfDocumento";
 import { fechaPagoAIso } from "@/lib/metas";
 import { calcularRangoPeriodo, type PeriodoId } from "@/lib/dashboardMetrics";
 import PeriodSelector from "@/components/dashboard/PeriodSelector";
@@ -28,7 +30,11 @@ export default function ReportePagos() {
     cargarDatosPaciente,
     puedeVerFinanzas,
     userEmail,
+    clinicInfo,
+    perfilDoctor,
   } = usePatientData();
+  const [generandoPdf, setGenerandoPdf] = useState(false);
+  const [errorPdf, setErrorPdf] = useState("");
 
   // Editar o eliminar desde aquí usa exactamente la misma lógica que la pestaña Pagos del expediente: se abre el
   // expediente del paciente en segundo plano (lo necesita para recalcular saldos y cortes) y se aplica el cambio.
@@ -137,6 +143,28 @@ export default function ReportePagos() {
     .sort((a, b) => b.eliminadoEn.localeCompare(a.eliminadoEn));
   const totalEliminados = eliminadosDelPeriodo.reduce((sum, r) => sum + r.pago.total, 0);
 
+  const descargarPdf = async () => {
+    setGenerandoPdf(true);
+    setErrorPdf("");
+    try {
+      const { blob, nombre } = await generarPagosPdf({
+        periodo: rango.detalleFecha,
+        desdeISO: rango.desdeISO,
+        hastaISO: rango.hastaISO,
+        realizados: realizadosDelPeriodo,
+        eliminados: eliminadosDelPeriodo,
+        clinicaNombre: clinicInfo?.nombre || "",
+        direccion: perfilDoctor.direccionClinica,
+        logoUrl: perfilDoctor.logoClinicaUrl,
+      });
+      descargarBlob(blob, nombre);
+    } catch {
+      setErrorPdf("No se pudo generar el PDF. Intenta de nuevo.");
+    } finally {
+      setGenerandoPdf(false);
+    }
+  };
+
   return (
     <div className="space-y-8">
       <PeriodSelector
@@ -147,6 +175,18 @@ export default function ReportePagos() {
         rango={rango}
         onNavigate={navegarPeriodo}
       />
+
+      <div className="flex flex-wrap items-center gap-3">
+        <button
+          onClick={descargarPdf}
+          disabled={generandoPdf}
+          title="Descargar en PDF los pagos realizados y eliminados de este periodo"
+          className="rounded-lg border border-edge/30 bg-field px-3.5 py-2 text-sm font-semibold text-ink/90 transition-colors hover:bg-surface2 disabled:opacity-60"
+        >
+          {generandoPdf ? "Generando PDF…" : "Descargar PDF"}
+        </button>
+        {errorPdf && <span className="text-xs text-danger">{errorPdf}</span>}
+      </div>
 
       <div>
         <div>

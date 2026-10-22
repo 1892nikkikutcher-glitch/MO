@@ -302,3 +302,35 @@ describe("corte diario en PDF", () => {
     expect(texto).not.toContain("LTIMOS D");
   });
 });
+
+describe("pagos en PDF", () => {
+  const pago = (id: string, total: number): Pago => ({ id, fecha: "19/10/2026", medico: "Dra. Ana", formaPago: "Efectivo", lineas: [{ id: `${id}-l`, tratamientoId: "t", folio: null, label: "Resina", monto: total } as never], total, facturar: false, firma: null });
+
+  it("lista los pagos realizados y los eliminados con motivo, con totales", async () => {
+    const { generarPagosPdf } = await import("../generarPagosPdf");
+    const { blob, nombre } = await generarPagosPdf({
+      periodo: "Octubre 2026",
+      desdeISO: "2026-10-01",
+      hastaISO: "2026-10-31",
+      realizados: [
+        { id: "a", patientId: "p1", patientName: "Ana Pérez", pago: pago("a", 580), registradoEn: "2026-10-19T10:00:00.000Z", registradoPor: "x@x.com" },
+        { id: "b", patientId: "p2", patientName: "Beto Ruiz", pago: pago("b", 2000), registradoEn: "2026-10-19T11:00:00.000Z", registradoPor: "x@x.com" },
+      ],
+      eliminados: [{ id: "e", patientId: "p3", patientName: "Cora Díaz", pago: pago("e", 300), motivo: "Se registró por error", eliminadoEn: "2026-10-20T09:00:00.000Z", eliminadoPor: "admin@x.com" }],
+      clinicaNombre: "Consultorio Medina",
+    });
+    expect(nombre).toBe("Pagos_2026_10_01_2026_10_31_Consultorio_Medina.pdf");
+    const texto = await textoDe(blob);
+    for (const frag of ["Octubre 2026", "PAGOS REALIZADOS", "$2,580.00", "Se registr", "PAGOS ELIMINADOS", "Cora D", "$300.00"]) {
+      expect(texto).toContain(frag);
+    }
+  });
+
+  it("un periodo sin pagos lo dice", async () => {
+    const { generarPagosPdf } = await import("../generarPagosPdf");
+    const { blob } = await generarPagosPdf({ periodo: "Hoy", desdeISO: "2026-10-22", hastaISO: "2026-10-22", realizados: [], eliminados: [], clinicaNombre: "X" });
+    const texto = await textoDe(blob);
+    expect(texto).toContain("No hay pagos registrados");
+    expect(texto).toContain("No se ha eliminado");
+  });
+});
