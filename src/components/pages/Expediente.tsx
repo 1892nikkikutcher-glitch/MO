@@ -1123,6 +1123,7 @@ export default function Expediente({
     cargarDatosPaciente,
     notasEvolucionPorPaciente,
     clinicInfo,
+    updatePatient,
     perfilDoctor: perfilClinica,
     citas,
     recursos,
@@ -1302,6 +1303,11 @@ export default function Expediente({
       ? citasSemanaConPaciente[indiceHoy + 1]
       : null;
 
+  // Médico responsable: el que se asignó al paciente; si no hay, se sugiere el de su próxima cita (o la última).
+  const medicosClinica = recursos.filter((r) => r.tipo === "medico");
+  const medicoAsignado = medicosClinica.find((r) => r.id === patient.medicoResponsableId);
+  const citaReferencia = citasFuturas[0] ?? ultimaCita;
+  const medicoDeCita = citaReferencia ? medicosClinica.find((r) => r.id === (citaReferencia.medicoId || citaReferencia.recursoId)) : undefined;
   const [generandoPdf, setGenerandoPdf] = useState(false);
   const [errorPdf, setErrorPdf] = useState("");
   const descargarExpediente = async () => {
@@ -1313,6 +1319,7 @@ export default function Expediente({
         clinicaNombre: clinicInfo?.nombre || "",
         direccion: perfilClinica.direccionClinica,
         logoUrl: perfilClinica.logoClinicaUrl,
+        medicoResponsable: medicoAsignado?.nombre ?? medicoDeCita?.nombre,
         historiaTemplate: historiaClinicaTemplate,
         historiaRespuestas: historiaClinicaPorPaciente[patient.id] ?? respuestasVacias,
         notas: notasEvolucionPorPaciente[patient.id] ?? [],
@@ -1373,6 +1380,22 @@ export default function Expediente({
                 <h2 className="text-2xl font-semibold leading-tight text-ink">{formatNombreConEdad(patient.name, patient.birthDate)}</h2>
                 <EstrellasPaciente citas={citasPaciente} />
               </div>
+              <label className="mt-2 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-ink/80">
+                <span className="font-semibold uppercase tracking-wide text-ink/60">🩺 Médico responsable</span>
+                <select
+                  value={medicoAsignado?.id ?? ""}
+                  onChange={(e) => updatePatient(patient.id, { medicoResponsableId: e.target.value || undefined })}
+                  aria-label="Médico responsable del paciente"
+                  className="rounded-full border border-accent/50 bg-accent/10 px-3 py-1 text-xs font-semibold text-ink outline-none focus:border-accent"
+                >
+                  <option value="">{medicoDeCita ? `Sin asignar (según su cita: ${medicoDeCita.nombre})` : "Sin asignar"}</option>
+                  {medicosClinica.map((m) => (
+                    <option key={m.id} value={m.id}>
+                      {m.nombre}
+                    </option>
+                  ))}
+                </select>
+              </label>
               <div className="mt-2 flex flex-wrap gap-2 text-xs text-ink/80">
                 {patient.phone && <span className="rounded-full border border-edge/15 bg-field px-2.5 py-1">📞 {patient.phone}</span>}
                 {patient.birthDate && (

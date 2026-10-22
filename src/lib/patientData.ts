@@ -42,6 +42,9 @@ export type Patient = {
   contactoParentesco?: string;
   contactoTelefono?: string;
 
+  /** Médico (recurso tipo "medico") que lleva al paciente; se elige en el encabezado del expediente. Ausente = sin asignar. */
+  medicoResponsableId?: string;
+
   /** Nombre del padre, madre o tutor — se captura cuando el paciente es
    * menor de edad (el campo se muestra/oculta en Datos del Paciente según
    * la fecha de nacimiento). */

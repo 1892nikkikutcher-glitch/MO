@@ -19,6 +19,8 @@ import { esNotaAdministrativa, esNotaV2, type NotaEvolucionAny } from "./notasEv
 export type DatosExpedientePdf = {
   patient: Patient;
   clinicaNombre: string;
+  /** Médico que lleva al paciente (el asignado, o el de su próxima cita). */
+  medicoResponsable?: string;
   direccion?: string;
   logoUrl?: string;
   historiaTemplate: HistoriaClinicaTemplate;
@@ -88,6 +90,7 @@ export async function generarExpedientePdf(datos: DatosExpedientePdf): Promise<{
   pdf.seccion("Datos del paciente");
   pdf.pares([
     ["Nombre", patient.name],
+    ["Médico responsable", datos.medicoResponsable],
     ["Fecha de nacimiento", patient.birthDate ? `${fechaPdf(patient.birthDate)} (${edadTexto(patient.birthDate)})` : ""],
     ["Sexo", patient.sexo],
     ["Teléfono", patient.phone],
