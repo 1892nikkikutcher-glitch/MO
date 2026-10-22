@@ -15,6 +15,8 @@ import {
   sumarDias,
   veredictoDeBloques,
 } from "@/lib/evaluacionSemanal";
+import { generarEvaluacionSemanalPdf } from "@/lib/generarEvaluacionSemanalPdf";
+import { descargarBlob } from "@/lib/pdfDocumento";
 
 const MESES = ["ene", "feb", "mar", "abr", "may", "jun", "jul", "ago", "sep", "oct", "nov", "dic"];
 
@@ -42,8 +44,10 @@ function Tarjeta({ titulo, valor, detalle, tono }: { titulo: string; valor: stri
 }
 
 export default function ReporteEvaluacionSemanal() {
-  const { miRol, citas, recursos, sedes, finanzas, pagosRealizados, gastos, colaboradoresActivos, userEmail } = usePatientData();
+  const { miRol, citas, recursos, sedes, finanzas, pagosRealizados, gastos, colaboradoresActivos, userEmail, clinicInfo, perfilDoctor } = usePatientData();
   const [lunes, setLunes] = useState(() => lunesDe(hoyISO()));
+  const [generandoPdf, setGenerandoPdf] = useState(false);
+  const [errorPdf, setErrorPdf] = useState("");
 
   const datos = useMemo(() => {
     const resumen = resumenSemana({ lunes, recursos, sedes, citas });
@@ -77,6 +81,31 @@ export default function ReporteEvaluacionSemanal() {
     if (correo === (userEmail ?? "").toLowerCase()) return "Tú (dueño)";
     const m = colaboradoresActivos.find((c) => (c.correo ?? "").toLowerCase() === correo);
     return m?.nombre || correo;
+  };
+  const descargarPdf = async () => {
+    setGenerandoPdf(true);
+    setErrorPdf("");
+    try {
+      const { blob, nombre } = await generarEvaluacionSemanalPdf({
+        lunes,
+        resumen,
+        cobros,
+        brutos,
+        devoluciones,
+        costos,
+        comisiones,
+        veredicto,
+        nombreOperador,
+        clinicaNombre: clinicInfo?.nombre || "",
+        direccion: perfilDoctor.direccionClinica,
+        logoUrl: perfilDoctor.logoClinicaUrl,
+      });
+      descargarBlob(blob, nombre);
+    } catch {
+      setErrorPdf("No se pudo generar el PDF. Intenta de nuevo.");
+    } finally {
+      setGenerandoPdf(false);
+    }
   };
   const tasaPuntual = resumen.puntualidad.conLlegada > 0 ? resumen.puntualidad.puntuales / resumen.puntualidad.conLlegada : null;
 
@@ -153,6 +182,10 @@ export default function ReporteEvaluacionSemanal() {
           <button onClick={() => setLunes(sumarDias(lunes, 7))} aria-label="Semana siguiente" className="rounded-lg border border-edge/15 px-3 py-1.5 text-sm text-ink/70 hover:bg-field">
             ›
           </button>
+          <button onClick={descargarPdf} disabled={generandoPdf} title="Descargar la evaluación de esta semana en PDF" className="rounded-lg border border-edge/30 bg-field px-3 py-1.5 text-xs font-semibold text-ink/90 hover:bg-surface2 disabled:opacity-60">
+            {generandoPdf ? "Generando PDF…" : "Descargar PDF"}
+          </button>
+          {errorPdf && <span className="text-xs text-danger">{errorPdf}</span>}
         </div>
       </div>
 

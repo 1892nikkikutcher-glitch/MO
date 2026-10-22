@@ -216,3 +216,35 @@ describe("cierre del día en PDF", () => {
     expect(texto).toContain("Sin citas, sin pendientes");
   });
 });
+
+describe("evaluación semanal en PDF", () => {
+  it("trae las medidas, el detalle por médico, los cobros por operador y el margen", async () => {
+    const { generarEvaluacionSemanalPdf } = await import("../generarEvaluacionSemanalPdf");
+    const { resumenSemana, costosDeLaSemana, cobrosPorOperador, veredictoDeBloques } = await import("../evaluacionSemanal");
+    const recursos = [{ id: "m1", tipo: "medico", nombre: "Dra. Ana", bloques: [{ id: "b1", sedeId: "s1", dias: [1, 2, 3, 4, 5], inicio: "09:00", fin: "13:00" }] }];
+    const sedes = [{ id: "s1", nombre: "Centro", direccion: "" }];
+    const citas = [{ id: "c1", fecha: "2026-10-19", horaInicio: "09:00", horaFin: "10:00", estatus: "Atendida", medicoId: "m1", recursoId: "m1" }];
+    const lunes = "2026-10-19";
+    const resumen = resumenSemana({ lunes, recursos: recursos as never, sedes: sedes as never, citas: citas as never });
+    const costos = costosDeLaSemana([{ id: "g1", concepto: "x", categoria: "Insumos", monto: 500, fecha: "2026-10-20" }], lunes);
+    const cobros = cobrosPorOperador([{ id: "p1", patientId: "p", patientName: "Ana", pago: { id: "p1", fecha: "20/10/2026", total: 3000 } as never, registradoEn: "2026-10-20T10:00:00.000Z", registradoPor: "caja@x.com" }], lunes);
+    const veredicto = veredictoDeBloques({ hoyISO: "2026-10-22", recursos: recursos as never, sedes: sedes as never, citas: citas as never });
+    const { blob, nombre } = await generarEvaluacionSemanalPdf({
+      lunes,
+      resumen,
+      cobros,
+      brutos: 3000,
+      devoluciones: 200,
+      costos,
+      comisiones: 300,
+      veredicto,
+      nombreOperador: (c) => (c === "caja@x.com" ? "Claudia Carbajal" : c),
+      clinicaNombre: "Consultorio Medina",
+    });
+    expect(nombre).toBe("Evaluacion_semanal_2026_10_19_Consultorio_Medina.pdf");
+    const texto = await textoDe(blob);
+    for (const frag of ["Evaluaci", "Semana del 19 oct 2026 al 25 oct 2026", "MEDIDAS DE LA SEMANA", "Dra. Ana", "Claudia Carbajal", "$2,800.00", "Margen directo", "$2,000.00"]) {
+      expect(texto).toContain(frag);
+    }
+  });
+});
