@@ -19,7 +19,7 @@ import ReciboPagoPanel from "@/components/ReciboPagoPanel";
 import RegistrarDevolucionDialog from "@/components/RegistrarDevolucionDialog";
 import { calcularDisponibleDevolucion, resumenDesdeDevoluciones } from "@/lib/devolucionesPago";
 import { fechaPagoAIso } from "@/lib/metas";
-import { FORMA_PAGO_CASHBACK, montoMaximoCanje } from "@/lib/cashback";
+import { FORMA_PAGO_CASHBACK, baseCashbackDePago, calcularCashback, montoMaximoCanje } from "@/lib/cashback";
 
 const formasDePago = ["Efectivo", "Tarjeta de crédito", "Tarjeta de débito", "Transferencia", "Cheque"];
 
@@ -384,7 +384,9 @@ export function AgregarPagoDialog({
   const { recursos, saldoCashbackDe, cashbackConfig } = usePatientData();
   const medicosDisponibles = recursos.filter((r) => r.tipo === "medico").map((r) => r.nombre);
   const cashbackDisponible = saldoCashbackDe(patientId).disponible;
-  const formasDisponibles = cashbackDisponible > 0 ? [...formasDePago, FORMA_PAGO_CASHBACK] : formasDePago;
+  const [sinCashback, setSinCashback] = useState(false);
+  // Una promoción, cortesía o tarifa especial no acumula ni se paga con cashback.
+  const formasDisponibles = cashbackDisponible > 0 && !sinCashback ? [...formasDePago, FORMA_PAGO_CASHBACK] : formasDePago;
 
   const [paso, setPaso] = useState<"form" | "firma" | "recibo">("form");
   const [pagoGuardado, setPagoGuardado] = useState<Pago | null>(null);
@@ -400,7 +402,6 @@ export function AgregarPagoDialog({
   const [extras, setExtras] = useState<{ id: string; label: string; monto: number }[]>([]);
   const [showExtraDialog, setShowExtraDialog] = useState(false);
   const [facturar, setFacturar] = useState(false);
-  const [sinCashback, setSinCashback] = useState(false);
 
   const toggleTratamiento = (t: TratamientoPendiente) => {
     setSeleccionados((prev) => {
@@ -422,6 +423,10 @@ export function AgregarPagoDialog({
   const valorAtencion = seleccionados.reduce((sum, id) => sum + (tratamientosPendientes.find((t) => t.id === id)?.price ?? 0), 0);
   const maxCashbackAhora = montoMaximoCanje(cashbackDisponible, valorAtencion, cashbackConfig);
   const excedeCashback = pagaConCashback && totalAPagar > maxCashbackAhora + 0.001;
+  useEffect(() => {
+    // Al marcar promoción o cortesía ya no se puede pagar con cashback.
+    if (sinCashback && formaPago === FORMA_PAGO_CASHBACK) setFormaPago(formasDePago[0]);
+  }, [sinCashback, formaPago]);
   const puedeGuardar = totalAPagar > 0 && medico !== "" && !excedeCashback;
 
   const handleGuardar = () => {
@@ -491,9 +496,15 @@ export function AgregarPagoDialog({
   }
 
   if (paso === "recibo" && pagoGuardado) {
+    const acumulaHoy = cashbackConfig.activo ? calcularCashback(baseCashbackDePago(pagoGuardado), cashbackConfig.porcentaje) : 0;
     return (
       <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4 print:bg-transparent">
         <div className="w-full max-w-md rounded-2xl border border-edge/10 bg-modal p-6 print:border-none print:bg-transparent print:p-0">
+          {acumulaHoy > 0 && (
+            <p className="mb-4 rounded-lg border border-success/40 bg-success/10 px-3 py-2 text-sm text-success print:hidden">
+              Hoy acumulaste <span className="font-semibold">{formatCurrency(acumulaHoy)}</span> de cashback para tu próxima atención. Se libera a partir de mañana, una vez aprobado.
+            </p>
+          )}
           <ReciboPagoPanel
             patientId={patientId}
             patientName={patientName}
@@ -572,7 +583,7 @@ export function AgregarPagoDialog({
               {cashbackConfig.activo && !pagaConCashback && (
                 <label className="mt-2 flex items-center gap-2 text-xs text-ink/70">
                   <input type="checkbox" checked={sinCashback} onChange={(e) => setSinCashback(e.target.checked)} className="h-4 w-4 rounded border-edge/30" />
-                  Sin cashback (promoción, cortesía o tarifa especial)
+                  Promoción, cortesía o tarifa especial (no genera ni usa cashback)
                 </label>
               )}
             </div>
