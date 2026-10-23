@@ -6,6 +6,7 @@
 import { redondearDinero } from "./dinero";
 import { MESES_ABR, addDays, addMonths } from "./agendaHelpers";
 import { inicioSemana } from "./metas";
+import { FORMA_PAGO_CASHBACK } from "./cashback";
 
 export type FondoAsignacion = { label: string; porcentaje: number };
 
@@ -73,11 +74,47 @@ export function sumarRangoPorFormaPago(
     const d = new Date(`${fecha}T00:00:00`);
     if (d < desde || d > hasta) return;
     Object.entries(porForma).forEach(([forma, monto]) => {
+      if (forma === FORMA_PAGO_CASHBACK) return; // lo pagado con Saldo Sonríe no es dinero que entró: no se reparte
       if (forma === "Efectivo") efectivo += monto;
       else electronico += monto;
     });
   });
   return { efectivo: redondearDinero(efectivo), electronico: redondearDinero(electronico) };
+}
+
+export type IngresosPorMedico = { medico: string; efectivo: number; electronico: number };
+
+/** Lo que cobró cada médico en el rango, separado en efectivo y electrónico (mismo criterio que `sumarRangoPorFormaPago`).
+ * Los médicos salen ordenados de quien más cobró a quien menos. */
+export function sumarRangoPorMedico(
+  porFechaMedicoYFormaPago: Record<string, Record<string, Record<string, number>>>,
+  desde: Date,
+  hasta: Date
+): IngresosPorMedico[] {
+  const acumulado = new Map<string, { efectivo: number; electronico: number }>();
+  Object.entries(porFechaMedicoYFormaPago).forEach(([fecha, porMedico]) => {
+    const d = new Date(`${fecha}T00:00:00`);
+    if (d < desde || d > hasta) return;
+    Object.entries(porMedico).forEach(([medico, porForma]) => {
+      const actual = acumulado.get(medico) ?? { efectivo: 0, electronico: 0 };
+      Object.entries(porForma).forEach(([forma, monto]) => {
+        if (forma === FORMA_PAGO_CASHBACK) return;
+        if (forma === "Efectivo") actual.efectivo += monto;
+        else actual.electronico += monto;
+      });
+      acumulado.set(medico, actual);
+    });
+  });
+  return [...acumulado.entries()]
+    .map(([medico, v]) => ({ medico, efectivo: redondearDinero(v.efectivo), electronico: redondearDinero(v.electronico) }))
+    .sort((a, b) => b.efectivo + b.electronico - (a.efectivo + a.electronico) || a.medico.localeCompare(b.medico));
+}
+
+/** ¿El desglose por médico suma lo mismo que el total cobrado en el rango? Si no (días anteriores a que existiera el
+ * desglose, o un cobro que no pasó por él), el reparto por doctor sería incompleto y hay que avisar. */
+export function desglosePorMedicoCompleto(medicos: IngresosPorMedico[], ingresos: { efectivo: number; electronico: number }): boolean {
+  const suma = medicos.reduce((s, m) => s + m.efectivo + m.electronico, 0);
+  return Math.abs(suma - (ingresos.efectivo + ingresos.electronico)) < 0.01;
 }
 
 export type VistaFondos = "dia" | "semana" | "quincena1" | "quincena2" | "mes";

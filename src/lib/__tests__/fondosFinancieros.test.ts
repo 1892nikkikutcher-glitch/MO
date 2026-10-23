@@ -3,6 +3,8 @@ import {
   GRUPOS_EFECTIVO,
   GRUPOS_ELECTRONICO,
   calcularAsignacionFondos,
+  desglosePorMedicoCompleto,
+  sumarRangoPorMedico,
   etiquetaTotalFondos,
   semanaDelAnio,
   tituloTotalFondos,
@@ -283,5 +285,43 @@ describe("título del total (día de la semana y semana del año)", () => {
     const ancla = new Date(2026, 9, 8);
     expect(tituloTotalFondos("mes", rangoVistaFondos("mes", ancla), ancla)).toBe("Total del mes · oct. 2026");
     expect(tituloTotalFondos("quincena1", rangoVistaFondos("quincena1", ancla), ancla)).toBe("Total de la quincena 1–15 · 1–15 oct.");
+  });
+});
+
+describe("reparto por doctor", () => {
+  const mapa = {
+    "2026-10-05": { "Dra. Ana": { Efectivo: 1000, "Tarjeta de débito": 2000 }, "Dr. Luis": { Efectivo: 500 } },
+    "2026-10-12": { "Dra. Ana": { Transferencia: 1500, "Saldo Sonríe": 300 }, "Dr. Luis": { "Tarjeta de crédito": 2500 } },
+    "2026-09-30": { "Dra. Ana": { Efectivo: 9999 } },
+  };
+  const desde = new Date("2026-10-01T00:00:00");
+  const hasta = new Date("2026-10-31T00:00:00");
+
+  it("separa lo que cobró cada doctor en efectivo y electrónico, del que más cobró al que menos", () => {
+    const r = sumarRangoPorMedico(mapa, desde, hasta);
+    expect(r).toEqual([
+      { medico: "Dra. Ana", efectivo: 1000, electronico: 3500 },
+      { medico: "Dr. Luis", efectivo: 500, electronico: 2500 },
+    ]);
+  });
+
+  it("lo pagado con Saldo Sonríe no es dinero que entró: no se reparte", () => {
+    const ana = sumarRangoPorMedico(mapa, desde, hasta).find((m) => m.medico === "Dra. Ana")!;
+    expect(ana.efectivo + ana.electronico).toBe(4500);
+    expect(sumarRangoPorFormaPago({ "2026-10-12": { Efectivo: 100, "Saldo Sonríe": 300 } }, desde, hasta)).toEqual({ efectivo: 100, electronico: 0 });
+  });
+
+  it("la suma de los doctores iguala el total cuando el desglose está completo, y avisa cuando no", () => {
+    const doctores = sumarRangoPorMedico(mapa, desde, hasta);
+    expect(desglosePorMedicoCompleto(doctores, { efectivo: 1500, electronico: 6000 })).toBe(true);
+    expect(desglosePorMedicoCompleto(doctores, { efectivo: 1500, electronico: 9000 })).toBe(false);
+    expect(desglosePorMedicoCompleto([], { efectivo: 0, electronico: 0 })).toBe(true);
+  });
+
+  it("cada doctor recibe su propio reparto de sobres sobre lo que cobró", () => {
+    const [ana] = sumarRangoPorMedico(mapa, desde, hasta);
+    const grupos = calcularAsignacionFondos(GRUPOS_ELECTRONICO, ana.electronico);
+    expect(grupos[0].montoGrupo).toBe(2100); // 60% de 3,500
+    expect(grupos[0].fondos.find((f) => f.label === "Mi sueldo")?.monto).toBe(700); // 20%
   });
 });

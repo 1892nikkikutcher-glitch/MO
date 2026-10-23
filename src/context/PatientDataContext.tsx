@@ -11,6 +11,7 @@ import {
 } from "react";
 import { sedesInicial, type Sede, type SedesConfig } from "@/lib/sedesBloques";
 import { balanceInicial, type BalanceConsultorio } from "@/lib/balanceConsultorio";
+import { redondearDinero } from "@/lib/dinero";
 import {
   cashbackConfigInicial,
   normalizarConfigCashback,
@@ -1868,6 +1869,7 @@ export function PatientDataProvider({
       const porFechaYFormaPago = { ...(prevFin.porFechaYFormaPago ?? {}) };
       const porFechaYMedico = { ...(prevFin.porFechaYMedico ?? {}) };
       const pagosCountPorFecha = { ...(prevFin.pagosCountPorFecha ?? {}) };
+      const porFechaMedicoYFormaPago = { ...(prevFin.porFechaMedicoYFormaPago ?? {}) };
       fechas.forEach((iso) => {
         const sumPrev = prevConIso.filter((p) => p._iso === iso).reduce((s, p) => s + p.total, 0);
         const sumNext = nextConIso.filter((p) => p._iso === iso).reduce((s, p) => s + p.total, 0);
@@ -1904,11 +1906,25 @@ export function PatientDataProvider({
           if (deltaMedico !== 0) porMedico[medico] = (porMedico[medico] ?? 0) + deltaMedico;
         });
         porFechaYMedico[iso] = porMedico;
+
+        // Por médico y por forma de pago a la vez (reparto de sobres por doctor).
+        const porMedicoYForma = { ...(porFechaMedicoYFormaPago[iso] ?? {}) };
+        medicosEnPagos.forEach((medico) => {
+          const formasDelMedico = { ...(porMedicoYForma[medico] ?? {}) };
+          formasDePago.forEach((forma) => {
+            const sumPrevMF = prevConIso.filter((p) => p._iso === iso && p.medico === medico && p.formaPago === forma).reduce((s, p) => s + p.total, 0);
+            const sumNextMF = nextConIso.filter((p) => p._iso === iso && p.medico === medico && p.formaPago === forma).reduce((s, p) => s + p.total, 0);
+            const deltaMF = sumNextMF - sumPrevMF;
+            if (deltaMF !== 0) formasDelMedico[forma] = redondearDinero((formasDelMedico[forma] ?? 0) + deltaMF);
+          });
+          porMedicoYForma[medico] = formasDelMedico;
+        });
+        porFechaMedicoYFormaPago[iso] = porMedicoYForma;
       });
       // Spread de prevFin PRIMERO — nunca se debe perder un campo que otra
       // parte de la app ya haya escrito aquí (ej. devolucionesPorFecha) solo
       // porque esta función todavía no lo conocía cuando se escribió.
-      return { ...prevFin, porFecha, porFechaYFormaPago, porFechaYMedico, pagosCountPorFecha };
+      return { ...prevFin, porFecha, porFechaYFormaPago, porFechaYMedico, porFechaMedicoYFormaPago, pagosCountPorFecha };
     });
   };
 

@@ -10,9 +10,11 @@ import {
   GRUPOS_EFECTIVO,
   GRUPOS_ELECTRONICO,
   calcularAsignacionFondos,
+  desglosePorMedicoCompleto,
   navegarVistaFondos,
   rangoVistaFondos,
   sumarRangoPorFormaPago,
+  sumarRangoPorMedico,
   totalCobrado,
   tituloTotalFondos,
   type GrupoConMonto,
@@ -141,7 +143,11 @@ function RevisarContraPagos({
   const realPeriodo = resultado ? cobradoEnRango(resultado.nuevo, desde, hasta) : 0;
   const guardadoTotal = resultado ? cobradoTotal(resultado.actual) : 0;
   const realTotal = resultado ? cobradoTotal(resultado.nuevo) : 0;
-  const cuadra = resultado ? JSON.stringify(resultado.actual.porFechaYFormaPago ?? {}) === JSON.stringify(resultado.nuevo.porFechaYFormaPago) && guardadoTotal === realTotal : false;
+  const cuadra = resultado
+    ? JSON.stringify(resultado.actual.porFechaYFormaPago ?? {}) === JSON.stringify(resultado.nuevo.porFechaYFormaPago) &&
+      JSON.stringify(resultado.actual.porFechaMedicoYFormaPago ?? {}) === JSON.stringify(resultado.nuevo.porFechaMedicoYFormaPago ?? {}) &&
+      guardadoTotal === realTotal
+    : false;
 
   async function corregir() {
     if (!resultado) return;
@@ -237,7 +243,7 @@ function RevisarContraPagos({
  * porcentajes son fijos (definidos por el usuario), no editables desde
  * aquí todavía. */
 export default function FondosFinancieros() {
-  const { puedeVerFinanzas, finanzas } = usePatientData();
+  const { puedeVerFinanzas, finanzas, recursos } = usePatientData();
   const { oculto } = usePrivacidad();
   const [vista, setVista] = useState<VistaFondos>("mes");
   // Ancla independiente de "hoy": las flechas la mueven, pero
@@ -255,6 +261,17 @@ export default function FondosFinancieros() {
 
   const gruposElectronico = calcularAsignacionFondos(GRUPOS_ELECTRONICO, ingresos.electronico);
   const gruposEfectivo = calcularAsignacionFondos(GRUPOS_EFECTIVO, ingresos.efectivo);
+
+  // Lo mismo, pero por doctor: los registrados en la Agenda (aunque no hayan cobrado) y cualquier nombre que haya cobrado.
+  const porMedico = sumarRangoPorMedico(finanzas.porFechaMedicoYFormaPago ?? {}, rangoActivo.desde, rangoActivo.hasta);
+  const desgloseCompleto = desglosePorMedicoCompleto(porMedico, ingresos);
+  const totalClinica = totalCobrado(ingresos);
+  const doctores = [
+    ...porMedico,
+    ...recursos
+      .filter((r) => r.tipo === "medico" && !porMedico.some((m) => m.medico === r.nombre))
+      .map((r) => ({ medico: r.nombre, efectivo: 0, electronico: 0 })),
+  ];
 
   return (
     <div className="rounded-2xl bg-surface p-6" style={MARCO_FOSFORESCENTE}>
@@ -351,6 +368,92 @@ export default function FondosFinancieros() {
           oculto={oculto}
           rangoLabel={rangoActivo.label}
         />
+      </div>
+
+      <div className="mt-8">
+        <div className="mb-1 flex flex-wrap items-center justify-between gap-2">
+          <h3 className="text-sm font-semibold uppercase tracking-wide text-ink">Por doctor · {rangoActivo.label}</h3>
+          <span className="text-[11px] text-ink/50">Cada doctor con su propio reparto de sobres, según lo que cobró.</span>
+        </div>
+
+        {!desgloseCompleto && (
+          <div className="my-3 rounded-lg border border-warning/40 bg-warning/10 p-3 text-xs text-ink/80">
+            El desglose por doctor está incompleto en este periodo: los cobros de antes de esta función no traen el detalle de quién cobró y por qué canal.{" "}
+            <button onClick={() => setRevisando(true)} className="font-semibold text-accent hover:underline">
+              Completarlo con los pagos reales
+            </button>
+          </div>
+        )}
+
+        {doctores.length > 0 && (
+          <div className="mt-3 overflow-x-auto rounded-xl border border-edge/10 bg-inset">
+            <table className="w-full text-left text-sm">
+              <thead>
+                <tr className="border-b border-edge/10 text-[11px] uppercase tracking-wide text-ink/50">
+                  <th className="px-4 py-2 font-medium">Doctor</th>
+                  <th className="px-4 py-2 text-right font-medium">Electrónico</th>
+                  <th className="px-4 py-2 text-right font-medium">Efectivo</th>
+                  <th className="px-4 py-2 text-right font-medium">Total</th>
+                  <th className="px-4 py-2 text-right font-medium">%</th>
+                </tr>
+              </thead>
+              <tbody>
+                {doctores.map((d) => {
+                  const total = Math.round((d.efectivo + d.electronico) * 100) / 100;
+                  const dinero = (n: number) => (oculto ? "••••••" : formatCurrency(n));
+                  return (
+                    <tr key={d.medico} className="border-b border-edge/5 last:border-0">
+                      <td className="px-4 py-2 font-medium text-ink">{d.medico}</td>
+                      <td className="px-4 py-2 text-right tabular-nums text-ink/80">{dinero(d.electronico)}</td>
+                      <td className="px-4 py-2 text-right tabular-nums text-ink/80">{dinero(d.efectivo)}</td>
+                      <td className="px-4 py-2 text-right font-semibold tabular-nums text-ink">{dinero(total)}</td>
+                      <td className="px-4 py-2 text-right tabular-nums text-ink/60">{totalClinica > 0 ? Math.round((total / totalClinica) * 100) : 0}%</td>
+                    </tr>
+                  );
+                })}
+                <tr className="border-t border-edge/20 font-semibold">
+                  <td className="px-4 py-2 text-ink">Total de la clínica</td>
+                  <td className="px-4 py-2 text-right tabular-nums text-ink">{oculto ? "••••••" : formatCurrency(ingresos.electronico)}</td>
+                  <td className="px-4 py-2 text-right tabular-nums text-ink">{oculto ? "••••••" : formatCurrency(ingresos.efectivo)}</td>
+                  <td className="px-4 py-2 text-right tabular-nums text-ink">{oculto ? "••••••" : formatCurrency(totalClinica)}</td>
+                  <td />
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        )}
+
+        {doctores.length === 0 ? (
+          <p className="py-6 text-center text-sm text-ink/40">Todavía no hay médicos registrados ni cobros en este periodo.</p>
+        ) : (
+          <div className="mt-3 space-y-5">
+            {doctores.map((d) => {
+              const total = Math.round((d.efectivo + d.electronico) * 100) / 100;
+              const parte = totalClinica > 0 ? Math.round((total / totalClinica) * 100) : 0;
+              return (
+                <div key={d.medico} className="rounded-xl border border-edge/10 bg-inset p-4">
+                  <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+                    <div>
+                      <div className="text-base font-semibold text-ink">{d.medico}</div>
+                      <div className="text-[11px] text-ink/50">{parte}% del total de la clínica</div>
+                    </div>
+                    <div className="text-right">
+                      <div className="text-[10px] font-semibold uppercase tracking-wide text-ink/50">Ingreso del doctor</div>
+                      <div className={`text-2xl font-bold text-ink ${oculto ? "blur-[8px] select-none" : ""}`}>{oculto ? "••••••" : formatCurrency(total)}</div>
+                    </div>
+                  </div>
+                  <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
+                    <CanalFondos nombre="Electrónico" ingresoCanal={d.electronico} grupos={calcularAsignacionFondos(GRUPOS_ELECTRONICO, d.electronico)} oculto={oculto} rangoLabel={rangoActivo.label} />
+                    <CanalFondos nombre="Efectivo" ingresoCanal={d.efectivo} grupos={calcularAsignacionFondos(GRUPOS_EFECTIVO, d.efectivo)} oculto={oculto} rangoLabel={rangoActivo.label} />
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        )}
+        {desgloseCompleto && doctores.length > 0 && (
+          <p className="mt-3 text-[11px] text-ink/40">La suma de los doctores es igual al total de arriba ({oculto ? "••••••" : formatCurrency(totalClinica)}).</p>
+        )}
       </div>
     </div>
   );

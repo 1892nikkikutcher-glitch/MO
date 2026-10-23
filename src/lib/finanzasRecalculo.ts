@@ -21,6 +21,7 @@ export function construirFinanzasDesdePagos(pagos: Pago[], actual: FinanzasConfi
   const porFecha: Record<string, number> = {};
   const porFechaYFormaPago: Record<string, Record<string, number>> = {};
   const porFechaYMedico: Record<string, Record<string, number>> = {};
+  const porFechaMedicoYFormaPago: Record<string, Record<string, Record<string, number>>> = {};
   const pagosCountPorFecha: Record<string, number> = {};
   let sinFechaValida = 0;
 
@@ -36,6 +37,8 @@ export function construirFinanzasDesdePagos(pagos: Pago[], actual: FinanzasConfi
     forma[p.formaPago] = (forma[p.formaPago] ?? 0) + p.total;
     const medico = (porFechaYMedico[iso] ??= {});
     medico[p.medico] = (medico[p.medico] ?? 0) + p.total;
+    const delMedico = ((porFechaMedicoYFormaPago[iso] ??= {})[p.medico] ??= {});
+    delMedico[p.formaPago] = (delMedico[p.formaPago] ?? 0) + p.total;
   }
 
   const redondear = <T extends Record<string, number>>(m: T) =>
@@ -49,6 +52,7 @@ export function construirFinanzasDesdePagos(pagos: Pago[], actual: FinanzasConfi
       porFecha: redondear(porFecha),
       porFechaYFormaPago: redondearDoble(porFechaYFormaPago),
       porFechaYMedico: redondearDoble(porFechaYMedico),
+      porFechaMedicoYFormaPago: Object.fromEntries(Object.entries(porFechaMedicoYFormaPago).map(([k, v]) => [k, redondearDoble(v)])),
       pagosCountPorFecha,
     },
     pagosLeidos: pagos.length,

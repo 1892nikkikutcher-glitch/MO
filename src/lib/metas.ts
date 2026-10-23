@@ -24,6 +24,10 @@ export type FinanzasConfig = {
    * médico" en Corte de Caja. Opcional por retrocompatibilidad, igual que
    * el resto de campos aditivos de esta config. */
   porFechaYMedico?: Record<string, Record<string, number>>;
+  /** Fecha → médico → forma de pago → monto: lo que cobró cada médico y por qué canal (efectivo o electrónico). Alimenta
+   * el reparto de la regla de sobres por doctor. Opcional: los días anteriores a este campo se completan con
+   * "Revisar contra los pagos reales". */
+  porFechaMedicoYFormaPago?: Record<string, Record<string, Record<string, number>>>;
   /** Devoluciones completadas — indexado por la fecha REAL en que se
    * completó la devolución (completadoEn), NUNCA por la fecha del pago
    * original, para que el corte histórico del día del pago nunca se

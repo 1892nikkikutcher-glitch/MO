@@ -59,3 +59,19 @@ describe("cobrado", () => {
     expect(cobradoTotal(nuevo)).toBe(1500);
   });
 });
+
+describe("recalculo por médico y forma de pago", () => {
+  it("reconstruye lo que cobró cada médico por cada forma de pago", () => {
+    const pagos = [
+      pago("1", "05/10/2026", 1000, "Efectivo", "Dra. Ana"),
+      pago("2", "05/10/2026", 2000, "Tarjeta de débito", "Dra. Ana"),
+      pago("3", "05/10/2026", 500, "Efectivo", "Dr. Luis"),
+      pago("4", "12/10/2026", 700, "Efectivo", "Dra. Ana"),
+    ];
+    const { nuevo } = construirFinanzasDesdePagos(pagos, finanzasInicial);
+    expect(nuevo.porFechaMedicoYFormaPago).toEqual({
+      "2026-10-05": { "Dra. Ana": { Efectivo: 1000, "Tarjeta de débito": 2000 }, "Dr. Luis": { Efectivo: 500 } },
+      "2026-10-12": { "Dra. Ana": { Efectivo: 700 } },
+    });
+  });
+});
