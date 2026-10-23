@@ -19,6 +19,7 @@ import ReciboPagoPanel from "@/components/ReciboPagoPanel";
 import RegistrarDevolucionDialog from "@/components/RegistrarDevolucionDialog";
 import { calcularDisponibleDevolucion, resumenDesdeDevoluciones } from "@/lib/devolucionesPago";
 import { fechaPagoAIso } from "@/lib/metas";
+import { medicoPredeterminadoParaPago } from "@/lib/medicoDelPago";
 import { FORMA_PAGO_CASHBACK, baseCashbackDePago, calcularCashback, montoMaximoCanje } from "@/lib/cashback";
 
 const formasDePago = ["Efectivo", "Tarjeta de crédito", "Tarjeta de débito", "Transferencia", "Cheque"];
@@ -132,6 +133,9 @@ export function EditarPagoDialog({
 }) {
   const [lineas, setLineas] = useState<LineaPago[]>(() => pago.lineas.map((l) => ({ ...l })));
   const [formaPago, setFormaPago] = useState(pago.formaPago);
+  const { recursos: recursosEdicion } = usePatientData();
+  const [medicoEdit, setMedicoEdit] = useState(pago.medico);
+  const medicosParaEditar = Array.from(new Set([pago.medico, ...recursosEdicion.filter((r) => r.tipo === "medico").map((r) => r.nombre)])).filter(Boolean);
   const fechaOriginalIso = fechaPagoAIso(pago.fecha) ?? "";
   const [fechaIso, setFechaIso] = useState(fechaOriginalIso);
   const hoyIso = new Date().toISOString().slice(0, 10);
@@ -180,6 +184,21 @@ export function EditarPagoDialog({
           efectivo un pago que en realidad fue con tarjeta. Si cambias la fecha, el pago pasa al
           corte y a los reportes del día que elijas.
         </p>
+        <div className="mb-4">
+          <label className="mb-1 block text-xs font-medium text-ink/60">Médico al que se atribuye</label>
+          <select
+            value={medicoEdit}
+            onChange={(e) => setMedicoEdit(e.target.value)}
+            className="w-full rounded-lg border border-edge/10 bg-field px-3 py-2 text-sm text-ink outline-none focus:border-accent/60"
+          >
+            {medicosParaEditar.map((m) => (
+              <option key={m} value={m}>
+                {m}
+              </option>
+            ))}
+          </select>
+          <p className="mt-1 text-[11px] text-ink/40">De aquí sale cuánto ingresó a cada doctor en Fondos y en el corte de caja.</p>
+        </div>
         <div className="mb-4">
           <label className="mb-1 block text-xs font-medium text-ink/60">Fecha del pago</label>
           <input
@@ -272,7 +291,7 @@ export function EditarPagoDialog({
               // Si no tocó la fecha se conserva el texto original tal cual; si la cambió, se guarda como DD/MM/AAAA.
               const fecha =
                 fechaIso && fechaIso !== fechaOriginalIso ? `${fechaIso.slice(8, 10)}/${fechaIso.slice(5, 7)}/${fechaIso.slice(0, 4)}` : pago.fecha;
-              onSave({ ...pago, lineas, total, formaPago, fecha });
+              onSave({ ...pago, lineas, total, formaPago, fecha, medico: medicoEdit });
             }}
             disabled={!puedeGuardar || !fechaIso}
             className="flex-1 rounded-lg border border-accent/60 bg-accent/15 py-2.5 text-sm font-semibold text-accent transition-opacity hover:bg-accent/25 disabled:cursor-not-allowed disabled:opacity-40"
@@ -381,7 +400,7 @@ export function AgregarPagoDialog({
   // de la clínica (Agenda → Recursos), nunca de una lista genérica — así
   // "Médico" en el recibo es el mismo nombre que alimenta el desglose de
   // ingresos por médico, en vez de un valor que nadie más lee.
-  const { recursos, saldoCashbackDe, cashbackConfig } = usePatientData();
+  const { recursos, saldoCashbackDe, cashbackConfig, patients, citas } = usePatientData();
   const medicosDisponibles = recursos.filter((r) => r.tipo === "medico").map((r) => r.nombre);
   const cashbackDisponible = saldoCashbackDe(patientId).disponible;
   const [sinCashback, setSinCashback] = useState(false);
@@ -391,11 +410,19 @@ export function AgregarPagoDialog({
   const [paso, setPaso] = useState<"form" | "firma" | "recibo">("form");
   const [pagoGuardado, setPagoGuardado] = useState<Pago | null>(null);
 
-  const [medico, setMedico] = useState(medicosDisponibles[0] ?? "");
-  useEffect(() => {
-    if (!medico && medicosDisponibles.length > 0) setMedico(medicosDisponibles[0]);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [medico, medicosDisponibles.join("|")]);
+  // A quién se le atribuye el pago (de aquí sale lo que ingresó a cada doctor y su comisión): el médico responsable del
+  // paciente, el de su cita de hoy o el de su última cita. Si no hay ninguno claro, quien cobra lo elige (no se adivina).
+  const ahoraPago = new Date();
+  const hoyIsoPago = ahoraPago.getFullYear() + "-" + String(ahoraPago.getMonth() + 1).padStart(2, "0") + "-" + String(ahoraPago.getDate()).padStart(2, "0");
+  const medicoSugerido =
+    medicoPredeterminadoParaPago({
+      patientId,
+      medicoResponsableId: patients.find((p) => p.id === patientId)?.medicoResponsableId,
+      recursos,
+      citas,
+      hoyISO: hoyIsoPago,
+    }) || (medicosDisponibles.length === 1 ? medicosDisponibles[0] : "");
+  const [medico, setMedico] = useState(medicoSugerido);
   const [formaPago, setFormaPago] = useState(formasDePago[0]);
   const [seleccionados, setSeleccionados] = useState<string[]>([]);
   const [montos, setMontos] = useState<Record<string, number>>({});
@@ -547,9 +574,14 @@ export function AgregarPagoDialog({
 
           <div className="grid grid-cols-2 gap-4">
             <div>
-              <label className="mb-1 block text-xs font-medium text-ink/60">Médico tratante</label>
+              <label className="mb-1 block text-xs font-medium text-ink/60">Médico al que se atribuye</label>
               {medicosDisponibles.length > 0 ? (
                 <select value={medico} onChange={(e) => setMedico(e.target.value)} className={inputClass}>
+                  {!medico && (
+                    <option value="" disabled>
+                      Elige quién atendió
+                    </option>
+                  )}
                   {medicosDisponibles.map((m) => (
                     <option key={m} value={m}>
                       {m}
