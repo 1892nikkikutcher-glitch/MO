@@ -11,6 +11,7 @@ import {
   GRUPOS_ELECTRONICO,
   calcularAsignacionFondos,
   desglosePorMedicoCompleto,
+  doctoresDelPeriodo,
   navegarVistaFondos,
   rangoVistaFondos,
   sumarRangoPorFormaPago,
@@ -265,24 +266,18 @@ export default function FondosFinancieros() {
   const porMedico = sumarRangoPorMedico(finanzas.porFechaMedicoYFormaPago ?? {}, rangoActivo.desde, rangoActivo.hasta);
   const desgloseCompleto = desglosePorMedicoCompleto(porMedico, ingresos);
   const totalClinica = totalCobrado(ingresos);
-  const medicosRegistrados = recursos.filter((r) => r.tipo === "medico");
-  const doctores = [
-    ...porMedico,
-    ...medicosRegistrados.filter((r) => !porMedico.some((m) => m.medico === r.nombre)).map((r) => ({ medico: r.nombre, efectivo: 0, electronico: 0 })),
-  ];
-  // Opciones del selector: todos los médicos y especialistas registrados (con su especialidad) y, aparte, cualquier nombre que cobró sin estar registrado.
-  const opcionesDoctor = [
-    ...medicosRegistrados.map((r) => ({ nombre: r.nombre, detalle: [r.especialidad, r.consultaExterna ? "consulta externa" : ""].filter(Boolean).join(" · "), registrado: true })),
-    ...porMedico.filter((m) => !medicosRegistrados.some((r) => r.nombre === m.medico)).map((m) => ({ nombre: m.medico, detalle: "", registrado: false })),
-  ].sort((a, b) => a.nombre.localeCompare(b.nombre));
-  const doctorElegido = medicoSel ? opcionesDoctor.find((d) => d.nombre === medicoSel) : undefined;
+  // Todos los médicos y especialistas registrados (con su especialidad) y, aparte, cualquier nombre que cobró sin estar registrado.
+  // Una misma persona escrita de dos formas, o registrada dos veces, sale una sola vez.
+  const doctores = doctoresDelPeriodo(recursos.filter((r) => r.tipo === "medico"), porMedico);
+  const opcionesDoctor = [...doctores].sort((a, b) => a.medico.localeCompare(b.medico));
+  const doctorElegido = medicoSel ? doctores.find((d) => d.clave === medicoSel) : undefined;
 
   // Lo que se reparte: todo el consultorio, o solo lo que cobró el doctor elegido.
-  const ingresosVista = doctorElegido ? (porMedico.find((m) => m.medico === doctorElegido.nombre) ?? { medico: doctorElegido.nombre, efectivo: 0, electronico: 0 }) : ingresos;
+  const ingresosVista = doctorElegido ?? ingresos;
   const gruposElectronico = calcularAsignacionFondos(GRUPOS_ELECTRONICO, ingresosVista.electronico);
   const gruposEfectivo = calcularAsignacionFondos(GRUPOS_EFECTIVO, ingresosVista.efectivo);
   const tituloTotal = doctorElegido
-    ? `Ingreso de ${doctorElegido.nombre} · ${tituloTotalFondos(vista, rangoActivo, ancla).replace(/^Total de(l| la)? /, "")}`
+    ? `Ingreso de ${doctorElegido.medico} · ${tituloTotalFondos(vista, rangoActivo, ancla).replace(/^Total de(l| la)? /, "")}`
     : tituloTotalFondos(vista, rangoActivo, ancla);
 
   return (
@@ -365,14 +360,14 @@ export default function FondosFinancieros() {
         </button>
         {opcionesDoctor.map((d) => (
           <button
-            key={d.nombre}
-            onClick={() => setMedicoSel(d.nombre)}
+            key={d.clave}
+            onClick={() => setMedicoSel(d.clave)}
             title={d.registrado ? d.detalle || "Médico registrado" : "Cobró en este periodo con un nombre que no está en Agenda → Recursos"}
             className={`rounded-lg border px-2.5 py-1 text-[11px] font-semibold transition-colors ${
-              doctorElegido?.nombre === d.nombre ? "border-accent bg-accent/15 text-accent" : "border-edge/10 bg-surface text-ink/50 hover:text-ink/80"
+              doctorElegido?.clave === d.clave ? "border-accent bg-accent/15 text-accent" : "border-edge/10 bg-surface text-ink/50 hover:text-ink/80"
             }`}
           >
-            {d.nombre}
+            {d.medico}
             {d.detalle && <span className="ml-1 font-normal opacity-70">· {d.detalle}</span>}
             {!d.registrado && <span className="ml-1 font-normal opacity-70">· sin registrar</span>}
           </button>
@@ -381,7 +376,7 @@ export default function FondosFinancieros() {
 
       {doctorElegido && !desgloseCompleto && (
         <div className="mb-4 rounded-lg border border-warning/40 bg-warning/10 p-3 text-xs text-ink/80">
-          El desglose por doctor está incompleto en este periodo, así que lo de {doctorElegido.nombre} puede quedar corto.{" "}
+          El desglose por doctor está incompleto en este periodo, así que lo de {doctorElegido.medico} puede quedar corto.{" "}
           <button onClick={() => setRevisando(true)} className="font-semibold text-accent hover:underline">
             Completarlo con los pagos reales
           </button>
@@ -454,7 +449,7 @@ export default function FondosFinancieros() {
                   const total = Math.round((d.efectivo + d.electronico) * 100) / 100;
                   const dinero = (n: number) => (oculto ? "••••••" : formatCurrency(n));
                   return (
-                    <tr key={d.medico} className="border-b border-edge/5 last:border-0">
+                    <tr key={d.clave} className="border-b border-edge/5 last:border-0">
                       <td className="px-4 py-2 font-medium text-ink">{d.medico}</td>
                       <td className="px-4 py-2 text-right tabular-nums text-ink/80">{dinero(d.electronico)}</td>
                       <td className="px-4 py-2 text-right tabular-nums text-ink/80">{dinero(d.efectivo)}</td>
@@ -483,7 +478,7 @@ export default function FondosFinancieros() {
               const total = Math.round((d.efectivo + d.electronico) * 100) / 100;
               const parte = totalClinica > 0 ? Math.round((total / totalClinica) * 100) : 0;
               return (
-                <div key={d.medico} className="rounded-xl border border-edge/10 bg-inset p-4">
+                <div key={d.clave} className="rounded-xl border border-edge/10 bg-inset p-4">
                   <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
                     <div>
                       <div className="text-base font-semibold text-ink">{d.medico}</div>

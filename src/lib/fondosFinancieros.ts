@@ -82,7 +82,23 @@ export function sumarRangoPorFormaPago(
   return { efectivo: redondearDinero(efectivo), electronico: redondearDinero(electronico) };
 }
 
-export type IngresosPorMedico = { medico: string; efectivo: number; electronico: number };
+/** Una misma persona puede estar escrita distinto (con o sin acento, mayúsculas, "Dr." delante, espacios de más): para
+ * juntar sus cobros se compara con esta clave en lugar del texto tal cual. */
+export function claveMedico(nombre: string): string {
+  let n = nombre
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase()
+    .replace(/[^a-z0-9 ]/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+  // Los títulos del principio no hacen a otra persona: "Dr. Luis Ortega" y "Luis Ortega" son el mismo.
+  const titulo = /^(?:c d e o|c d|dra?|doctora?|mtro|mtra|esp|lic) /;
+  while (titulo.test(n)) n = n.replace(titulo, "");
+  return n;
+}
+
+export type IngresosPorMedico = { clave: string; medico: string; efectivo: number; electronico: number };
 
 /** Lo que cobró cada médico en el rango, separado en efectivo y electrónico (mismo criterio que `sumarRangoPorFormaPago`).
  * Los médicos salen ordenados de quien más cobró a quien menos. */
@@ -91,23 +107,63 @@ export function sumarRangoPorMedico(
   desde: Date,
   hasta: Date
 ): IngresosPorMedico[] {
-  const acumulado = new Map<string, { efectivo: number; electronico: number }>();
+  // Se junta por persona (clave), aunque su nombre venga escrito de varias formas; se muestra la forma con la que más cobró.
+  const acumulado = new Map<string, { efectivo: number; electronico: number; variantes: Map<string, number> }>();
   Object.entries(porFechaMedicoYFormaPago).forEach(([fecha, porMedico]) => {
     const d = new Date(`${fecha}T00:00:00`);
     if (d < desde || d > hasta) return;
     Object.entries(porMedico).forEach(([medico, porForma]) => {
-      const actual = acumulado.get(medico) ?? { efectivo: 0, electronico: 0 };
+      const clave = claveMedico(medico);
+      const actual = acumulado.get(clave) ?? { efectivo: 0, electronico: 0, variantes: new Map<string, number>() };
       Object.entries(porForma).forEach(([forma, monto]) => {
         if (forma === FORMA_PAGO_CASHBACK) return;
         if (forma === "Efectivo") actual.efectivo += monto;
         else actual.electronico += monto;
+        actual.variantes.set(medico, (actual.variantes.get(medico) ?? 0) + monto);
       });
-      acumulado.set(medico, actual);
+      acumulado.set(clave, actual);
     });
   });
   return [...acumulado.entries()]
-    .map(([medico, v]) => ({ medico, efectivo: redondearDinero(v.efectivo), electronico: redondearDinero(v.electronico) }))
+    .map(([clave, v]) => ({
+      clave,
+      medico: [...v.variantes.entries()].sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]))[0]?.[0] ?? clave,
+      efectivo: redondearDinero(v.efectivo),
+      electronico: redondearDinero(v.electronico),
+    }))
     .sort((a, b) => b.efectivo + b.electronico - (a.efectivo + a.electronico) || a.medico.localeCompare(b.medico));
+}
+
+export type DoctorDelPeriodo = IngresosPorMedico & { detalle: string; registrado: boolean };
+
+/** Los doctores a mostrar: todos los registrados en la Agenda (aunque no hayan cobrado, con su especialidad) y, aparte,
+ * cualquiera que haya cobrado con un nombre que no está registrado. Una misma persona escrita de dos formas, o
+ * registrada dos veces, sale una sola vez. Ordenados de quien más cobró a quien menos. */
+export function doctoresDelPeriodo(
+  registrados: { nombre: string; especialidad?: string; consultaExterna?: boolean }[],
+  porMedico: IngresosPorMedico[]
+): DoctorDelPeriodo[] {
+  const mapa = new Map<string, DoctorDelPeriodo>();
+  for (const r of registrados) {
+    const clave = claveMedico(r.nombre);
+    const detalle = [r.especialidad, r.consultaExterna ? "consulta externa" : ""].filter(Boolean).join(" · ");
+    const existente = mapa.get(clave);
+    if (existente) {
+      if (!existente.detalle && detalle) existente.detalle = detalle;
+    } else {
+      mapa.set(clave, { clave, medico: r.nombre, efectivo: 0, electronico: 0, detalle, registrado: true });
+    }
+  }
+  for (const m of porMedico) {
+    const existente = mapa.get(m.clave);
+    if (existente) {
+      existente.efectivo = redondearDinero(existente.efectivo + m.efectivo);
+      existente.electronico = redondearDinero(existente.electronico + m.electronico);
+    } else {
+      mapa.set(m.clave, { ...m, detalle: "", registrado: false });
+    }
+  }
+  return [...mapa.values()].sort((a, b) => b.efectivo + b.electronico - (a.efectivo + a.electronico) || a.medico.localeCompare(b.medico));
 }
 
 /** ¿El desglose por médico suma lo mismo que el total cobrado en el rango? Si no (días anteriores a que existiera el

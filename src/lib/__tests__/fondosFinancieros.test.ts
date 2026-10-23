@@ -3,7 +3,9 @@ import {
   GRUPOS_EFECTIVO,
   GRUPOS_ELECTRONICO,
   calcularAsignacionFondos,
+  claveMedico,
   desglosePorMedicoCompleto,
+  doctoresDelPeriodo,
   sumarRangoPorMedico,
   etiquetaTotalFondos,
   semanaDelAnio,
@@ -300,8 +302,8 @@ describe("reparto por doctor", () => {
   it("separa lo que cobró cada doctor en efectivo y electrónico, del que más cobró al que menos", () => {
     const r = sumarRangoPorMedico(mapa, desde, hasta);
     expect(r).toEqual([
-      { medico: "Dra. Ana", efectivo: 1000, electronico: 3500 },
-      { medico: "Dr. Luis", efectivo: 500, electronico: 2500 },
+      { clave: "ana", medico: "Dra. Ana", efectivo: 1000, electronico: 3500 },
+      { clave: "luis", medico: "Dr. Luis", efectivo: 500, electronico: 2500 },
     ]);
   });
 
@@ -323,5 +325,46 @@ describe("reparto por doctor", () => {
     const grupos = calcularAsignacionFondos(GRUPOS_ELECTRONICO, ana.electronico);
     expect(grupos[0].montoGrupo).toBe(2100); // 60% de 3,500
     expect(grupos[0].fondos.find((f) => f.label === "Mi sueldo")?.monto).toBe(700); // 20%
+  });
+});
+
+describe("un mismo doctor escrito de varias formas sale una sola vez", () => {
+  it("compara sin acentos, mayúsculas, espacios de más ni el título del principio", () => {
+    expect(claveMedico("Nicolás Medina Gonzalez")).toBe(claveMedico("  nicolas  MEDINA gonzalez "));
+    expect(claveMedico("Dr. Luis Ortega")).toBe(claveMedico("Luis Ortega"));
+    expect(claveMedico("C.D. Nicolas Medina Gonzalez")).toBe(claveMedico("Nicolas Medina Gonzalez"));
+    expect(claveMedico("Dra. Ana Mendoza")).not.toBe(claveMedico("Dr. Luis Ortega"));
+  });
+
+  it("junta los cobros de las variantes del nombre y muestra la que más cobró", () => {
+    const mapa = {
+      "2026-10-05": { "Nicolas Medina Gonzalez": { Efectivo: 1000 }, "Nicolás Medina Gonzalez": { Efectivo: 300 } },
+      "2026-10-06": { "Nicolas Medina Gonzalez": { "Tarjeta de débito": 500 } },
+    };
+    const r = sumarRangoPorMedico(mapa, new Date("2026-10-01T00:00:00"), new Date("2026-10-31T00:00:00"));
+    expect(r).toHaveLength(1);
+    expect(r[0]).toMatchObject({ medico: "Nicolas Medina Gonzalez", efectivo: 1300, electronico: 500 });
+  });
+
+  it("un médico registrado dos veces, o registrado y también escrito en los pagos, es uno solo", () => {
+    const porMedico = [{ clave: claveMedico("Enrique Humberto Santin Peña"), medico: "Enrique Humberto Santin Peña", efectivo: 400, electronico: 600 }];
+    const lista = doctoresDelPeriodo(
+      [
+        { nombre: "Enrique Humberto Santin Peña" },
+        { nombre: "Enrique Humberto Santin Peña", especialidad: "Endodoncia" },
+        { nombre: "Nicolas Medina Gonzalez", especialidad: "Cirujano dentista" },
+        { nombre: "Nicolás Medina Gonzalez" },
+      ],
+      porMedico
+    );
+    expect(lista.map((d) => d.medico)).toEqual(["Enrique Humberto Santin Peña", "Nicolas Medina Gonzalez"]);
+    expect(lista[0]).toMatchObject({ efectivo: 400, electronico: 600, detalle: "Endodoncia", registrado: true });
+    expect(lista[1]).toMatchObject({ detalle: "Cirujano dentista", registrado: true });
+  });
+
+  it("quien cobró sin estar registrado sale aparte, marcado como no registrado", () => {
+    const lista = doctoresDelPeriodo([{ nombre: "Dra. Ana" }], [{ clave: claveMedico("Diplomado"), medico: "Diplomado", efectivo: 100, electronico: 0 }]);
+    expect(lista.find((d) => d.medico === "Diplomado")).toMatchObject({ registrado: false });
+    expect(lista.find((d) => d.medico === "Dra. Ana")).toMatchObject({ registrado: true, efectivo: 0 });
   });
 });
