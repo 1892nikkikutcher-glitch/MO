@@ -253,25 +253,37 @@ export default function FondosFinancieros() {
   // — mismo criterio que el selector de periodo del Dashboard Principal.
   const [ancla, setAncla] = useState<Date>(() => new Date());
   const [revisando, setRevisando] = useState(false);
+  // Doctor elegido ("" = todos): el reparto de sobres se ve de toda la clínica o solo de lo que cobró ese doctor.
+  const [medicoSel, setMedicoSel] = useState("");
 
   if (!puedeVerFinanzas) return null;
 
   const rangoActivo = rangoVistaFondos(vista, ancla);
   const ingresos = sumarRangoPorFormaPago(finanzas.porFechaYFormaPago, rangoActivo.desde, rangoActivo.hasta);
 
-  const gruposElectronico = calcularAsignacionFondos(GRUPOS_ELECTRONICO, ingresos.electronico);
-  const gruposEfectivo = calcularAsignacionFondos(GRUPOS_EFECTIVO, ingresos.efectivo);
-
   // Lo mismo, pero por doctor: los registrados en la Agenda (aunque no hayan cobrado) y cualquier nombre que haya cobrado.
   const porMedico = sumarRangoPorMedico(finanzas.porFechaMedicoYFormaPago ?? {}, rangoActivo.desde, rangoActivo.hasta);
   const desgloseCompleto = desglosePorMedicoCompleto(porMedico, ingresos);
   const totalClinica = totalCobrado(ingresos);
+  const medicosRegistrados = recursos.filter((r) => r.tipo === "medico");
   const doctores = [
     ...porMedico,
-    ...recursos
-      .filter((r) => r.tipo === "medico" && !porMedico.some((m) => m.medico === r.nombre))
-      .map((r) => ({ medico: r.nombre, efectivo: 0, electronico: 0 })),
+    ...medicosRegistrados.filter((r) => !porMedico.some((m) => m.medico === r.nombre)).map((r) => ({ medico: r.nombre, efectivo: 0, electronico: 0 })),
   ];
+  // Opciones del selector: todos los médicos y especialistas registrados (con su especialidad) y, aparte, cualquier nombre que cobró sin estar registrado.
+  const opcionesDoctor = [
+    ...medicosRegistrados.map((r) => ({ nombre: r.nombre, detalle: [r.especialidad, r.consultaExterna ? "consulta externa" : ""].filter(Boolean).join(" · "), registrado: true })),
+    ...porMedico.filter((m) => !medicosRegistrados.some((r) => r.nombre === m.medico)).map((m) => ({ nombre: m.medico, detalle: "", registrado: false })),
+  ].sort((a, b) => a.nombre.localeCompare(b.nombre));
+  const doctorElegido = medicoSel ? opcionesDoctor.find((d) => d.nombre === medicoSel) : undefined;
+
+  // Lo que se reparte: todo el consultorio, o solo lo que cobró el doctor elegido.
+  const ingresosVista = doctorElegido ? (porMedico.find((m) => m.medico === doctorElegido.nombre) ?? { medico: doctorElegido.nombre, efectivo: 0, electronico: 0 }) : ingresos;
+  const gruposElectronico = calcularAsignacionFondos(GRUPOS_ELECTRONICO, ingresosVista.electronico);
+  const gruposEfectivo = calcularAsignacionFondos(GRUPOS_EFECTIVO, ingresosVista.efectivo);
+  const tituloTotal = doctorElegido
+    ? `Ingreso de ${doctorElegido.nombre} · ${tituloTotalFondos(vista, rangoActivo, ancla).replace(/^Total de(l| la)? /, "")}`
+    : tituloTotalFondos(vista, rangoActivo, ancla);
 
   return (
     <div className="rounded-2xl bg-surface p-6" style={MARCO_FOSFORESCENTE}>
@@ -340,13 +352,52 @@ export default function FondosFinancieros() {
         </span>
       </div>
 
+      {/* Quién: todo el consultorio o un doctor en particular (médicos y especialistas registrados en la Agenda). */}
+      <div className="mb-4 flex flex-wrap items-center gap-1.5">
+        <span className="mr-1 text-[11px] font-semibold uppercase tracking-wide text-ink/50">Ver</span>
+        <button
+          onClick={() => setMedicoSel("")}
+          className={`rounded-lg border px-2.5 py-1 text-[11px] font-semibold transition-colors ${
+            !doctorElegido ? "border-accent bg-accent/15 text-accent" : "border-edge/10 bg-surface text-ink/50 hover:text-ink/80"
+          }`}
+        >
+          Todos
+        </button>
+        {opcionesDoctor.map((d) => (
+          <button
+            key={d.nombre}
+            onClick={() => setMedicoSel(d.nombre)}
+            title={d.registrado ? d.detalle || "Médico registrado" : "Cobró en este periodo con un nombre que no está en Agenda → Recursos"}
+            className={`rounded-lg border px-2.5 py-1 text-[11px] font-semibold transition-colors ${
+              doctorElegido?.nombre === d.nombre ? "border-accent bg-accent/15 text-accent" : "border-edge/10 bg-surface text-ink/50 hover:text-ink/80"
+            }`}
+          >
+            {d.nombre}
+            {d.detalle && <span className="ml-1 font-normal opacity-70">· {d.detalle}</span>}
+            {!d.registrado && <span className="ml-1 font-normal opacity-70">· sin registrar</span>}
+          </button>
+        ))}
+      </div>
+
+      {doctorElegido && !desgloseCompleto && (
+        <div className="mb-4 rounded-lg border border-warning/40 bg-warning/10 p-3 text-xs text-ink/80">
+          El desglose por doctor está incompleto en este periodo, así que lo de {doctorElegido.nombre} puede quedar corto.{" "}
+          <button onClick={() => setRevisando(true)} className="font-semibold text-accent hover:underline">
+            Completarlo con los pagos reales
+          </button>
+        </div>
+      )}
+
       <div className="mb-4 flex flex-col items-center rounded-xl border border-accent/30 bg-accent/10 px-4 py-3 text-center">
         <span className="text-[11px] font-semibold uppercase tracking-wide text-ink/60">
-          {tituloTotalFondos(vista, rangoActivo, ancla)}
+          {tituloTotal}
         </span>
         <span className={`text-3xl font-bold text-ink ${oculto ? "blur-[8px] select-none" : ""}`}>
-          {oculto ? "••••••" : formatCurrency(totalCobrado(ingresos))}
+          {oculto ? "••••••" : formatCurrency(totalCobrado(ingresosVista))}
         </span>
+        {doctorElegido && totalClinica > 0 && (
+          <span className="mt-0.5 text-[11px] text-ink/50">{Math.round((totalCobrado(ingresosVista) / totalClinica) * 100)}% del total de la clínica</span>
+        )}
       </div>
 
       {revisando && (
@@ -356,20 +407,21 @@ export default function FondosFinancieros() {
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
         <CanalFondos
           nombre="Electrónico"
-          ingresoCanal={ingresos.electronico}
+          ingresoCanal={ingresosVista.electronico}
           grupos={gruposElectronico}
           oculto={oculto}
           rangoLabel={rangoActivo.label}
         />
         <CanalFondos
           nombre="Efectivo"
-          ingresoCanal={ingresos.efectivo}
+          ingresoCanal={ingresosVista.efectivo}
           grupos={gruposEfectivo}
           oculto={oculto}
           rangoLabel={rangoActivo.label}
         />
       </div>
 
+      {!doctorElegido && (
       <div className="mt-8">
         <div className="mb-1 flex flex-wrap items-center justify-between gap-2">
           <h3 className="text-sm font-semibold uppercase tracking-wide text-ink">Por doctor · {rangoActivo.label}</h3>
@@ -455,6 +507,7 @@ export default function FondosFinancieros() {
           <p className="mt-3 text-[11px] text-ink/40">La suma de los doctores es igual al total de arriba ({oculto ? "••••••" : formatCurrency(totalClinica)}).</p>
         )}
       </div>
+      )}
     </div>
   );
 }

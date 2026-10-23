@@ -48,7 +48,7 @@ const dmy = (d) => `${String(d.getDate()).padStart(2, "0")}/${String(d.getMonth(
 
 const recursos = [
   { id: "r1", nombre: "Dra. Ana Mendoza", color: "#3FD3F3", tipo: "medico" },
-  { id: "r2", nombre: "Dr. Luis Ortega", color: "#FF6602", tipo: "medico" },
+  { id: "r2", nombre: "Dr. Luis Ortega", color: "#FF6602", tipo: "medico", especialidad: "Endodoncia" },
   { id: "u1", nombre: "Unidad 1", color: "#7E3AEC", tipo: "unidad" },
 ];
 
