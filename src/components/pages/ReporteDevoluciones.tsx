@@ -1,7 +1,10 @@
 "use client";
 
+import { useState } from "react";
 import { usePatientData } from "@/context/PatientDataContext";
 import { formatCurrency } from "@/lib/patientData";
+import { generarDevolucionesPdf } from "@/lib/generarDevolucionesPdf";
+import { descargarBlob } from "@/lib/pdfDocumento";
 
 const tipoEventoLabel: Record<string, string> = {
   devolucion_completada: "Devolución completada",
@@ -13,12 +16,35 @@ const tipoEventoLabel: Record<string, string> = {
 };
 
 export default function ReporteDevoluciones() {
-  const { devolucionesLog } = usePatientData();
+  const { devolucionesLog, colaboradoresActivos, clinicInfo, perfilDoctor, clinicUid, userEmail } = usePatientData();
+  const [generandoPdf, setGenerandoPdf] = useState(false);
+  const [errorPdf, setErrorPdf] = useState("");
 
   const ordenados = [...devolucionesLog].sort((a, b) => b.creadoEn.localeCompare(a.creadoEn));
   const totalDevuelto = devolucionesLog
     .filter((e) => e.tipo === "devolucion_completada")
     .reduce((s, e) => s + (e.monto ?? 0), 0);
+
+  const nombreDeUid = (u: string) => (u === clinicUid ? userEmail || "Tú" : colaboradoresActivos.find((c) => c.uid === u)?.nombre || colaboradoresActivos.find((c) => c.uid === u)?.correo || "");
+
+  const descargarPdf = async () => {
+    setGenerandoPdf(true);
+    setErrorPdf("");
+    try {
+      const { blob, nombre } = await generarDevolucionesPdf({
+        eventos: devolucionesLog,
+        nombreDeUid,
+        clinicaNombre: clinicInfo?.nombre || "",
+        direccion: perfilDoctor.direccionClinica,
+        logoUrl: perfilDoctor.logoClinicaUrl,
+      });
+      descargarBlob(blob, nombre);
+    } catch {
+      setErrorPdf("No se pudo generar el PDF. Intenta de nuevo.");
+    } finally {
+      setGenerandoPdf(false);
+    }
+  };
 
   return (
     <div className="space-y-6">
@@ -28,6 +54,17 @@ export default function ReporteDevoluciones() {
           Bitácora de auditoría de devoluciones de pago — cada movimiento queda registrado aquí, sin importar el
           expediente del paciente.
         </p>
+        <div className="mt-3 flex flex-wrap items-center gap-3">
+          <button
+            onClick={descargarPdf}
+            disabled={generandoPdf}
+            title="Descargar la bitácora de devoluciones en PDF"
+            className="rounded-lg border border-edge/30 bg-field px-3.5 py-2 text-sm font-semibold text-ink/90 transition-colors hover:bg-surface2 disabled:opacity-60"
+          >
+            {generandoPdf ? "Generando PDF…" : "Descargar PDF"}
+          </button>
+          {errorPdf && <span className="text-xs text-danger">{errorPdf}</span>}
+        </div>
       </div>
 
       <div className="rounded-2xl border border-edge/10 bg-surface p-5">

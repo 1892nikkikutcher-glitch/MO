@@ -334,3 +334,32 @@ describe("pagos en PDF", () => {
     expect(texto).toContain("No se ha eliminado");
   });
 });
+
+describe("devoluciones en PDF", () => {
+  const evento = (id: string, tipo: string, extra: Record<string, unknown> = {}) => ({ id, tipo, patientId: "p", patientName: "Ana Pérez", devolucionId: "d", pagoOrigenId: "pg", uid: "u1", creadoEn: "2026-10-20T10:00:00.000Z", ...extra });
+
+  it("lista la bitácora con quién registró cada movimiento y el total devuelto", async () => {
+    const { generarDevolucionesPdf } = await import("../generarDevolucionesPdf");
+    const { blob, nombre } = await generarDevolucionesPdf({
+      eventos: [
+        evento("1", "devolucion_completada", { monto: 800, motivo: "Se canceló el tratamiento" }),
+        evento("2", "devolucion_completada", { monto: 200, creadoEn: "2026-10-21T10:00:00.000Z" }),
+        evento("3", "devolucion_cancelada"),
+      ] as never,
+      nombreDeUid: (u) => (u === "u1" ? "Claudia Carbajal" : ""),
+      clinicaNombre: "Consultorio Medina",
+      fecha: new Date("2026-10-24T12:00:00"),
+    });
+    expect(nombre).toBe("Devoluciones_2026_10_24_Consultorio_Medina.pdf");
+    const texto = await textoDe(blob);
+    for (const frag of ["Devoluciones de pago", "Claudia Carbajal", "Se cancel", "Borrador cancelado", "-$1,000.00", "BIT"]) {
+      expect(texto).toContain(frag);
+    }
+  });
+
+  it("sin devoluciones lo dice", async () => {
+    const { generarDevolucionesPdf } = await import("../generarDevolucionesPdf");
+    const { blob } = await generarDevolucionesPdf({ eventos: [], nombreDeUid: () => "", clinicaNombre: "X" });
+    expect(await textoDe(blob)).toContain("No se ha registrado ninguna devoluci");
+  });
+});

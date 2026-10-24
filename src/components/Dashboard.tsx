@@ -19,6 +19,7 @@ import Metas from "./pages/Metas";
 import PresupuestoGastos from "./pages/PresupuestoGastos";
 import Membresias from "./pages/Membresias";
 import Cashback from "./pages/Cashback";
+import BuscadorPlataforma from "./BuscadorPlataforma";
 import Asistencia from "./pages/Asistencia";
 import Procedimientos from "./pages/Procedimientos";
 import HistorialClinicoAdmin from "./pages/HistorialClinicoAdmin";
@@ -873,6 +874,8 @@ function DashboardBody({
                 >
                   <span suppressHydrationWarning>{isLight ? <SunIcon /> : <MoonIcon />}</span>
                 </button>
+
+                <BuscadorPlataforma onNavigate={setActivePage} />
 
                 <IdentidadYFecha administrador={tituloYNombre(clinicInfo?.administradorTitulo, clinicInfo?.administradorNombre)} ciudad={clinicInfo?.ciudad ?? ""} />
                 <span className="hidden shrink-0 truncate text-sm text-ink/50 sm:inline">{userEmail}</span>
