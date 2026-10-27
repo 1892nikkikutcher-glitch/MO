@@ -10,20 +10,21 @@ export const etiquetaRolClinica: Record<RolClinica, string> = {
 
 export const descripcionRolClinica: Record<RolClinica, string> = {
   admin: "Dueño o socio: ve todo, incluidas finanzas, y puede configurar y eliminar.",
-  colaborador: "Ve pacientes, agenda, recetas y presupuestos; no ve pagos ni cortes de caja.",
+  colaborador:
+    "Ve y edita pacientes, agenda, recetas, presupuestos y fotografías (puede subir archivos); no ve pagos ni cortes de caja y no puede eliminar nada: si se equivoca, avisa al administrador.",
   odontologo:
     "Atiende como empleado: ve y edita pacientes, historia clínica, odontograma, recetas, notas y agenda, pero no ve pagos ni finanzas y no puede eliminar nada.",
 };
 
-/** Solo el Cirujano dentista no elimina registros (pacientes, citas, presupuestos, notas, fotos...). Es
- * la misma regla que aplican las reglas de Firestore (`puedeBorrar`); aquí sirve para avisar antes
- * en vez de dejar que falle. Sin rol conocido todavía se permite: las reglas son la autoridad. */
+/** Solo el administrador elimina registros (pacientes, citas, presupuestos, notas, fotos...). Es la misma
+ * regla que aplican las reglas de Firestore y de Storage (`puedeBorrar`); aquí sirve para avisar antes en
+ * vez de dejar que falle. Sin rol conocido todavía se permite: las reglas son la autoridad. */
 export function puedeEliminarConRol(rol: RolClinica | null | undefined): boolean {
-  return rol !== "odontologo";
+  return !rol || rol === "admin";
 }
 
 export const MENSAJE_ROL_SIN_PERMISO_ELIMINAR =
-  "Tu rol (Cirujano dentista) no permite eliminar registros. Pídele al administrador que lo haga.";
+  "Tu rol no permite eliminar registros. Si cometiste un error, avisa a tu administrador para que lo corrija.";
 
 /** Módulos del menú que el rol no ve (los ids son los de BottomNav; un módulo oculto esconde también
  * sus subpáginas, ej. "reportes-pagos"). El Cirujano dentista ve lo clínico y operativo; lo

@@ -12,7 +12,10 @@ import { readFileSync } from "fs";
 import path from "path";
 import { initializeTestEnvironment, type RulesTestEnvironment } from "@firebase/rules-unit-testing";
 
-const PROJECT_ID = "demo-mo-conecta-rules-test"; // "demo-" — el emulador nunca exige credenciales reales para este prefijo
+// Las reglas de Storage que consultan Firestore (clinicMembers) solo funcionan en el emulador con el proyecto con el que
+// arrancó; "firebase emulators:exec" lo deja en GCLOUD_PROJECT. Sin él se usa un proyecto "demo-" (el emulador nunca
+// exige credenciales reales para ese prefijo), y esas pruebas de Storage no podrán consultar Firestore.
+const PROJECT_ID = process.env.GCLOUD_PROJECT || "demo-mo-conecta-rules-test";
 
 export async function crearEntornoDePrueba(): Promise<RulesTestEnvironment> {
   return initializeTestEnvironment({

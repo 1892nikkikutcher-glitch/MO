@@ -2,16 +2,32 @@ rules_version = '2';
 service firebase.storage {
   match /b/{bucket}/o {
 
-    // Fotos de pacientes (perfil, extraorales, intraorales, INE) — mismo
-    // criterio base que la capa "sin cambios" de firestore.rules: acceso
-    // total al dueño de la clínica (uid == clinicId). Cuando los
-    // colaboradores necesiten subir/ver fotos, esto debe ampliarse para
-    // reflejar isActiveMember(clinicId) igual que ya hace firestore.rules
-    // para users/{ownerId}/pacientes/{patientId}/** — no se hizo aquí
-    // todavía para no depender de llamadas cross-servicio (firestore.get)
-    // en reglas de Storage sin poder probarlas antes de desplegar.
+    // Quién es quién en una clínica (la misma colección clinicMembers que usa firestore.rules; el
+    // dueño de la clínica es quien tiene uid == clinicId).
+    function esDuenoDeClinica(clinicId) {
+      return request.auth != null && request.auth.uid == clinicId;
+    }
+    function miembro(clinicId) {
+      return firestore.get(/databases/(default)/documents/clinicMembers/$(clinicId + '_' + request.auth.uid));
+    }
+    function esMiembroActivo(clinicId) {
+      return esDuenoDeClinica(clinicId)
+        || (request.auth != null
+            && firestore.exists(/databases/(default)/documents/clinicMembers/$(clinicId + '_' + request.auth.uid))
+            && miembro(clinicId).data.status == 'active');
+    }
+    function esAdministrador(clinicId) {
+      return esDuenoDeClinica(clinicId)
+        || (esMiembroActivo(clinicId) && miembro(clinicId).data.role == 'admin');
+    }
+
+    // Fotos de pacientes (perfil, extraorales, intraorales, INE, radiografías): todo el equipo activo de la
+    // clínica las ve y sube nuevas; reemplazar o borrar un archivo solo lo hace el administrador.
     match /users/{clinicId}/pacientes/{patientId}/fotos/{allPaths=**} {
-      allow read, write: if request.auth != null && request.auth.uid == clinicId;
+      allow read, create: if esMiembroActivo(clinicId);
+      // Pisar un archivo que ya existe cuenta como "update" en Cloud Storage: solo el administrador. Las fotos de MO siempre se
+      // suben con un nombre nuevo, así que subir no necesita pisar nada.
+      allow update, delete: if esAdministrador(clinicId);
     }
 
     // Firma de acuse de recepción de una devolución de pago (ver

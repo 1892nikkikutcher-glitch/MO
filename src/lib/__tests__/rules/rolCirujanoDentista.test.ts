@@ -107,10 +107,10 @@ describe("Cirujano dentista (odontologo)", () => {
 });
 
 describe("el resto de los roles no cambia", () => {
-  it("el colaborador de siempre sigue pudiendo eliminar lo operativo", async () => {
+  it("el colaborador tampoco elimina (ver rolColaborador.test.ts)", async () => {
     const db = como(COLABORADOR);
-    await assertSucceeds(deleteDoc(doc(db, `${paciente}/presupuestos/b1`)));
-    await assertSucceeds(deleteDoc(doc(db, `${base}/citas/c1`)));
+    await assertFails(deleteDoc(doc(db, `${paciente}/presupuestos/b1`)));
+    await assertFails(deleteDoc(doc(db, `${base}/citas/c1`)));
   });
 
   it("el administrador puede eliminar y ve los pagos", async () => {

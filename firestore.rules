@@ -90,12 +90,12 @@ service cloud.firestore {
     function isClinician(clinicId) {
       return isActiveMember(clinicId) && memberRole(clinicId) in ['odontologo', 'admin'];
     }
-    // "Cirujano dentista" (rol 'odontologo'): atiende, captura y edita lo clínico y lo operativo,
-    // pero NO elimina registros (pacientes, citas, presupuestos, notas, recetas, fotos...). Quien
-    // elimina es el administrador (y el colaborador de siempre, que no cambia). Las eliminaciones
-    // que sí necesitan este permiso son las de la clínica; la Papelera sigue admitiendo crear copias.
+    // Solo el administrador ELIMINA registros (pacientes, citas, presupuestos, notas, recetas, fotos...).
+    // El Colaborador y el Cirujano dentista capturan, editan y suben archivos, pero si se equivocan
+    // avisan al administrador. Las eliminaciones que necesitan este permiso son las de la clínica; la
+    // Papelera sigue admitiendo crear copias (guardar antes de que el administrador elimine).
     function puedeBorrar(clinicId) {
-      return isActiveMember(clinicId) && memberRole(clinicId) != 'odontologo';
+      return isClinicAdmin(clinicId);
     }
 
     // MO: un colaborador puede tener limitado a cuáles recursos (médicos/

@@ -232,14 +232,16 @@ export default function Colaboradores() {
 
       <div className="rounded-2xl border border-accent/30 bg-accent/10 p-4 text-sm text-accent">
         <p>
-          Los colaboradores con rol &quot;Colaborador&quot; pueden ver pacientes, agenda, recetas y
-          presupuestos, pero <strong>no</strong> ven pagos ni cortes de caja — esa información queda
-          reservada al dueño (rol &quot;Administrador&quot;).
+          Los colaboradores con rol &quot;Colaborador&quot; pueden ver y editar pacientes, agenda, recetas y
+          presupuestos, y también ver y <strong>subir fotografías y archivos</strong> al expediente. Pero{" "}
+          <strong>no</strong> ven pagos ni cortes de caja, y <strong>no pueden eliminar nada</strong>: si cometen un
+          error, avisan al administrador para que lo corrija. Esa información y esas acciones quedan
+          reservadas al dueño (rol &quot;Administrador&quot;).
         </p>
         <p className="mt-2">
           El rol &quot;Cirujano dentista&quot; es para un doctor que trabaja como empleado: atiende y edita
           pacientes, historia clínica, odontograma, recetas, notas y agenda, pero{" "}
-          <strong>no puede eliminar nada</strong> (ni pacientes, ni citas, ni presupuestos, ni notas) y tampoco ve
+          <strong>no puede eliminar nada</strong> (igual que el colaborador: ni pacientes, ni citas, ni presupuestos, ni notas) y tampoco ve
           finanzas. Si solo debe ver su propia agenda, límitalo en &quot;Calendarios que ve&quot;.
         </p>
         <p className="mt-2">

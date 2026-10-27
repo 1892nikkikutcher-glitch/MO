@@ -2,10 +2,10 @@ import { describe, expect, it } from "vitest";
 import { descripcionRolClinica, etiquetaRolClinica, moduloVisibleParaRol, puedeEliminarConRol } from "../permisosRol";
 
 describe("permisosRol", () => {
-  it("solo el Cirujano dentista no puede eliminar", () => {
+  it("solo el administrador puede eliminar: ni el colaborador ni el Cirujano dentista", () => {
     expect(puedeEliminarConRol("odontologo")).toBe(false);
+    expect(puedeEliminarConRol("colaborador")).toBe(false);
     expect(puedeEliminarConRol("admin")).toBe(true);
-    expect(puedeEliminarConRol("colaborador")).toBe(true);
     expect(puedeEliminarConRol(null)).toBe(true); // aún sin rol: mandan las reglas del servidor
   });
 
