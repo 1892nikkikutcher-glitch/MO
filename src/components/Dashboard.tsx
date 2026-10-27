@@ -7,8 +7,8 @@ import { useLadoNavegacion } from "@/lib/useLadoNavegacion";
 import { ladoOpuesto } from "@/lib/ladoNavegacion";
 import { auth } from "@/lib/firebase";
 import BottomNav, { navItems } from "./BottomNav";
-import { categoriaSugerenciaOptions, DURACION_PRUEBA_DIAS, pruebaVencida, type CategoriaSugerencia } from "@/lib/patientData";
-import { MO_ES_GRATIS } from "@/lib/planesConfig";
+import { categoriaSugerenciaOptions, diasRestantesDePrueba, DURACION_PRUEBA_DIAS, pruebaVencida, type CategoriaSugerencia } from "@/lib/patientData";
+import { INICIO_DEL_COBRO, MO_ES_GRATIS } from "@/lib/planesConfig";
 import Inicio from "./pages/Inicio";
 import Pacientes from "./pages/Pacientes";
 import Agenda from "./pages/Agenda";
@@ -801,7 +801,7 @@ function DashboardBody({
   // siempre alcanzable para poder pagar y salir del bloqueo sin ayuda de
   // un admin.
   // MO es gratis por ahora (ver planesConfig.ts): la prueba vencida no bloquea a nadie.
-  if (!MO_ES_GRATIS && !esAdmin && activePage !== "planes" && pruebaVencida(suscripcion)) {
+  if (!MO_ES_GRATIS && !esAdmin && activePage !== "planes" && pruebaVencida(suscripcion, INICIO_DEL_COBRO)) {
     return <PruebaVencida onVerPlanes={() => setActivePage("planes")} onLogout={onLogout} />;
   }
 
@@ -905,6 +905,22 @@ function DashboardBody({
         </header>
 
         <div className={`px-3 py-6 sm:px-6 sm:py-8 ${ladoNav === "izquierda" ? "lg:pl-28" : "lg:pr-28"}`}>
+          {!MO_ES_GRATIS && !esAdmin && miRol === "admin" && suscripcion.planActivo === "prueba" && activePage !== "planes" && (
+            <div
+              className={`mb-4 flex flex-wrap items-center justify-between gap-2 rounded-xl border px-4 py-2.5 text-sm print:hidden ${
+                diasRestantesDePrueba(suscripcion.pruebaIniciadaEl, INICIO_DEL_COBRO) <= 3 ? "border-warning/40 bg-warning/10 text-warning" : "border-accent/30 bg-accent/10 text-ink/80"
+              }`}
+            >
+              <span>
+                Prueba gratuita: te {diasRestantesDePrueba(suscripcion.pruebaIniciadaEl, INICIO_DEL_COBRO) === 1 ? "queda" : "quedan"}{" "}
+                <strong>{Math.max(0, diasRestantesDePrueba(suscripcion.pruebaIniciadaEl, INICIO_DEL_COBRO))}</strong>{" "}
+                {diasRestantesDePrueba(suscripcion.pruebaIniciadaEl, INICIO_DEL_COBRO) === 1 ? "día" : "días"} para elegir un plan.
+              </span>
+              <button onClick={() => setActivePage("planes")} className="rounded-lg border border-accent/50 bg-accent/15 px-3 py-1 text-xs font-semibold text-accent hover:bg-accent/25">
+                Ver planes
+              </button>
+            </div>
+          )}
           <div className="mb-6 flex items-center gap-3 print:hidden">
             {esPaginaDeSubmenu && (
               <button

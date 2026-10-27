@@ -459,9 +459,11 @@ export type SuscripcionPlan = {
  * nadie por error. Única fuente de verdad — Planes.tsx y Dashboard.tsx
  * (bloqueo real de acceso) comparten esta misma función a propósito, para
  * que nunca puedan quedar desalineados sobre cuándo "ya venció". */
-export function diasRestantesDePrueba(pruebaIniciadaEl: string | undefined): number {
+export function diasRestantesDePrueba(pruebaIniciadaEl: string | undefined, inicioDelCobro?: string): number {
   if (!pruebaIniciadaEl) return DURACION_PRUEBA_DIAS;
-  const inicio = new Date(`${pruebaIniciadaEl}T00:00:00`);
+  // Quien ya usaba MO antes de que empezara el cobro cuenta sus 14 días desde ese día, no desde que se registró.
+  const desde = inicioDelCobro && inicioDelCobro > pruebaIniciadaEl ? inicioDelCobro : pruebaIniciadaEl;
+  const inicio = new Date(`${desde}T00:00:00`);
   if (Number.isNaN(inicio.getTime())) return DURACION_PRUEBA_DIAS;
   const fin = new Date(inicio);
   fin.setDate(fin.getDate() + DURACION_PRUEBA_DIAS);
@@ -473,8 +475,8 @@ export function diasRestantesDePrueba(pruebaIniciadaEl: string | undefined): num
 /** true solo si el plan activo sigue siendo "prueba" Y esos 14 días ya se
  * cumplieron — nunca aplica a un plan pagado (activo, atrasado o incluso
  * cancelado), donde el vencimiento de la prueba ya no significa nada. */
-export function pruebaVencida(suscripcion: Pick<SuscripcionPlan, "planActivo" | "pruebaIniciadaEl">): boolean {
-  return suscripcion.planActivo === "prueba" && diasRestantesDePrueba(suscripcion.pruebaIniciadaEl) <= 0;
+export function pruebaVencida(suscripcion: Pick<SuscripcionPlan, "planActivo" | "pruebaIniciadaEl">, inicioDelCobro?: string): boolean {
+  return suscripcion.planActivo === "prueba" && diasRestantesDePrueba(suscripcion.pruebaIniciadaEl, inicioDelCobro) <= 0;
 }
 
 /** "odontologo" = Cirujano dentista: atiende y edita, pero no elimina ni ve finanzas (ver permisosRol.ts). */

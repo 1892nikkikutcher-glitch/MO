@@ -234,3 +234,28 @@ describe("identidadDoctorDe", () => {
     expect(enrique.especialidad).not.toBe(ana.especialidad);
   });
 });
+
+describe("prueba gratuita de quien ya usaba MO antes de que empezara el cobro", () => {
+  const INICIO = "2026-10-27";
+
+  it("sin fecha de cobro, la cuenta sigue siendo la de siempre", () => {
+    expect(pruebaVencida({ planActivo: "prueba", pruebaIniciadaEl: "2026-01-01" })).toBe(true);
+  });
+
+  it("con fecha de cobro, una clínica antigua cuenta sus 14 días desde ese día y no amanece bloqueada", () => {
+    const hoy = new Date();
+    const fin = new Date(hoy.getFullYear(), hoy.getMonth(), hoy.getDate());
+    const inicio = `${fin.getFullYear()}-${String(fin.getMonth() + 1).padStart(2, "0")}-${String(fin.getDate()).padStart(2, "0")}`;
+    expect(pruebaVencida({ planActivo: "prueba", pruebaIniciadaEl: "2026-01-01" }, inicio)).toBe(false);
+    expect(diasRestantesDePrueba("2026-01-01", inicio)).toBe(DURACION_PRUEBA_DIAS);
+  });
+
+  it("una clínica nueva (registrada después del inicio del cobro) cuenta desde su propio día", () => {
+    expect(diasRestantesDePrueba(haceNDias(3), "2020-01-01")).toBe(DURACION_PRUEBA_DIAS - 3);
+    expect(pruebaVencida({ planActivo: "prueba", pruebaIniciadaEl: haceNDias(20) }, "2020-01-01")).toBe(true);
+  });
+
+  it("una clínica con plan pagado nunca se marca vencida", () => {
+    expect(pruebaVencida({ planActivo: "consultorio", pruebaIniciadaEl: "2026-01-01" }, INICIO)).toBe(false);
+  });
+});

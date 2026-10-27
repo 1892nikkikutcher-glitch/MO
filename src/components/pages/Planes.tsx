@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { usePatientData } from "@/context/PatientDataContext";
-import { MO_ES_GRATIS } from "@/lib/planesConfig";
+import { INICIO_DEL_COBRO, MO_ES_GRATIS } from "@/lib/planesConfig";
 import {
   DURACION_PRUEBA_DIAS,
   diasRestantesDePrueba,
@@ -21,8 +21,8 @@ function hoyLocalIso(): string {
 
 export default function Planes() {
   const { suscripcion, setSuscripcion, clinicUid, userEmail } = usePatientData();
-  const diasRestantes = diasRestantesDePrueba(suscripcion.pruebaIniciadaEl);
-  const pruebaVencida = calcularPruebaVencida(suscripcion);
+  const diasRestantes = diasRestantesDePrueba(suscripcion.pruebaIniciadaEl, INICIO_DEL_COBRO);
+  const pruebaVencida = calcularPruebaVencida(suscripcion, INICIO_DEL_COBRO);
   const [cargando, setCargando] = useState<PlanId | null>(null);
   const [error, setError] = useState("");
 

@@ -16,6 +16,7 @@ import type {
   PerfilProfesionalPublico,
 } from "@/lib/moConecta";
 import type { InvitacionConecta } from "@/lib/invitacionesConecta";
+import { INICIO_DEL_COBRO } from "@/lib/planesConfig";
 
 /** Métricas de MO Conecta para el Panel de administrador — mismo criterio
  * que el resto de este archivo: solo lectura vía dbAdmin, nunca desde el
@@ -135,8 +136,8 @@ export async function GET(req: NextRequest) {
         ultimaActividad,
         // Solo tiene sentido mientras el plan siga siendo "prueba" — un plan
         // ya pagado nunca se marca vencido sin importar cuánto tiempo pasó.
-        diasRestantesPrueba: planActivo === "prueba" ? diasRestantesDePrueba(pruebaIniciadaEl) : null,
-        pruebaVencida: calcularPruebaVencida({ planActivo, pruebaIniciadaEl }),
+        diasRestantesPrueba: planActivo === "prueba" ? diasRestantesDePrueba(pruebaIniciadaEl, INICIO_DEL_COBRO) : null,
+        pruebaVencida: calcularPruebaVencida({ planActivo, pruebaIniciadaEl }, INICIO_DEL_COBRO),
       };
     })
   );
