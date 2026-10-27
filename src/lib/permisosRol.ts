@@ -30,8 +30,8 @@ export const MENSAJE_ROL_SIN_PERMISO_ELIMINAR =
  * administrativo y financiero queda para el administrador. */
 const MODULOS_OCULTOS_POR_ROL: Record<RolClinica, string[]> = {
   admin: [],
-  colaborador: ["cashback"],
-  odontologo: ["cashback", "reportes", "administracion", "asistencia", "gastos", "regulacion-sanitaria", "rpbi", "contabilidad", "planes"],
+  colaborador: ["cashback", "facturacion"],
+  odontologo: ["cashback", "facturacion", "reportes", "administracion", "asistencia", "gastos", "regulacion-sanitaria", "rpbi", "contabilidad", "planes"],
 };
 
 export function moduloVisibleParaRol(rol: RolClinica | null | undefined, idModulo: string): boolean {

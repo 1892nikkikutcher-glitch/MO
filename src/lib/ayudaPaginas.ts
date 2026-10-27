@@ -193,6 +193,13 @@ export const ayudaPaginas: Record<string, AyudaPagina> = {
       "El paciente usa su saldo eligiendo Cashback como forma de pago, y puede transferirlo a un conocido o familiar que ya sea paciente (también lo apruebas tú).",
     ],
   },
+  facturacion: {
+    titulo: "Facturación",
+    resumen: "Sección en construcción: todavía no se pueden emitir facturas desde MO.",
+    puntos: [
+      "Mientras tanto, al registrar un pago puedes marcar «Activo para facturar» para dejarlo identificado.",
+    ],
+  },
   educacion: {
     titulo: "Educación",
     resumen: "Material educativo/visual para mostrar o enviar a pacientes.",

@@ -19,6 +19,7 @@ import Metas from "./pages/Metas";
 import PresupuestoGastos from "./pages/PresupuestoGastos";
 import Membresias from "./pages/Membresias";
 import Cashback from "./pages/Cashback";
+import Facturacion from "./pages/Facturacion";
 import BuscadorPlataforma from "./BuscadorPlataforma";
 import Asistencia from "./pages/Asistencia";
 import Procedimientos from "./pages/Procedimientos";
@@ -90,6 +91,7 @@ const paginasConstruidas = new Set([
   "administracion-contrato-ortodoncia",
   "membresias",
   "cashback",
+  "facturacion",
   "asistencia",
   "administracion-procedimientos",
   "administracion-historial-clinico",
@@ -939,6 +941,7 @@ function DashboardBody({
           {activePage === "administracion-contrato-ortodoncia" && <AdministracionContratoOrtodoncia />}
           {activePage === "membresias" && <Membresias />}
           {activePage === "cashback" && <Cashback />}
+          {activePage === "facturacion" && <Facturacion />}
           {activePage === "asistencia" && <Asistencia />}
           {activePage === "administracion-procedimientos" && <Procedimientos />}
           {activePage === "administracion-historial-clinico" && <HistorialClinicoAdmin />}
