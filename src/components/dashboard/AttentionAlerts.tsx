@@ -75,6 +75,8 @@ export default function AttentionAlerts({ rango }: { rango: RangoPeriodo }) {
     notasEvolucionPorPaciente,
     estadoCargaNotasPorPaciente,
     cargarNotasPaciente,
+    miRol,
+    cashbackMovimientos,
   } = usePatientData();
   const [mostrarLaboratorios, setMostrarLaboratorios] = useState(false);
   const { casosRecibidos, casosEnviados, uid: miUidConecta, novedades: novedadesConecta } = useMoConecta();
@@ -183,6 +185,18 @@ export default function AttentionAlerts({ rango }: { rango: RangoPeriodo }) {
       prioridad: "media",
       categoria: "conecta",
       onClick: () => irAPagina("mo-conecta"),
+    });
+  }
+
+  const cashbackPorAprobar = miRol === "admin" ? cashbackMovimientos.filter((m) => m.estado === "pendiente").length : 0;
+  if (cashbackPorAprobar > 0) {
+    alertas.push({
+      key: "cashback-por-aprobar",
+      emoji: "💰",
+      texto: `${cashbackPorAprobar} movimiento(s) de cashback esperan tu aprobación`,
+      prioridad: "media",
+      categoria: "financiero",
+      onClick: () => irAPagina("cashback"),
     });
   }
 

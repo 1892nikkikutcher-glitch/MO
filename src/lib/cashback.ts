@@ -33,6 +33,8 @@ export type CashbackConfig = {
   saldoMaximo: number;
   /** El saldo ganado se puede usar a partir del día siguiente (la siguiente visita), no el mismo día. */
   liberarSiguienteDia: boolean;
+  /** Cada cashback ganado queda aprobado solo (respetando el saldo máximo). Apagado: espera tu aprobación en el módulo. */
+  aprobarAutomaticamente: boolean;
 };
 
 export const cashbackConfigInicial: CashbackConfig = {
@@ -44,6 +46,7 @@ export const cashbackConfigInicial: CashbackConfig = {
   topeCanjePorVisita: 500,
   saldoMaximo: 1000,
   liberarSiguienteDia: true,
+  aprobarAutomaticamente: true,
 };
 
 /** La configuración guardada puede ser anterior a algún campo: lo que falte toma el valor de siempre. */
@@ -130,6 +133,20 @@ function sumarMesesIso(iso: string, meses: number): string {
 
 export function venceElCashback(fechaIso: string, vigenciaMeses: number): string {
   return vigenciaMeses > 0 ? sumarMesesIso(fechaIso, vigenciaMeses) : "9999-12-31";
+}
+
+/** Con quién queda registrado un cashback que se aprobó solo. */
+export const APROBADO_AUTOMATICO = "automático";
+
+/** Un cashback recién ganado, aprobado sin intervención: entra completo si cabe en el saldo máximo del paciente, se recorta si
+ * cabe solo una parte, y se rechaza (con la razón) si ya no cabe nada. */
+export function aprobarSolo(m: MovimientoCashback, movimientos: MovimientoCashback[], config: CashbackConfig, ahoraIso: string): MovimientoCashback {
+  const espacio = espacioParaAcumular(saldoCashback(movimientos.filter((x) => x.id !== m.id), m.patientId, config), config);
+  if (espacio <= 0) {
+    return { ...m, estado: "rechazado", nota: "El paciente ya tiene el saldo máximo acumulable", resueltoPor: APROBADO_AUTOMATICO, resueltoEn: ahoraIso };
+  }
+  const monto = Math.min(m.monto, espacio);
+  return { ...m, estado: "aprobado", monto, resueltoPor: APROBADO_AUTOMATICO, resueltoEn: ahoraIso, ...(monto < m.monto ? { nota: "Se limitó al saldo máximo acumulable" } : {}) };
 }
 
 export const idCashbackGenerado = (pagoId: string) => `cb-${pagoId}`;
@@ -406,12 +423,24 @@ export function sincronizarCashbackConPagos(
     if (!generado) {
       if (config.activo) {
         const nuevo = movimientoGenerado(pago, patientId, patientName, config, ahoraIso);
-        if (nuevo) poner(nuevo);
+        if (nuevo) poner(config.aprobarAutomaticamente ? aprobarSolo(nuevo, resultado, config, ahoraIso) : nuevo);
       }
     } else if (generado.estado === "pendiente" && generado.monto === generado.montoCalculado) {
       const recalculado = movimientoGenerado(pago, patientId, patientName, { ...config, porcentaje: generado.porcentaje ?? config.porcentaje }, generado.creadoEn);
       if (recalculado) reemplazar({ ...generado, monto: recalculado.monto, montoCalculado: recalculado.monto, baseMonto: recalculado.baseMonto, fecha: recalculado.fecha });
       else quitar(generado.id);
+    } else if (generado.estado === "aprobado" && generado.resueltoPor === APROBADO_AUTOMATICO && generado.monto === generado.montoCalculado) {
+      // Aprobado solo y sin tocar: si se corrige el pago, el cashback se corrige con él (siempre que el paciente no haya usado ya más de lo que quedaría).
+      const recalculado = movimientoGenerado(pago, patientId, patientName, { ...config, porcentaje: generado.porcentaje ?? config.porcentaje }, generado.creadoEn);
+      const sinEste = resultado.filter((m) => m.id !== generado.id);
+      const deficitAntes = saldoCashback(resultado, patientId, config).deficit;
+      if (recalculado) {
+        const candidato = aprobarSolo({ ...recalculado, id: generado.id, creadoEn: generado.creadoEn }, sinEste, config, ahoraIso);
+        const nuevo = { ...candidato, resueltoEn: generado.resueltoEn ?? candidato.resueltoEn };
+        if (saldoCashback([nuevo, ...sinEste], patientId, config).deficit <= deficitAntes) reemplazar(nuevo);
+      } else if (saldoCashback(sinEste, patientId, config).deficit <= deficitAntes) {
+        quitar(generado.id);
+      }
     }
   }
 
@@ -426,4 +455,59 @@ export function sincronizarCashbackConPagos(
     }
   }
   return cambio ? resultado : movimientos;
+}
+
+// ---------- Totales ----------
+
+export type ResumenCashback = SaldoCashback & {
+  /** Cashback aprobado que se le ha otorgado (sin contar lo que recibió de otros pacientes). */
+  otorgado: number;
+  /** Lo que ya usó pagando con cashback. */
+  usado: number;
+};
+
+export function resumenCashbackDePaciente(movimientos: MovimientoCashback[], patientId: string, config: CashbackConfig, hoyIso?: string): ResumenCashback {
+  const suyos = movimientos.filter((m) => m.patientId === patientId);
+  return {
+    ...saldoCashback(movimientos, patientId, config, hoyIso),
+    otorgado: redondearDinero(suyos.filter((m) => m.tipo === "generado" && m.estado === "aprobado").reduce((s, m) => s + m.monto, 0)),
+    usado: redondearDinero(suyos.filter((m) => m.tipo === "canje" && m.estado === "aprobado").reduce((s, m) => s + m.monto, 0)),
+  };
+}
+
+export type TotalesCashback = {
+  otorgado: number;
+  usado: number;
+  /** Lo que los pacientes tienen y todavía pueden usar (incluye lo que se libera mañana). */
+  porRedimir: number;
+  vencido: number;
+  porAprobar: number;
+  pacientesConSaldo: number;
+};
+
+/** Cuánto cashback se ha otorgado, cuánto se ha usado y cuánto falta por redimir, en toda la clínica. */
+export function totalesCashback(movimientos: MovimientoCashback[], config: CashbackConfig, hoyIso?: string): TotalesCashback {
+  const ids = new Set<string>();
+  movimientos.forEach((m) => {
+    ids.add(m.patientId);
+    if (m.destinoId) ids.add(m.destinoId);
+  });
+  const t: TotalesCashback = { otorgado: 0, usado: 0, porRedimir: 0, vencido: 0, porAprobar: 0, pacientesConSaldo: 0 };
+  ids.forEach((id) => {
+    const r = resumenCashbackDePaciente(movimientos, id, config, hoyIso);
+    t.otorgado += r.otorgado;
+    t.usado += r.usado;
+    t.porRedimir += r.disponible + r.porLiberar;
+    t.vencido += r.vencido;
+    t.porAprobar += r.porAprobar + r.enTransferencia;
+    if (r.disponible + r.porLiberar > 0) t.pacientesConSaldo += 1;
+  });
+  return {
+    otorgado: redondearDinero(t.otorgado),
+    usado: redondearDinero(t.usado),
+    porRedimir: redondearDinero(t.porRedimir),
+    vencido: redondearDinero(t.vencido),
+    porAprobar: redondearDinero(t.porAprobar),
+    pacientesConSaldo: t.pacientesConSaldo,
+  };
 }

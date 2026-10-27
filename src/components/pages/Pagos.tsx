@@ -529,7 +529,7 @@ export function AgregarPagoDialog({
         <div className="w-full max-w-md rounded-2xl border border-edge/10 bg-modal p-6 print:border-none print:bg-transparent print:p-0">
           {acumulaHoy > 0 && (
             <p className="mb-4 rounded-lg border border-success/40 bg-success/10 px-3 py-2 text-sm text-success print:hidden">
-              Hoy acumulaste <span className="font-semibold">{formatCurrency(acumulaHoy)}</span> de Cashback para tu próxima atención. Se libera a partir de mañana, una vez aprobado.
+              Hoy acumulaste <span className="font-semibold">{formatCurrency(acumulaHoy)}</span> de Cashback para tu próxima atención. Se libera a partir de mañana{cashbackConfig.aprobarAutomaticamente ? "" : ", una vez aprobado"}.
             </p>
           )}
           <ReciboPagoPanel

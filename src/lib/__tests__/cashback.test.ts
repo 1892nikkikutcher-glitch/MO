@@ -7,7 +7,10 @@ import {
   baseCashbackDePago,
   calcularCashback,
   cashbackConfigInicial,
+  APROBADO_AUTOMATICO,
   crearTransferencia,
+  resumenCashbackDePaciente,
+  totalesCashback,
   espacioParaAcumular,
   montoMaximoCanje,
   normalizarConfigCashback,
@@ -21,7 +24,7 @@ import {
 } from "../cashback";
 import type { Pago } from "../patientData";
 
-const config: CashbackConfig = { ...cashbackConfigInicial, activo: true, porcentaje: 3, vigenciaMeses: 12, transferible: true };
+const config: CashbackConfig = { ...cashbackConfigInicial, activo: true, porcentaje: 3, vigenciaMeses: 12, transferible: true, aprobarAutomaticamente: false };
 const AHORA = "2026-10-20T12:00:00.000Z";
 const HOY = "2026-10-20";
 
@@ -224,6 +227,7 @@ describe("seguir a los pagos", () => {
       topeCanjePorVisita: 500,
       saldoMaximo: 1000,
       liberarSiguienteDia: true,
+      aprobarAutomaticamente: true,
     });
   });
 
@@ -297,5 +301,66 @@ describe("pagos guardados con el nombre anterior de la forma de pago", () => {
     expect(esFormaPagoCashback("Efectivo")).toBe(false);
     const viejo = pago("v", "20/10/2026", [{ monto: 300 }], "Saldo Sonríe");
     expect(baseCashbackDePago(viejo)).toBe(0);
+  });
+});
+
+describe("aprobación automática", () => {
+  const auto: CashbackConfig = { ...config, aprobarAutomaticamente: true };
+
+  it("un pago nuevo genera su cashback ya aprobado, marcado como automático", () => {
+    const p = pago("p1", "20/10/2026", [{ monto: 2000 }]);
+    const [m] = sincronizarCashbackConPagos([], "p1", "Ana", [], [p], auto, AHORA);
+    expect(m).toMatchObject({ estado: "aprobado", monto: 60, resueltoPor: APROBADO_AUTOMATICO });
+  });
+
+  it("respeta el saldo máximo: recorta lo que no cabe y rechaza si ya no cabe nada", () => {
+    const tope = { ...auto, saldoMaximo: 100 };
+    const lleno = mov({ id: "viejo", monto: 80, fecha: "2026-09-01" });
+    const [recortado] = sincronizarCashbackConPagos([lleno], "p1", "Ana", [], [pago("p1", "20/10/2026", [{ monto: 2000 }])], tope, AHORA);
+    expect(recortado).toMatchObject({ estado: "aprobado", monto: 20, nota: "Se limitó al saldo máximo acumulable" });
+    const completo = mov({ id: "viejo", monto: 100, fecha: "2026-09-01" });
+    const [rechazado] = sincronizarCashbackConPagos([completo], "p1", "Ana", [], [pago("p2", "20/10/2026", [{ monto: 2000 }])], tope, AHORA);
+    expect(rechazado).toMatchObject({ estado: "rechazado", nota: "El paciente ya tiene el saldo máximo acumulable" });
+  });
+
+  it("si se corrige el pago, el cashback aprobado solo se corrige con él; uno cambiado a mano no", () => {
+    const p = pago("p1", "20/10/2026", [{ monto: 1000 }]);
+    const movs = sincronizarCashbackConPagos([], "p1", "Ana", [], [p], auto, AHORA);
+    const corregido = pago("p1", "20/10/2026", [{ monto: 3000 }]);
+    expect(sincronizarCashbackConPagos(movs, "p1", "Ana", [p], [corregido], auto, AHORA)[0].monto).toBe(90);
+    const aMano = [ajustarMontoGenerado(movs[0], 20)];
+    expect(sincronizarCashbackConPagos(aMano, "p1", "Ana", [p], [corregido], auto, AHORA)[0].monto).toBe(20);
+  });
+
+  it("si el pago se vuelve promoción, el cashback aprobado solo se quita", () => {
+    const p = pago("p1", "20/10/2026", [{ monto: 1000 }]);
+    const movs = sincronizarCashbackConPagos([], "p1", "Ana", [], [p], auto, AHORA);
+    const promo = { ...p, sinCashback: true };
+    expect(sincronizarCashbackConPagos(movs, "p1", "Ana", [p], [promo], auto, AHORA)).toEqual([]);
+  });
+
+  it("apagada la aprobación automática, nace pendiente como antes", () => {
+    const p = pago("p1", "20/10/2026", [{ monto: 1000 }]);
+    expect(sincronizarCashbackConPagos([], "p1", "Ana", [], [p], { ...auto, aprobarAutomaticamente: false }, AHORA)[0].estado).toBe("pendiente");
+  });
+});
+
+describe("totales", () => {
+  const movs: MovimientoCashback[] = [
+    mov({ id: "a", patientId: "p1", monto: 100, fecha: "2026-09-01" }),
+    mov({ id: "b", patientId: "p1", tipo: "canje", monto: 40, fecha: "2026-10-01" }),
+    mov({ id: "c", patientId: "p2", monto: 60, fecha: "2026-09-05" }),
+    mov({ id: "d", patientId: "p2", monto: 25, estado: "pendiente" }),
+    mov({ id: "e", patientId: "p3", monto: 30, estado: "rechazado" }),
+  ];
+
+  it("por paciente: lo otorgado, lo usado y lo que le queda", () => {
+    const r = resumenCashbackDePaciente(movs, "p1", config, HOY);
+    expect(r).toMatchObject({ otorgado: 100, usado: 40, disponible: 60 });
+    expect(resumenCashbackDePaciente(movs, "p2", config, HOY)).toMatchObject({ otorgado: 60, usado: 0, disponible: 60, porAprobar: 25 });
+  });
+
+  it("de toda la clínica: otorgado, usado, por redimir, por aprobar y pacientes con saldo; lo rechazado no cuenta", () => {
+    expect(totalesCashback(movs, config, HOY)).toEqual({ otorgado: 160, usado: 40, porRedimir: 120, vencido: 0, porAprobar: 25, pacientesConSaldo: 2 });
   });
 });

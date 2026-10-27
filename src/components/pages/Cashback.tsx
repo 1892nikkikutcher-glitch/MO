@@ -3,7 +3,7 @@
 import { useMemo, useState } from "react";
 import { usePatientData } from "@/context/PatientDataContext";
 import { formatCurrency } from "@/lib/patientData";
-import { saldoCashback, type CashbackConfig } from "@/lib/cashback";
+import { aprobarSolo, resumenCashbackDePaciente, totalesCashback, type CashbackConfig } from "@/lib/cashback";
 import { mensajeSaldoWhatsApp, terminosCashback } from "@/lib/cashbackTextos";
 import { FilaMovimientoCashback } from "./CashbackComponentes";
 
@@ -18,11 +18,11 @@ function diasHasta(iso: string): number {
   return Math.round((new Date(`${iso}T00:00:00`).getTime() - hoy.getTime()) / 86400000);
 }
 
-type FormConfig = { activo: boolean; porcentaje: string; vigenciaMeses: string; transferible: boolean; porcentajeMaxCanje: string; topeCanjePorVisita: string; saldoMaximo: string; liberarSiguienteDia: boolean };
+type FormConfig = { aprobarAutomaticamente: boolean; activo: boolean; porcentaje: string; vigenciaMeses: string; transferible: boolean; porcentajeMaxCanje: string; topeCanjePorVisita: string; saldoMaximo: string; liberarSiguienteDia: boolean };
 
 /** Módulo Cashback: configuración del programa, saldo por aprobar, saldos por paciente, saldos por vencer y términos para el paciente. */
 export default function Cashback() {
-  const { miRol, cashbackConfig, setCashbackConfig, cashbackMovimientos, patients, irAExpediente, clinicInfo } = usePatientData();
+  const { miRol, cashbackConfig, setCashbackConfig, cashbackMovimientos, setCashbackMovimientos, patients, irAExpediente, clinicInfo, userEmail } = usePatientData();
   const [form, setForm] = useState<FormConfig>({
     activo: cashbackConfig.activo,
     porcentaje: String(cashbackConfig.porcentaje),
@@ -32,6 +32,7 @@ export default function Cashback() {
     topeCanjePorVisita: String(cashbackConfig.topeCanjePorVisita),
     saldoMaximo: String(cashbackConfig.saldoMaximo),
     liberarSiguienteDia: cashbackConfig.liberarSiguienteDia,
+    aprobarAutomaticamente: cashbackConfig.aprobarAutomaticamente,
   });
   const [guardado, setGuardado] = useState(false);
   const [error, setError] = useState("");
@@ -60,13 +61,27 @@ export default function Cashback() {
         id,
         nombre: patients.find((p) => p.id === id)?.name ?? cashbackMovimientos.find((m) => m.patientId === id)?.patientName ?? "",
         telefono: patients.find((p) => p.id === id)?.phone ?? "",
-        saldo: saldoCashback(cashbackMovimientos, id, cashbackConfig),
+        saldo: resumenCashbackDePaciente(cashbackMovimientos, id, cashbackConfig),
       }))
-      .filter((s) => s.saldo.disponible > 0 || s.saldo.porLiberar > 0 || s.saldo.porAprobar > 0 || s.saldo.enTransferencia > 0)
-      .sort((a, b) => b.saldo.disponible - a.saldo.disponible);
+      .filter((s) => s.saldo.otorgado > 0 || s.saldo.disponible > 0 || s.saldo.porLiberar > 0 || s.saldo.porAprobar > 0 || s.saldo.enTransferencia > 0)
+      .sort((a, b) => b.saldo.disponible + b.saldo.porLiberar - (a.saldo.disponible + a.saldo.porLiberar) || b.saldo.otorgado - a.saldo.otorgado);
   }, [cashbackMovimientos, cashbackConfig, patients]);
-  const totalDisponible = saldos.reduce((s, x) => s + x.saldo.disponible + x.saldo.porLiberar, 0);
-  const totalPorAprobar = saldos.reduce((s, x) => s + x.saldo.porAprobar + x.saldo.enTransferencia, 0);
+  const totales = useMemo(() => totalesCashback(cashbackMovimientos, cashbackConfig), [cashbackMovimientos, cashbackConfig]);
+  const totalDisponible = totales.porRedimir;
+
+  /** Aprueba de una vez todo el cashback ganado que está esperando (respetando el saldo máximo de cada paciente). Las transferencias se deciden una por una. */
+  const aprobarTodoLoGanado = () => {
+    const ahora = new Date().toISOString();
+    setCashbackMovimientos((prev) => {
+      let actual = prev;
+      for (const m of [...prev].filter((x) => x.tipo === "generado" && x.estado === "pendiente").sort((a, b) => a.creadoEn.localeCompare(b.creadoEn))) {
+        const aprobado = { ...aprobarSolo(m, actual, cashbackConfig, ahora), resueltoPor: userEmail };
+        actual = actual.map((x) => (x.id === m.id ? aprobado : x));
+      }
+      return actual;
+    });
+  };
+  const hayGanadoPendiente = pendientes.some((m) => m.tipo === "generado");
   const porVencer = useMemo(
     () =>
       saldos
@@ -104,6 +119,7 @@ export default function Cashback() {
       topeCanjePorVisita: tope,
       saldoMaximo: saldoMax,
       liberarSiguienteDia: form.liberarSiguienteDia,
+      aprobarAutomaticamente: form.aprobarAutomaticamente,
     };
     setCashbackConfig(nueva);
     setError("");
@@ -179,6 +195,13 @@ export default function Cashback() {
               <input type="checkbox" checked={form.liberarSiguienteDia} onChange={(e) => cambiar({ liberarSiguienteDia: e.target.checked })} className="h-4 w-4 rounded border-edge/30" />
               Disponible desde la siguiente visita
             </label>
+            <label className="flex items-start gap-2" title="Si está apagado, cada cashback espera tu aprobación aquí y te avisamos en el Inicio.">
+              <input type="checkbox" checked={form.aprobarAutomaticamente} onChange={(e) => cambiar({ aprobarAutomaticamente: e.target.checked })} className="mt-0.5 h-4 w-4 rounded border-edge/30" />
+              <span>
+                Aprobar cada cashback automáticamente
+                <span className="block text-[11px] text-ink/50">Recomendado: no tienes que revisar nada.</span>
+              </span>
+            </label>
             <label className="flex items-center gap-2">
               <input type="checkbox" checked={form.transferible} onChange={(e) => cambiar({ transferible: e.target.checked })} className="h-4 w-4 rounded border-edge/30" />
               Se puede transferir a otra persona
@@ -204,28 +227,44 @@ export default function Cashback() {
         </div>
       </div>
 
-      <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+      <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+        <div className="rounded-xl border border-edge/10 bg-inset p-4" title="Todo el cashback que se ha dado a los pacientes (aprobado), desde que empezó el programa.">
+          <div className="text-[11px] uppercase tracking-wide text-ink/40">Total otorgado</div>
+          <div className="mt-1 text-xl font-bold text-ink">{formatCurrency(totales.otorgado)}</div>
+          <div className="mt-0.5 text-[11px] text-ink/50">Lo que has regalado en total</div>
+        </div>
+        <div className="rounded-xl border border-edge/10 bg-inset p-4" title="Lo que los pacientes ya usaron para pagar con cashback.">
+          <div className="text-[11px] uppercase tracking-wide text-ink/40">Usado por pacientes</div>
+          <div className="mt-1 text-xl font-bold text-ink">{formatCurrency(totales.usado)}</div>
+          <div className="mt-0.5 text-[11px] text-ink/50">{totales.otorgado > 0 ? `${Math.round((totales.usado / totales.otorgado) * 100)}% de lo otorgado` : "Todavía nada"}</div>
+        </div>
         <div className="rounded-xl border border-edge/10 bg-inset p-4" title="Lo que la clínica debe en atenciones: guárdalo como una reserva aparte, no como dinero libre.">
-          <div className="text-[11px] uppercase tracking-wide text-ink/40">Saldo pendiente de redimir</div>
+          <div className="text-[11px] uppercase tracking-wide text-ink/40">Por redimir</div>
           <div className="mt-1 text-xl font-bold text-success">{formatCurrency(totalDisponible)}</div>
-          <div className="mt-0.5 text-[11px] text-ink/50">Reserva interna: no es ingreso libre</div>
+          <div className="mt-0.5 text-[11px] text-ink/50">Reserva interna · {totales.pacientesConSaldo} {totales.pacientesConSaldo === 1 ? "paciente" : "pacientes"}{totales.vencido > 0 ? ` · ${formatCurrency(totales.vencido)} vencido` : ""}</div>
         </div>
         <div className="rounded-xl border border-edge/10 bg-inset p-4">
           <div className="text-[11px] uppercase tracking-wide text-ink/40">Por aprobar</div>
-          <div className="mt-1 text-xl font-bold text-warning">{formatCurrency(totalPorAprobar)}</div>
-          <div className="mt-0.5 text-[11px] text-ink/50">{pendientes.length} {pendientes.length === 1 ? "movimiento" : "movimientos"} esperando tu decisión</div>
-        </div>
-        <div className="rounded-xl border border-edge/10 bg-inset p-4">
-          <div className="text-[11px] uppercase tracking-wide text-ink/40">Pacientes con saldo</div>
-          <div className="mt-1 text-xl font-bold text-ink">{saldos.filter((s) => s.saldo.disponible + s.saldo.porLiberar > 0).length}</div>
-          <div className="mt-0.5 text-[11px] text-ink/50">{porVencer.length} con saldo por vencer en {DIAS_AVISO_VENCIMIENTO} días</div>
+          <div className="mt-1 text-xl font-bold text-warning">{formatCurrency(totales.porAprobar)}</div>
+          <div className="mt-0.5 text-[11px] text-ink/50">{pendientes.length} {pendientes.length === 1 ? "movimiento" : "movimientos"} · {porVencer.length} por vencer en {DIAS_AVISO_VENCIMIENTO} días</div>
         </div>
       </div>
 
       <div className="rounded-2xl border border-edge/10 bg-surface p-6">
-        <h3 className="text-sm font-semibold uppercase tracking-wide text-ink/60">
-          Por aprobar {pendientes.length > 0 && <span className="ml-1 rounded-full bg-warning/20 px-2 py-0.5 text-[11px] text-warning">{pendientes.length}</span>}
-        </h3>
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <h3 className="text-sm font-semibold uppercase tracking-wide text-ink/60">
+            Por aprobar {pendientes.length > 0 && <span className="ml-1 rounded-full bg-warning/20 px-2 py-0.5 text-[11px] text-warning">{pendientes.length}</span>}
+          </h3>
+          {hayGanadoPendiente && (
+            <button onClick={aprobarTodoLoGanado} className="rounded-lg border border-success/50 bg-success/10 px-3 py-1.5 text-xs font-semibold text-success hover:bg-success/20">
+              Aprobar todo lo ganado
+            </button>
+          )}
+        </div>
+        <p className="mt-1 text-xs text-ink/50">
+          Aprobar sirve para que tú decidas si un cashback corresponde (por ejemplo, si fue una promoción o si el tratamiento incluía laboratorio) antes de que el paciente pueda usarlo.{" "}
+          {cashbackConfig.aprobarAutomaticamente ? "Con la aprobación automática encendida, el cashback nuevo se aprueba solo y aquí solo quedan las transferencias." : "Con la aprobación automática apagada, cada cashback espera aquí."}
+        </p>
         {pendientes.length === 0 ? (
           <p className="py-6 text-center text-sm text-ink/40">No hay cashback ni transferencias esperando tu decisión.</p>
         ) : (
@@ -268,7 +307,7 @@ export default function Cashback() {
         <div className="flex flex-wrap items-baseline justify-between gap-2">
           <h3 className="text-sm font-semibold uppercase tracking-wide text-ink/60">Saldos por paciente</h3>
           <span className="text-xs text-ink/50">
-            Total: <span className="font-semibold text-success">{formatCurrency(totalDisponible)}</span>
+            Por redimir: <span className="font-semibold text-success">{formatCurrency(totalDisponible)}</span> · Otorgado: <span className="font-semibold text-ink">{formatCurrency(totales.otorgado)}</span>
           </span>
         </div>
         {saldos.length === 0 ? (
@@ -279,6 +318,8 @@ export default function Cashback() {
               <thead>
                 <tr className="border-b border-edge/10 text-xs uppercase tracking-wide text-ink/40">
                   <th className="py-2 font-medium">Paciente</th>
+                  <th className="py-2 text-right font-medium">Otorgado</th>
+                  <th className="py-2 text-right font-medium">Usado</th>
                   <th className="py-2 text-right font-medium">Disponible</th>
                   <th className="py-2 text-right font-medium">Se libera mañana</th>
                   <th className="py-2 text-right font-medium">Por aprobar</th>
@@ -293,6 +334,8 @@ export default function Cashback() {
                         {s.nombre || "Paciente"}
                       </button>
                     </td>
+                    <td className="py-2 text-right text-ink/70">{formatCurrency(s.saldo.otorgado)}</td>
+                    <td className="py-2 text-right text-ink/70">{s.saldo.usado > 0 ? formatCurrency(s.saldo.usado) : "—"}</td>
                     <td className="py-2 text-right font-semibold text-success">{formatCurrency(s.saldo.disponible)}</td>
                     <td className="py-2 text-right text-ink/60">{s.saldo.porLiberar > 0 ? formatCurrency(s.saldo.porLiberar) : "—"}</td>
                     <td className="py-2 text-right text-warning">{s.saldo.porAprobar + s.saldo.enTransferencia > 0 ? formatCurrency(s.saldo.porAprobar + s.saldo.enTransferencia) : "—"}</td>
