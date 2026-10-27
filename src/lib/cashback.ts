@@ -9,9 +9,13 @@ import type { Pago } from "./patientData";
 
 /** Forma de pago con la que se usa el saldo de cashback en un pago. */
 /** Cómo se llama el programa para el paciente y en todas las pantallas. */
-export const NOMBRE_PROGRAMA_CASHBACK = "Saldo Sonríe";
+export const NOMBRE_PROGRAMA_CASHBACK = "Cashback";
 
-export const FORMA_PAGO_CASHBACK = "Saldo Sonríe";
+export const FORMA_PAGO_CASHBACK = "Cashback";
+
+/** Nombres con los que esta forma de pago se guardó antes: los pagos ya hechos con ellos siguen siendo cashback. */
+export const NOMBRES_ANTERIORES_FORMA_CASHBACK = ["Saldo Sonríe"];
+export const esFormaPagoCashback = (forma: string) => forma === FORMA_PAGO_CASHBACK || NOMBRES_ANTERIORES_FORMA_CASHBACK.includes(forma);
 
 export type CashbackConfig = {
   activo: boolean;
@@ -91,7 +95,7 @@ export type MovimientoCashback = {
 };
 
 export const etiquetaTipoCashback: Record<TipoMovimientoCashback, string> = {
-  generado: "Saldo ganado",
+  generado: "Cashback ganado",
   canje: "Usado en un pago",
   transferencia: "Transferencia",
 };
@@ -109,7 +113,7 @@ export function calcularCashback(base: number, porcentaje: number): number {
 
 /** Lo que cuenta para ganar cashback: lo pagado en tratamientos (no membresías ni conceptos sueltos) y nunca un pago hecho con cashback. */
 export function baseCashbackDePago(pago: Pago): number {
-  if (pago.formaPago === FORMA_PAGO_CASHBACK || pago.sinCashback) return 0;
+  if (esFormaPagoCashback(pago.formaPago) || pago.sinCashback) return 0;
   return redondearDinero(pago.lineas.reduce((s, l) => s + (l.tratamientoId ? l.monto : 0), 0));
 }
 
@@ -393,7 +397,7 @@ export function sincronizarCashbackConPagos(
     if (previo && igualesPago(previo, pago)) continue;
     const generado = resultado.find((m) => m.id === idCashbackGenerado(pago.id));
     const canje = resultado.find((m) => m.id === idCashbackCanje(pago.id));
-    if (pago.formaPago === FORMA_PAGO_CASHBACK) {
+    if (esFormaPagoCashback(pago.formaPago)) {
       if (generado && generado.estado === "pendiente") quitar(generado.id);
       poner(movimientoCanje(pago, patientId, patientName, ahoraIso));
       continue;

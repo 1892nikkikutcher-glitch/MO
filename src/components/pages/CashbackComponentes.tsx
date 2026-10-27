@@ -41,7 +41,7 @@ export function ChipEstadoCashback({ estado }: { estado: EstadoMovimientoCashbac
 /** Qué es el movimiento, dicho desde el paciente que se está mirando (o sin perspectiva en el listado general). */
 export function descripcionMovimiento(m: MovimientoCashback, desdePacienteId?: string): string {
   if (m.tipo === "generado") {
-    const base = m.baseMonto ? `${m.porcentaje ?? ""}% de ${formatCurrency(m.baseMonto)} pagados` : "Saldo";
+    const base = m.baseMonto ? `${m.porcentaje ?? ""}% de ${formatCurrency(m.baseMonto)} pagados` : "Cashback";
     const cambiado = m.montoCalculado !== undefined && m.montoCalculado !== m.monto ? ` · el cálculo era ${formatCurrency(m.montoCalculado)}` : "";
     return `${base}${cambiado}`;
   }
@@ -69,7 +69,7 @@ export function FilaMovimientoCashback({ movimiento: m, desdePacienteId, mostrar
 
   const aprobar = () => {
     let monto = m.tipo === "generado" ? numero(montoTexto) : m.monto;
-    if (!(monto > 0)) return setError("El monto debe ser mayor a 0. Si no corresponde saldo, recházalo.");
+    if (!(monto > 0)) return setError("El monto debe ser mayor a 0. Si no corresponde cashback, recházalo.");
     let nota: string | undefined;
     if (m.tipo === "generado") {
       // Un paciente no puede acumular más del saldo máximo: se aprueba solo lo que cabe.
@@ -126,7 +126,7 @@ export function FilaMovimientoCashback({ movimiento: m, desdePacienteId, mostrar
                 step="0.01"
                 value={montoTexto}
                 onChange={(e) => setMontoTexto(e.target.value)}
-                aria-label="Monto de Saldo Sonríe"
+                aria-label="Monto de Cashback"
                 className="w-24 rounded-md border border-edge/10 bg-field px-1.5 py-1 text-right text-sm text-ink outline-none focus:border-accent/60"
               />
             </span>
@@ -166,7 +166,7 @@ export function FilaMovimientoCashback({ movimiento: m, desdePacienteId, mostrar
                 setMontoTexto(String(m.monto));
                 setEditando(true);
               }}
-              title="Cambiar el monto de este saldo"
+              title="Cambiar el monto de este cashback"
               className="flex h-7 w-7 items-center justify-center rounded-full border border-edge/15 text-ink/50 hover:border-accent/50 hover:text-accent"
             >
               ✎
@@ -243,14 +243,14 @@ export function TransferirCashbackDialog({ patientId, patientName, onClose }: { 
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4">
       <div className="w-full max-w-md rounded-2xl border border-edge/10 bg-modal p-6">
         <div className="mb-3 flex items-center justify-between">
-          <h3 className="text-base font-semibold text-ink">Transferir Saldo Sonríe</h3>
+          <h3 className="text-base font-semibold text-ink">Transferir Cashback</h3>
           <button onClick={onClose} className="flex h-7 w-7 items-center justify-center rounded-full text-ink/50 hover:bg-surface hover:text-ink">
             ✕
           </button>
         </div>
         <p className="mb-4 text-xs text-ink/50">
           {patientName} tiene <span className="font-semibold text-success">{formatCurrency(disponible)}</span> disponibles. La persona que lo recibe debe estar registrada como paciente; el
-          saldo le llega cuando lo apruebes.
+          cashback le llega cuando lo apruebes.
         </p>
         <label className="mb-1 block text-xs font-medium text-ink/60">Para quién</label>
         {destino ? (

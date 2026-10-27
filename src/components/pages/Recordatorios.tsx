@@ -3,6 +3,7 @@
 import { usePatientData } from "@/context/PatientDataContext";
 import { renderPlantilla, formatFechaLarga, formatHora12 } from "@/lib/formatosWhatsapp";
 import { formatFechaCita } from "@/lib/patientData";
+import { lineaCashbackRecordatorio } from "@/lib/cashbackTextos";
 
 function WhatsAppIcon() {
   return (
@@ -30,7 +31,7 @@ function enDias(dias: number) {
 }
 
 export default function Recordatorios() {
-  const { citas, patients, clinicInfo, formatosWhatsapp } = usePatientData();
+  const { citas, patients, clinicInfo, formatosWhatsapp, saldoCashbackDe, cashbackConfig } = usePatientData();
   const desde = hoyISO();
   const hasta = enDias(7);
 
@@ -50,7 +51,7 @@ export default function Recordatorios() {
       hora: formatHora12(cita.horaInicio),
       procedimiento: cita.tratamientos.join(", ") || "su tratamiento",
       costo: cita.costo?.trim() || "por confirmar",
-    });
+    }) + (cita.patientId ? lineaCashbackRecordatorio(saldoCashbackDe(cita.patientId), cashbackConfig) : "");
     window.open(`https://wa.me/${telefono}?text=${encodeURIComponent(texto)}`, "_blank");
   };
 

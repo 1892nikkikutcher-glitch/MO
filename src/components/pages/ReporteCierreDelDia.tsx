@@ -5,6 +5,7 @@ import { usePatientData } from "@/context/PatientDataContext";
 import { armarCierre, duracionLegible, fechaLargaConDia, siguienteDiaDeAtencion, textoDelCierre, type CitaDelCierre } from "@/lib/cierreDelDia";
 import { sumarDias } from "@/lib/evaluacionSemanal";
 import { generarCierreDelDiaPdf } from "@/lib/generarCierreDelDiaPdf";
+import { lineaCashbackRecordatorio } from "@/lib/cashbackTextos";
 import { descargarBlob } from "@/lib/pdfDocumento";
 import { formatFechaLarga, formatHora12, plantillaConUbicacion, renderPlantilla, ubicacionParaMensaje } from "@/lib/formatosWhatsapp";
 
@@ -24,7 +25,7 @@ function Tarjeta({ titulo, valor, detalle, tono }: { titulo: string; valor: stri
 }
 
 export default function ReporteCierreDelDia() {
-  const { citas, setCitas, recursos, sedes, patients, laboratoriosPendientes, saldosPendientes, clinicInfo, formatosWhatsapp, perfilDoctor } = usePatientData();
+  const { citas, setCitas, recursos, sedes, patients, laboratoriosPendientes, saldosPendientes, clinicInfo, formatosWhatsapp, perfilDoctor, saldoCashbackDe, cashbackConfig } = usePatientData();
   const [fecha, setFecha] = useState(() => siguienteDiaDeAtencion(hoyISO(), recursos, citas));
   const [copiado, setCopiado] = useState(false);
   const [generandoPdf, setGenerandoPdf] = useState(false);
@@ -101,7 +102,7 @@ export default function ReporteCierreDelDia() {
       hora: formatHora12(c.horaInicio),
       procedimiento: c.motivo || "su tratamiento",
       costo: original?.costo?.trim() || "por confirmar",
-    });
+    }) + (c.patientId ? lineaCashbackRecordatorio(saldoCashbackDe(c.patientId), cashbackConfig) : "");
     window.open(`https://wa.me/${numero}?text=${encodeURIComponent(mensaje)}`, "_blank");
   };
 

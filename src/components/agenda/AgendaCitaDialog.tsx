@@ -26,6 +26,7 @@ import {
   type SavedBudget,
   type UnidadSeguimiento,
 } from "@/lib/patientData";
+import { lineaCashbackRecordatorio } from "@/lib/cashbackTextos";
 import { renderPlantilla, formatFechaLarga, formatHora12, plantillaConUbicacion, ubicacionParaMensaje } from "@/lib/formatosWhatsapp";
 import {
   PRESETS_INTERVALO,
@@ -124,6 +125,8 @@ export default function AgendaCitaDialog({
     miUid,
     userEmail,
     sedes,
+    saldoCashbackDe,
+    cashbackConfig,
   } = usePatientData();
   const medicos = recursos.filter((r) => r.tipo === "medico");
   const unidades = recursos.filter((r) => r.tipo === "unidad");
@@ -404,7 +407,7 @@ export default function AgendaCitaDialog({
       hora: formatHora12(horaInicio),
       procedimiento: tratamientos.join(", ") || "su tratamiento",
       costo: costo.trim() || "por confirmar",
-    });
+    }) + (patientId ? lineaCashbackRecordatorio(saldoCashbackDe(patientId), cashbackConfig) : "");
     window.open(`https://wa.me/${telefonoLimpio}?text=${encodeURIComponent(texto)}`, "_blank");
   };
 

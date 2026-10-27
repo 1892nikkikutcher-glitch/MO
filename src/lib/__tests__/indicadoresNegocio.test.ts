@@ -391,7 +391,7 @@ describe("flujo de efectivo y cashback", () => {
     const e = base({
       finanzas: {
         ...base().finanzas,
-        porFechaYFormaPago: { "2026-10-05": { Efectivo: 15000, "Saldo Sonríe": 5000 }, "2026-10-12": { Tarjeta: 30000 } },
+        porFechaYFormaPago: { "2026-10-05": { Efectivo: 15000, "Cashback": 5000 }, "2026-10-12": { Tarjeta: 30000 } },
       },
     });
     const f = calcularIndicadores(e).finanzas;

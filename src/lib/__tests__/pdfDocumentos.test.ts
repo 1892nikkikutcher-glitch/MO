@@ -254,7 +254,7 @@ describe("corte de caja en PDF", () => {
     fecha: "2026-10-20",
     cobrosBrutos: 6000,
     devoluciones: 500,
-    formas: [["Efectivo", 4000], ["Tarjeta de débito", 1500], ["Saldo Sonríe", 500]] as [string, number][],
+    formas: [["Efectivo", 4000], ["Tarjeta de débito", 1500], ["Cashback", 500]] as [string, number][],
     metodosDevolucion: [["Efectivo", 500]] as [string, number][],
     medicos: [{ nombre: "Dra. Ana", monto: 4000, porcentajeComision: 30 }, { nombre: "Dr. Luis", monto: 2000, porcentajeComision: null }],
     ultimosDias: [["2026-10-20", 6000], ["2026-10-19", 3000]] as [string, number][],

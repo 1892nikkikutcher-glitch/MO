@@ -20,7 +20,7 @@ function diasHasta(iso: string): number {
 
 type FormConfig = { activo: boolean; porcentaje: string; vigenciaMeses: string; transferible: boolean; porcentajeMaxCanje: string; topeCanjePorVisita: string; saldoMaximo: string; liberarSiguienteDia: boolean };
 
-/** Módulo Saldo Sonríe: configuración del programa, saldo por aprobar, saldos por paciente, saldos por vencer y términos para el paciente. */
+/** Módulo Cashback: configuración del programa, saldo por aprobar, saldos por paciente, saldos por vencer y términos para el paciente. */
 export default function Cashback() {
   const { miRol, cashbackConfig, setCashbackConfig, cashbackMovimientos, patients, irAExpediente, clinicInfo } = usePatientData();
   const [form, setForm] = useState<FormConfig>({
@@ -77,7 +77,7 @@ export default function Cashback() {
   const terminos = useMemo(() => terminosCashback(cashbackConfig), [cashbackConfig]);
 
   if (miRol !== "admin") {
-    return <div className="rounded-2xl border border-edge/10 bg-surface p-10 text-center text-sm text-ink/50">El Saldo Sonríe lo administra el administrador de la clínica.</div>;
+    return <div className="rounded-2xl border border-edge/10 bg-surface p-10 text-center text-sm text-ink/50">El Cashback lo administra el administrador de la clínica.</div>;
   }
 
   const cambiar = (cambios: Partial<FormConfig>) => {
@@ -131,9 +131,9 @@ export default function Cashback() {
   return (
     <div className="space-y-6">
       <div className="rounded-2xl border border-edge/10 bg-surface p-6">
-        <h3 className="text-sm font-semibold uppercase tracking-wide text-ink/60">Programa Saldo Sonríe</h3>
+        <h3 className="text-sm font-semibold uppercase tracking-wide text-ink/60">Programa Cashback</h3>
         <p className="mt-1 text-xs text-ink/40">
-          Un porcentaje de lo que el paciente paga en sus tratamientos vuelve como saldo para su siguiente tratamiento. Cada saldo ganado te llega aquí para aprobarlo, rechazarlo o cambiar su
+          Un porcentaje de lo que el paciente paga en sus tratamientos vuelve como saldo para su siguiente tratamiento. Cada cashback ganado te llega aquí para aprobarlo, rechazarlo o cambiar su
           monto antes de que el paciente pueda usarlo.
         </p>
 
@@ -145,7 +145,7 @@ export default function Cashback() {
               <input type="number" min={0} max={100} step="0.5" value={form.porcentaje} onChange={(e) => cambiar({ porcentaje: e.target.value })} className={inputClass} />
               <span className="text-sm text-ink/60">%</span>
             </div>
-            <p className="mt-1 text-[11px] text-ink/40">Por cada $1,000 efectivamente pagados, {formatCurrency(ejemplo)} de Saldo Sonríe.</p>
+            <p className="mt-1 text-[11px] text-ink/40">Por cada $1,000 efectivamente pagados, {formatCurrency(ejemplo)} de Cashback.</p>
           </div>
           <div>
             <label className="mb-1 block text-xs font-medium text-ink/60">Saldo máximo acumulable ($)</label>
@@ -155,7 +155,7 @@ export default function Cashback() {
           <div>
             <label className="mb-1 block text-xs font-medium text-ink/60">Vigencia del saldo (meses)</label>
             <input type="number" min={0} step="1" value={form.vigenciaMeses} onChange={(e) => cambiar({ vigenciaMeses: e.target.value })} className={inputClass} />
-            <p className="mt-1 text-[11px] text-ink/40">Cuenta desde que ganó el saldo. 0 = no vence.</p>
+            <p className="mt-1 text-[11px] text-ink/40">Cuenta desde que ganó el cashback. 0 = no vence.</p>
           </div>
         </div>
 
@@ -191,7 +191,7 @@ export default function Cashback() {
         </div>
 
         <p className="mt-4 text-[11px] text-ink/40">
-          Genera saldo solo lo pagado en tratamientos (no membresías) y lo pagado con Saldo Sonríe no genera más. Para promociones, cortesías o tarifas especiales, marca la casilla «Promoción, cortesía o tarifa especial» al
+          Genera cashback solo lo pagado en tratamientos (no membresías) y lo pagado con Cashback no genera más. Para promociones, cortesías o tarifas especiales, marca la casilla «Promoción, cortesía o tarifa especial» al
           registrar el pago. Si un tratamiento incluye laboratorio, cambia el monto al aprobarlo para que cuente solo los honorarios clínicos. Un cambio de reglas aplica a los pagos nuevos; el saldo ya
           generado conserva su monto.
         </p>
@@ -227,7 +227,7 @@ export default function Cashback() {
           Por aprobar {pendientes.length > 0 && <span className="ml-1 rounded-full bg-warning/20 px-2 py-0.5 text-[11px] text-warning">{pendientes.length}</span>}
         </h3>
         {pendientes.length === 0 ? (
-          <p className="py-6 text-center text-sm text-ink/40">No hay saldo ni transferencias esperando tu decisión.</p>
+          <p className="py-6 text-center text-sm text-ink/40">No hay cashback ni transferencias esperando tu decisión.</p>
         ) : (
           <ul className="mt-2">
             {pendientes.map((m) => (
@@ -272,7 +272,7 @@ export default function Cashback() {
           </span>
         </div>
         {saldos.length === 0 ? (
-          <p className="py-6 text-center text-sm text-ink/40">Nadie tiene Saldo Sonríe todavía.</p>
+          <p className="py-6 text-center text-sm text-ink/40">Nadie tiene Cashback todavía.</p>
         ) : (
           <div className="mt-3 overflow-x-auto">
             <table className="w-full text-left text-sm">
@@ -289,7 +289,7 @@ export default function Cashback() {
                 {saldos.map((s) => (
                   <tr key={s.id} className="border-b border-edge/5 last:border-0">
                     <td className="py-2">
-                      <button onClick={() => irAExpediente(s.id, "Saldo Sonríe")} className="text-left font-medium text-ink/80 underline decoration-ink/20 underline-offset-2 hover:text-accent">
+                      <button onClick={() => irAExpediente(s.id, "Cashback")} className="text-left font-medium text-ink/80 underline decoration-ink/20 underline-offset-2 hover:text-accent">
                         {s.nombre || "Paciente"}
                       </button>
                     </td>

@@ -293,7 +293,7 @@ describe("título del total (día de la semana y semana del año)", () => {
 describe("reparto por doctor", () => {
   const mapa = {
     "2026-10-05": { "Dra. Ana": { Efectivo: 1000, "Tarjeta de débito": 2000 }, "Dr. Luis": { Efectivo: 500 } },
-    "2026-10-12": { "Dra. Ana": { Transferencia: 1500, "Saldo Sonríe": 300 }, "Dr. Luis": { "Tarjeta de crédito": 2500 } },
+    "2026-10-12": { "Dra. Ana": { Transferencia: 1500, "Cashback": 300 }, "Dr. Luis": { "Tarjeta de crédito": 2500 } },
     "2026-09-30": { "Dra. Ana": { Efectivo: 9999 } },
   };
   const desde = new Date("2026-10-01T00:00:00");
@@ -307,10 +307,10 @@ describe("reparto por doctor", () => {
     ]);
   });
 
-  it("lo pagado con Saldo Sonríe no es dinero que entró: no se reparte", () => {
+  it("lo pagado con Cashback no es dinero que entró: no se reparte", () => {
     const ana = sumarRangoPorMedico(mapa, desde, hasta).find((m) => m.medico === "Dra. Ana")!;
     expect(ana.efectivo + ana.electronico).toBe(4500);
-    expect(sumarRangoPorFormaPago({ "2026-10-12": { Efectivo: 100, "Saldo Sonríe": 300 } }, desde, hasta)).toEqual({ efectivo: 100, electronico: 0 });
+    expect(sumarRangoPorFormaPago({ "2026-10-12": { Efectivo: 100, "Cashback": 300 } }, desde, hasta)).toEqual({ efectivo: 100, electronico: 0 });
   });
 
   it("la suma de los doctores iguala el total cuando el desglose está completo, y avisa cuando no", () => {

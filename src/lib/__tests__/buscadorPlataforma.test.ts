@@ -6,7 +6,7 @@ const menu: ItemMenu[] = [
   { id: "inicio", label: "Inicio" },
   { id: "pacientes", label: "Pacientes" },
   { id: "agenda", label: "Agenda" },
-  { id: "cashback", label: "Saldo Sonríe" },
+  { id: "cashback", label: "Cashback" },
   { id: "membresias", label: "Membresías" },
   {
     id: "reportes",

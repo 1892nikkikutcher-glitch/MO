@@ -1,5 +1,5 @@
 import { ConstructorPdf, dineroPdf, fechaPdf, nombreArchivoPdf, porcentajePdf } from "./pdfDocumento";
-import { FORMA_PAGO_CASHBACK } from "./cashback";
+import { esFormaPagoCashback } from "./cashback";
 
 export type DatosCorteCajaPdf = {
   /** "Corte de caja" (por defecto) o "Corte diario": el mismo documento, con otro título y nombre de archivo. */
@@ -68,8 +68,8 @@ export async function generarCorteCajaPdf(datos: DatosCorteCajaPdf): Promise<{ b
           : "No hay pagos registrados en esta fecha.",
     }
   );
-  if (datos.formas.some(([forma]) => forma === FORMA_PAGO_CASHBACK)) {
-    pdf.parrafo("Lo pagado con Saldo Sonríe cuenta como venta, pero no es dinero que entró a caja.", { gris: true, tamano: 8.5 });
+  if (datos.formas.some(([forma]) => esFormaPagoCashback(forma))) {
+    pdf.parrafo("Lo pagado con Cashback cuenta como venta, pero no es dinero que entró a caja.", { gris: true, tamano: 8.5 });
   }
 
   // ----- Devoluciones -----

@@ -6,7 +6,7 @@
 import { redondearDinero } from "./dinero";
 import { MESES_ABR, addDays, addMonths } from "./agendaHelpers";
 import { inicioSemana } from "./metas";
-import { FORMA_PAGO_CASHBACK } from "./cashback";
+import { esFormaPagoCashback } from "./cashback";
 
 export type FondoAsignacion = { label: string; porcentaje: number };
 
@@ -74,7 +74,7 @@ export function sumarRangoPorFormaPago(
     const d = new Date(`${fecha}T00:00:00`);
     if (d < desde || d > hasta) return;
     Object.entries(porForma).forEach(([forma, monto]) => {
-      if (forma === FORMA_PAGO_CASHBACK) return; // lo pagado con Saldo Sonríe no es dinero que entró: no se reparte
+      if (esFormaPagoCashback(forma)) return; // lo pagado con Cashback no es dinero que entró: no se reparte
       if (forma === "Efectivo") efectivo += monto;
       else electronico += monto;
     });
@@ -116,7 +116,7 @@ export function sumarRangoPorMedico(
       const clave = claveMedico(medico);
       const actual = acumulado.get(clave) ?? { efectivo: 0, electronico: 0, variantes: new Map<string, number>() };
       Object.entries(porForma).forEach(([forma, monto]) => {
-        if (forma === FORMA_PAGO_CASHBACK) return;
+        if (esFormaPagoCashback(forma)) return;
         if (forma === "Efectivo") actual.efectivo += monto;
         else actual.electronico += monto;
         actual.variantes.set(medico, (actual.variantes.get(medico) ?? 0) + monto);

@@ -214,7 +214,7 @@ describe("seguir a los pagos", () => {
     expect(sincronizarCashbackConPagos(movs, "p1", "Ana", [p], [p], config, AHORA)).toBe(movs);
   });
 
-  it("la configuración inicial viene apagada con las reglas del Saldo Sonríe", () => {
+  it("la configuración inicial viene apagada con las reglas del Cashback", () => {
     expect(cashbackConfigInicial).toEqual({
       activo: false,
       porcentaje: 5,
@@ -241,7 +241,7 @@ describe("seguir a los pagos", () => {
   });
 });
 
-describe("reglas del Saldo Sonríe", () => {
+describe("reglas del Cashback", () => {
   it("el saldo aplicable es el menor entre saldo, 20% de la atención y $500 por visita", () => {
     // Ejemplo: $400 en el monedero, tratamiento de $1,000 -> solo $200.
     expect(montoMaximoCanje(400, 1000, cashbackConfigInicial)).toBe(200);
@@ -286,5 +286,16 @@ describe("reglas del Saldo Sonríe", () => {
     const pendiente = mov({ id: "cb-p1", estado: "pendiente", monto: 50, montoCalculado: 50, pagoId: "p1" });
     expect(revertirCashbackPorDevolucion([pendiente], "p1", 1000, 1000, AHORA)).toEqual([]);
     expect(revertirCashbackPorDevolucion([g], "otro", 100, 1000, AHORA)).toEqual([g]);
+  });
+});
+
+describe("pagos guardados con el nombre anterior de la forma de pago", () => {
+  it("un pago hecho con 'Saldo Sonríe' sigue sin generar cashback ni repartirse como dinero", async () => {
+    const { esFormaPagoCashback } = await import("../cashback");
+    expect(esFormaPagoCashback("Cashback")).toBe(true);
+    expect(esFormaPagoCashback("Saldo Sonríe")).toBe(true);
+    expect(esFormaPagoCashback("Efectivo")).toBe(false);
+    const viejo = pago("v", "20/10/2026", [{ monto: 300 }], "Saldo Sonríe");
+    expect(baseCashbackDePago(viejo)).toBe(0);
   });
 });

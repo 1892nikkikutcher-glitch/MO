@@ -88,7 +88,7 @@ const expedienteTabs = [
   "Plan de Tratamiento y Presupuesto",
   "Pagos",
   "Membresía",
-  "Saldo Sonríe",
+  "Cashback",
   "Fotografías",
   "Laboratorios",
   "Listado de Citas",
@@ -1179,7 +1179,7 @@ export default function Expediente({
 
   useEffect(() => {
     if (activeTab === "Pagos" && !puedeVerFinanzas) setActiveTab(expedienteTabs[0]);
-    if (activeTab === "Saldo Sonríe" && miRol !== "admin") setActiveTab(expedienteTabs[0]);
+    if (activeTab === "Cashback" && miRol !== "admin") setActiveTab(expedienteTabs[0]);
   }, [activeTab, puedeVerFinanzas, miRol]);
 
   // Carrusel de pestañas con movimiento perpetuo, como un anuncio: se
@@ -1352,7 +1352,7 @@ export default function Expediente({
     window.open(`https://wa.me/${telefono}?text=${encodeURIComponent(texto)}`, "_blank");
   };
 
-  const tabsVisibles = expedienteTabs.filter((tab) => (tab !== "Pagos" || puedeVerFinanzas) && (tab !== "Saldo Sonríe" || miRol === "admin"));
+  const tabsVisibles = expedienteTabs.filter((tab) => (tab !== "Pagos" || puedeVerFinanzas) && (tab !== "Cashback" || miRol === "admin"));
 
   return (
     <div className="space-y-6">
@@ -1659,7 +1659,7 @@ export default function Expediente({
               )}
             </div>
           )}
-          {activeTab === "Saldo Sonríe" && <CashbackPaciente patientId={patient.id} patientName={patient.name} />}
+          {activeTab === "Cashback" && <CashbackPaciente patientId={patient.id} patientName={patient.name} />}
           {activeTab === "Laboratorios" && <Laboratorios patientId={patient.id} />}
           {activeTab === "Notas de Evolución y Seguimiento" && (
             <NotasEvolucionTab patientId={patient.id} citaId={initialCitaId} />
@@ -1687,7 +1687,7 @@ export default function Expediente({
             activeTab !== "Fotografías" &&
             activeTab !== "Pagos" &&
             activeTab !== "Membresía" &&
-            activeTab !== "Saldo Sonríe" &&
+            activeTab !== "Cashback" &&
             activeTab !== "Consentimientos Informados" &&
             activeTab !== "Laboratorios" &&
             activeTab !== "Notas de Evolución y Seguimiento" &&

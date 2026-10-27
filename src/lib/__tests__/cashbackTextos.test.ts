@@ -44,7 +44,7 @@ describe("mensaje de saldo", () => {
 
   it("si no tiene saldo, le cuenta cómo acumular", () => {
     const m = mensajeSaldoWhatsApp({ paciente: "Ana", clinica: "X", saldo: { disponible: 0, porLiberar: 0, proximoAVencer: null }, config: cashbackConfigInicial });
-    expect(m).toContain("no tienes Saldo Sonríe");
+    expect(m).toContain("no tienes Cashback");
     expect(m).toContain("5%");
   });
 
@@ -52,5 +52,23 @@ describe("mensaje de saldo", () => {
     const m = mensajeSaldoWhatsApp({ paciente: "Ana", clinica: "X", saldo: { disponible: 0, porLiberar: 40, proximoAVencer: null }, config: cashbackConfigInicial });
     expect(m).toContain("$40");
     expect(m).toContain("a partir de mañana");
+  });
+});
+
+describe("cashback en el recordatorio de la cita", () => {
+  it("avisa cuánto tiene (contando lo que se libera mañana), lo que puede usar y cuándo vence", async () => {
+    const { lineaCashbackRecordatorio } = await import("../cashbackTextos");
+    const linea = lineaCashbackRecordatorio({ disponible: 100, porLiberar: 60, proximoAVencer: { fecha: "2027-10-26", monto: 160 } }, cashbackConfigInicial);
+    expect(linea.startsWith("\n\n")).toBe(true);
+    expect(linea).toContain("*$160*");
+    expect(linea).toContain("cashback");
+    expect(linea).toContain("hasta 20% de tu atención");
+    expect(linea).toContain("$500 por visita");
+    expect(linea).toContain("26 de octubre de 2027");
+  });
+
+  it("si no tiene saldo no agrega nada", async () => {
+    const { lineaCashbackRecordatorio } = await import("../cashbackTextos");
+    expect(lineaCashbackRecordatorio({ disponible: 0, porLiberar: 0, proximoAVencer: null }, cashbackConfigInicial)).toBe("");
   });
 });

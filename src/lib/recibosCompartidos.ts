@@ -17,7 +17,7 @@ export const reciboCompartidoSchema = z
     clinicaNombre: texto(200),
     logoClinicaUrl: texto(2000).default(""),
     direccionClinica: texto(1000).default(""),
-    /** Próxima cita y saldo de Saldo Sonríe, que van al pie del recibo. */
+    /** Próxima cita y saldo de Cashback, que van al pie del recibo. */
     notaPie: texto(1000).default(""),
     pago: z
       .object({

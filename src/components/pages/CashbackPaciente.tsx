@@ -13,7 +13,7 @@ export default function CashbackPaciente({ patientId, patientName }: { patientId
   const [transfiriendo, setTransfiriendo] = useState(false);
 
   if (miRol !== "admin") {
-    return <div className="rounded-2xl border border-edge/10 bg-surface p-10 text-center text-sm text-ink/50">El Saldo Sonríe solo lo ve y lo administra el administrador de la clínica.</div>;
+    return <div className="rounded-2xl border border-edge/10 bg-surface p-10 text-center text-sm text-ink/50">El Cashback solo lo ve y lo administra el administrador de la clínica.</div>;
   }
 
   const saldo = saldoCashbackDe(patientId);
@@ -27,15 +27,15 @@ export default function CashbackPaciente({ patientId, patientName }: { patientId
   return (
     <div className="space-y-5">
       <div className="flex flex-wrap items-center justify-between gap-2">
-        <h3 className="text-sm font-semibold uppercase tracking-wide text-ink/60">Saldo Sonríe</h3>
+        <h3 className="text-sm font-semibold uppercase tracking-wide text-ink/60">Cashback</h3>
         <button onClick={() => irAPagina("cashback")} className="text-xs font-semibold text-accent hover:underline">
-          Ir al módulo Saldo Sonríe
+          Ir al módulo Cashback
         </button>
       </div>
 
       {!cashbackConfig.activo && (
         <p className="rounded-lg border border-warning/30 bg-warning/10 px-3 py-2 text-xs text-warning">
-          El programa Saldo Sonríe está apagado, así que los pagos nuevos no generan saldo. Se activa en el módulo Saldo Sonríe; lo que ya se ganó sigue disponible.
+          El programa Cashback está apagado, así que los pagos nuevos no generan cashback. Se activa en el módulo Cashback; lo que ya se ganó sigue disponible.
         </p>
       )}
 
@@ -44,7 +44,7 @@ export default function CashbackPaciente({ patientId, patientName }: { patientId
           <div className="text-[11px] uppercase tracking-wide text-ink/40">Disponible</div>
           <div className="mt-1 text-xl font-bold text-success">{formatCurrency(saldo.disponible)}</div>
           <div className="mt-0.5 text-[11px] text-ink/50">
-            {saldo.porLiberar > 0 ? `+ ${formatCurrency(saldo.porLiberar)} que se libera mañana · ` : ""}Se usa como forma de pago: Saldo Sonríe
+            {saldo.porLiberar > 0 ? `+ ${formatCurrency(saldo.porLiberar)} que se libera mañana · ` : ""}Se usa como forma de pago: Cashback
           </div>
         </div>
         <div className="rounded-xl border border-edge/10 bg-inset p-4">
@@ -87,7 +87,7 @@ export default function CashbackPaciente({ patientId, patientName }: { patientId
       <div className="rounded-2xl border border-edge/10 bg-surface p-5">
         <h4 className="mb-1 text-xs font-semibold uppercase tracking-wide text-ink/40">Movimientos</h4>
         {movimientos.length === 0 ? (
-          <p className="py-6 text-center text-sm text-ink/40">Todavía no hay movimientos de Saldo Sonríe para este paciente.</p>
+          <p className="py-6 text-center text-sm text-ink/40">Todavía no hay movimientos de Cashback para este paciente.</p>
         ) : (
           <ul>
             {movimientos.map((m) => (
