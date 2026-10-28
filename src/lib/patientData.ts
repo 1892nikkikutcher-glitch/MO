@@ -317,6 +317,9 @@ export type FotoPaciente = {
   tipo?: string;
   /** Solo en radiografías: nota breve de quien la subió (hasta 300 caracteres). */
   nota?: string;
+  /** Solo en fotografías intraorales: superior, inferior, derecha, izquierda, anterior o acercamiento (ver
+   * lib/fotosIntraorales.ts). Ausente = subida antes de las vistas, sin clasificar. */
+  vista?: string;
 };
 
 /** Documento `users/{clinicUid}/pacientes/{patientId}/fotos/datos` — solo

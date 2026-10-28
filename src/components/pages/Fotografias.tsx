@@ -5,6 +5,15 @@ import ConfirmarEliminar from "@/components/ConfirmarEliminar";
 import { usePatientData } from "@/context/PatientDataContext";
 import { fotosVacias, type FotoPaciente } from "@/lib/patientData";
 import { subirFotoPaciente } from "@/lib/fotosPaciente";
+import {
+  conVista,
+  esVistaIntraoral,
+  fotosDeVista,
+  fotosSinClasificar,
+  VISTAS_INTRAORALES,
+  vistasCompletadas,
+  type VistaIntraoral,
+} from "@/lib/fotosIntraorales";
 import { archivarYQuitarFoto } from "@/lib/papeleraFirestore";
 import type { CampoFoto } from "@/lib/papelera";
 import { MENSAJE_ROL_SIN_PERMISO_ELIMINAR } from "@/lib/permisosRol";
@@ -527,6 +536,239 @@ function RadiografiasCard({
   );
 }
 
+/** Serie intraoral: seis vistas fijas (superior, inferior, derecha, izquierda, anterior y acercamiento). Cada vista
+ * muestra su foto más reciente; al subir otra queda la anterior como historial (para comparar antes y después). Las
+ * fotos subidas antes de que existieran las vistas aparecen aparte, "sin clasificar", y se asignan con un selector. */
+function IntraoralesCard({
+  fotos,
+  onAdd,
+  onAsignar,
+  onRemove,
+}: {
+  fotos: FotoPaciente[];
+  onAdd: (files: File[], vista: VistaIntraoral) => Promise<void>;
+  onAsignar: (foto: FotoPaciente, vista: VistaIntraoral) => void;
+  onRemove: (foto: FotoPaciente) => void;
+}) {
+  const [subiendoVista, setSubiendoVista] = useState<VistaIntraoral | null>(null);
+  const [error, setError] = useState("");
+  const [fotoAEliminar, setFotoAEliminar] = useState<FotoPaciente | null>(null);
+  const [anterioresAbiertas, setAnterioresAbiertas] = useState<Partial<Record<VistaIntraoral, boolean>>>({});
+  const sinClasificar = fotosSinClasificar(fotos);
+  const completadas = vistasCompletadas(fotos);
+
+  const subir = async (files: File[], vista: VistaIntraoral) => {
+    if (files.length === 0) return;
+    setSubiendoVista(vista);
+    setError("");
+    try {
+      await onAdd(files, vista);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "No se pudieron subir las fotos.");
+    } finally {
+      setSubiendoVista(null);
+    }
+  };
+
+  const fechaCorta = (iso: string) => {
+    const d = new Date(iso);
+    return Number.isNaN(d.getTime()) ? "" : d.toLocaleDateString("es-MX", { day: "2-digit", month: "short", year: "numeric" });
+  };
+
+  const entradaArchivo = (vista: VistaIntraoral) => (
+    <input
+      type="file"
+      accept="image/*"
+      multiple={vista === "acercamiento"}
+      className="sr-only"
+      disabled={subiendoVista !== null}
+      onChange={(e) => {
+        // Copia a un arreglo antes de limpiar el input (la FileList es la misma en vivo).
+        const files = e.target.files ? Array.from(e.target.files) : [];
+        e.target.value = "";
+        void subir(files, vista);
+      }}
+    />
+  );
+
+  return (
+    <div className="space-y-4 rounded-2xl border border-edge/10 bg-surface p-6">
+      <div className="flex items-start justify-between gap-3">
+        <div className="min-w-0 flex-1">
+          <h3 className="text-sm font-semibold uppercase tracking-wide text-ink/60">Fotografías Intraorales</h3>
+          <p className="mt-1 text-xs text-ink/40">
+            Serie de seis vistas. Al subir otra foto de una vista, la anterior queda como historial para comparar.
+          </p>
+        </div>
+        <span
+          className={`shrink-0 whitespace-nowrap rounded-full border px-3 py-1 text-xs font-semibold ${
+            completadas === VISTAS_INTRAORALES.length ? "border-success/40 bg-success/10 text-success" : "border-edge/15 text-ink/60"
+          }`}
+        >
+          {completadas} de {VISTAS_INTRAORALES.length} vistas
+        </span>
+      </div>
+
+      {error && <p className="text-xs text-danger">{error}</p>}
+
+      <div className="grid grid-cols-[repeat(auto-fill,minmax(180px,1fr))] gap-4">
+        {VISTAS_INTRAORALES.map((vista) => {
+          const deVista = fotosDeVista(fotos, vista.id);
+          const actual = deVista[0];
+          const anteriores = deVista.slice(1);
+          return (
+            <div key={vista.id} className="flex flex-col gap-2" data-vista={vista.id}>
+              <div className="flex items-baseline justify-between gap-2">
+                <span className="text-sm font-semibold text-ink">{vista.etiqueta}</span>
+                {actual && <span className="text-[11px] text-ink/40">{fechaCorta(actual.fecha)}</span>}
+              </div>
+              <div className="relative aspect-[4/3] overflow-hidden rounded-xl border border-edge/10 bg-inset">
+                {actual ? (
+                  <a href={actual.url} target="_blank" rel="noreferrer" title="Abrir imagen completa" className="block h-full w-full">
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img src={actual.url} alt={`Intraoral ${vista.etiqueta.toLowerCase()}`} className="h-full w-full object-cover" />
+                  </a>
+                ) : (
+                  <label className="flex h-full w-full cursor-pointer flex-col items-center justify-center gap-1 px-4 text-center text-ink/30 transition-colors hover:text-accent">
+                    <UploadIcon />
+                    <span className="text-xs font-medium">Falta esta vista</span>
+                    <span className="text-[11px] leading-snug text-ink/30">{vista.ayuda}</span>
+                    {entradaArchivo(vista.id)}
+                  </label>
+                )}
+                {subiendoVista === vista.id && (
+                  <div className="absolute inset-0 flex items-center justify-center bg-black/60 text-xs font-semibold text-white">Subiendo…</div>
+                )}
+              </div>
+              {actual && (
+                <div className="flex flex-wrap gap-2">
+                  <label
+                    className={`flex cursor-pointer items-center gap-2 rounded-lg border border-accent/40 px-3 py-1.5 text-xs font-semibold text-accent transition-colors hover:bg-accent/10 ${
+                      subiendoVista !== null ? "pointer-events-none opacity-50" : ""
+                    }`}
+                  >
+                    <UploadIcon />
+                    Nueva foto
+                    {entradaArchivo(vista.id)}
+                  </label>
+                  <a
+                    href={actual.url}
+                    download={actual.name}
+                    className="flex items-center gap-2 rounded-lg border border-edge/15 px-3 py-1.5 text-xs font-semibold text-ink/70 transition-colors hover:bg-surface"
+                  >
+                    <DownloadIcon />
+                    Descargar
+                  </a>
+                  <button
+                    onClick={() => setFotoAEliminar(actual)}
+                    className="flex items-center gap-2 rounded-lg border border-edge/15 px-3 py-1.5 text-xs font-semibold text-danger/80 transition-colors hover:bg-danger/10"
+                  >
+                    <TrashIcon />
+                    Quitar
+                  </button>
+                </div>
+              )}
+              {anteriores.length > 0 && (
+                <div>
+                  <button
+                    onClick={() => setAnterioresAbiertas((prev) => ({ ...prev, [vista.id]: !prev[vista.id] }))}
+                    className="text-xs text-ink/50 hover:text-accent"
+                  >
+                    {anterioresAbiertas[vista.id] ? "Ocultar" : "Ver"} anteriores ({anteriores.length})
+                  </button>
+                  {anterioresAbiertas[vista.id] && (
+                    <div className="mt-2 grid grid-cols-3 gap-2">
+                      {anteriores.map((foto) => (
+                        <div key={foto.id} className="space-y-1">
+                          <a
+                            href={foto.url}
+                            target="_blank"
+                            rel="noreferrer"
+                            title="Abrir imagen completa"
+                            className="block aspect-square overflow-hidden rounded-lg border border-edge/10 bg-inset"
+                          >
+                            {/* eslint-disable-next-line @next/next/no-img-element */}
+                            <img src={foto.url} alt={foto.name} className="h-full w-full object-cover" />
+                          </a>
+                          <div className="flex items-center justify-between gap-1 text-[10px] text-ink/40">
+                            <span>{fechaCorta(foto.fecha)}</span>
+                            <button onClick={() => setFotoAEliminar(foto)} title="Quitar" className="text-danger/70 hover:text-danger">
+                              <TrashIcon />
+                            </button>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+          );
+        })}
+      </div>
+
+      {sinClasificar.length > 0 && (
+        <div className="space-y-3 border-t border-edge/10 pt-4" data-sin-clasificar>
+          <div>
+            <h4 className="text-xs font-semibold uppercase tracking-wide text-ink/50">Sin clasificar ({sinClasificar.length})</h4>
+            <p className="mt-0.5 text-xs text-ink/40">
+              Se subieron antes de que existieran las seis vistas. Asigna cada una a la vista que le corresponde.
+            </p>
+          </div>
+          <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-4">
+            {sinClasificar.map((foto) => (
+              <div key={foto.id} className="space-y-1.5">
+                <a
+                  href={foto.url}
+                  target="_blank"
+                  rel="noreferrer"
+                  title="Abrir imagen completa"
+                  className="block aspect-square overflow-hidden rounded-xl border border-edge/10 bg-inset"
+                >
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img src={foto.url} alt={foto.name} className="h-full w-full object-cover" />
+                </a>
+                <div className="flex items-center gap-1.5">
+                  <select
+                    value=""
+                    onChange={(e) => {
+                      if (esVistaIntraoral(e.target.value)) onAsignar(foto, e.target.value);
+                    }}
+                    aria-label="Asignar a una vista"
+                    className="min-w-0 flex-1 rounded-lg border border-edge/10 bg-field px-2 py-1 text-xs text-ink outline-none focus:border-accent/60"
+                  >
+                    <option value="">Asignar a…</option>
+                    {VISTAS_INTRAORALES.map((v) => (
+                      <option key={v.id} value={v.id}>
+                        {v.etiqueta}
+                      </option>
+                    ))}
+                  </select>
+                  <button onClick={() => setFotoAEliminar(foto)} title="Quitar" className="shrink-0 text-danger/70 hover:text-danger">
+                    <TrashIcon />
+                  </button>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {fotoAEliminar && (
+        <ConfirmarEliminar
+          titulo="¿Quitar esta fotografía?"
+          mensaje="Quedará guardada en la Papelera por si necesitas recuperarla."
+          onCancel={() => setFotoAEliminar(null)}
+          onConfirm={() => {
+            onRemove(fotoAEliminar);
+            setFotoAEliminar(null);
+          }}
+        />
+      )}
+    </div>
+  );
+}
+
 export default function Fotografias({ patientId }: { patientId: string }) {
   const { clinicUid, fotosPorPaciente, setFotosPaciente, puedeEliminar } = usePatientData();
   const fotos = fotosPorPaciente[patientId] ?? fotosVacias;
@@ -629,15 +871,24 @@ export default function Fotografias({ patientId }: { patientId: string }) {
         onRemove={(foto) => quitarFoto("extraorales", foto)}
       />
 
-      <GalleryUploadCard
-        title="Fotografías Intraorales"
+      <IntraoralesCard
         fotos={fotos.intraorales}
-        onAdd={async (files) => {
+        onAdd={async (files, vista) => {
+          if (!clinicUid) throw new Error("No se pudo identificar la clínica.");
           const nuevas = await Promise.all(
-            files.map((file) => subirFotoPaciente(clinicUid!, patientId, "intraorales", file))
+            files.map(async (file) => ({
+              ...(await subirFotoPaciente(clinicUid, patientId, "intraorales", file, { maxLado: 2000 })),
+              vista,
+            }))
           );
           setFotosPaciente(patientId, (prev) => ({ ...prev, intraorales: [...prev.intraorales, ...nuevas] }));
         }}
+        onAsignar={(foto, vista) =>
+          setFotosPaciente(patientId, (prev) => ({
+            ...prev,
+            intraorales: prev.intraorales.map((f) => (f.id === foto.id ? conVista(f, vista) : f)),
+          }))
+        }
         onRemove={(foto) => quitarFoto("intraorales", foto)}
       />
 

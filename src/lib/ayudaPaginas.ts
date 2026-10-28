@@ -109,7 +109,8 @@ export const ayudaPaginas: Record<string, AyudaPagina> = {
     puntos: [
       "\"Subir foto\" abre la galería o cámara del dispositivo; una vez subida, \"Cambiar\" la reemplaza y \"Quitar\" la elimina (con confirmación).",
       "La sección de INE (Frente/Reverso) es para el documento de identidad del paciente, separada de las fotos clínicas.",
-      "Extraorales e Intraorales aceptan varias fotos a la vez y se pueden descargar individualmente.",
+      "Extraorales acepta varias fotos a la vez y se pueden descargar individualmente.",
+      "Intraorales es una serie de seis vistas: Superior, Inferior, Derecha, Izquierda, Anterior y Acercamiento. Cada una guarda su foto más reciente y, al subir otra, la anterior queda en \"Ver anteriores\" para comparar. Las fotos subidas antes quedan \"Sin clasificar\" hasta que las asignes a una vista.",
     ],
   },
   "pacientes-Laboratorios": {
