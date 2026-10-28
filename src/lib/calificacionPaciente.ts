@@ -65,3 +65,15 @@ export function detalleCalificacion(c: CalificacionPaciente): string {
   if (c.reagendadas > 0) partes.push(`${c.reagendadas} reagendó`);
   return partes.join(" · ");
 }
+
+/** Calificación puesta a mano por el doctor: de 0 a 5 en pasos de 0.5. Cualquier otra cosa (vacío, texto, NaN)
+ * cuenta como "sin calificación manual". */
+export function calificacionManualValida(valor: unknown): number | undefined {
+  if (typeof valor !== "number" || !Number.isFinite(valor)) return undefined;
+  return Math.max(0, Math.min(5, Math.round(valor * 2) / 2));
+}
+
+/** Las estrellas que se ven: la calificación manual si el doctor la puso; si no, la que sale de sus citas. */
+export function estrellasVisibles(automatica: CalificacionPaciente, manual?: number | null): number {
+  return calificacionManualValida(manual) ?? automatica.estrellas;
+}

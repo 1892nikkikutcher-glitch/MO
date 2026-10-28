@@ -60,6 +60,16 @@ export function mensajeSaldoWhatsApp(args: {
   return L.join(" ");
 }
 
+/** La línea con el saldo de cashback del paciente para el recibo de pago por WhatsApp (nada si no tiene). Cuenta lo ganado
+ * con este pago (que se libera para la siguiente visita) y lo dice aparte, para que el total no confunda. */
+export function lineaCashbackRecibo(saldo: Pick<SaldoCashback, "disponible" | "porLiberar" | "proximoAVencer">): string {
+  const total = saldo.disponible + saldo.porLiberar;
+  if (total <= 0) return "";
+  const ganado = saldo.porLiberar > 0 ? ` (incluye ${pesos(saldo.porLiberar)} ganados hoy, disponibles desde tu siguiente visita)` : "";
+  const vence = saldo.proximoAVencer ? ` Vence el ${fechaLarga(saldo.proximoAVencer.fecha)}.` : "";
+  return `\n\n💰 Tu saldo de cashback: *${pesos(total)}*${ganado}.${vence}`;
+}
+
 /** La línea que se agrega al recordatorio de una cita: cuánto cashback tiene el paciente para esa atención (nada si no tiene).
  * Cuenta lo que se libera mañana, porque para la próxima visita ya estará disponible. */
 export function lineaCashbackRecordatorio(saldo: Pick<SaldoCashback, "disponible" | "porLiberar" | "proximoAVencer">, config: CashbackConfig): string {

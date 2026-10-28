@@ -516,7 +516,7 @@ export default function Pacientes() {
               </td>
               <td className="px-6 py-4">
                 <div className="flex flex-wrap items-center gap-x-2.5 gap-y-1">
-                  <EstrellasPaciente citas={citasPorPaciente.get(p.id) ?? []} tamano={14} ocultarSinHistorial />
+                  <EstrellasPaciente citas={citasPorPaciente.get(p.id) ?? []} tamano={14} ocultarSinHistorial manual={p.calificacionManual} />
                   <button
                     onClick={() => setSelected(p)}
                     className="font-medium text-ink transition-colors hover:text-accent"

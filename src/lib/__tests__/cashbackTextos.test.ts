@@ -72,3 +72,20 @@ describe("cashback en el recordatorio de la cita", () => {
     expect(lineaCashbackRecordatorio({ disponible: 0, porLiberar: 0, proximoAVencer: null }, cashbackConfigInicial)).toBe("");
   });
 });
+
+describe("cashback en el recibo de pago por WhatsApp", () => {
+  it("dice el saldo total, lo ganado hoy aparte y cuándo vence", async () => {
+    const { lineaCashbackRecibo } = await import("../cashbackTextos");
+    const linea = lineaCashbackRecibo({ disponible: 100, porLiberar: 30, proximoAVencer: { fecha: "2027-10-26", monto: 130 } });
+    expect(linea.startsWith("\n\n")).toBe(true);
+    expect(linea).toContain("*$130*");
+    expect(linea).toContain("incluye $30 ganados hoy");
+    expect(linea).toContain("26 de octubre de 2027");
+  });
+
+  it("sin lo ganado hoy no menciona el paréntesis, y sin saldo no agrega nada", async () => {
+    const { lineaCashbackRecibo } = await import("../cashbackTextos");
+    expect(lineaCashbackRecibo({ disponible: 100, porLiberar: 0, proximoAVencer: null })).not.toContain("incluye");
+    expect(lineaCashbackRecibo({ disponible: 0, porLiberar: 0, proximoAVencer: null })).toBe("");
+  });
+});

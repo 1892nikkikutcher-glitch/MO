@@ -17,6 +17,7 @@ type PacienteMin = {
   fusionadoEnId?: string;
   recordatorioPrevencion?: boolean;
   horarioPreferente?: HorarioPreferente | null;
+  calificacionManual?: number;
 };
 type CitaMin = { patientId: string | null; fecha: string; estatus: string; canceladaTarde?: boolean };
 

@@ -1381,7 +1381,11 @@ export default function Expediente({
               <div>
                 <h2 className="text-xl font-semibold leading-tight text-ink sm:text-2xl">{formatNombreConEdad(patient.name, patient.birthDate)}</h2>
                 <div className="mt-1">
-                  <EstrellasPaciente citas={citasPaciente} />
+                  <EstrellasPaciente
+                    citas={citasPaciente}
+                    manual={patient.calificacionManual}
+                    onCambiar={(valor) => updatePatient(patient.id, { calificacionManual: valor ?? undefined })}
+                  />
                 </div>
               </div>
 

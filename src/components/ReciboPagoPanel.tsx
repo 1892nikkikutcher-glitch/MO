@@ -5,7 +5,8 @@ import { createPortal } from "react-dom";
 import { usePatientData } from "@/context/PatientDataContext";
 import AbrirWhatsAppPrompt from "@/components/AbrirWhatsAppPrompt";
 import { enviarPdfPorWhatsapp } from "@/lib/enviarPdfWhatsapp";
-import { buildProximaCitaTexto, formatosWhatsAppInicial, renderPlantilla } from "@/lib/formatosWhatsapp";
+import { lineaCashbackRecibo } from "@/lib/cashbackTextos";
+import { buildProximaCitaTexto, formatosWhatsAppInicial, plantillaConSaldoCashback, renderPlantilla } from "@/lib/formatosWhatsapp";
 import { crearEnlaceReciboApi } from "@/lib/recibosCompartidosApi";
 import { mensajeConEnlaceRecibo } from "@/lib/recibosCompartidos";
 import { generarReciboPagoPdf } from "@/lib/generarReciboPagoPdf";
@@ -16,6 +17,10 @@ type EstadoPdf =
   | { tipo: "generando" }
   | { tipo: "listo"; blob: Blob; url: string; nombre: string }
   | { tipo: "error" };
+
+/** La liga pública del recibo se crea de antemano (apenas el PDF está listo) para que "Compartir por WhatsApp" abra el
+ * chat en el mismo toque, ya con la liga dentro del mensaje. `no_aplica` = quien registra no es el administrador. */
+type EstadoEnlace = { tipo: "no_aplica" } | { tipo: "creando" } | { tipo: "listo"; enlace: string } | { tipo: "error" };
 
 /** El recibo de un pago, en dos tiempos: PRIMERO se genera el PDF (apenas se abre esto) y solo
  * DESPUÉS se puede verlo, imprimirlo o compartirlo — los botones actúan sobre el PDF ya listo.
@@ -40,7 +45,7 @@ export default function ReciboPagoPanel({
 }) {
   const { citas, patients, clinicInfo, formatosWhatsapp, perfilDoctor, saldoCashbackDe, cashbackConfig, clinicUid, miRol } = usePatientData();
   const [mensajeWa, setMensajeWa] = useState<string | undefined>(undefined);
-  const [creandoEnlace, setCreandoEnlace] = useState(false);
+  const [estadoEnlace, setEstadoEnlace] = useState<EstadoEnlace>({ tipo: "creando" });
   const [estado, setEstado] = useState<EstadoPdf>({ tipo: "generando" });
   const [intento, setIntento] = useState(0);
   const [waUrlPendiente, setWaUrlPendiente] = useState<string | null>(null);
@@ -55,6 +60,10 @@ export default function ReciboPagoPanel({
     return `Cashback: $${total.toLocaleString("es-MX", { maximumFractionDigits: 2 })}${vence}`;
   };
 
+  // Pie del recibo (próxima cita y saldo). El saldo de cashback llega por el listener un instante después de
+  // registrar el pago: por eso entra a las dependencias de abajo y el recibo se vuelve a armar con el saldo ya al día.
+  const notaPie = [buildProximaCitaTexto(citas, patientId, pago.fecha), textoSaldoCashback()].filter(Boolean).join("\n");
+
   // Genera el PDF al abrir y cada vez que el pago cambia (por ejemplo, al agregarle la firma).
   useEffect(() => {
     let cancelado = false;
@@ -65,7 +74,7 @@ export default function ReciboPagoPanel({
       pacienteNombre: patientName,
       clinicaNombre: clinicInfo?.nombre || "",
       perfilDoctor,
-      notaPie: [buildProximaCitaTexto(citas, patientId, pago.fecha), textoSaldoCashback()].filter(Boolean).join("\n"),
+      notaPie,
     })
       .then((blob) => {
         if (cancelado) return;
@@ -80,11 +89,55 @@ export default function ReciboPagoPanel({
       cancelado = true;
       if (url) URL.revokeObjectURL(url);
     };
-    // El recibo depende solo del pago; el resto (clínica, citas) es contexto de pie de página.
+    // El recibo depende del pago y de su pie; el resto (clínica) es contexto fijo.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [pago, intento]);
+  }, [pago, intento, notaPie]);
 
   const listo = estado.tipo === "listo" ? estado : null;
+  const urlPdf = listo?.url;
+
+  // Con el recibo ya armado, el administrador deja lista la liga pública para descargarlo (el paciente no necesita
+  // cuenta). Así el botón de WhatsApp no espera nada: abre el chat al instante con la liga ya en el mensaje.
+  useEffect(() => {
+    if (!urlPdf) return;
+    if (!clinicUid || miRol !== "admin") {
+      setEstadoEnlace({ tipo: "no_aplica" });
+      return;
+    }
+    let cancelado = false;
+    setEstadoEnlace({ tipo: "creando" });
+    crearEnlaceReciboApi({
+      clinicaId: clinicUid,
+      pacienteNombre: patientName,
+      clinicaNombre: clinicInfo?.nombre || "",
+      logoClinicaUrl: perfilDoctor.logoClinicaUrl || "",
+      direccionClinica: perfilDoctor.direccionClinica || "",
+      notaPie,
+      pago: {
+        id: pago.id,
+        fecha: pago.fecha,
+        medico: pago.medico,
+        formaPago: pago.formaPago,
+        total: pago.total,
+        facturar: pago.facturar,
+        // Una firma muy grande no viaja en la liga (el recibo sale igual, sin ella).
+        firma: pago.firma && pago.firma.length <= 400_000 ? pago.firma : null,
+        lineas: pago.lineas.map((l) => ({ id: l.id, label: l.label, monto: l.monto, tratamientoId: l.tratamientoId, folio: l.folio })),
+      },
+    })
+      .then(({ enlace }) => {
+        if (!cancelado) setEstadoEnlace({ tipo: "listo", enlace });
+      })
+      .catch((err) => {
+        console.error("No se pudo crear el enlace del recibo; se mandará el archivo", err);
+        if (!cancelado) setEstadoEnlace({ tipo: "error" });
+      });
+    return () => {
+      cancelado = true;
+    };
+    // Una liga por recibo armado: se rehace solo cuando el PDF se vuelve a generar (firma nueva, saldo al día).
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [urlPdf]);
 
   const descargar = () => {
     if (!listo) return;
@@ -102,8 +155,9 @@ export default function ReciboPagoPanel({
   };
 
   const compartirPorWhatsApp = async () => {
+    // El administrador espera a que la liga esté lista (es cosa de un instante); si falló, se manda el archivo.
     if (!listo) return;
-    const plantilla = formatosWhatsapp.reciboPago ?? formatosWhatsAppInicial.reciboPago;
+    const plantilla = plantillaConSaldoCashback(formatosWhatsapp.reciboPago ?? formatosWhatsAppInicial.reciboPago);
     const caption = renderPlantilla(plantilla, {
       clinica: clinicInfo?.nombre || "tu clínica",
       paciente: patientName,
@@ -113,42 +167,21 @@ export default function ReciboPagoPanel({
       conceptos: pago.lineas.map((l) => `- ${l.label}: ${formatCurrency(l.monto)}`).join("\n"),
       total: formatCurrency(pago.total),
       proximaCita: buildProximaCitaTexto(citas, patientId, pago.fecha),
+      saldoCashback: lineaCashbackRecibo(saldoCashbackDe(patientId)),
     });
     const telefono = patients.find((p) => p.id === patientId)?.phone;
 
-    // Lo normal: se manda una liga para descargar el recibo (el paciente no necesita cuenta). Solo el administrador la puede crear.
-    if (clinicUid && miRol === "admin") {
-      setCreandoEnlace(true);
-      try {
-        const { enlace } = await crearEnlaceReciboApi({
-          clinicaId: clinicUid,
-          pacienteNombre: patientName,
-          clinicaNombre: clinicInfo?.nombre || "",
-          logoClinicaUrl: perfilDoctor.logoClinicaUrl || "",
-          direccionClinica: perfilDoctor.direccionClinica || "",
-          notaPie: [buildProximaCitaTexto(citas, patientId, pago.fecha), textoSaldoCashback()].filter(Boolean).join("\n"),
-          pago: {
-            id: pago.id,
-            fecha: pago.fecha,
-            medico: pago.medico,
-            formaPago: pago.formaPago,
-            total: pago.total,
-            facturar: pago.facturar,
-            // Una firma muy grande no viaja en la liga (el recibo sale igual, sin ella).
-            firma: pago.firma && pago.firma.length <= 400_000 ? pago.firma : null,
-            lineas: pago.lineas.map((l) => ({ id: l.id, label: l.label, monto: l.monto, tratamientoId: l.tratamientoId, folio: l.folio })),
-          },
-        });
-        const numero = (telefono ?? "").replace(/\D/g, "");
-        const texto = mensajeConEnlaceRecibo(caption, enlace);
+    // Lo normal: el mensaje lleva la liga para descargar el recibo (el paciente no necesita cuenta). La liga ya está
+    // creada, así que el chat se abre en el mismo toque, sin esperas ni pasos de más.
+    if (estadoEnlace.tipo === "listo") {
+      const numero = (telefono ?? "").replace(/\D/g, "");
+      const waUrl = `https://wa.me/${numero}?text=${encodeURIComponent(mensajeConEnlaceRecibo(caption, estadoEnlace.enlace))}`;
+      if (!window.open(waUrl, "_blank")) {
+        // El navegador bloqueó la ventana: se ofrece el botón (un clic directo nunca lo bloquean).
         setMensajeWa("El enlace de tu recibo está listo — ábrelo en WhatsApp para enviarlo.");
-        setWaUrlPendiente(`https://wa.me/${numero}?text=${encodeURIComponent(texto)}`);
-        return;
-      } catch (err) {
-        console.error("No se pudo crear el enlace del recibo; se manda el archivo", err);
-      } finally {
-        setCreandoEnlace(false);
+        setWaUrlPendiente(waUrl);
       }
+      return;
     }
 
     try {
@@ -254,11 +287,11 @@ export default function ReciboPagoPanel({
           <button
             type="button"
             onClick={compartirPorWhatsApp}
-            disabled={!listo || creandoEnlace}
-            title="Manda por WhatsApp una liga para que el paciente descargue su recibo en PDF"
+            disabled={!listo || estadoEnlace.tipo === "creando"}
+            title="Abre WhatsApp con el mensaje y la liga para que el paciente descargue su recibo en PDF"
             className={`${boton} border-success/40 text-success hover:bg-success/10`}
           >
-            {creandoEnlace ? "Creando enlace…" : "Compartir por WhatsApp"}
+            {listo && estadoEnlace.tipo === "creando" ? "Preparando enlace…" : "Compartir por WhatsApp"}
           </button>
           <button
             type="button"

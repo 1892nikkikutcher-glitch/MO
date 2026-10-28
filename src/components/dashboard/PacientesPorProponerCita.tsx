@@ -43,7 +43,7 @@ export default function PacientesPorProponerCita() {
             <div key={item.paciente.id} className="space-y-2 py-3 first:pt-0 last:pb-0">
               <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1">
                 <div className="flex min-w-0 items-center gap-2">
-                  <EstrellasPaciente citas={citasDelPaciente} />
+                  <EstrellasPaciente citas={citasDelPaciente} manual={item.paciente.calificacionManual} />
                   <span className="truncate font-medium text-ink">{item.paciente.name}</span>
                 </div>
                 <span className={`text-xs ${item.vencida ? "text-warning" : "text-ink/50"}`}>

@@ -49,7 +49,7 @@ Forma de pago: {{formaPago}}
 
 {{conceptos}}
 
-*Total: {{total}}*{{proximaCita}}
+*Total: {{total}}*{{proximaCita}}{{saldoCashback}}
 
 ¡Gracias por su confianza!`,
 };
@@ -70,6 +70,14 @@ export function plantillaConUbicacion(plantilla: string, ubicacion: string): str
   const corte = plantilla.indexOf("\n\n");
   if (corte === -1) return `${plantilla}\n\n{{ubicacion}}`;
   return `${plantilla.slice(0, corte)}\n\n{{ubicacion}}${plantilla.slice(corte)}`;
+}
+
+/** Plantilla del recibo lista para rellenar: si la que tiene guardada la clínica no usa {{saldoCashback}} (las anteriores
+ * a esta variable no la tienen), el saldo se pone justo después de la próxima cita, o al final si tampoco la usa. */
+export function plantillaConSaldoCashback(plantilla: string): string {
+  if (plantilla.includes("{{saldoCashback}}")) return plantilla;
+  if (plantilla.includes("{{proximaCita}}")) return plantilla.split("{{proximaCita}}").join("{{proximaCita}}{{saldoCashback}}");
+  return `${plantilla.trimEnd()}{{saldoCashback}}`;
 }
 
 export function renderPlantilla(plantilla: string, vars: Record<string, string>): string {

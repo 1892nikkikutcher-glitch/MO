@@ -781,7 +781,12 @@ export default function AgendaCitaDialog({
             {patientId ? (
               <div className="flex items-center justify-between rounded-lg border border-success/30 bg-success/10 px-3 py-2 text-sm">
                 <span className="flex min-w-0 items-center gap-2 text-ink">
-                  <EstrellasPaciente citas={citas.filter((c) => c.patientId === patientId)} tamano={14} />
+                  <EstrellasPaciente
+                    citas={citas.filter((c) => c.patientId === patientId)}
+                    tamano={14}
+                    manual={patients.find((p) => p.id === patientId)?.calificacionManual}
+                    onCambiar={(valor) => updatePatient(patientId, { calificacionManual: valor ?? undefined })}
+                  />
                   <span className="truncate">
                     {edadPacienteSeleccionado ? `(${edadPacienteSeleccionado.years}) ${searchText}` : searchText}
                   </span>

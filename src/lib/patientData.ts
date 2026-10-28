@@ -10,6 +10,9 @@ export type Patient = {
   id: string;
   /** Cuándo le acomoda venir (días y hora), para saber cuándo proponerle una cita. `null` = sin preferencia. */
   horarioPreferente?: HorarioPreferente | null;
+  /** Estrellas puestas a mano por el doctor (0 a 5, de media en media). Ausente = se usa la calificación que
+   * sale de sus citas (ver lib/calificacionPaciente.ts). */
+  calificacionManual?: number;
   name: string;
   phone: string;
   email?: string;
@@ -313,9 +316,10 @@ export type FotoPaciente = {
   name: string;
   /** ISO datetime — cuándo se subió. */
   fecha: string;
-  /** Solo en radiografías: periapical, panorámica, etc. (ver lib/radiografias.ts). Ausente = sin especificar. */
+  /** Solo en radiografías y documentos: periapical, panorámica, estudio de laboratorio, etc. (ver lib/radiografias.ts y
+   * lib/documentosPaciente.ts). Ausente = sin especificar. */
   tipo?: string;
-  /** Solo en radiografías: nota breve de quien la subió (hasta 300 caracteres). */
+  /** Solo en radiografías y documentos: nota breve de quien la subió (hasta 300 caracteres). */
   nota?: string;
   /** Solo en fotografías intraorales: superior, inferior, derecha, izquierda, anterior o acercamiento (ver
    * lib/fotosIntraorales.ts). Ausente = subida antes de las vistas, sin clasificar. */
@@ -333,6 +337,9 @@ export type FotosPaciente = {
   /** Fotografías de radiografías (panorámicas, periapicales, etc.). Ausente en documentos guardados antes
    * de este campo. */
   radiografias?: FotoPaciente[];
+  /** Fotografías de documentos (estudios, recetas de otro médico, referencias...), con su tipo y nota (ver
+   * lib/documentosPaciente.ts). Ausente en documentos guardados antes de este campo. */
+  documentos?: FotoPaciente[];
   ineFrente?: FotoPaciente | null;
   ineReverso?: FotoPaciente | null;
   /** Fotos anexadas desde una Nota de Evolución (ver SeccionQueEncontraste

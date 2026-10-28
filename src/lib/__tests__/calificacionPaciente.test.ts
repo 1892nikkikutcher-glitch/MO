@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { calificacionDePaciente, detalleCalificacion } from "../calificacionPaciente";
+import { calificacionDePaciente, calificacionManualValida, detalleCalificacion, estrellasVisibles } from "../calificacionPaciente";
 
 const cita = (estatus: string, extra: object = {}) => ({ estatus, ...extra });
 const muchas = (n: number, estatus: string, extra: object = {}) => Array.from({ length: n }, () => cita(estatus, extra));
@@ -49,5 +49,26 @@ describe("calificacionDePaciente", () => {
     const c = calificacionDePaciente([cita("Atendida"), cita("Atendida"), cita("No Asistió"), cita("Cancelada", { canceladaTarde: true }), cita("Cancelada"), cita("Reagendada")]);
     expect(detalleCalificacion(c)).toBe("2 atendidas · 1 no asistió · 1 canceló fuera de tiempo · 1 canceló · 1 reagendó");
     expect(detalleCalificacion(calificacionDePaciente([]))).toBe("Aún sin historial de citas");
+  });
+});
+
+describe("calificación manual", () => {
+  it("acepta de 0 a 5 en pasos de media estrella y descarta lo demás", () => {
+    expect(calificacionManualValida(3.5)).toBe(3.5);
+    expect(calificacionManualValida(3.7)).toBe(3.5);
+    expect(calificacionManualValida(9)).toBe(5);
+    expect(calificacionManualValida(-2)).toBe(0);
+    expect(calificacionManualValida(0)).toBe(0);
+    expect(calificacionManualValida("4")).toBeUndefined();
+    expect(calificacionManualValida(undefined)).toBeUndefined();
+    expect(calificacionManualValida(Number.NaN)).toBeUndefined();
+  });
+
+  it("la manual manda sobre la automática; sin ella se ve la de las citas", () => {
+    const auto = calificacionDePaciente([{ estatus: "No Asistió" }, { estatus: "No Asistió" }]);
+    expect(estrellasVisibles(auto, 5)).toBe(5);
+    expect(estrellasVisibles(auto, 0)).toBe(0);
+    expect(estrellasVisibles(auto, null)).toBe(auto.estrellas);
+    expect(estrellasVisibles(auto)).toBe(auto.estrellas);
   });
 });

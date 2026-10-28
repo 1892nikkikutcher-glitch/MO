@@ -19,6 +19,7 @@ const VISTA_PREVIA_VARS = {
   conceptos: "- Limpieza dental: $1,200",
   total: "$1,200",
   proximaCita: "\n\nSu próxima cita es el 20 de agosto de 2026 a las 11:00 AM.",
+  saldoCashback: "\n\n💰 Tu saldo de cashback: *$60*.",
 };
 
 function PlantillaEditor({
@@ -143,7 +144,9 @@ export default function FormatosWhatsApp() {
               <code className="text-accent">{"{{conceptos}}"}</code> y{" "}
               <code className="text-accent">{"{{total}}"}</code> — se rellenan solos con los datos
               reales del pago. <code className="text-accent">{"{{proximaCita}}"}</code> se rellena
-              sola con la siguiente cita agendada del paciente (o queda vacía si no tiene ninguna).
+              sola con la siguiente cita agendada del paciente (o queda vacía si no tiene ninguna), y{" "}
+              <code className="text-accent">{"{{saldoCashback}}"}</code> con el saldo de cashback del paciente
+              (vacía si no tiene). Si tu mensaje no la incluye, el saldo se agrega solo después de la próxima cita.
             </>
           }
         />

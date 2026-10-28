@@ -76,3 +76,17 @@ describe("buildProximaCitaTexto", () => {
     expect(texto).toContain("2027");
   });
 });
+
+describe("saldo de cashback en el recibo", () => {
+  it("la plantilla inicial ya lo lleva, después de la próxima cita", async () => {
+    const { formatosWhatsAppInicial, plantillaConSaldoCashback } = await import("../formatosWhatsapp");
+    expect(formatosWhatsAppInicial.reciboPago).toContain("{{proximaCita}}{{saldoCashback}}");
+    expect(plantillaConSaldoCashback(formatosWhatsAppInicial.reciboPago)).toBe(formatosWhatsAppInicial.reciboPago);
+  });
+
+  it("una plantilla guardada sin la variable lo recibe después de la próxima cita, o al final si tampoco la usa", async () => {
+    const { plantillaConSaldoCashback } = await import("../formatosWhatsapp");
+    expect(plantillaConSaldoCashback("Total {{total}}{{proximaCita}}\n\nGracias")).toBe("Total {{total}}{{proximaCita}}{{saldoCashback}}\n\nGracias");
+    expect(plantillaConSaldoCashback("Total {{total}}\n")).toBe("Total {{total}}{{saldoCashback}}");
+  });
+});
