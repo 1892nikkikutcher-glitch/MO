@@ -2,12 +2,15 @@ import { describe, expect, it } from "vitest";
 import {
   citasCompartibles,
   diagnosticosCompartibles,
+  documentosCompartibles,
   fotosCompartibles,
   historiaClinicaCompartible,
   notasCompartibles,
   odontogramaCompartible,
   planCompartible,
+  MAX_DOCUMENTOS_COMPARTIDOS,
   MAX_FOTOS_COMPARTIDAS,
+  seccionesCompartibles,
   MAX_NOTAS_COMPARTIDAS,
 } from "../expedienteCompartido";
 import type { HistoriaClinicaTemplate, RespuestasHistoriaClinica } from "../historiaClinica";
@@ -164,5 +167,25 @@ describe("radiografías al compartir", () => {
 
   it("sin el campo (expedientes anteriores) sigue funcionando igual", () => {
     expect(fotosCompartibles({ extraorales: [f("e1", "2026-10-01")] }).map((x) => x.id)).toEqual(["e1"]);
+  });
+});
+
+describe("documentos al compartir", () => {
+  const f = (id: string, fecha: string) => ({ id, path: `p/${id}`, name: id, fecha });
+  const d = (id: string, fecha: string) => ({ id, path: `p/${id}`, name: `${id}.jpg`, fecha, tipo: "Estudio de laboratorio" });
+
+  it("son una sección aparte, que no entra sola con las fotos y radiografías", () => {
+    expect(seccionesCompartibles).toContain("documentos");
+    const r = fotosCompartibles({ extraorales: [f("e1", "2026-10-01")], documentos: [d("d1", "2026-10-02")] } as Parameters<typeof fotosCompartibles>[0]);
+    expect(r.map((x) => x.id)).toEqual(["e1"]);
+  });
+
+  it("van los más recientes primero, con un máximo de 8, conservando tipo y nota", () => {
+    const docs = Array.from({ length: 10 }, (_, i) => d(`d${i}`, `2026-10-${String(i + 1).padStart(2, "0")}`));
+    const r = documentosCompartibles({ documentos: docs });
+    expect(r).toHaveLength(MAX_DOCUMENTOS_COMPARTIDOS);
+    expect(r[0].id).toBe("d9");
+    expect(r[0].tipo).toBe("Estudio de laboratorio");
+    expect(documentosCompartibles({})).toEqual([]);
   });
 });

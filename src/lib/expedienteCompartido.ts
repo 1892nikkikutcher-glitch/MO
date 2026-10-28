@@ -33,6 +33,7 @@ export const seccionesCompartibles = [
   "odontograma",
   "notas_evolucion",
   "fotos_radiografias",
+  "documentos",
   "citas",
 ] as const;
 export type SeccionCompartible = (typeof seccionesCompartibles)[number];
@@ -43,6 +44,7 @@ export const etiquetaSeccionCompartible: Record<SeccionCompartible, string> = {
   odontograma: "Odontograma",
   notas_evolucion: "Notas de evolución recientes",
   fotos_radiografias: "Fotografías y radiografías",
+  documentos: "Documentos del paciente",
   citas: "Citas del paciente (calendario)",
 };
 
@@ -52,11 +54,13 @@ export const descripcionSeccionCompartible: Record<SeccionCompartible, string> =
   odontograma: "Diagnósticos marcados en cada pieza dental, pintados en rojo (por tratar) y azul (realizado).",
   notas_evolucion: "Las últimas 5 notas clínicas firmadas (no las administrativas).",
   fotos_radiografias: "Hasta 8 imágenes recientes: primero las radiografías y después las fotografías clínicas (extraorales e intraorales). Nunca la INE ni la foto de perfil.",
+  documentos: "Hasta 8 fotografías de documentos recientes (estudios de laboratorio, recetas, referencias...), con su tipo y su nota. Se elige aparte porque pueden traer datos personales; nunca la INE.",
   citas: "Citas pasadas y próximas de este paciente: fecha, hora, estatus y tratamiento. Sin costos ni comentarios.",
 };
 
 export const MAX_NOTAS_COMPARTIDAS = 5;
 export const MAX_FOTOS_COMPARTIDAS = 8;
+export const MAX_DOCUMENTOS_COMPARTIDOS = 8;
 export const MAX_CITAS_COMPARTIDAS = 40;
 const MAX_TEXTO_NOTA = 3000;
 const MAX_FILAS = 120;
@@ -280,6 +284,13 @@ export function fotosCompartibles(fotos: {
   const radiografias = masRecientes(fotos.radiografias ?? []).map((r) => ({ ...r, esRadiografia: true as const }));
   const clinicas = masRecientes([...(fotos.extraorales ?? []), ...(fotos.intraorales ?? [])]);
   return [...radiografias, ...clinicas].slice(0, MAX_FOTOS_COMPARTIDAS);
+}
+
+/** Hasta 8 fotografías de documentos, las más recientes primero (con su tipo y nota). */
+export function documentosCompartibles(fotos: {
+  documentos?: { id: string; path: string; name: string; fecha: string; tipo?: string; nota?: string }[];
+}): { id: string; path: string; name: string; fecha: string; tipo?: string; nota?: string }[] {
+  return [...(fotos.documentos ?? [])].sort((a, b) => b.fecha.localeCompare(a.fecha)).slice(0, MAX_DOCUMENTOS_COMPARTIDOS);
 }
 
 /** Texto de lo compartido para el registro de consentimiento (lo que el

@@ -126,7 +126,7 @@ export function archivarYEliminar(ruta: string, itemsPedidos: ({ id: string } & 
   });
 }
 
-const camposLista: ReadonlySet<CampoFoto> = new Set(["extraorales", "intraorales", "radiografias"]);
+const camposLista: ReadonlySet<CampoFoto> = new Set(["extraorales", "intraorales", "radiografias", "documentos"]);
 
 /** Quita una foto del expediente SIN borrar el archivo de Storage (antes se
  * borraba para siempre): la copia del registro va a la Papelera y, en el

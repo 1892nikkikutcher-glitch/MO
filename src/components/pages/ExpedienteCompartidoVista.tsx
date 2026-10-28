@@ -421,11 +421,11 @@ export default function ExpedienteCompartidoVista({
       )}
 
       {expediente.fotosArchivoIds && (
-        <Bloque titulo={`Fotografías y radiografías (${cantidadFotos})`}>
+        <Bloque titulo={`${expediente.secciones.includes("documentos") ? (expediente.secciones.includes("fotos_radiografias") ? "Fotografías, radiografías y documentos" : "Documentos") : "Fotografías y radiografías"} (${cantidadFotos})`}>
           <p>
             {cantidadFotos > 0
-              ? "Las imágenes están en la sección «Archivos» de este caso, listas para descargar; las radiografías traen su tipo y su nota."
-              : "No había fotografías ni radiografías para compartir."}
+              ? "Las imágenes están en la sección «Archivos» de este caso, listas para descargar; las radiografías y los documentos traen su tipo y su nota."
+              : "No había imágenes para compartir."}
           </p>
         </Bloque>
       )}

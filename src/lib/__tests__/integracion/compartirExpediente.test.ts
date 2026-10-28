@@ -142,10 +142,10 @@ describe("compartir parte del expediente (servidor + emulador)", () => {
     expect(caso.resumenPaciente.nombre).toBe("Paciente de Prueba");
   });
 
-  it("con las 6 secciones: arma la foto fija completa y copia solo fotos clínicas", async () => {
+  it("con todas las secciones: arma la foto fija completa y copia solo fotos clínicas", async () => {
     const caso = await crearInterconsulta(REMITENTE, { ...entradaBase, seccionesCompartidas: [...seccionesCompartibles] });
     const exp = caso.expedienteCompartido!;
-    expect(exp.secciones).toHaveLength(6);
+    expect(exp.secciones).toHaveLength(seccionesCompartibles.length);
 
     // Historia clínica: respuestas con detalle, alergias, sin la pregunta de odontograma
     expect(exp.historiaClinica?.[0]).toEqual({ titulo: "Alergias", items: [{ pregunta: "Alergias", respuesta: "Penicilina" }] });
@@ -214,6 +214,28 @@ describe("compartir parte del expediente (servidor + emulador)", () => {
     } finally {
       const { FieldValue } = await import("firebase-admin/firestore");
       await base().collection("fotos").doc("datos").update({ radiografias: FieldValue.delete() });
+    }
+  });
+
+  it("los documentos solo viajan si se elige su sección, y llegan al colega como documentos", async () => {
+    const pathDoc = await subirFoto("documentos", "doc1.jpg");
+    await base().collection("fotos").doc("datos").set(
+      { documentos: [{ id: "doc1.jpg", url: "u", name: "IMG_77.jpg", fecha: "2026-09-02", path: pathDoc, tipo: "Estudio de laboratorio", nota: "Previa a la cirugía" }] },
+      { merge: true }
+    );
+    try {
+      const soloFotos = await crearInterconsulta(REMITENTE, { ...entradaBase, seccionesCompartidas: ["fotos_radiografias"] });
+      expect(soloFotos.archivos.some((x) => x.categoriaClinica === "documento")).toBe(false);
+
+      const conDocumentos = await crearInterconsulta(REMITENTE, { ...entradaBase, seccionesCompartidas: ["documentos"] });
+      expect(conDocumentos.archivos.map((x) => x.categoriaClinica)).toEqual(["documento"]);
+      expect(conDocumentos.archivos[0].nombreOriginalSaneado).toBe("Documento Estudio de laboratorio (2026-09-02).jpg");
+      expect(conDocumentos.archivos[0].descripcion).toBe("Estudio de laboratorio — Previa a la cirugía");
+      expect(conDocumentos.archivos[0].origenPath).toBe(pathDoc);
+      expect(conDocumentos.expedienteCompartido?.fotosArchivoIds).toHaveLength(1);
+    } finally {
+      const { FieldValue } = await import("firebase-admin/firestore");
+      await base().collection("fotos").doc("datos").update({ documentos: FieldValue.delete() });
     }
   });
 

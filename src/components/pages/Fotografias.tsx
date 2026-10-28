@@ -24,6 +24,12 @@ import {
   NOTA_RADIOGRAFIA_MAX,
   TIPOS_RADIOGRAFIA,
 } from "@/lib/radiografias";
+import {
+  conDetallesDocumento,
+  detallesDocumentoParaGuardar,
+  etiquetaDocumento,
+  TIPOS_DOCUMENTO,
+} from "@/lib/documentosPaciente";
 
 function UploadIcon() {
   return (
@@ -300,12 +306,33 @@ function EditIcon() {
   );
 }
 
-/** Pide el tipo y la nota de una radiografía (al subirla o al editarla). */
+type TextosDetalles = {
+  /** Etiqueta del selector de tipo ("Tipo de radiografía"). */
+  etiquetaTipo: string;
+  tipos: readonly string[];
+  placeholderNota: string;
+};
+
+const TEXTOS_RADIOGRAFIA: TextosDetalles = {
+  etiquetaTipo: "Tipo de radiografía",
+  tipos: TIPOS_RADIOGRAFIA,
+  placeholderNota: "Ej. Control de endodoncia del 46; se ve lesión periapical.",
+};
+
+const TEXTOS_DOCUMENTO: TextosDetalles = {
+  etiquetaTipo: "Tipo de documento",
+  tipos: TIPOS_DOCUMENTO,
+  placeholderNota: "Ej. Biometría hemática del 20 de octubre, previa a la cirugía.",
+};
+
+/** Pide el tipo y la nota de una radiografía o un documento (al subirlo o al editarlo). */
 function DetallesRadiografiaDialog({
   titulo,
   subtitulo,
   inicial,
   textoGuardar,
+  textos = TEXTOS_RADIOGRAFIA,
+  guardar = detallesParaGuardar,
   onGuardar,
   onCancelar,
 }: {
@@ -313,6 +340,8 @@ function DetallesRadiografiaDialog({
   subtitulo?: string;
   inicial: { tipo?: string; nota?: string };
   textoGuardar: string;
+  textos?: TextosDetalles;
+  guardar?: (detalles: { tipo?: string; nota?: string }) => { tipo?: string; nota?: string };
   onGuardar: (detalles: { tipo?: string; nota?: string }) => void;
   onCancelar: () => void;
 }) {
@@ -327,10 +356,10 @@ function DetallesRadiografiaDialog({
         {subtitulo && <p className="mt-1 text-xs text-ink/50">{subtitulo}</p>}
         <div className="mt-4 space-y-3">
           <div>
-            <label className="mb-1 block text-xs font-medium text-ink/60">Tipo de radiografía</label>
+            <label className="mb-1 block text-xs font-medium text-ink/60">{textos.etiquetaTipo}</label>
             <select value={tipo} onChange={(e) => setTipo(e.target.value)} className={campo}>
               <option value="">Sin especificar</option>
-              {TIPOS_RADIOGRAFIA.map((t) => (
+              {textos.tipos.map((t) => (
                 <option key={t} value={t}>
                   {t}
                 </option>
@@ -343,7 +372,7 @@ function DetallesRadiografiaDialog({
               value={nota}
               onChange={(e) => setNota(e.target.value.slice(0, NOTA_RADIOGRAFIA_MAX))}
               rows={3}
-              placeholder="Ej. Control de endodoncia del 46; se ve lesión periapical."
+              placeholder={textos.placeholderNota}
               className={campo}
             />
             <div className="mt-0.5 text-right text-[11px] text-ink/40">
@@ -359,7 +388,7 @@ function DetallesRadiografiaDialog({
             Cancelar
           </button>
           <button
-            onClick={() => onGuardar(detallesParaGuardar({ tipo, nota }))}
+            onClick={() => onGuardar(guardar({ tipo, nota }))}
             className="flex-1 rounded-lg border border-accent/60 bg-accent/15 py-2 text-sm font-semibold text-accent transition-opacity hover:bg-accent/25"
           >
             {textoGuardar}
@@ -370,14 +399,59 @@ function DetallesRadiografiaDialog({
   );
 }
 
-/** Radiografías del paciente: se sube con más resolución, la imagen se ve completa (sin recortar) y cada una
- * lleva su tipo y una nota que se pueden editar después. */
-function RadiografiasCard({
+type ConfigTarjetaConDetalles = {
+  titulo: string;
+  ayuda: string;
+  botonSubir: string;
+  vacio: string;
+  errorSubida: string;
+  dialogoSubir: string;
+  dialogoEditar: string;
+  eliminarTitulo: string;
+  textos: TextosDetalles;
+  etiqueta: (foto: FotoPaciente) => string;
+  guardar: (detalles: { tipo?: string; nota?: string }) => { tipo?: string; nota?: string };
+};
+
+const CONFIG_RADIOGRAFIAS: ConfigTarjetaConDetalles = {
+  titulo: "Radiografías",
+  ayuda: "Toma una foto de la radiografía (o sube la imagen). Se guarda con más resolución para poder ver el detalle; ponle su tipo y una nota.",
+  botonSubir: "Subir radiografía",
+  vacio: "Aún no hay radiografías cargadas",
+  errorSubida: "No se pudieron subir las radiografías.",
+  dialogoSubir: "Datos de la radiografía",
+  dialogoEditar: "Editar radiografía",
+  eliminarTitulo: "¿Eliminar esta radiografía?",
+  textos: TEXTOS_RADIOGRAFIA,
+  etiqueta: etiquetaRadiografia,
+  guardar: detallesParaGuardar,
+};
+
+const CONFIG_DOCUMENTOS: ConfigTarjetaConDetalles = {
+  titulo: "Documentos",
+  ayuda:
+    "Toma una foto de un documento del paciente (estudios, recetas de otro médico, referencias, consentimientos firmados). Ponle su tipo y una nota; podrás compartirlo con un colega desde MO Conecta, en «Documentos del paciente».",
+  botonSubir: "Subir documento",
+  vacio: "Aún no hay documentos cargados",
+  errorSubida: "No se pudieron subir los documentos.",
+  dialogoSubir: "Datos del documento",
+  dialogoEditar: "Editar documento",
+  eliminarTitulo: "¿Eliminar este documento?",
+  textos: TEXTOS_DOCUMENTO,
+  etiqueta: etiquetaDocumento,
+  guardar: detallesDocumentoParaGuardar,
+};
+
+/** Fotos con tipo y nota (radiografías y documentos): se suben con más resolución, la imagen se ve completa (sin
+ * recortar) y cada una lleva su tipo y una nota que se pueden editar después. */
+function FotosConDetallesCard({
+  config,
   fotos,
   onAdd,
   onActualizar,
   onRemove,
 }: {
+  config: ConfigTarjetaConDetalles;
   fotos: FotoPaciente[];
   onAdd: (files: File[], detalles: { tipo?: string; nota?: string }) => Promise<void>;
   onActualizar: (foto: FotoPaciente, detalles: { tipo?: string; nota?: string }) => void;
@@ -397,7 +471,7 @@ function RadiografiasCard({
     try {
       await onAdd(files, detalles);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "No se pudieron subir las radiografías.");
+      setError(err instanceof Error ? err.message : config.errorSubida);
     } finally {
       setSubiendo(false);
     }
@@ -412,10 +486,8 @@ function RadiografiasCard({
     <div className="space-y-4 rounded-2xl border border-edge/10 bg-surface p-6">
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0 flex-1">
-          <h3 className="text-sm font-semibold uppercase tracking-wide text-ink/60">Radiografías</h3>
-          <p className="mt-1 text-xs text-ink/40">
-            Toma una foto de la radiografía (o sube la imagen). Se guarda con más resolución para poder ver el detalle; ponle su tipo y una nota.
-          </p>
+          <h3 className="text-sm font-semibold uppercase tracking-wide text-ink/60">{config.titulo}</h3>
+          <p className="mt-1 text-xs text-ink/40">{config.ayuda}</p>
         </div>
         <button
           onClick={() => inputRef.current?.click()}
@@ -423,7 +495,7 @@ function RadiografiasCard({
           className="flex shrink-0 items-center gap-2 whitespace-nowrap rounded-lg border border-accent/40 px-3 py-1.5 text-xs font-semibold text-accent transition-colors hover:bg-accent/10 disabled:opacity-50"
         >
           <UploadIcon />
-          {subiendo ? "Subiendo…" : "Subir radiografía"}
+          {subiendo ? "Subiendo…" : config.botonSubir}
         </button>
         <input
           ref={inputRef}
@@ -443,7 +515,7 @@ function RadiografiasCard({
       {error && <p className="text-xs text-danger">{error}</p>}
 
       {fotos.length === 0 ? (
-        <div className="rounded-xl border border-dashed border-edge/15 p-8 text-center text-sm text-ink/30">Aún no hay radiografías cargadas</div>
+        <div className="rounded-xl border border-dashed border-edge/15 p-8 text-center text-sm text-ink/30">{config.vacio}</div>
       ) : (
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
           {fotos.map((foto) => (
@@ -481,7 +553,7 @@ function RadiografiasCard({
               </div>
               <div className="px-3 py-2 text-xs">
                 <div className="flex items-baseline justify-between gap-2">
-                  <span className="font-semibold text-ink">{etiquetaRadiografia(foto)}</span>
+                  <span className="font-semibold text-ink">{config.etiqueta(foto)}</span>
                   <span className="shrink-0 text-ink/40">{fechaCorta(foto.fecha)}</span>
                 </div>
                 {foto.nota ? (
@@ -499,10 +571,12 @@ function RadiografiasCard({
 
       {pendientes && (
         <DetallesRadiografiaDialog
-          titulo="Datos de la radiografía"
+          titulo={config.dialogoSubir}
           subtitulo={pendientes.length === 1 ? "Se aplican a la imagen que vas a subir." : `Se aplican a las ${pendientes.length} imágenes que vas a subir; después puedes cambiarlas una por una.`}
           inicial={{}}
           textoGuardar="Subir"
+          textos={config.textos}
+          guardar={config.guardar}
           onCancelar={() => setPendientes(null)}
           onGuardar={(detalles) => void subir(pendientes, detalles)}
         />
@@ -510,9 +584,11 @@ function RadiografiasCard({
 
       {editando && (
         <DetallesRadiografiaDialog
-          titulo="Editar radiografía"
+          titulo={config.dialogoEditar}
           inicial={{ tipo: editando.tipo, nota: editando.nota }}
           textoGuardar="Guardar"
+          textos={config.textos}
+          guardar={config.guardar}
           onCancelar={() => setEditando(null)}
           onGuardar={(detalles) => {
             onActualizar(editando, detalles);
@@ -523,7 +599,7 @@ function RadiografiasCard({
 
       {fotoAEliminar && (
         <ConfirmarEliminar
-          titulo="¿Eliminar esta radiografía?"
+          titulo={config.eliminarTitulo}
           mensaje="Quedará guardada en la Papelera por si necesitas recuperarla."
           onCancel={() => setFotoAEliminar(null)}
           onConfirm={() => {
@@ -892,7 +968,8 @@ export default function Fotografias({ patientId }: { patientId: string }) {
         onRemove={(foto) => quitarFoto("intraorales", foto)}
       />
 
-      <RadiografiasCard
+      <FotosConDetallesCard
+        config={CONFIG_RADIOGRAFIAS}
         fotos={fotos.radiografias ?? []}
         onAdd={async (files, detalles) => {
           const nuevas = await Promise.all(
@@ -910,6 +987,27 @@ export default function Fotografias({ patientId }: { patientId: string }) {
           }))
         }
         onRemove={(foto) => quitarFoto("radiografias", foto)}
+      />
+
+      <FotosConDetallesCard
+        config={CONFIG_DOCUMENTOS}
+        fotos={fotos.documentos ?? []}
+        onAdd={async (files, detalles) => {
+          const nuevas = await Promise.all(
+            files.map(async (file) => {
+              const foto = await subirFotoPaciente(clinicUid!, patientId, "documentos", file, { maxLado: 2400, calidad: 0.9 });
+              return { ...foto, ...detallesDocumentoParaGuardar(detalles) };
+            })
+          );
+          setFotosPaciente(patientId, (prev) => ({ ...prev, documentos: [...(prev.documentos ?? []), ...nuevas] }));
+        }}
+        onActualizar={(foto, detalles) =>
+          setFotosPaciente(patientId, (prev) => ({
+            ...prev,
+            documentos: (prev.documentos ?? []).map((d) => (d.id === foto.id ? conDetallesDocumento(d, detalles) : d)),
+          }))
+        }
+        onRemove={(foto) => quitarFoto("documentos", foto)}
       />
     </div>
   );

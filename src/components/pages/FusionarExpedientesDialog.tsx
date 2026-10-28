@@ -185,6 +185,7 @@ export default function FusionarExpedientesDialog({
           extraorales: [...fotosSobreviviente.extraorales, ...fotosPerdedor.extraorales],
           intraorales: [...fotosSobreviviente.intraorales, ...fotosPerdedor.intraorales],
           radiografias: [...(fotosSobreviviente.radiografias ?? []), ...(fotosPerdedor.radiografias ?? [])],
+          documentos: [...(fotosSobreviviente.documentos ?? []), ...(fotosPerdedor.documentos ?? [])],
         },
       });
       onFusionado();

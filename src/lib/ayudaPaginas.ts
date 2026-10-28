@@ -105,12 +105,13 @@ export const ayudaPaginas: Record<string, AyudaPagina> = {
   },
   "pacientes-Fotografías": {
     titulo: "Expediente — Fotografías",
-    resumen: "Fotos clínicas del paciente: foto de perfil, identificación oficial (INE), fotos extraorales/intraorales y fotografías de radiografías.",
+    resumen: "Fotos clínicas del paciente: foto de perfil, identificación oficial (INE), fotos extraorales/intraorales, fotografías de radiografías y de documentos.",
     puntos: [
       "\"Subir foto\" abre la galería o cámara del dispositivo; una vez subida, \"Cambiar\" la reemplaza y \"Quitar\" la elimina (con confirmación).",
       "La sección de INE (Frente/Reverso) es para el documento de identidad del paciente, separada de las fotos clínicas.",
       "Extraorales acepta varias fotos a la vez y se pueden descargar individualmente.",
       "Intraorales es una serie de seis vistas: Superior, Inferior, Derecha, Izquierda, Anterior y Acercamiento. Cada una guarda su foto más reciente y, al subir otra, la anterior queda en \"Ver anteriores\" para comparar. Las fotos subidas antes quedan \"Sin clasificar\" hasta que las asignes a una vista.",
+      "Documentos sirve para fotografiar estudios, recetas de otro médico, referencias o consentimientos firmados: cada uno lleva su tipo y una nota. Para que un colega los vea, elígelos en MO Conecta al compartir el expediente (sección \"Documentos del paciente\"); no se incluyen solos.",
     ],
   },
   "pacientes-Laboratorios": {

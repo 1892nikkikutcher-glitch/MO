@@ -5,6 +5,7 @@
 
 import { randomUUID } from "node:crypto";
 import { descripcionDeRadiografia, nombreCompartidoDeRadiografia } from "./radiografias";
+import { descripcionDeDocumento, nombreCompartidoDeDocumento } from "./documentosPaciente";
 import { dbAdmin, bucketAdmin } from "./firebaseAdmin";
 import { ConectaError, aplicarRateLimit, esMiembroActivoDeClinica, nowISO, sinIndefinidos } from "./conectaServer";
 import { construirResumenPacienteAutorizado } from "./resumenPacienteAutorizado";
@@ -19,6 +20,7 @@ import type { Patient } from "./patientData";
 import {
   citasCompartibles,
   diagnosticosCompartibles,
+  documentosCompartibles,
   fotosCompartibles,
   historiaClinicaCompartible,
   notasCompartibles,
@@ -133,20 +135,32 @@ export async function construirExpedienteCompartido(args: {
       citasSnap.docs.map((d) => d.data() as { fecha: string; horaInicio: string; estatus: string; tratamientos?: string[] })
     );
   }
-  if (secciones.includes("fotos_radiografias")) {
+  if (secciones.includes("fotos_radiografias") || secciones.includes("documentos")) {
     const fotosSnap = await base.collection("fotos").doc("datos").get();
-    const fotos = fotosCompartibles((fotosSnap.exists ? fotosSnap.data() : {}) as Parameters<typeof fotosCompartibles>[0]);
+    const datosFotos = (fotosSnap.exists ? fotosSnap.data() : {}) as Parameters<typeof fotosCompartibles>[0] &
+      Parameters<typeof documentosCompartibles>[0];
+    // Las fotos clínicas y los documentos se eligen por separado, pero viajan juntos como archivos del caso.
+    const fotos: { id: string; path: string; name: string; fecha: string; esRadiografia?: boolean; esDocumento?: boolean; tipo?: string; nota?: string }[] = [
+      ...(secciones.includes("fotos_radiografias") ? fotosCompartibles(datosFotos) : []),
+      ...(secciones.includes("documentos") ? documentosCompartibles(datosFotos).map((d) => ({ ...d, esDocumento: true })) : []),
+    ];
     for (const foto of fotos) {
       // Solo se copian objetos que de verdad cuelgan de ESTE paciente y son JPEG
       // dentro del límite — nunca una ruta arbitraria.
       if (!foto.path.startsWith(`users/${clinicaId}/pacientes/${pacienteId}/fotos/`)) continue;
-      // De las radiografías viajan también el tipo y la nota (en el nombre y en la descripción del archivo).
-      const descripcion = foto.esRadiografia ? descripcionDeRadiografia(foto) : undefined;
-      const nombreVisible = sanearNombreArchivo(foto.esRadiografia ? nombreCompartidoDeRadiografia(foto) : foto.name || "fotografia.jpg");
+      // De las radiografías y los documentos viajan también el tipo y la nota (en el nombre y en la descripción del archivo).
+      const conDetalles = Boolean(foto.esRadiografia || foto.esDocumento);
+      const descripcion = foto.esRadiografia ? descripcionDeRadiografia(foto) : foto.esDocumento ? descripcionDeDocumento(foto) : undefined;
+      const nombreDetallado = foto.esRadiografia
+        ? nombreCompartidoDeRadiografia(foto)
+        : foto.esDocumento
+          ? nombreCompartidoDeDocumento(foto)
+          : foto.name || "fotografia.jpg";
+      const nombreVisible = sanearNombreArchivo(nombreDetallado);
       const yaCopiada = deExpediente.find((a) => a.origenPath === foto.path);
       if (yaCopiada) {
         // Si después se le cambió el tipo o la nota, la copia del colega se pone al día.
-        if (foto.esRadiografia) {
+        if (conDetalles) {
           const { descripcion: _anterior, ...resto } = yaCopiada;
           mantenidos.push(sinIndefinidos({ ...resto, nombreOriginalSaneado: nombreVisible, descripcion }));
         } else {
@@ -170,7 +184,7 @@ export async function construirExpedienteCompartido(args: {
             storagePath: destino,
             mimeType: "image/jpeg",
             tamanioBytes: tamanio,
-            categoriaClinica: foto.esRadiografia ? ("radiografia" as const) : ("fotografia" as const),
+            categoriaClinica: foto.esRadiografia ? ("radiografia" as const) : foto.esDocumento ? ("documento" as const) : ("fotografia" as const),
             subidoPorUid: args.remitenteUid,
             fecha: ahora,
             origenPath: foto.path,
