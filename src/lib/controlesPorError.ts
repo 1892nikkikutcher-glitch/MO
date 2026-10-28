@@ -30,6 +30,7 @@ export type PropuestaControl = {
   procedimientos: string[];
   origen: "cita" | "pago";
   creadoPorEmail?: string;
+  creadoDesde?: string;
   /** "quitar" (sin pagos), "pasar_pagos" (pagos al presupuesto principal) o
    * "revisar" (no se puede decidir solo). */
   accion: "quitar" | "pasar_pagos" | "revisar";
@@ -84,6 +85,7 @@ export function controlesPorError(e: EntradaFalsos): PropuestaControl[] {
       procedimientos: c.items.map((i) => i.procedure),
       origen: origenDe(c.id) as "cita" | "pago",
       creadoPorEmail: c.creadoPorEmail,
+      creadoDesde: c.creadoDesde,
       movimientos: [] as DestinoPago[],
     };
     if (pagadoControl <= 0) return { ...base, accion: "quitar" as const };

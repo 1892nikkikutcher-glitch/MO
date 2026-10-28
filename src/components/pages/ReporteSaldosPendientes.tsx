@@ -22,6 +22,7 @@ export default function ReporteSaldosPendientes() {
     patients,
     clinicInfo,
     perfilDoctor,
+    nombresDeDispositivos,
   } = usePatientData();
   const [generandoPdf, setGenerandoPdf] = useState(false);
   const [errorPdf, setErrorPdf] = useState("");
@@ -265,7 +266,7 @@ export default function ReporteSaldosPendientes() {
                           </button>{" "}
                           · {c.procedimientos.join(", ")} · {formatCurrency(c.total)}
                           <span className="block text-[11px] text-ink/40">
-                            {textoAutoriaPresupuesto({ id: c.presupuestoId, creadoPorEmail: c.creadoPorEmail })}
+                            {textoAutoriaPresupuesto({ id: c.presupuestoId, creadoPorEmail: c.creadoPorEmail, creadoDesde: c.creadoDesde }, nombresDeDispositivos)}
                           </span>
                         </span>
                       </label>

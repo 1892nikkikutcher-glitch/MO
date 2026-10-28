@@ -226,6 +226,8 @@ export type SavedBudget = BudgetData & {
   creadoPorUid?: string;
   creadoPorEmail?: string;
   creadoEl?: string;
+  /** Tipo de equipo desde el que se creó ("iPhone", "Xiaomi"…), ver dispositivo.ts. */
+  creadoDesde?: string;
 };
 
 export type Tratamiento = {

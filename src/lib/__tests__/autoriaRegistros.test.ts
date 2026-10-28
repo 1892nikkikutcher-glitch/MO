@@ -3,6 +3,7 @@ import {
   estamparNuevos,
   origenDePresupuesto,
   pareceControlOMensualidad,
+  quienCreo,
   textoAutoriaPresupuesto,
 } from "../autoriaRegistros";
 
@@ -52,5 +53,29 @@ describe("pareceControlOMensualidad", () => {
     [["Controlador"], false],
   ])("%j -> %s", (t, esperado) => {
     expect(pareceControlOMensualidad(t)).toBe(esperado);
+  });
+});
+
+describe("autoría por tipo de equipo", () => {
+  it("estampa el equipo desde el que se creó, solo en registros nuevos", () => {
+    const [viejo, nuevo] = estamparNuevos([{ id: "a" }], [{ id: "a" }, { id: "b" }], { ...autor, dispositivo: "Xiaomi" }, ahora);
+    expect(viejo).not.toHaveProperty("creadoDesde");
+    expect(nuevo.creadoDesde).toBe("Xiaomi");
+  });
+
+  it("sin equipo detectado no guarda el campo", () => {
+    const [nuevo] = estamparNuevos([], [{ id: "b" }], autor, ahora);
+    expect(nuevo).not.toHaveProperty("creadoDesde");
+  });
+
+  it("muestra el nombre de quien usa ese equipo; sin nombre, el correo y el equipo", () => {
+    expect(quienCreo("duena@clinica.mx", "Xiaomi", { Xiaomi: "Tía Claudia" })).toBe("Tía Claudia (Xiaomi)");
+    expect(quienCreo("duena@clinica.mx", "iPhone", { Xiaomi: "Tía Claudia" })).toBe("duena@clinica.mx, desde iPhone");
+    expect(quienCreo("duena@clinica.mx")).toBe("duena@clinica.mx");
+  });
+
+  it("la leyenda del presupuesto usa ese nombre", () => {
+    const t = textoAutoriaPresupuesto({ id: "x1", creadoPorEmail: "duena@clinica.mx", creadoDesde: "Xiaomi" }, { Xiaomi: "Tía Claudia" });
+    expect(t).toContain("Creado por Tía Claudia (Xiaomi)");
   });
 });

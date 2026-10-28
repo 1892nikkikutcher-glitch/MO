@@ -1,10 +1,11 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { usePatientData } from "@/context/PatientDataContext";
 import type { RolClinica, Recurso } from "@/lib/patientData";
 import { descripcionRolClinica, etiquetaRolClinica } from "@/lib/permisosRol";
 import { manejarCambioNombre } from "@/lib/textoNombre";
+import { ETIQUETAS_DISPOSITIVO, type NombresDeDispositivos } from "@/lib/dispositivo";
 import ConfirmarEliminar from "@/components/ConfirmarEliminar";
 
 const inputClass =
@@ -164,6 +165,8 @@ export default function Colaboradores() {
     actualizarWhatsappColaborador,
     actualizarNombreColaborador,
     actualizarCorreoColaborador,
+    nombresDeDispositivos,
+    setNombresDeDispositivos,
   } = usePatientData();
 
   const [nombreClinica, setNombreClinica] = useState(clinicInfo?.nombre ?? "");
@@ -172,6 +175,12 @@ export default function Colaboradores() {
   const [whatsapp, setWhatsapp] = useState("");
   const [rol, setRol] = useState<RolClinica>("colaborador");
   const [enviando, setEnviando] = useState(false);
+  const [nombresEquipos, setNombresEquipos] = useState<NombresDeDispositivos>(nombresDeDispositivos);
+  const [equiposGuardados, setEquiposGuardados] = useState(false);
+  const nombresGuardadosJson = JSON.stringify(nombresDeDispositivos);
+  useEffect(() => {
+    setNombresEquipos(JSON.parse(nombresGuardadosJson));
+  }, [nombresGuardadosJson]);
   const [colaboradorAEliminar, setColaboradorAEliminar] = useState<{
     memberId: string;
     nombre: string;
@@ -191,6 +200,16 @@ export default function Colaboradores() {
   const guardarNombreClinica = () => {
     if (!nombreClinica.trim()) return;
     setClinicInfo((prev) => ({ ...(prev ?? { ownerId: "", nombre: "" }), nombre: nombreClinica.trim() }));
+  };
+
+  const guardarNombresEquipos = () => {
+    const limpios: NombresDeDispositivos = {};
+    for (const equipo of ETIQUETAS_DISPOSITIVO) {
+      const nombreEquipo = nombresEquipos[equipo]?.trim();
+      if (nombreEquipo) limpios[equipo] = nombreEquipo;
+    }
+    setNombresDeDispositivos(limpios);
+    setEquiposGuardados(true);
   };
 
   const invitar = async () => {
@@ -227,6 +246,44 @@ export default function Colaboradores() {
           >
             Guardar
           </button>
+        </div>
+      </div>
+
+      <div className="rounded-2xl border border-edge/10 bg-surface p-6">
+        <h3 className="mb-3 text-sm font-semibold uppercase tracking-wide text-ink/60">
+          Quién usa cada celular o equipo
+        </h3>
+        <p className="mb-3 text-xs text-ink/40">
+          Si varias personas capturan con tu misma cuenta, MO guarda desde qué tipo de equipo se creó cada presupuesto
+          nuevo y lo muestra con el nombre que pongas aquí (ej. iPhone: tu nombre; Xiaomi: recepción). Es una pista:
+          lo más confiable es que cada persona tenga su propio acceso, en &quot;Invitar Colaborador&quot;. Lo ya
+          capturado antes no se puede atribuir.
+        </p>
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
+          {ETIQUETAS_DISPOSITIVO.map((equipo) => (
+            <label key={equipo} className="block text-xs text-ink/60">
+              {equipo}
+              <input
+                type="text"
+                value={nombresEquipos[equipo] ?? ""}
+                onChange={(e) => {
+                  setEquiposGuardados(false);
+                  manejarCambioNombre(e, (v) => setNombresEquipos((prev) => ({ ...prev, [equipo]: v })));
+                }}
+                placeholder="Nombre de quien lo usa"
+                className={`mt-1 ${inputClass}`}
+              />
+            </label>
+          ))}
+        </div>
+        <div className="mt-3 flex items-center gap-3">
+          <button
+            onClick={guardarNombresEquipos}
+            className="rounded-lg border border-accent/40 px-4 py-2 text-sm font-semibold text-accent transition-colors hover:bg-accent/10"
+          >
+            Guardar
+          </button>
+          {equiposGuardados && <span className="text-xs text-success">Guardado</span>}
         </div>
       </div>
 

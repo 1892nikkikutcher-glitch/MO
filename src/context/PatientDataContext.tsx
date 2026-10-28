@@ -13,6 +13,7 @@ import { sedesInicial, type Sede, type SedesConfig } from "@/lib/sedesBloques";
 import { balanceInicial, type BalanceConsultorio } from "@/lib/balanceConsultorio";
 import { redondearDinero } from "@/lib/dinero";
 import { toISODate } from "@/lib/agendaHelpers";
+import { detectarDispositivo, dispositivosConfigInicial, type DispositivosConfig, type NombresDeDispositivos } from "@/lib/dispositivo";
 import {
   cashbackConfigInicial,
   normalizarConfigCashback,
@@ -962,6 +963,9 @@ type PatientDataContextValue = {
   /** Programa de cashback: porcentaje, vigencia y si se puede transferir. */
   cashbackConfig: CashbackConfig;
   setCashbackConfig: (config: CashbackConfig) => void;
+  /** Quién usa cada tipo de equipo ("iPhone", "Xiaomi"…) para atribuir lo que se captura desde cada uno. */
+  nombresDeDispositivos: NombresDeDispositivos;
+  setNombresDeDispositivos: (nombres: NombresDeDispositivos) => void;
   /** Todos los movimientos de cashback de la clínica (ganado, usado, transferido), solo para el administrador. */
   cashbackMovimientos: MovimientoCashback[];
   setCashbackMovimientos: (updater: Updater<MovimientoCashback[]>) => void;
@@ -1119,6 +1123,15 @@ export function PatientDataProvider({
   const [cashbackConfigGuardada, setCashbackConfigDoc] = useFirestoreDoc<CashbackConfig>(clinicUid, "cashback", cashbackConfigInicial);
   const cashbackConfig = normalizarConfigCashback(cashbackConfigGuardada);
   const setCashbackConfig = (c: CashbackConfig) => setCashbackConfigDoc(c);
+  const [dispositivosConfig, setDispositivosConfigDoc] = useFirestoreDoc<DispositivosConfig>(clinicUid, "dispositivos", dispositivosConfigInicial);
+  const nombresDeDispositivos = dispositivosConfig.nombres ?? {};
+  const setNombresDeDispositivos = (nombres: NombresDeDispositivos) => setDispositivosConfigDoc({ nombres });
+  const dispositivoActual = useRef<string | undefined>(undefined);
+  useEffect(() => {
+    detectarDispositivo().then((d) => {
+      dispositivoActual.current = d;
+    });
+  }, []);
   const [cashbackMovimientos, setCashbackMovimientos] = useFirestoreList<MovimientoCashback>(clinicUid, "cashbackMovimientos");
   const saldoCashbackDe = (patientId: string) => saldoCashback(cashbackMovimientos, patientId, cashbackConfig);
   const [presupuestoGastos, setPresupuestoGastos] = useFirestoreDoc<PresupuestoGastosConfig>(
@@ -1781,6 +1794,7 @@ export function PatientDataProvider({
       procedimientos: p.items.map((i) => i.procedure),
       creadoEn: new Date().toISOString(),
       ...(p.creadoPorEmail ? { creadoPorEmail: p.creadoPorEmail } : {}),
+      ...(p.creadoDesde ? { creadoDesde: p.creadoDesde } : {}),
     }));
     setPresupuestosLog((prev) => [...entradas, ...prev]);
   };
@@ -1838,7 +1852,7 @@ export function PatientDataProvider({
     const prevArr = presupuestosPorPaciente[patientId] ?? [];
     // Todo presupuesto NUEVO queda marcado con quién lo creó y cuándo (antes no
     // se guardaba y era imposible saber qué colaborador lo capturó).
-    const next = estamparNuevos(prevArr, resolveUpdater(updater, prevArr), { uid, email: userEmail }, new Date().toISOString());
+    const next = estamparNuevos(prevArr, resolveUpdater(updater, prevArr), { uid, email: userEmail, dispositivo: dispositivoActual.current }, new Date().toISOString());
     syncFirestoreList(`users/${clinicUid}/pacientes/${patientId}/presupuestos`, prevArr, next);
     registrarDeltaPresupuestos(prevArr, next);
     registrarPresupuestosPendientesDetalle(patientId, prevArr, next);
@@ -3317,6 +3331,8 @@ export function PatientDataProvider({
         setBalance,
         cashbackConfig,
         setCashbackConfig,
+        nombresDeDispositivos,
+        setNombresDeDispositivos,
         cashbackMovimientos,
         setCashbackMovimientos,
         saldoCashbackDe,

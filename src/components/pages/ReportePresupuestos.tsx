@@ -2,6 +2,7 @@
 
 import { usePatientData } from "@/context/PatientDataContext";
 import { formatCurrency } from "@/lib/patientData";
+import { quienCreo } from "@/lib/autoriaRegistros";
 
 function TrashIcon() {
   return (
@@ -18,7 +19,7 @@ function TrashIcon() {
 }
 
 export default function ReportePresupuestos() {
-  const { presupuestosLog, setPresupuestosLog, irAExpediente } = usePatientData();
+  const { presupuestosLog, setPresupuestosLog, irAExpediente, nombresDeDispositivos } = usePatientData();
 
   const ordenados = [...presupuestosLog].sort((a, b) => b.creadoEn.localeCompare(a.creadoEn));
   const total = ordenados.reduce((s, p) => s + p.total, 0);
@@ -76,7 +77,7 @@ export default function ReportePresupuestos() {
                   </td>
                   <td className="px-6 py-3 text-ink/70">{p.procedimientos.join(", ") || "—"}</td>
                   <td className="px-6 py-3 text-ink/60">{p.medico}</td>
-                  <td className="px-6 py-3 text-xs text-ink/50">{p.creadoPorEmail ?? "Sin registro"}</td>
+                  <td className="px-6 py-3 text-xs text-ink/50">{p.creadoPorEmail ? quienCreo(p.creadoPorEmail, p.creadoDesde, nombresDeDispositivos) : "Sin registro"}</td>
                   <td className="px-6 py-3 text-right font-semibold text-ink">
                     {formatCurrency(p.total)}
                   </td>

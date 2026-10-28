@@ -16,4 +16,5 @@ export type PresupuestoLogEntry = {
   creadoEn: string;
   /** Quién lo creó — ausente en entradas anteriores. */
   creadoPorEmail?: string;
+  creadoDesde?: string;
 };
