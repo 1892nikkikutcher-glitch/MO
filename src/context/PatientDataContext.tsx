@@ -12,6 +12,7 @@ import {
 import { sedesInicial, type Sede, type SedesConfig } from "@/lib/sedesBloques";
 import { balanceInicial, type BalanceConsultorio } from "@/lib/balanceConsultorio";
 import { redondearDinero } from "@/lib/dinero";
+import { toISODate } from "@/lib/agendaHelpers";
 import {
   cashbackConfigInicial,
   normalizarConfigCashback,
@@ -1102,7 +1103,7 @@ export function PatientDataProvider({
   }, [clinicUid]);
   const [suscripcionInicial] = useState<SuscripcionPlan>(() => ({
     planActivo: "prueba",
-    pruebaIniciadaEl: new Date().toISOString().slice(0, 10),
+    pruebaIniciadaEl: toISODate(new Date()),
   }));
   const [suscripcion, setSuscripcion] = useFirestoreDoc<SuscripcionPlan>(
     clinicUid,
