@@ -23,6 +23,15 @@ import { elegirColorDisponible, type Recurso } from "./patientData";
 
 const ID_RECURSO_MIGRADO = "doctor_migrado";
 
+/** Compara nombres sin importar acentos, mayúsculas ni espacios de más: "Nicolás Medina González" y
+ * "nicolas  medina gonzalez" son la misma persona. Sin esto la migración no reconocía al médico ya
+ * dado de alta en la Agenda y creaba un duplicado. */
+export function mismoNombre(a: string | undefined, b: string | undefined): boolean {
+  const limpio = (t: string | undefined) =>
+    (t ?? "").normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase().replace(/\s+/g, " ").trim();
+  return limpio(a) !== "" && limpio(a) === limpio(b);
+}
+
 const CAMPOS_A_MIGRAR = [
   "cedulaProfesional",
   "especialidad",
@@ -46,7 +55,7 @@ export async function migrarIdentidadDoctor(
 
   const recursosSnap = await getDocs(collection(db, `users/${clinicUid}/recursos`));
   const recursos = recursosSnap.docs.map((d) => ({ ...(d.data() as Recurso), id: d.id }));
-  const existente = recursos.find((r) => r.tipo === "medico" && r.nombre === nombreLegado);
+  const existente = recursos.find((r) => r.tipo === "medico" && mismoNombre(r.nombre, nombreLegado));
 
   const base: Recurso = existente ?? {
     id: ID_RECURSO_MIGRADO,
