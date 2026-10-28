@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   addMonths,
+  detectarConflictos,
   estaDentroDeHorario,
   medicoPreferidoDePaciente,
   textoNoAsistioDeCita,
@@ -127,5 +128,33 @@ describe("textoCancelacionDeCita", () => {
     const t = textoCancelacionDeCita(cita, true);
     expect(t).toContain("canceló su cita programada el 14 de octubre de 2026 a las 10:00 hrs para Limpieza dental");
     expect(t).toContain("después de que ya se había agotado el tiempo de la cita");
+  });
+});
+
+describe("detectarConflictos: el mismo paciente en dos citas a la vez", () => {
+  const recursos = [
+    { id: "m1", nombre: "Dr. Héctor", tipo: "medico", color: "#000" },
+    { id: "m2", nombre: "Dra. Lucía", tipo: "medico", color: "#000" },
+  ] as never;
+  const existente = {
+    id: "c1", patientId: "p1", paciente: "Ana Torres", medicoId: "m1", recursoId: "m1", unidadId: null,
+    fecha: "2026-10-28", horaInicio: "09:00", horaFin: "09:45", estatus: "Agendada",
+  } as never;
+  const nueva = { id: "c2", patientId: "p1", medicoId: "m2", unidadId: null, recursoId: "m2", fecha: "2026-10-28", horaInicio: "09:15", horaFin: "10:00" };
+
+  it("avisa aunque sea con otro médico", () => {
+    const avisos = detectarConflictos(recursos, [existente], nueva);
+    expect(avisos).toHaveLength(1);
+    expect(avisos[0]).toContain("Ana Torres ya tiene otra cita de 09:00 a 09:45 con Dr. Héctor");
+  });
+
+  it("no avisa si la otra cita se canceló, es de otro paciente o no se empalma", () => {
+    expect(detectarConflictos(recursos, [{ ...(existente as object), estatus: "Cancelada" } as never], nueva)).toEqual([]);
+    expect(detectarConflictos(recursos, [{ ...(existente as object), patientId: "p2" } as never], nueva)).toEqual([]);
+    expect(detectarConflictos(recursos, [existente], { ...nueva, horaInicio: "09:45", horaFin: "10:30" })).toEqual([]);
+  });
+
+  it("sin patientId se comporta como antes", () => {
+    expect(detectarConflictos(recursos, [existente], { ...nueva, patientId: null })).toEqual([]);
   });
 });

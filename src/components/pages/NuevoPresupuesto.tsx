@@ -21,6 +21,8 @@ import { calcularFechaVigencia } from "@/lib/presupuestoVigencia";
 import { prioridadTratamientoLabel } from "@/lib/planTratamiento";
 import type { PresupuestoPrefillItem } from "@/lib/historiaClinica";
 import { identidadDoctorDe, type BudgetData, type LineItem, type Patient } from "@/lib/patientData";
+import { medicoPredeterminadoParaPago } from "@/lib/medicoDelPago";
+import { toISODate } from "@/lib/agendaHelpers";
 
 const VIGENCIA_DIAS_DEFECTO = 30;
 
@@ -88,7 +90,7 @@ export default function NuevoPresupuesto({
   onSave: (budget: BudgetData) => void;
 }) {
   const patientName = patient.name;
-  const { recursos, procedimientos, setProcedimientos, perfilDoctor, irAPagina, setCambiosSinGuardar } =
+  const { recursos, citas, procedimientos, setProcedimientos, perfilDoctor, irAPagina, setCambiosSinGuardar } =
     usePatientData();
   const medicos = recursos.filter((r) => r.tipo === "medico");
   const procedimientosActivos = procedimientos.filter(esProcedimientoActivo);
@@ -99,7 +101,20 @@ export default function NuevoPresupuesto({
   const isEditing = Boolean(initialBudget);
   const [folio] = useState(() => initialBudget?.folio ?? generateFolio());
   const [fecha] = useState(() => initialBudget?.fecha ?? todayFormatted());
-  const [medico, setMedico] = useState(initialBudget?.medico ?? medicos[0]?.nombre ?? "");
+  // Con varios médicos en la clínica el de partida es el del paciente (responsable, cita de hoy o última cita), no el
+  // primero de la lista: el médico del presupuesto define a quién se le atribuye el trabajo.
+  const [medico, setMedico] = useState(
+    () =>
+      initialBudget?.medico ??
+      (medicoPredeterminadoParaPago({
+        patientId: patient.id,
+        medicoResponsableId: patient.medicoResponsableId,
+        recursos,
+        citas,
+        hoyISO: toISODate(new Date()),
+      }) || medicos[0]?.nombre) ??
+      ""
+  );
   const [tipoDePrecio, setTipoDePrecio] = useState(initialBudget?.tipoDePrecio ?? tiposDePrecios[0]);
   const [especialidad, setEspecialidad] = useState(
     initialBudget?.especialidad ?? especialidadesPredefinidas[0]
@@ -385,7 +400,10 @@ export default function NuevoPresupuesto({
   };
 
   const total = items.reduce((sum, item) => sum + item.price, 0);
-  const hayRenglonesSinPrecio = items.some((item) => item.price === 0);
+  // Un renglón en $0 es "falta precio" salvo que sea una cortesía o garantía a propósito (descuento del 100 %),
+  // por ejemplo atender sin costo una complicación del propio tratamiento.
+  const esCortesia = (item: LineItem) => item.price === 0 && (item.descuentoPct ?? 0) >= 100;
+  const hayRenglonesSinPrecio = items.some((item) => item.price === 0 && !esCortesia(item));
 
   const handleGuardar = () => {
     if (items.length === 0 || hayRenglonesSinPrecio) return;
@@ -843,7 +861,11 @@ export default function NuevoPresupuesto({
                     )}
                   </div>
                   <div className="flex items-center gap-3">
-                    {item.price === 0 ? (
+                    {esCortesia(item) ? (
+                      <span className="rounded-full bg-success/15 px-2 py-0.5 text-xs font-semibold text-success" title="Sin costo para el paciente (descuento del 100 %)">
+                        Cortesía
+                      </span>
+                    ) : item.price === 0 ? (
                       <button
                         onClick={() => iniciarEdicionItem(item)}
                         className="rounded-full bg-danger/15 px-2 py-0.5 text-xs font-semibold text-danger print:hidden"

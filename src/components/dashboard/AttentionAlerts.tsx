@@ -14,6 +14,7 @@ import {
   textoAntiguedad,
   type EstadoDocumentacion,
 } from "@/lib/documentacionPendiente";
+import { incidentesPendientesDeSeguimiento, VENTANA_INCIDENTES_DIAS } from "@/lib/incidentesPendientes";
 import LaboratoriosPendientesPanel from "./LaboratoriosPendientesPanel";
 
 function toIso(d: Date): string {
@@ -68,6 +69,7 @@ export default function AttentionAlerts({ rango }: { rango: RangoPeriodo }) {
     presupuestosPendientesDetalle,
     laboratoriosPendientes,
     irAPagina,
+    irAExpediente,
     recursos,
     horario,
     horarioCargado,
@@ -118,9 +120,24 @@ export default function AttentionAlerts({ rango }: { rango: RangoPeriodo }) {
     [citas, rango.desdeISO, rango.hastaISO]
   );
 
+  // Para avisar de incidentes sin seguimiento también hacen falta las notas de quien se atendió en los últimos días,
+  // aunque el periodo elegido arriba sea más corto.
+  const desdeIncidentesISO = useMemo(() => {
+    const d = new Date();
+    d.setDate(d.getDate() - VENTANA_INCIDENTES_DIAS);
+    return toIso(d);
+  }, []);
   const patientIdsNecesarios = useMemo(
-    () => Array.from(new Set(citasAtendidasRecientes.map((c) => c.patientId as string))),
-    [citasAtendidasRecientes]
+    () =>
+      Array.from(
+        new Set([
+          ...citasAtendidasRecientes.map((c) => c.patientId as string),
+          ...citas
+            .filter((c) => c.estatus === "Atendida" && c.patientId && c.fecha >= desdeIncidentesISO && c.fecha <= toIso(new Date()))
+            .map((c) => c.patientId as string),
+        ])
+      ),
+    [citasAtendidasRecientes, citas, desdeIncidentesISO]
   );
   const claveIdsNecesarios = patientIdsNecesarios.join(",");
 
@@ -147,7 +164,26 @@ export default function AttentionAlerts({ rango }: { rango: RangoPeriodo }) {
   const borrador = clasificadas.filter((x) => x.estado === "borrador");
   const listaRevision = clasificadas.filter((x) => x.estado === "lista_revision");
 
+  const incidentes = incidentesPendientesDeSeguimiento(notasEvolucionPorPaciente, citas, toIso(hoy));
+
   const alertas: Alerta[] = [];
+
+  if (incidentes.length > 0) {
+    const primero = incidentes[0];
+    alertas.push({
+      key: "incidentes-sin-seguimiento",
+      emoji: "🔴",
+      texto:
+        incidentes.length === 1
+          ? `${primero.paciente} tuvo un incidente en su atención (${primero.queOcurrio}) y aún no tiene cita de seguimiento${
+              primero.seguimientoRequerido ? ` — pendiente: ${primero.seguimientoRequerido}` : ""
+            }`
+          : `${incidentes.length} pacientes tuvieron un incidente en su atención y aún no tienen cita de seguimiento — el más antiguo, ${primero.paciente}`,
+      prioridad: "alta",
+      categoria: "documentacion",
+      onClick: () => irAExpediente(primero.patientId, "Notas de Evolución y Seguimiento"),
+    });
+  }
 
   if (conectaPorAtender > 0) {
     alertas.push({

@@ -11,6 +11,7 @@ import {
   variacionPct,
   type RangoPeriodo,
 } from "@/lib/dashboardMetrics";
+import { hayBloquesCapturados, horasDisponiblesPorBloques } from "@/lib/sedesBloques";
 import DashboardMetricCard from "./DashboardMetricCard";
 import DashboardDetallePanel, { type DashboardDetalleItem } from "./DashboardDetallePanel";
 
@@ -25,7 +26,7 @@ type Detalle = { title: string; items: DashboardDetalleItem[] } | null;
  * clínicas. Pacientes Activos usa una ventana fija de 12 meses (definición
  * de "actividad clínica", no del periodo del selector). */
 export default function ProductivitySummary({ rango }: { rango: RangoPeriodo }) {
-  const { patients, citas, horario, irAExpediente } = usePatientData();
+  const { patients, citas, horario, recursos, irAExpediente } = usePatientData();
   const [detalle, setDetalle] = useState<Detalle>(null);
 
   const hoy = new Date();
@@ -45,7 +46,11 @@ export default function ProductivitySummary({ rango }: { rango: RangoPeriodo }) 
   const activos = pacientesActivos(citas, hoyISO);
 
   const horasClinicas = horasClinicasEnRango(citas, rango.desdeISO, rango.hastaISO);
-  const horasDisponibles = horasDisponiblesEnRango(horario, rango.desdeISO, rango.hastaISO);
+  // Con varios médicos, lo que se abre son los bloques de cada uno; solo sin bloques se usa el horario del consultorio.
+  const medicos = recursos.filter((r) => r.tipo === "medico");
+  const horasDisponibles = hayBloquesCapturados(medicos)
+    ? horasDisponiblesPorBloques(medicos, rango.desdeISO, rango.hastaISO)
+    : horasDisponiblesEnRango(horario, rango.desdeISO, rango.hastaISO);
   const ocupacionPct = horasDisponibles > 0 ? Math.min(100, Math.round((horasClinicas / horasDisponibles) * 100)) : 0;
   const citasClinicasPeriodo = citas.filter(
     (c) => c.estatus === "Atendida" && c.fecha >= rango.desdeISO && c.fecha <= rango.hastaISO

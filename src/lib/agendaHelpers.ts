@@ -170,11 +170,11 @@ export function resolverUnidad(recursos: Recurso[], cita: CitaResoluble): Recurs
 export function detectarConflictos(
   recursos: Recurso[],
   citas: CitaAgenda[],
-  candidata: CitaResoluble & { id?: string; fecha: string; horaInicio: string; horaFin: string }
+  candidata: CitaResoluble & { id?: string; patientId?: string | null; fecha: string; horaInicio: string; horaFin: string }
 ): string[] {
   const medicoCand = resolverMedico(recursos, candidata);
   const unidadCand = resolverUnidad(recursos, candidata);
-  if (!medicoCand && !unidadCand) return [];
+  if (!medicoCand && !unidadCand && !candidata.patientId) return [];
 
   const inicioCand = timeToMinutes(candidata.horaInicio);
   const finCand = timeToMinutes(candidata.horaFin);
@@ -205,6 +205,16 @@ export function detectarConflictos(
     if (choque) {
       avisos.push(
         `${unidadCand.nombre} ya está ocupada de ${choque.horaInicio} a ${choque.horaFin} (${choque.paciente}).`
+      );
+    }
+  }
+  // El mismo paciente no puede estar en dos citas a la vez, aunque sean con médicos o en sedes distintas.
+  if (candidata.patientId) {
+    const choque = otras.find((c) => traslapa(c) && c.patientId === candidata.patientId);
+    if (choque) {
+      const conQuien = resolverMedico(recursos, choque)?.nombre;
+      avisos.push(
+        `${choque.paciente} ya tiene otra cita de ${choque.horaInicio} a ${choque.horaFin}${conQuien ? ` con ${conQuien}` : ""}.`
       );
     }
   }

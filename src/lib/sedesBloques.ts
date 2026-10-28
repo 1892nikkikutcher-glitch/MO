@@ -110,6 +110,36 @@ export function bloquesDelDia(bloques: BloqueAtencion[] | undefined, fechaISO: s
   return (bloques ?? []).filter((b) => b.dias.includes(dia));
 }
 
+/** Horas que abren los bloques de todos los médicos entre dos fechas ("YYYY-MM-DD", ambas incluidas). Con `sedeId`
+ * solo cuentan los bloques de esa sede. Es la disponibilidad real de una clínica con varios médicos: cada uno abre sus
+ * propias horas, no hay un solo horario del consultorio. */
+export function horasDisponiblesPorBloques(
+  medicos: { bloques?: unknown }[],
+  desdeISO: string,
+  hastaISO: string,
+  sedeId?: string
+): number {
+  const [a1, m1, d1] = desdeISO.split("-").map(Number);
+  const [a2, m2, d2] = hastaISO.split("-").map(Number);
+  const hasta = new Date(a2, m2 - 1, d2);
+  let minutos = 0;
+  for (let d = new Date(a1, m1 - 1, d1); d <= hasta; d.setDate(d.getDate() + 1)) {
+    const dia = d.getDay();
+    for (const medico of medicos) {
+      for (const b of normalizarBloques(medico.bloques)) {
+        if (sedeId && b.sedeId !== sedeId) continue;
+        if (b.dias.includes(dia)) minutos += aMinutos(b.fin) - aMinutos(b.inicio);
+      }
+    }
+  }
+  return Math.round(minutos / 6) / 10;
+}
+
+/** ¿Algún médico ya tiene bloques capturados? Si sí, la ocupación se mide contra ellos; si no, contra el horario del consultorio. */
+export function hayBloquesCapturados(medicos: { bloques?: unknown }[]): boolean {
+  return medicos.some((m) => normalizarBloques(m.bloques).length > 0);
+}
+
 export type EvaluacionDeCita =
   /** El médico no tiene bloques capturados: no hay nada contra qué comparar. */
   | { estado: "sin_bloques" }

@@ -10,6 +10,7 @@ import {
 } from "@/lib/patientData";
 import { descargarICS } from "@/lib/exportCalendario";
 import { horasDisponiblesEnRango } from "@/lib/dashboardMetrics";
+import { hayBloquesCapturados, horasDisponiblesPorBloques } from "@/lib/sedesBloques";
 import { collection, onSnapshot, query, where } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import {
@@ -289,20 +290,20 @@ export default function Agenda() {
 
   /** Fuente para todo lo que se dibuja en la grilla (día/3días/semana/mes)
    * y para el resumen por vista — citasEnRango ya viene acotada al rango
-   * visible (ver useCitasEnRango). Los conteos globales de arriba
-   * (conteoEstatus) siguen usando `citas` completo a propósito. */
-  const citasVisibles = citasEnRango.filter((c) => {
+   * visible (ver useCitasEnRango). Los botones de estatus de arriba cuentan lo mismo que se ve
+   * (rango, médicos y sede elegidos), para que el número coincida con la pantalla. */
+  const pasaMedicosYSede = (c: CitaAgenda) => {
     const idsRecurso = [c.medicoId, c.unidadId, c.recursoId].filter(Boolean) as string[];
-    const ocultaPorRecurso = idsRecurso.some((id) => recursosOcultos.has(id));
-    if (ocultaPorRecurso || estatusOcultos.has(c.estatus)) return false;
+    if (idsRecurso.some((id) => recursosOcultos.has(id))) return false;
     // Con una sede elegida solo se ven las citas de esa sede.
     if (sedeFiltro !== "todas" && sedeDeCita(c, recursos, sedes)?.id !== sedeFiltro) return false;
     return true;
-  });
+  };
+  const citasVisibles = citasEnRango.filter((c) => pasaMedicosYSede(c) && !estatusOcultos.has(c.estatus));
 
   const conteoEstatus = citaEstatusOptions.map((e) => ({
     estatus: e,
-    total: citas.filter((c) => c.estatus === e).length,
+    total: citasEnRango.filter((c) => c.estatus === e && pasaMedicosYSede(c)).length,
   }));
 
   const toggleRecurso = (id: string) => {
@@ -539,11 +540,10 @@ export default function Agenda() {
   };
 
   /** Métricas del periodo visible en la vista activa. La ocupación solo se
-   * calcula en "Ver por: Todos" contra el horario configurado del
-   * consultorio (única disponibilidad real que existe hoy) — al filtrar
-   * por médico o unidad específicos no hay disponibilidad configurada por
-   * recurso todavía, así que se muestra "—" en vez de inventar un
-   * porcentaje (queda lista la arquitectura para cuando exista). */
+   * calcula en "Ver por: Todos": contra los bloques de atención de los médicos
+   * (de la sede elegida, si hay una) y, si ninguno los tiene, contra el horario
+   * del consultorio. Al filtrar por médico o unidad específicos se muestra "—"
+   * en vez de inventar un porcentaje. */
   const resumenVista = useMemo(() => {
     const citasDelRango = citasVisibles.filter(
       (c) => c.fecha >= rangoResumen.desde && c.fecha <= rangoResumen.hasta
@@ -557,7 +557,11 @@ export default function Agenda() {
       ) / 10;
     let ocupacion: number | null = null;
     if (vistaRecurso === "todos") {
-      const disponibles = horasDisponiblesEnRango(horario, rangoResumen.desde, rangoResumen.hasta);
+      // Con médicos que tienen bloques, la disponibilidad es la de sus bloques (de la sede elegida, si hay una); si no, el horario del consultorio.
+      const medicosAgenda = recursos.filter((r) => r.tipo === "medico");
+      const disponibles = hayBloquesCapturados(medicosAgenda)
+        ? horasDisponiblesPorBloques(medicosAgenda, rangoResumen.desde, rangoResumen.hasta, sedeFiltro === "todas" ? undefined : sedeFiltro)
+        : horasDisponiblesEnRango(horario, rangoResumen.desde, rangoResumen.hasta);
       ocupacion = disponibles > 0 ? Math.round((horasClinicas / disponibles) * 1000) / 10 : null;
     }
     return {
@@ -571,7 +575,7 @@ export default function Agenda() {
       horasClinicas,
       ocupacion,
     };
-  }, [citasVisibles, rangoResumen, horario, vistaRecurso]);
+  }, [citasVisibles, rangoResumen, horario, vistaRecurso, recursos, sedeFiltro]);
 
   return (
     <div className="mx-auto flex w-full max-w-[1600px] flex-col gap-6">

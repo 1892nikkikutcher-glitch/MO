@@ -414,7 +414,9 @@ export function ocupacionPorSemana(
   citas: CitaAgenda[],
   horario: HorarioAtencion,
   hoy: Date,
-  n = 8
+  n = 8,
+  /** Horas disponibles de un rango; sin esto se usa el horario del consultorio (ver `horasDisponiblesEnRango`). */
+  disponiblesEn?: (desdeISO: string, hastaISO: string) => number
 ): PuntoSemanal[] {
   const semanas: PuntoSemanal[] = [];
   for (let i = n - 1; i >= 0; i--) {
@@ -426,7 +428,7 @@ export function ocupacionPorSemana(
     const desdeISO = toIsoDate(inicioSemana);
     const hastaISO = toIsoDate(finSemana);
     const horas = horasClinicasEnRango(citas, desdeISO, hastaISO);
-    const disponibles = horasDisponiblesEnRango(horario, desdeISO, hastaISO);
+    const disponibles = disponiblesEn ? disponiblesEn(desdeISO, hastaISO) : horasDisponiblesEnRango(horario, desdeISO, hastaISO);
     const pct = disponibles > 0 ? Math.min(100, Math.round((horas / disponibles) * 100)) : 0;
 
     semanas.push({ label: `${inicioSemana.getDate()}/${inicioSemana.getMonth() + 1}`, valor: pct });

@@ -319,6 +319,7 @@ export default function AgendaCitaDialog({
     fecha && horaInicio && (medicoId || unidadId)
       ? detectarConflictos(recursos, citas, {
           id: initial.id,
+          patientId: patientId || null,
           fecha,
           horaInicio,
           horaFin: minutesToTime(timeToMinutes(horaInicio) + duracion),

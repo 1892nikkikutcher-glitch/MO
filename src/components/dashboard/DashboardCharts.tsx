@@ -5,6 +5,7 @@ import { usePrivacidad } from "@/context/PrivacidadContext";
 import { formatCurrency } from "@/lib/patientData";
 import { produccionPorTratamiento } from "@/lib/reportes";
 import { ingresosPorMes, ocupacionPorSemana, pacientesNuevosPorMes } from "@/lib/dashboardMetrics";
+import { hayBloquesCapturados, horasDisponiblesPorBloques } from "@/lib/sedesBloques";
 import BarChart from "./charts/BarChart";
 import HorizontalBarList from "./charts/HorizontalBarList";
 
@@ -44,7 +45,7 @@ function ChartCard({
  * gate que el resto de la app); Pacientes Nuevos y Ocupación son
  * operativas y quedan visibles para todos los roles. */
 export default function DashboardCharts() {
-  const { puedeVerFinanzas, finanzas, patients, citas, horario, procedimientos } = usePatientData();
+  const { puedeVerFinanzas, finanzas, patients, citas, horario, recursos, procedimientos } = usePatientData();
 
   const hoy = new Date();
 
@@ -53,7 +54,14 @@ export default function DashboardCharts() {
     label: p.label,
     valor: p.valor,
   }));
-  const datosOcupacion = ocupacionPorSemana(citas, horario, hoy);
+  const medicos = recursos.filter((r) => r.tipo === "medico");
+  const datosOcupacion = ocupacionPorSemana(
+    citas,
+    horario,
+    hoy,
+    8,
+    hayBloquesCapturados(medicos) ? (desde, hasta) => horasDisponiblesPorBloques(medicos, desde, hasta) : undefined
+  );
 
   const { porTratamiento, sinCatalogoCount } = produccionPorTratamiento(citas, procedimientos);
   const topTratamientos = porTratamiento.slice(0, 8).map((t) => ({

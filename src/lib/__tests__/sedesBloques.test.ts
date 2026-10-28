@@ -6,7 +6,9 @@ import {
   errorDeBloque,
   etiquetaDias,
   evaluarCitaContraBloques,
+  hayBloquesCapturados,
   horariosSeguidos,
+  horasDisponiblesPorBloques,
   mensajeFueraDeBloque,
   normalizarBloques,
   sedeDeCita,
@@ -208,5 +210,34 @@ describe("número de semana del año", () => {
     expect(semanaConTotalDelAnio(new Date(2025, 5, 18))).toEqual({ semana: 25, total: 52 });
     // 2024 (bisiesto que empieza en lunes) tiene 52.
     expect(semanaConTotalDelAnio(new Date(2024, 11, 30))).toEqual({ semana: 1, total: 52 });
+  });
+});
+
+describe("horasDisponiblesPorBloques", () => {
+  // 2026-10-26 es lunes.
+  const medicos = [
+    { bloques: [{ id: "a", sedeId: "s1", dias: [1, 3], inicio: "09:00", fin: "14:00" }] },
+    { bloques: [{ id: "b", sedeId: "s2", dias: [1, 2, 3, 4, 5], inicio: "10:00", fin: "12:30" }] },
+    {},
+  ];
+
+  it("suma lo que abren los bloques de todos los médicos en el rango", () => {
+    // Lunes y miércoles: 5 h del primero; lunes a viernes: 2.5 h del segundo → 2×5 + 5×2.5 = 22.5 h.
+    expect(horasDisponiblesPorBloques(medicos, "2026-10-26", "2026-10-30")).toBe(22.5);
+  });
+
+  it("con una sede solo cuenta los bloques de esa sede", () => {
+    expect(horasDisponiblesPorBloques(medicos, "2026-10-26", "2026-10-30", "s1")).toBe(10);
+    expect(horasDisponiblesPorBloques(medicos, "2026-10-26", "2026-10-30", "s2")).toBe(12.5);
+  });
+
+  it("un solo día y días sin bloques", () => {
+    expect(horasDisponiblesPorBloques(medicos, "2026-10-26", "2026-10-26")).toBe(7.5);
+    expect(horasDisponiblesPorBloques(medicos, "2026-10-31", "2026-11-01")).toBe(0);
+  });
+
+  it("hayBloquesCapturados distingue clínicas con y sin bloques", () => {
+    expect(hayBloquesCapturados(medicos)).toBe(true);
+    expect(hayBloquesCapturados([{}, { bloques: [] }])).toBe(false);
   });
 });

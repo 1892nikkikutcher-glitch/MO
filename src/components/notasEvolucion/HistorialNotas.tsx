@@ -102,10 +102,27 @@ function TarjetaFirmadaV2({ nota, diagnosticosCatalogo }: { nota: NotaEvolucionV
         <span>
           <span className="font-medium text-ink/70">{fechaGuardado}</span> · {nota.encabezado.medico || "Sin médico registrado"}
         </span>
-        <span className={`rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase ${estadoBadge[nota.estado].clase}`}>
-          {nota.estado === "con_aclaracion" ? "Con aclaración" : "Firmada"}
+        <span className="flex items-center gap-1.5">
+          {nota.estadoFinal?.chips.includes("incidente") && (
+            <span className="rounded-full bg-danger/15 px-2 py-0.5 text-[10px] font-semibold uppercase text-danger">Incidente</span>
+          )}
+          <span className={`rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase ${estadoBadge[nota.estado].clase}`}>
+            {nota.estado === "con_aclaracion" ? "Con aclaración" : "Firmada"}
+          </span>
         </span>
       </div>
+      {nota.estadoFinal?.chips.includes("incidente") && nota.estadoFinal.incidente?.queOcurrio && (
+        <div className="mt-2 rounded-lg border border-danger/30 bg-danger/10 px-3 py-2 text-xs text-ink/80">
+          <p>
+            <span className="font-semibold text-danger">Qué ocurrió:</span> {nota.estadoFinal.incidente.queOcurrio}
+          </p>
+          {nota.estadoFinal.incidente.seguimientoRequerido && (
+            <p className="mt-0.5">
+              <span className="font-semibold text-danger">Seguimiento:</span> {nota.estadoFinal.incidente.seguimientoRequerido}
+            </p>
+          )}
+        </div>
+      )}
       {nota.detalleProcedimiento?.actividadRealizada && (
         <p className="mt-2 text-sm font-medium text-ink">
           {nota.detalleProcedimiento.actividadRealizada}
