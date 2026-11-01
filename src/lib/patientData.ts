@@ -5,6 +5,7 @@ import type { PrioridadTratamiento } from "./planTratamiento";
 import { montoMayorQue, redondearDinero } from "./dinero";
 import type { MigracionEstado } from "./migracionExpedienteEstado";
 import type { RazonNoAsistencia } from "./noAsistencia";
+import type { DatosFiscales } from "./facturacion";
 
 export type Patient = {
   id: string;
@@ -13,6 +14,8 @@ export type Patient = {
   /** Estrellas puestas a mano por el doctor (0 a 5, de media en media). Ausente = se usa la calificación que
    * sale de sus citas (ver lib/calificacionPaciente.ts). */
   calificacionManual?: number;
+  /** Lo que se necesita para facturarle (RFC, razón social, régimen…). Se captura desde Facturación. */
+  datosFiscales?: DatosFiscales;
   name: string;
   phone: string;
   email?: string;

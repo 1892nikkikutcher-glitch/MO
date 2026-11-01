@@ -15,6 +15,8 @@ import {
   type EstadoDocumentacion,
 } from "@/lib/documentacionPendiente";
 import { incidentesPendientesDeSeguimiento, VENTANA_INCIDENTES_DIAS } from "@/lib/incidentesPendientes";
+import { DIAS_AVISO_MANTENIMIENTO, resumenMantenimiento } from "@/lib/mantenimientoEquipos";
+import { pagosPendientesDeFacturar, totalDePagos } from "@/lib/facturacion";
 import LaboratoriosPendientesPanel from "./LaboratoriosPendientesPanel";
 
 function toIso(d: Date): string {
@@ -79,6 +81,10 @@ export default function AttentionAlerts({ rango }: { rango: RangoPeriodo }) {
     cargarNotasPaciente,
     miRol,
     cashbackMovimientos,
+    equipos,
+    registrosEquipos,
+    pagosRealizados,
+    facturas,
   } = usePatientData();
   const [mostrarLaboratorios, setMostrarLaboratorios] = useState(false);
   const { casosRecibidos, casosEnviados, uid: miUidConecta, novedades: novedadesConecta } = useMoConecta();
@@ -258,6 +264,19 @@ export default function AttentionAlerts({ rango }: { rango: RangoPeriodo }) {
     });
   }
 
+  const porFacturar = puedeVerFinanzas ? pagosPendientesDeFacturar(pagosRealizados, facturas, hoy) : [];
+  if (porFacturar.length > 0) {
+    const masAntiguo = Math.max(...porFacturar.map((p) => p.dias));
+    alertas.push({
+      key: "por-facturar",
+      emoji: "🟡",
+      texto: `${porFacturar.length} pago(s) esperan su factura — ${formatCurrency(totalDePagos(porFacturar.map((p) => p.registro)))}, el más antiguo ${textoAntiguedad(masAntiguo)}`,
+      prioridad: masAntiguo > 20 ? "media" : "baja",
+      categoria: "financiero",
+      onClick: () => irAPagina("facturacion"),
+    });
+  }
+
   if (citasMananaSinConfirmar > 0) {
     alertas.push({
       key: "manana",
@@ -310,6 +329,49 @@ export default function AttentionAlerts({ rango }: { rango: RangoPeriodo }) {
       prioridad: "alta",
       categoria: "inventario",
       onClick: () => irAPagina("deposito-dental"),
+    });
+  }
+
+  const mantenimiento = resumenMantenimiento(equipos, registrosEquipos, hoy);
+  const listaNombres = (lista: { nombre: string }[]) =>
+    lista.length <= 2 ? lista.map((e) => e.nombre).join(" y ") : `${lista[0].nombre} y ${lista.length - 1} más`;
+  if (mantenimiento.conFalla.length > 0) {
+    alertas.push({
+      key: "equipos-con-falla",
+      emoji: "🔴",
+      texto:
+        mantenimiento.conFalla.length === 1
+          ? `${mantenimiento.conFalla[0].nombre} tiene una falla reportada — avisa al ingeniero biomédico`
+          : `${mantenimiento.conFalla.length} equipos tienen falla reportada (${listaNombres(mantenimiento.conFalla)})`,
+      prioridad: "alta",
+      categoria: "inventario",
+      onClick: () => irAPagina("mantenimiento-equipos"),
+    });
+  }
+  if (mantenimiento.vencidos.length > 0) {
+    alertas.push({
+      key: "equipos-mantenimiento-vencido",
+      emoji: "🟠",
+      texto:
+        mantenimiento.vencidos.length === 1
+          ? `${mantenimiento.vencidos[0].nombre} ya pasó su fecha de mantenimiento`
+          : `${mantenimiento.vencidos.length} equipos ya pasaron su fecha de mantenimiento (${listaNombres(mantenimiento.vencidos)})`,
+      prioridad: "media",
+      categoria: "inventario",
+      onClick: () => irAPagina("mantenimiento-equipos"),
+    });
+  }
+  if (mantenimiento.proximos.length > 0) {
+    alertas.push({
+      key: "equipos-mantenimiento-proximo",
+      emoji: "🟡",
+      texto:
+        mantenimiento.proximos.length === 1
+          ? `${mantenimiento.proximos[0].nombre} necesita mantenimiento en los próximos ${DIAS_AVISO_MANTENIMIENTO} días`
+          : `${mantenimiento.proximos.length} equipos necesitan mantenimiento en los próximos ${DIAS_AVISO_MANTENIMIENTO} días (${listaNombres(mantenimiento.proximos)})`,
+      prioridad: "baja",
+      categoria: "inventario",
+      onClick: () => irAPagina("mantenimiento-equipos"),
     });
   }
 

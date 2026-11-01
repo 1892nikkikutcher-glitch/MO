@@ -69,6 +69,7 @@ export const PALABRAS_CLAVE: Record<string, string> = {
   asistencia: "checada entrada salida horario personal puntualidad empleados",
   "regulacion-sanitaria": "cofepris aviso de funcionamiento licencia sanitaria normas",
   rpbi: "residuos peligrosos biologico infecciosos bitacora",
+  "mantenimiento-equipos": "equipos aparatos autoclave compresor sillon rayos x falla descompuesto reparacion ingeniero biomedico bitacora garantia fecha de compra calibracion",
   contrasena: "cambiar contrasena seguridad clave acceso",
   planes: "plan suscripcion pago prueba precio",
 };

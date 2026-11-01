@@ -223,6 +223,11 @@ const tiposPapelera: Record<string, DefinicionTipo> = {
     grupo: "finanzas",
     etiqueta: (d) => unir(dinero(d.total) || "Pago", fechaCorta(d.fecha), texto(d.formaPago)),
   },
+  facturas: {
+    singular: "Factura",
+    grupo: "finanzas",
+    etiqueta: (d) => unir("Factura", [texto(d.serie), texto(d.folio)].filter(Boolean).join("-"), texto(d.patientName), dinero(d.total)),
+  },
   gastos: {
     singular: "Gasto",
     grupo: "finanzas",
@@ -242,6 +247,13 @@ const tiposPapelera: Record<string, DefinicionTipo> = {
   aseguradoras: { singular: "Aseguradora", grupo: "catalogos" },
   empresasRpbi: { singular: "Empresa de RPBI", grupo: "catalogos" },
   contadores: { singular: "Contador", grupo: "catalogos" },
+  equipos: { singular: "Equipo del consultorio", grupo: "catalogos" },
+  ingenierosBiomedicos: { singular: "Ingeniero biomédico", grupo: "catalogos" },
+  registrosEquipos: {
+    singular: "Registro de mantenimiento de equipo",
+    grupo: "bitacoras",
+    etiqueta: (d) => unir(texto(d.tipo) || "Registro de equipo", fechaCorta(d.fecha), texto(d.descripcion)),
+  },
 
   // Proveedores
   depositosDentales: { singular: "Depósito dental", grupo: "proveedores" },

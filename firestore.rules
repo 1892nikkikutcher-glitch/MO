@@ -394,6 +394,23 @@ service cloud.firestore {
       allow read, create, update: if isActiveMember(ownerId);
       allow delete: if puedeBorrar(ownerId);
     }
+    // Facturas emitidas (con RFC y montos de los pacientes): financiero, solo admin — mismo criterio que pagos.
+    match /users/{ownerId}/facturas/{id} {
+      allow read, write: if isClinicAdmin(ownerId);
+    }
+    // Mantenimiento de equipos: cualquier miembro registra una falla o un servicio; solo el administrador elimina.
+    match /users/{ownerId}/equipos/{id} {
+      allow read, create, update: if isActiveMember(ownerId);
+      allow delete: if puedeBorrar(ownerId);
+    }
+    match /users/{ownerId}/registrosEquipos/{id} {
+      allow read, create, update: if isActiveMember(ownerId);
+      allow delete: if puedeBorrar(ownerId);
+    }
+    match /users/{ownerId}/ingenierosBiomedicos/{id} {
+      allow read, create, update: if isActiveMember(ownerId);
+      allow delete: if puedeBorrar(ownerId);
+    }
     match /users/{ownerId}/otsLog/{id} {
       allow read, create, update: if isActiveMember(ownerId);
       allow delete: if puedeBorrar(ownerId);

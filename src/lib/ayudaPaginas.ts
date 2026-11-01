@@ -197,9 +197,13 @@ export const ayudaPaginas: Record<string, AyudaPagina> = {
   },
   facturacion: {
     titulo: "Facturación",
-    resumen: "Sección en construcción: todavía no se pueden emitir facturas desde MO.",
+    resumen: "Control de pagos por facturar y registro de las facturas emitidas. MO no timbra ante el SAT: la factura se emite en tu sistema o con tu contador y aquí se registra.",
     puntos: [
-      "Mientras tanto, al registrar un pago puedes marcar «Activo para facturar» para dejarlo identificado.",
+      "Al cobrar, marca «Activo para facturar»: el pago aparece en «Por facturar», agrupado por paciente.",
+      "Captura los datos fiscales del paciente (RFC, razón social, régimen, C.P. y uso de CFDI) o pídeselos por WhatsApp.",
+      "Cuando emitas la factura, usa «Registrar factura» con su serie y folio: los pagos quedan ligados a ella.",
+      "En «Facturas emitidas» busca por folio, paciente o RFC, filtra por fechas, descarga el listado en Excel y avisa al paciente por WhatsApp.",
+      "Si cancelas una factura, sus pagos regresan a «Por facturar».",
     ],
   },
   educacion: {
@@ -265,6 +269,16 @@ export const ayudaPaginas: Record<string, AyudaPagina> = {
     titulo: "RPBI",
     resumen: "Control de Residuos Peligrosos Biológico-Infecciosos: empresa recolectora y bitácora de recolección.",
     puntos: [],
+  },
+  "mantenimiento-equipos": {
+    titulo: "Mantenimiento de equipos",
+    resumen: "Inventario del equipo del consultorio con su bitácora de mantenimientos y fallas, y aviso al ingeniero biomédico.",
+    puntos: [
+      "Da de alta cada equipo con su fecha de compra, garantía y cada cuántos meses le toca mantenimiento.",
+      "Si algo falla, usa «Reportar falla»: el equipo queda marcado y aparece en Requieren Atención en Inicio.",
+      "«Avisar al ingeniero» abre WhatsApp con el equipo, la serie y la falla ya escritos.",
+      "Al registrar un mantenimiento, la falla abierta se da por resuelta y se calcula la siguiente fecha.",
+    ],
   },
   contabilidad: {
     titulo: "Contabilidad y finanzas",

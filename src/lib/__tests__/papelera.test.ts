@@ -268,6 +268,7 @@ describe("catálogo de tipos", () => {
       "depositosDentales", "articulosFaltantes", "articulosCaducidad", "centrosRadiodiagnostico",
       "laboratoriosDentales", "encuestas", "domiciliaciones", "pendientes", "personalAsistencia",
       "registrosAsistencia", "pagosEliminados", "pagosRealizados", "presupuestosLog", "recetasLog", "otsLog",
+      "equipos", "ingenierosBiomedicos", "registrosEquipos", "facturas",
     ].forEach((t) => expect(todos.has(t), t).toBe(true));
   });
 

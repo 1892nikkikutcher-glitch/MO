@@ -165,6 +165,8 @@ import type { EncuestaEnviada } from "@/lib/encuestas";
 import type { Pendiente } from "@/lib/pendientes";
 import type { Domiciliacion } from "@/lib/domiciliacion";
 import type { Promocion, Aseguradora, EmpresaRPBI, Contador } from "@/lib/catalogosVarios";
+import type { Equipo, RegistroEquipo, IngenieroBiomedico } from "@/lib/mantenimientoEquipos";
+import type { Factura } from "@/lib/facturacion";
 import type { PersonalAsistencia, RegistroAsistencia } from "@/lib/asistencia";
 import type { Procedimiento } from "@/lib/procedimientos";
 import { catalogoRecomendado } from "@/lib/catalogoRecomendado";
@@ -883,6 +885,14 @@ type PatientDataContextValue = {
   setEmpresasRpbi: (updater: Updater<EmpresaRPBI[]>) => void;
   contadores: Contador[];
   setContadores: (updater: Updater<Contador[]>) => void;
+  facturas: Factura[];
+  setFacturas: (updater: Updater<Factura[]>) => void;
+  equipos: Equipo[];
+  setEquipos: (updater: Updater<Equipo[]>) => void;
+  registrosEquipos: RegistroEquipo[];
+  setRegistrosEquipos: (updater: Updater<RegistroEquipo[]>) => void;
+  ingenierosBiomedicos: IngenieroBiomedico[];
+  setIngenierosBiomedicos: (updater: Updater<IngenieroBiomedico[]>) => void;
   membresiasPorPaciente: Record<string, PatientMembership[]>;
   activarMembresia: (
     patientId: string,
@@ -1228,6 +1238,10 @@ export function PatientDataProvider({
   const [aseguradoras, setAseguradoras] = useFirestoreList<Aseguradora>(clinicUid, "aseguradoras");
   const [empresasRpbi, setEmpresasRpbi] = useFirestoreList<EmpresaRPBI>(clinicUid, "empresasRpbi");
   const [contadores, setContadores] = useFirestoreList<Contador>(clinicUid, "contadores");
+  const [facturas, setFacturas] = useFirestoreList<Factura>(clinicUid, "facturas");
+  const [equipos, setEquipos] = useFirestoreList<Equipo>(clinicUid, "equipos");
+  const [registrosEquipos, setRegistrosEquipos] = useFirestoreList<RegistroEquipo>(clinicUid, "registrosEquipos");
+  const [ingenierosBiomedicos, setIngenierosBiomedicos] = useFirestoreList<IngenieroBiomedico>(clinicUid, "ingenierosBiomedicos");
   const [personalAsistencia, setPersonalAsistencia] = useFirestoreList<PersonalAsistencia>(
     clinicUid,
     "personalAsistencia"
@@ -3282,6 +3296,14 @@ export function PatientDataProvider({
         setEmpresasRpbi,
         contadores,
         setContadores,
+        facturas,
+        setFacturas,
+        equipos,
+        setEquipos,
+        registrosEquipos,
+        setRegistrosEquipos,
+        ingenierosBiomedicos,
+        setIngenierosBiomedicos,
         membresiasPorPaciente,
         activarMembresia,
         renovarMembresia,
