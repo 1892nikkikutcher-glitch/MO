@@ -38,6 +38,7 @@ export const PALABRAS_CLAVE: Record<string, string> = {
   "reportes-corte-caja": "corte de caja formas de pago efectivo tarjeta comision medicos ingresos del dia",
   "reportes-corte-diario": "corte del dia cobros diarios ingresos",
   "reportes-cierre-del-dia": "confirmar citas siguiente dia espacios libres pendientes material",
+  "reportes-porcentajes": "porcentajes comision medicos trabajador cuanto cobra meta objetivo avance pago a doctores",
   "reportes-evaluacion-semanal": "bloques ocupacion puntualidad cancelaciones horas atendidas costos directos",
   "reportes-presupuestos": "presupuestos creados aceptados pendientes cierre",
   "reportes-saldos-pendientes": "deudas adeudos cuentas por cobrar pacientes que deben saldo pendiente",

@@ -168,6 +168,7 @@ export const navItems = [
       { id: "reportes-pagos", label: "Pagos" },
       { id: "reportes-devoluciones", label: "Devoluciones" },
       { id: "reportes-corte-caja", label: "Corte caja" },
+      { id: "reportes-porcentajes", label: "Porcentajes" },
       { id: "reportes-cierre-del-dia", label: "Cierre del día" },
       { id: "reportes-evaluacion-semanal", label: "Evaluación semanal" },
       { id: "reportes-presupuestos", label: "Presupuestos" },

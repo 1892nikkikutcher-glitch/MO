@@ -610,6 +610,9 @@ export type Recurso = {
    * cobra la clínica. Solo aplica a tipo "medico"; ausente = todavía sin
    * configurar, nunca se asume un valor por defecto. */
   porcentajeComision?: number;
+  /** Meta de cobro mensual de este médico ($) — para el reporte de Porcentajes (cuánto lleva y cuánto le falta).
+   * Solo aplica a tipo "medico"; ausente = sin meta. */
+  metaMensual?: number;
   /** Se atiende fuera del consultorio principal (consulta externa) — solo para
    * identificarlo en la lista de Recursos de la Agenda. Ausente = no. */
   consultaExterna?: boolean;

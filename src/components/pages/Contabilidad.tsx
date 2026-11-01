@@ -149,6 +149,7 @@ const ACCESOS_FINANZAS: { id: string; titulo: string; descripcion: string; soloD
   { id: "gastos", titulo: "Gastos", descripcion: "Captura y revisa los gastos del consultorio." },
   { id: "administracion-presupuesto-gastos", titulo: "Presupuesto de gastos", descripcion: "Cuánto puedes gastar por categoría." },
   { id: "reportes-corte-caja", titulo: "Corte de caja", descripcion: "Cobros del día por forma de pago y por médico." },
+  { id: "reportes-porcentajes", titulo: "Porcentajes", descripcion: "Cuánto le toca a cada médico y si va alcanzando su meta." },
   { id: "reportes-corte-diario", titulo: "Corte diario", descripcion: "El cierre de cada día." },
   { id: "reportes-pagos", titulo: "Pagos", descripcion: "Todos los pagos registrados." },
   { id: "reportes-devoluciones", titulo: "Devoluciones", descripcion: "Pagos que se devolvieron al paciente." },

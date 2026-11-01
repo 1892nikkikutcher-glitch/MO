@@ -59,6 +59,7 @@ import SeguimientoAsistencia from "./pages/SeguimientoAsistencia";
 import ReporteCorteDiario from "./pages/ReporteCorteDiario";
 import ReporteCorteCaja from "./pages/ReporteCorteCaja";
 import ReporteEvaluacionSemanal from "./pages/ReporteEvaluacionSemanal";
+import ReportePorcentajes from "./pages/ReportePorcentajes";
 import ReporteCierreDelDia from "./pages/ReporteCierreDelDia";
 import ReporteGraficas from "./pages/ReporteGraficas";
 import ReporteCP from "./pages/ReporteCP";
@@ -126,6 +127,7 @@ const paginasConstruidas = new Set([
   "reportes-devoluciones",
   "reportes-corte-diario",
   "reportes-corte-caja",
+  "reportes-porcentajes",
   "reportes-evaluacion-semanal",
   "reportes-cierre-del-dia",
   "reportes-graficas",
@@ -990,6 +992,7 @@ function DashboardBody({
           {activePage === "reportes-devoluciones" && <ReporteDevoluciones />}
           {activePage === "reportes-corte-diario" && <ReporteCorteDiario />}
           {activePage === "reportes-corte-caja" && <ReporteCorteCaja />}
+          {activePage === "reportes-porcentajes" && <ReportePorcentajes />}
           {activePage === "reportes-evaluacion-semanal" && <ReporteEvaluacionSemanal />}
           {activePage === "reportes-cierre-del-dia" && <ReporteCierreDelDia />}
           {activePage === "reportes-graficas" && <ReporteGraficas />}

@@ -1326,6 +1326,7 @@ export default function Agenda() {
                   const {
                     cedulaProfesional: _cedula,
                     porcentajeComision: _comision,
+                    metaMensual: _meta,
                     consultaExterna: _externa,
                     calendarioCompartidoCon: _compartido,
                     bloques: _bloques,

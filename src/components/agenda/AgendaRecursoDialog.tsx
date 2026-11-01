@@ -23,6 +23,7 @@ export default function AgendaRecursoDialog({
     tipo: "medico" | "unidad";
     color: string;
     porcentajeComision?: number;
+    metaMensual?: number;
     cedulaProfesional?: string;
     consultaExterna?: boolean;
     calendarioCompartidoCon?: string;
@@ -35,6 +36,7 @@ export default function AgendaRecursoDialog({
   const [porcentajeComision, setPorcentajeComision] = useState(
     inicial?.porcentajeComision != null ? String(inicial.porcentajeComision) : ""
   );
+  const [metaMensual, setMetaMensual] = useState(inicial?.metaMensual != null ? String(inicial.metaMensual) : "");
   const [cedulaProfesional, setCedulaProfesional] = useState(inicial?.cedulaProfesional ?? "");
   const [consultaExterna, setConsultaExterna] = useState(inicial?.consultaExterna === true);
   const [compartido, setCompartido] = useState(!!inicial?.calendarioCompartidoCon);
@@ -127,6 +129,20 @@ export default function AgendaRecursoDialog({
                 placeholder="Ej. 50"
                 className={inputClass}
               />
+              <label className="mb-1 mt-3 block text-xs font-medium text-ink/60">Meta de cobro mensual ($)</label>
+              <p className="mb-1.5 text-[11px] text-ink/40">
+                Cuánto esperas que cobre al mes. El reporte Reportes → Porcentajes la lleva a la semana, quincena o día y
+                dice si la va alcanzando. Déjala vacía si no tiene meta.
+              </p>
+              <input
+                type="number"
+                min={0}
+                step="100"
+                value={metaMensual}
+                onChange={(e) => setMetaMensual(e.target.value)}
+                placeholder="Ej. 80000"
+                className={inputClass}
+              />
             </div>
           )}
           {tipo === "medico" && (
@@ -203,6 +219,7 @@ export default function AgendaRecursoDialog({
                 tipo: "medico" | "unidad";
                 color: string;
                 porcentajeComision?: number;
+                metaMensual?: number;
                 cedulaProfesional?: string;
                 consultaExterna?: boolean;
                 calendarioCompartidoCon?: string;
@@ -221,6 +238,9 @@ export default function AgendaRecursoDialog({
               // nunca lo borra).
               if (tipo === "medico" && porcentajeComision.trim() !== "") {
                 datos = { ...datos, porcentajeComision: Math.min(100, Math.max(0, Number(porcentajeComision))) };
+              }
+              if (tipo === "medico" && Number(metaMensual) > 0) {
+                datos = { ...datos, metaMensual: Number(metaMensual) };
               }
               if (tipo === "medico" && cedulaProfesional.trim() !== "") {
                 datos = { ...datos, cedulaProfesional: cedulaProfesional.trim() };
