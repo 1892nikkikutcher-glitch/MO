@@ -6,6 +6,7 @@ import { montoMayorQue, redondearDinero } from "./dinero";
 import type { MigracionEstado } from "./migracionExpedienteEstado";
 import type { RazonNoAsistencia } from "./noAsistencia";
 import type { DatosFiscales } from "./facturacion";
+import type { ConfigTimbrado } from "./timbrado";
 
 export type Patient = {
   id: string;
@@ -510,6 +511,8 @@ export type ClinicInfo = {
   telefono?: string;
   correoContacto?: string;
   rfc?: string;
+  /** Datos del consultorio como emisor de facturas timbradas por MO (ver timbrado.ts). */
+  timbrado?: ConfigTimbrado;
   /** Persona designada como responsable sanitario ante COFEPRIS/COPRISEM —
    * no siempre es el mismo doctor que atiende, así que se captura aparte. */
   responsableSanitario?: string;

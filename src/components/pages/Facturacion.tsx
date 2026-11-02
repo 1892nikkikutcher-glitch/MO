@@ -1,7 +1,16 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { usePatientData } from "@/context/PatientDataContext";
+import {
+  CONFIG_TIMBRADO_INICIAL,
+  MOTIVOS_CANCELACION_SAT,
+  TRATAMIENTOS_IVA,
+  faltantesConfigTimbrado,
+  type ConfigTimbrado,
+  type TratamientoIva,
+} from "@/lib/timbrado";
+import { cancelarFacturaSatApi, descargarFacturaApi, estadoTimbradoApi, timbrarFacturaApi, type EstadoPac } from "@/lib/timbradoApi";
 import { toISODate } from "@/lib/agendaHelpers";
 import { exportarCsv } from "@/lib/exportCsv";
 import { limpiarTelefono } from "@/lib/depositoDental";
@@ -274,12 +283,214 @@ function CancelarFacturaDialog({ factura, onClose, onConfirmar }: { factura: Fac
   );
 }
 
+// ---------------------------------------------------------------- Timbrado con el PAC
+
+function ConfigTimbradoDialog({ rfc, inicial, onClose, onGuardar }: { rfc: string; inicial: ConfigTimbrado | undefined; onClose: () => void; onGuardar: (c: ConfigTimbrado) => void }) {
+  const [form, setForm] = useState<ConfigTimbrado>({ ...CONFIG_TIMBRADO_INICIAL, ...inicial });
+  const set = <K extends keyof ConfigTimbrado>(k: K, v: ConfigTimbrado[K]) => setForm((p) => ({ ...p, [k]: v }));
+  const cpMalo = form.codigoPostal.length > 0 && !/^\d{5}$/.test(form.codigoPostal);
+  const claveMala = form.claveProdServ.length > 0 && !/^\d{8}$/.test(form.claveProdServ);
+  const puedeGuardar = !cpMalo && !claveMala;
+
+  return (
+    <Modal titulo="Ajustes de timbrado" onClose={onClose} ancho="max-w-lg">
+      <p className="mb-4 text-xs text-ink/50">
+        Son los datos del consultorio como emisor de la factura. Cópialos tal cual de tu Constancia de Situación Fiscal y confirma con tu contador la clave y el tratamiento del IVA.
+      </p>
+      <div className="space-y-4">
+        <div>
+          <label className={labelClass}>RFC del consultorio</label>
+          <p className={`rounded-lg border border-edge/10 bg-inset px-3 py-2 text-sm ${rfc ? "text-ink" : "text-danger"}`}>{rfc || "Falta: captúralo en Administración → Consultorio"}</p>
+        </div>
+        <div>
+          <label className={labelClass}>Razón social (sin «S.A. de C.V.» ni régimen)</label>
+          <input type="text" value={form.razonSocial} onChange={(e) => set("razonSocial", e.target.value)} placeholder="Como aparece en tu constancia" className={inputClass} />
+        </div>
+        <div>
+          <label className={labelClass}>Régimen fiscal</label>
+          <select value={form.regimenFiscal} onChange={(e) => set("regimenFiscal", e.target.value)} className={inputClass}>
+            <option value="">Elige…</option>
+            {REGIMENES_FISCALES.map((r) => (
+              <option key={r.clave} value={r.clave}>
+                {r.clave} · {r.nombre}
+              </option>
+            ))}
+          </select>
+        </div>
+        <div className="grid grid-cols-2 gap-3">
+          <div>
+            <label className={labelClass}>C.P. fiscal (lugar de expedición)</label>
+            <input type="text" inputMode="numeric" value={form.codigoPostal} onChange={(e) => set("codigoPostal", e.target.value.replace(/\D/g, "").slice(0, 5))} className={inputClass} />
+            {cpMalo && <p className="mt-1 text-[11px] text-danger">Son 5 dígitos.</p>}
+          </div>
+          <div>
+            <label className={labelClass}>Clave de producto o servicio</label>
+            <input type="text" inputMode="numeric" value={form.claveProdServ} onChange={(e) => set("claveProdServ", e.target.value.replace(/\D/g, "").slice(0, 8))} className={inputClass} />
+            {claveMala ? <p className="mt-1 text-[11px] text-danger">Son 8 dígitos.</p> : <p className="mt-1 text-[11px] text-ink/40">Sugerida: 85122001 (Dentistas).</p>}
+          </div>
+        </div>
+        <div>
+          <label className={labelClass}>IVA en los conceptos</label>
+          <select value={form.tratamientoIva} onChange={(e) => set("tratamientoIva", e.target.value as TratamientoIva)} className={inputClass}>
+            {TRATAMIENTOS_IVA.map((t) => (
+              <option key={t.clave} value={t.clave}>
+                {t.nombre}
+              </option>
+            ))}
+          </select>
+          <p className="mt-1 text-[11px] text-ink/40">{TRATAMIENTOS_IVA.find((t) => t.clave === form.tratamientoIva)?.ayuda}</p>
+        </div>
+      </div>
+      <div className="mt-6 flex justify-end gap-3">
+        <button onClick={onClose} className={botonSecundario}>
+          Cancelar
+        </button>
+        <button onClick={() => puedeGuardar && onGuardar({ ...form, razonSocial: form.razonSocial.trim() })} disabled={!puedeGuardar} className={botonPrimario}>
+          Guardar
+        </button>
+      </div>
+    </Modal>
+  );
+}
+
+function TimbrarDialog({
+  resumen,
+  inicial,
+  facturas,
+  ambiente,
+  onClose,
+  onTimbrar,
+}: {
+  resumen: { paciente: string; rfc: string; total: number; pagos: number };
+  inicial: { serie: string; folio: string };
+  facturas: Factura[];
+  ambiente: "sandbox" | "produccion" | null;
+  onClose: () => void;
+  onTimbrar: (f: { serie: string; folio: string; notas: string }) => Promise<void>;
+}) {
+  const [form, setForm] = useState({ ...inicial, notas: "" });
+  const [timbrando, setTimbrando] = useState(false);
+  const [fallo, setFallo] = useState("");
+  const repetido = folioRepetido(facturas, form.serie, form.folio);
+
+  const timbrar = async () => {
+    setTimbrando(true);
+    setFallo("");
+    try {
+      await onTimbrar({ serie: form.serie.trim(), folio: form.folio.trim(), notas: form.notas.trim() });
+    } catch (e) {
+      setFallo(e instanceof Error ? e.message : "No se pudo timbrar la factura.");
+      setTimbrando(false);
+    }
+  };
+
+  return (
+    <Modal titulo="Timbrar factura" onClose={timbrando ? () => {} : onClose}>
+      <div className="mb-4 rounded-xl border border-edge/10 bg-surface p-3 text-xs text-ink/70">
+        <p className="font-semibold text-ink">{resumen.paciente}</p>
+        <p>
+          RFC {resumen.rfc} · {resumen.pagos} pago(s) · <span className="font-semibold text-ink">{formatCurrency(resumen.total)}</span>
+        </p>
+      </div>
+      {ambiente === "sandbox" ? (
+        <p className="mb-4 rounded-lg border border-warning/30 bg-warning/5 px-3 py-2 text-xs text-ink/70">Modo de pruebas: esta factura no tiene validez fiscal.</p>
+      ) : (
+        <p className="mb-4 rounded-lg border border-danger/30 bg-danger/5 px-3 py-2 text-xs text-ink/70">
+          Se timbrará ante el SAT y no se puede deshacer; para anularla hay que cancelarla ante el SAT.
+        </p>
+      )}
+      <div className="space-y-4">
+        <div className="grid grid-cols-3 gap-3">
+          <div>
+            <label className={labelClass}>Serie</label>
+            <input type="text" value={form.serie} onChange={(e) => setForm((p) => ({ ...p, serie: e.target.value.toUpperCase() }))} placeholder="A" className={inputClass} disabled={timbrando} />
+          </div>
+          <div className="col-span-2">
+            <label className={labelClass}>Folio</label>
+            <input type="text" value={form.folio} onChange={(e) => setForm((p) => ({ ...p, folio: e.target.value }))} className={inputClass} disabled={timbrando} />
+            {repetido && <p className="mt-1 text-[11px] text-danger">Ya existe una factura vigente con ese folio.</p>}
+          </div>
+        </div>
+        <div>
+          <label className={labelClass}>Notas (solo para ti, no van en la factura)</label>
+          <textarea value={form.notas} onChange={(e) => setForm((p) => ({ ...p, notas: e.target.value }))} rows={2} className={inputClass} disabled={timbrando} />
+        </div>
+      </div>
+      {fallo && <p className="mt-4 rounded-lg border border-danger/30 bg-danger/5 px-3 py-2 text-xs text-danger">{fallo}</p>}
+      <div className="mt-6 flex justify-end gap-3">
+        <button onClick={onClose} disabled={timbrando} className={botonSecundario}>
+          Cancelar
+        </button>
+        <button onClick={timbrar} disabled={timbrando || repetido} className={botonPrimario}>
+          {timbrando ? "Timbrando…" : "Timbrar ante el SAT"}
+        </button>
+      </div>
+    </Modal>
+  );
+}
+
+function CancelarSatDialog({ factura, onClose, onCancelar }: { factura: Factura; onClose: () => void; onCancelar: (motivo: string, uuidSustitucion: string) => Promise<void> }) {
+  const [motivo, setMotivo] = useState("02");
+  const [uuid, setUuid] = useState("");
+  const [cancelando, setCancelando] = useState(false);
+  const [fallo, setFallo] = useState("");
+  const requiereUuid = motivo === "01";
+  const puede = !cancelando && (!requiereUuid || folioFiscalValido(uuid));
+
+  const cancelar = async () => {
+    setCancelando(true);
+    setFallo("");
+    try {
+      await onCancelar(motivo, uuid.trim());
+    } catch (e) {
+      setFallo(e instanceof Error ? e.message : "No se pudo cancelar la factura.");
+      setCancelando(false);
+    }
+  };
+
+  return (
+    <Modal titulo={`Cancelar factura ${etiquetaFolio(factura)}`} onClose={cancelando ? () => {} : onClose}>
+      <p className="mb-4 text-xs text-ink/50">
+        Se cancela ante el SAT. Si el SAT la cancela al momento, los pagos regresan a «Por facturar»; si el cliente debe aceptar la cancelación, queda como pendiente.
+      </p>
+      <label className={labelClass}>Motivo de cancelación (SAT)</label>
+      <select value={motivo} onChange={(e) => setMotivo(e.target.value)} className={inputClass} disabled={cancelando}>
+        {MOTIVOS_CANCELACION_SAT.map((m) => (
+          <option key={m.clave} value={m.clave}>
+            {m.nombre}
+          </option>
+        ))}
+      </select>
+      <p className="mt-1 text-[11px] text-ink/40">{MOTIVOS_CANCELACION_SAT.find((m) => m.clave === motivo)?.ayuda}</p>
+      {requiereUuid && (
+        <div className="mt-4">
+          <label className={labelClass}>Folio fiscal (UUID) de la factura que la sustituye</label>
+          <input type="text" value={uuid} onChange={(e) => setUuid(e.target.value.trim())} placeholder="00000000-0000-0000-0000-000000000000" className={inputClass} disabled={cancelando} />
+        </div>
+      )}
+      {fallo && <p className="mt-4 rounded-lg border border-danger/30 bg-danger/5 px-3 py-2 text-xs text-danger">{fallo}</p>}
+      <div className="mt-6 flex justify-end gap-3">
+        <button onClick={onClose} disabled={cancelando} className={botonSecundario}>
+          Volver
+        </button>
+        <button
+          onClick={cancelar}
+          disabled={!puede}
+          className="rounded-lg border border-danger/50 bg-danger/10 px-4 py-2 text-sm font-semibold text-danger transition-opacity hover:bg-danger/20 disabled:opacity-40"
+        >
+          {cancelando ? "Cancelando…" : "Cancelar ante el SAT"}
+        </button>
+      </div>
+    </Modal>
+  );
+}
+
 // ---------------------------------------------------------------- Página
 
 type GrupoPaciente = { patientId: string; patientName: string; pagos: PagoPendienteDeFacturar[] };
 
 export default function Facturacion() {
-  const { pagosRealizados, facturas, setFacturas, patients, updatePatient, clinicInfo, puedeVerFinanzas, userEmail } = usePatientData();
+  const { pagosRealizados, facturas, setFacturas, patients, updatePatient, clinicInfo, setClinicInfo, clinicUid, puedeVerFinanzas, userEmail } = usePatientData();
 
   const hoy = new Date();
   const pendientes = useMemo(() => pagosPendientesDeFacturar(pagosRealizados, facturas, new Date()), [pagosRealizados, facturas]);
@@ -301,7 +512,17 @@ export default function Facturacion() {
   const [cancelando, setCancelando] = useState<Factura | null>(null);
   const [eliminando, setEliminando] = useState<Factura | null>(null);
   const [aviso, setAviso] = useState("");
+  const [pacEstado, setPacEstado] = useState<EstadoPac>({ disponible: false, ambiente: null });
+  const [ajustando, setAjustando] = useState(false);
+  const [timbrando, setTimbrando] = useState<{ grupo: GrupoPaciente; pagos: PagoPendienteDeFacturar[] } | null>(null);
+  const [cancelandoSat, setCancelandoSat] = useState<Factura | null>(null);
+  const [descargando, setDescargando] = useState("");
+  const [falloDescarga, setFalloDescarga] = useState("");
   const [filtro, setFiltro] = useState<FiltroFacturas>({ texto: "", desde: "", hasta: "", serie: "", estado: "todas" });
+
+  useEffect(() => {
+    if (puedeVerFinanzas) estadoTimbradoApi().then(setPacEstado);
+  }, [puedeVerFinanzas]);
 
   if (!puedeVerFinanzas) {
     return <div className="rounded-2xl border border-edge/10 bg-surface p-10 text-center text-sm text-ink/50">No tienes permiso para ver información financiera.</div>;
@@ -370,6 +591,49 @@ export default function Facturacion() {
     setCancelando(null);
   };
 
+  const faltaConfig = faltantesConfigTimbrado(clinicInfo?.rfc, clinicInfo?.timbrado);
+  const puedeTimbrar = pacEstado.disponible && faltaConfig.length === 0;
+
+  const timbrar = async (f: { serie: string; folio: string; notas: string }) => {
+    if (!timbrando || !clinicUid) return;
+    const { grupo, pagos } = timbrando;
+    const nueva = await timbrarFacturaApi({
+      clinicaId: clinicUid,
+      facturaId: `fac${Date.now()}`,
+      patientId: grupo.patientId,
+      pagoIds: pagos.map((p) => p.registro.id),
+      ...f,
+    });
+    setTimbrando(null);
+    setFalloDescarga("");
+    setAviso(`Factura ${etiquetaFolio(nueva)} timbrada ante el SAT (folio fiscal ${nueva.uuid}). Ya puedes descargar su PDF y XML en «Facturas emitidas».`);
+  };
+
+  const cancelarSat = async (motivo: string, uuidSustitucion: string) => {
+    if (!cancelandoSat || !clinicUid) return;
+    const r = await cancelarFacturaSatApi({ clinicaId: clinicUid, facturaId: cancelandoSat.id, motivo, uuidSustitucion });
+    setFalloDescarga("");
+    setAviso(
+      r.estado === "canceled"
+        ? `Factura ${etiquetaFolio(cancelandoSat)} cancelada ante el SAT. Sus pagos volvieron a «Por facturar».`
+        : `El SAT pidió que el cliente acepte la cancelación de la factura ${etiquetaFolio(cancelandoSat)}: queda como «Cancelación pendiente».`
+    );
+    setCancelandoSat(null);
+  };
+
+  const descargar = async (f: Factura, formato: "pdf" | "xml") => {
+    if (!clinicUid) return;
+    setDescargando(`${f.id}-${formato}`);
+    setFalloDescarga("");
+    try {
+      await descargarFacturaApi(clinicUid, f.id, formato, `factura-${etiquetaFolio(f).replace(/[^A-Za-z0-9_-]/g, "")}`);
+    } catch (e) {
+      setFalloDescarga(e instanceof Error ? e.message : "No se pudo descargar el archivo.");
+    } finally {
+      setDescargando("");
+    }
+  };
+
   const pacienteFiscal = fiscalDe ? paciente(fiscalDe) : undefined;
   const clinicaSinRfc = !clinicInfo?.rfc?.trim();
 
@@ -384,6 +648,19 @@ export default function Facturacion() {
           <p className="rounded-lg border border-warning/30 bg-warning/5 px-3 py-2 text-xs text-ink/70">
             Falta el RFC del consultorio. Captúralo en Administración → Consultorio para tenerlo a la mano al facturar.
           </p>
+        )}
+        {pacEstado.disponible ? (
+          <div className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-edge/10 bg-surface px-3 py-2 text-xs text-ink/70">
+            <span>
+              Timbrado ante el SAT activo{pacEstado.ambiente === "sandbox" ? " en modo de pruebas (las facturas no tienen validez fiscal)" : ""}.
+              {faltaConfig.length > 0 && <span className="text-warning"> Falta: {faltaConfig.join(", ")}.</span>}
+            </span>
+            <button onClick={() => setAjustando(true)} className="rounded-lg border border-edge/15 px-2.5 py-1 text-xs font-semibold text-ink/80 hover:bg-surface2">
+              Ajustes de timbrado
+            </button>
+          </div>
+        ) : (
+          <p className="max-w-3xl text-xs text-ink/40">Para timbrar desde MO hay que contratar un PAC y poner sus credenciales en Vercel; mientras tanto puedes registrar a mano tus facturas.</p>
         )}
       </div>
 
@@ -427,6 +704,15 @@ export default function Facturacion() {
         <div className="flex items-start justify-between gap-3 rounded-xl border border-success/30 bg-success/5 p-3 text-xs text-ink/80">
           <span>{aviso}</span>
           <button onClick={() => setAviso("")} className="text-ink/40 hover:text-ink" aria-label="Cerrar aviso">
+            ✕
+          </button>
+        </div>
+      )}
+
+      {falloDescarga && (
+        <div className="flex items-start justify-between gap-3 rounded-xl border border-danger/30 bg-danger/5 p-3 text-xs text-danger">
+          <span>{falloDescarga}</span>
+          <button onClick={() => setFalloDescarga("")} className="text-danger/60 hover:text-danger" aria-label="Cerrar aviso">
             ✕
           </button>
         </div>
@@ -502,13 +788,25 @@ export default function Facturacion() {
                     <button onClick={() => setFiscalDe(g.patientId)} className="rounded-lg border border-edge/15 px-2.5 py-1 text-xs text-ink/70 hover:bg-surface2" disabled={!pac}>
                       {faltan.length === 0 ? "Datos fiscales" : "Capturar datos fiscales"}
                     </button>
+                    {pacEstado.disponible && (
+                      <button
+                        onClick={() => setTimbrando({ grupo: g, pagos: elegidos })}
+                        disabled={!puedeTimbrar || faltan.length > 0 || elegidos.length === 0}
+                        title={
+                          !puedeTimbrar ? "Completa los ajustes de timbrado" : faltan.length > 0 ? "Primero captura los datos fiscales" : elegidos.length === 0 ? "Elige al menos un pago" : ""
+                        }
+                        className={botonPrimario}
+                      >
+                        Timbrar factura
+                      </button>
+                    )}
                     <button
                       onClick={() => setFacturando({ grupo: g, pagos: elegidos })}
                       disabled={faltan.length > 0 || elegidos.length === 0}
                       title={faltan.length > 0 ? "Primero captura los datos fiscales" : elegidos.length === 0 ? "Elige al menos un pago" : ""}
-                      className={botonPrimario}
+                      className={pacEstado.disponible ? botonSecundario : botonPrimario}
                     >
-                      Registrar factura
+                      {pacEstado.disponible ? "Registrar a mano" : "Registrar factura"}
                     </button>
                   </div>
                 </div>
@@ -602,8 +900,12 @@ export default function Facturacion() {
                             <span className="rounded-full bg-danger/10 px-2.5 py-0.5 text-[11px] font-semibold text-danger" title={f.motivoCancelacion}>
                               Cancelada
                             </span>
+                          ) : f.cancelacionPendiente ? (
+                            <span className="rounded-full bg-warning/15 px-2.5 py-0.5 text-[11px] font-semibold text-warning" title="El cliente debe aceptar la cancelación en el SAT">
+                              Cancelación pendiente
+                            </span>
                           ) : (
-                            <span className="rounded-full bg-success/10 px-2.5 py-0.5 text-[11px] font-semibold text-success">Vigente</span>
+                            <span className="rounded-full bg-success/10 px-2.5 py-0.5 text-[11px] font-semibold text-success">{f.timbrada ? "Timbrada" : "Vigente"}</span>
                           )}
                         </td>
                         <td className="px-4 py-3">
@@ -617,11 +919,25 @@ export default function Facturacion() {
                                 <WhatsAppIcon />
                               </button>
                             )}
-                            <button onClick={() => setEditando(f)} className="rounded-lg border border-edge/15 px-2 py-1 text-xs text-ink/70 hover:bg-surface2">
-                              Editar
-                            </button>
+                            {f.timbrada &&
+                              f.cfdiId &&
+                              (["pdf", "xml"] as const).map((fmt) => (
+                                <button
+                                  key={fmt}
+                                  onClick={() => descargar(f, fmt)}
+                                  disabled={descargando === `${f.id}-${fmt}`}
+                                  className="rounded-lg border border-edge/15 px-2 py-1 text-xs uppercase text-ink/70 hover:bg-surface2 disabled:opacity-40"
+                                >
+                                  {descargando === `${f.id}-${fmt}` ? "…" : fmt}
+                                </button>
+                              ))}
+                            {!f.timbrada && (
+                              <button onClick={() => setEditando(f)} className="rounded-lg border border-edge/15 px-2 py-1 text-xs text-ink/70 hover:bg-surface2">
+                                Editar
+                              </button>
+                            )}
                             {f.estado !== "cancelada" ? (
-                              <button onClick={() => setCancelando(f)} className="rounded-lg border border-danger/30 px-2 py-1 text-xs text-danger hover:bg-danger/10">
+                              <button onClick={() => (f.timbrada ? setCancelandoSat(f) : setCancelando(f))} className="rounded-lg border border-danger/30 px-2 py-1 text-xs text-danger hover:bg-danger/10">
                                 Cancelar
                               </button>
                             ) : (
@@ -680,6 +996,36 @@ export default function Facturacion() {
           onGuardar={guardarEdicion}
         />
       )}
+
+      {ajustando && (
+        <ConfigTimbradoDialog
+          rfc={clinicInfo?.rfc ?? ""}
+          inicial={clinicInfo?.timbrado}
+          onClose={() => setAjustando(false)}
+          onGuardar={(c) => {
+            setClinicInfo((prev) => ({ ...prev, timbrado: c }));
+            setAjustando(false);
+          }}
+        />
+      )}
+
+      {timbrando && (
+        <TimbrarDialog
+          resumen={{
+            paciente: timbrando.grupo.patientName,
+            rfc: paciente(timbrando.grupo.patientId)?.datosFiscales?.rfc ?? "",
+            total: totalDePagos(timbrando.pagos.map((p) => p.registro)),
+            pagos: timbrando.pagos.length,
+          }}
+          inicial={{ serie: serieSugerida, folio: siguienteFolio(facturas, serieSugerida) }}
+          facturas={facturas}
+          ambiente={pacEstado.ambiente}
+          onClose={() => setTimbrando(null)}
+          onTimbrar={timbrar}
+        />
+      )}
+
+      {cancelandoSat && <CancelarSatDialog factura={cancelandoSat} onClose={() => setCancelandoSat(null)} onCancelar={cancelarSat} />}
 
       {cancelando && <CancelarFacturaDialog factura={cancelando} onClose={() => setCancelando(null)} onConfirmar={cancelar} />}
 

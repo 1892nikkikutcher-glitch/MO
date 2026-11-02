@@ -109,6 +109,12 @@ export type Factura = {
   /** Solo si se canceló. */
   canceladaEn?: string;
   motivoCancelacion?: string;
+  /** true cuando MO la timbró ante el SAT a través del PAC (el folio fiscal ya es real); ausente = registro manual. */
+  timbrada?: boolean;
+  /** Id del CFDI en el PAC: con él se descargan el PDF/XML y se cancela. */
+  cfdiId?: string;
+  /** Se pidió la cancelación ante el SAT pero el cliente aún debe aceptarla. */
+  cancelacionPendiente?: boolean;
   notas: string;
   registradaPor: string;
   creadoEn: string;

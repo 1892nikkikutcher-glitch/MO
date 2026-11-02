@@ -156,7 +156,11 @@ export default function Home() {
         className="flex h-60 w-60 items-center justify-center rounded-full border-2 border-premium"
         style={{ boxShadow: "0 0 28px 2px rgb(var(--premium-rgb) / 0.5)" }}
       >
-        <h1 className="bg-gradient-to-r from-[#FF5757] via-[#D946EF] to-[#3B82F6] bg-clip-text text-7xl font-bold text-transparent">
+        {/* El texto es transparente (degradado recortado), así que la sombra va con drop-shadow: un text-shadow se vería a través de las letras. */}
+        <h1
+          className="bg-gradient-to-r from-[#FF5757] via-[#D946EF] to-[#3B82F6] bg-clip-text px-3 text-transparent logo-mo"
+          style={{ filter: "drop-shadow(0 4px 6px rgb(0 0 0 / 0.2))" }}
+        >
           MO
         </h1>
       </div>

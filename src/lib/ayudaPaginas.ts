@@ -197,13 +197,14 @@ export const ayudaPaginas: Record<string, AyudaPagina> = {
   },
   facturacion: {
     titulo: "Facturación",
-    resumen: "Control de pagos por facturar y registro de las facturas emitidas. MO no timbra ante el SAT: la factura se emite en tu sistema o con tu contador y aquí se registra.",
+    resumen: "Control de pagos por facturar y registro de las facturas emitidas. Si tu consultorio tiene un PAC conectado, MO timbra la factura ante el SAT; si no, la emites en tu sistema y aquí la registras.",
     puntos: [
       "Al cobrar, marca «Activo para facturar»: el pago aparece en «Por facturar», agrupado por paciente.",
       "Captura los datos fiscales del paciente (RFC, razón social, régimen, C.P. y uso de CFDI) o pídeselos por WhatsApp.",
-      "Cuando emitas la factura, usa «Registrar factura» con su serie y folio: los pagos quedan ligados a ella.",
+      "Con el PAC conectado, llena «Ajustes de timbrado» una vez y usa «Timbrar factura»: MO la timbra, guarda el folio fiscal y te deja descargar el PDF y el XML.",
+      "Sin PAC (o para facturas emitidas en otro sistema), usa «Registrar factura» con su serie y folio: los pagos quedan ligados a ella.",
       "En «Facturas emitidas» busca por folio, paciente o RFC, filtra por fechas, descarga el listado en Excel y avisa al paciente por WhatsApp.",
-      "Si cancelas una factura, sus pagos regresan a «Por facturar».",
+      "Si cancelas una factura, sus pagos regresan a «Por facturar». Una factura timbrada se cancela ante el SAT con su motivo; si el cliente debe aceptarla, queda «Cancelación pendiente».",
     ],
   },
   educacion: {
