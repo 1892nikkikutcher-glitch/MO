@@ -43,6 +43,7 @@ import {
   type PrioridadTratamiento,
 } from "@/lib/planTratamiento";
 import type { SavedBudget } from "@/lib/patientData";
+import { toISODate } from "@/lib/agendaHelpers";
 
 type SiNo = "" | "si" | "no";
 
@@ -275,7 +276,7 @@ function ListaPrioridad({ valor, onChange }: { valor: PuntoPrioridad[]; onChange
 }
 
 function todayISO() {
-  return new Date().toISOString().slice(0, 10);
+  return toISODate(new Date());
 }
 
 function formatFechaCorta(iso: string) {

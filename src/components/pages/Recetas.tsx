@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { flushSync } from "react-dom";
 import { usePatientData } from "@/context/PatientDataContext";
 import { formatNombreConEdad, identidadDoctorDe, type MedicamentoRecetado, type Receta } from "@/lib/patientData";
 import { calcularDosisPediatrica, type MedicamentoCatalogo } from "@/lib/medicamentos";
@@ -99,6 +100,12 @@ export default function Recetas() {
   const [patientId, setPatientId] = useState("");
   const [busquedaPaciente, setBusquedaPaciente] = useState("");
   const [medico, setMedico] = useState(medicos[0]?.nombre ?? "");
+  // Los médicos pueden llegar de Firestore después de montar la pantalla (recarga estando en Recetas):
+  // el selector ya muestra al primero, así que el estado debe coincidir con lo que se ve.
+  const primerMedico = medicos[0]?.nombre ?? "";
+  useEffect(() => {
+    if (!medico && primerMedico) setMedico(primerMedico);
+  }, [medico, primerMedico]);
   const [sexo, setSexo] = useState("");
   const [peso, setPeso] = useState("");
   const [estatura, setEstatura] = useState("");
@@ -247,7 +254,8 @@ export default function Recetas() {
   };
 
   const handleImprimir = () => {
-    handleGuardar();
+    // flushSync: el folio y la hora se asignan al guardar y la hoja debe llevarlos ya puestos cuando se abre la impresión.
+    flushSync(() => handleGuardar());
     if (patient) {
       const tituloOriginal = document.title;
       document.title = `Receta_${slugify(patient.name)}_${slugify(todayFormatted())}`;

@@ -1,7 +1,7 @@
 /** Facturación: datos fiscales del paciente, pagos que están pendientes de facturar y el registro de las facturas que
- * ya se emitieron. MO no timbra ante el SAT: la factura se emite en el sistema del contador o del proveedor de
- * facturación del consultorio y aquí se registra (serie, folio, folio fiscal y total) para que cada pago quede
- * ligado a su factura. Lógica pura: las pantallas solo guardan lo que aquí se calcula. */
+ * ya se emitieron. La factura la timbra el PAC conectado (ver timbrado.ts) o, si no hay PAC o se emitió en otro
+ * sistema, se registra a mano (serie, folio, folio fiscal y total) para que cada pago quede ligado a su factura.
+ * Lógica pura: las pantallas solo guardan lo que aquí se calcula. */
 
 import { fechaPagoAIso } from "./metas";
 import type { PagoRealizado } from "./pagosRealizados";

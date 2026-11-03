@@ -1,5 +1,6 @@
 import { ConstructorPdf, dineroPdf, nombreArchivoPdf } from "./pdfDocumento";
 import type { EventoDevolucionLog, TipoEventoDevolucion } from "./devolucionesLog";
+import { toISODate } from "./agendaHelpers";
 
 export type DatosDevolucionesPdf = {
   eventos: EventoDevolucionLog[];
@@ -73,5 +74,5 @@ export async function generarDevolucionesPdf(datos: DatosDevolucionesPdf): Promi
     { vacio: "No se ha registrado ninguna devolución." }
   );
 
-  return { blob: pdf.finalizar(), nombre: nombreArchivoPdf("Devoluciones", fecha.toISOString().slice(0, 10), datos.clinicaNombre) };
+  return { blob: pdf.finalizar(), nombre: nombreArchivoPdf("Devoluciones", toISODate(fecha), datos.clinicaNombre) };
 }

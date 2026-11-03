@@ -101,7 +101,7 @@ export default function ReporteDevoluciones() {
                     {e.monto ? `−${formatCurrency(e.monto)}` : "—"}
                   </td>
                   <td className="px-6 py-3 text-ink/70">{e.motivo || "—"}</td>
-                  <td className="px-6 py-3 text-ink/40">{e.uid}</td>
+                  <td className="px-6 py-3 text-ink/40">{nombreDeUid(e.uid) || "—"}</td>
                 </tr>
               ))}
             </tbody>

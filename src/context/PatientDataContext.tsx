@@ -419,7 +419,7 @@ async function crearClinicaPropia(authUid: string, authEmail: string) {
   await setDoc(doc(db, "clinics", authUid), {
     ownerId: authUid,
     nombre: "",
-    creadoEl: new Date().toISOString().slice(0, 10),
+    creadoEl: toISODate(new Date()),
   } satisfies ClinicInfo);
   await setDoc(doc(db, "clinicMembers", `${authUid}_${authUid}`), {
     clinicId: authUid,
@@ -1518,7 +1518,7 @@ export function PatientDataProvider({
       name: data.name,
       phone: data.phone,
       birthDate: data.birthDate ?? "",
-      createdAt: new Date().toISOString().slice(0, 10),
+      createdAt: toISODate(new Date()),
     };
     setPatients((prev) => [...prev, nuevo]);
     return nuevo;
@@ -2862,24 +2862,35 @@ export function PatientDataProvider({
       month: "2-digit",
       year: "numeric",
     });
-    setPagosPaciente(patientId, (prev) => [
+    const pagoMembresia: Pago = {
+      id: pagoId,
+      fecha: fechaDisplay,
+      medico: datosPago.medico,
+      formaPago: datosPago.formaPago,
+      lineas: [
+        {
+          id: `${pagoId}-membresia`,
+          tratamientoId: null,
+          folio: null,
+          label: `Membresía: ${plan.nombre}`,
+          monto: plan.precio,
+        },
+      ],
+      total: plan.precio,
+      facturar: datosPago.facturar,
+      firma: null,
+    };
+    setPagosPaciente(patientId, (prev) => [pagoMembresia, ...prev]);
+    // Igual que un pago normal (Pagos.tsx): entra a la bitácora de pagos para que salga en Reportes → Pagos,
+    // en el corte de caja y, si está marcado «Activo para facturar», en Facturación → Por facturar.
+    setPagosRealizados((prev) => [
       {
         id: pagoId,
-        fecha: fechaDisplay,
-        medico: datosPago.medico,
-        formaPago: datosPago.formaPago,
-        lineas: [
-          {
-            id: `${pagoId}-membresia`,
-            tratamientoId: null,
-            folio: null,
-            label: `Membresía: ${plan.nombre}`,
-            monto: plan.precio,
-          },
-        ],
-        total: plan.precio,
-        facturar: datosPago.facturar,
-        firma: null,
+        patientId,
+        patientName: patients.find((p) => p.id === patientId)?.name ?? "",
+        pago: pagoMembresia,
+        registradoEn: new Date().toISOString(),
+        registradoPor: userEmail,
       },
       ...prev,
     ]);
@@ -2904,7 +2915,7 @@ export function PatientDataProvider({
     plan: MembershipPlan,
     datosPago: { medico: string; formaPago: string; facturar: boolean }
   ) => {
-    const hoyISO = new Date().toISOString().slice(0, 10);
+    const hoyISO = toISODate(new Date());
     crearMembresiaConPago(patientId, plan, hoyISO, datosPago);
   };
 
@@ -2913,7 +2924,7 @@ export function PatientDataProvider({
     membresiaAnterior: PatientMembership,
     datosPago: { medico: string; formaPago: string; facturar: boolean }
   ) => {
-    const hoyISO = new Date().toISOString().slice(0, 10);
+    const hoyISO = toISODate(new Date());
     const diaSiguienteAlVencimiento = (() => {
       const d = new Date(`${membresiaAnterior.fechaFin}T00:00:00`);
       d.setDate(d.getDate() + 1);
@@ -2939,7 +2950,7 @@ export function PatientDataProvider({
     beneficioId: string,
     profesional: string
   ) => {
-    const uso: UsoBeneficio = { fecha: new Date().toISOString().slice(0, 10), profesional };
+    const uso: UsoBeneficio = { fecha: toISODate(new Date()), profesional };
     setMembresiasPaciente(patientId, (prev) =>
       prev.map((m) =>
         m.id === membresiaId

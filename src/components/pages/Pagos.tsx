@@ -21,6 +21,7 @@ import { calcularDisponibleDevolucion, resumenDesdeDevoluciones } from "@/lib/de
 import { fechaPagoAIso } from "@/lib/metas";
 import { medicoPredeterminadoParaPago } from "@/lib/medicoDelPago";
 import { FORMA_PAGO_CASHBACK, baseCashbackDePago, calcularCashback, esFormaPagoCashback, montoMaximoCanje } from "@/lib/cashback";
+import { toISODate } from "@/lib/agendaHelpers";
 
 const formasDePago = ["Efectivo", "Tarjeta de crédito", "Tarjeta de débito", "Transferencia", "Cheque"];
 
@@ -138,7 +139,7 @@ export function EditarPagoDialog({
   const medicosParaEditar = Array.from(new Set([pago.medico, ...recursosEdicion.filter((r) => r.tipo === "medico").map((r) => r.nombre)])).filter(Boolean);
   const fechaOriginalIso = fechaPagoAIso(pago.fecha) ?? "";
   const [fechaIso, setFechaIso] = useState(fechaOriginalIso);
-  const hoyIso = new Date().toISOString().slice(0, 10);
+  const hoyIso = toISODate(new Date());
   const total = lineas.reduce((sum, l) => sum + l.monto, 0);
   const puedeGuardar = total > 0;
   const tratamientosDisponibles: Tratamiento[] = tratamientosDeDisponibles(presupuestos);
@@ -560,7 +561,7 @@ export function AgregarPagoDialog({
         <div className="space-y-4">
           <div className="rounded-lg border border-accent/30 bg-accent/10 px-3 py-2">
             <div className="text-[11px] uppercase tracking-wide text-ink/50">
-              Total del presupuesto del paciente
+              Saldo pendiente del paciente
             </div>
             <div className="text-xl font-bold text-accent">
               {formatCurrency(saldoPendienteTotal)}
@@ -681,7 +682,7 @@ export function AgregarPagoDialog({
                               max={t.pendiente}
                               value={montos[t.id] ?? t.pendiente}
                               onChange={(e) =>
-                                setMontos((prev) => ({ ...prev, [t.id]: Number(e.target.value) }))
+                                setMontos((prev) => ({ ...prev, [t.id]: Math.min(Math.max(Number(e.target.value) || 0, 0), t.pendiente) }))
                               }
                               className="w-24 rounded-md border border-edge/10 bg-field px-1.5 py-1 text-right text-sm text-ink outline-none focus:border-accent/60"
                             />
@@ -860,19 +861,14 @@ export default function Pagos({
       setPagosRealizados((prev) => prev.map((r) => (r.id === pago.id ? { ...r, pago } : r)));
       return;
     }
-    setPagos((prev) => {
-      const existe = prev.some((p) => p.id === pago.id);
-      if (existe) return prev.map((p) => (p.id === pago.id ? pago : p));
-      // Solo se registra en la bitácora de Pagos Realizados la primera vez
-      // (pago nuevo) — editar montos/tratamientos de un pago ya existente
-      // (EditarPagoDialog reusa este mismo upsertPago) no debe generar una
-      // segunda entrada para el mismo pago.
-      setPagosRealizados((prevRealizados) => [
-        { id: pago.id, patientId, patientName, pago, registradoEn: new Date().toISOString(), registradoPor: userEmail },
-        ...prevRealizados,
-      ]);
-      return [pago, ...prev];
-    });
+    // Solo se registra en la bitácora de Pagos Realizados la primera vez (pago nuevo): editar un pago ya existente
+    // (EditarPagoDialog reusa este mismo upsertPago) entra por la rama de arriba y no genera una segunda entrada.
+    // Los dos setters van por separado: un efecto dentro del updater de otro se ejecutaría dos veces en desarrollo.
+    setPagos((prev) => [pago, ...prev]);
+    setPagosRealizados((prevRealizados) => [
+      { id: pago.id, patientId, patientName, pago, registradoEn: new Date().toISOString(), registradoPor: userEmail },
+      ...prevRealizados.filter((r) => r.id !== pago.id),
+    ]);
   };
 
   return (

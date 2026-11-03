@@ -9,6 +9,7 @@ import { coincidePaciente, formatEdad, type Patient } from "@/lib/patientData";
 import { exportarCsv } from "@/lib/exportCsv";
 import { parseArchivoPacientes, type RegistroImportado } from "@/lib/importPacientes";
 import { capitalizarNombre, manejarCambioNombre } from "@/lib/textoNombre";
+import { toISODate } from "@/lib/agendaHelpers";
 
 const avatarColors = ["#f59e0b", "#ec4899", "#3b82f6", "#22c55e", "#dc2626", "#a855f7"];
 
@@ -369,7 +370,7 @@ export default function Pacientes() {
 
   const exportarPacientes = () => {
     exportarCsv(
-      `pacientes_${new Date().toISOString().slice(0, 10)}.csv`,
+      `pacientes_${toISODate(new Date())}.csv`,
       ["Nombre completo", "Teléfono", "Correo", "Fecha de nacimiento", "Edad", "Notas"],
       patients.map((p) => [
         p.name,

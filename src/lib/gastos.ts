@@ -161,7 +161,7 @@ export function calcularFijosYVariables(
 
 /** Suma de gastos del rango, agrupada por categoría — mismo filtro de fecha
  * inclusive que ya usaba el cálculo de "Gastos del Mes" en Gastos.tsx.
- * Siempre devuelve las 7 categorías (en 0 si no tuvieron gasto en el
+ * Siempre devuelve las 9 categorías (en 0 si no tuvieron gasto en el
  * rango), para que un sobre sin movimiento este mes se siga mostrando
  * vacío en vez de desaparecer de la lista. */
 export function calcularGastosPorCategoria(
@@ -198,7 +198,7 @@ export type SobreGasto = PresupuestoCategoria & {
 
 /** Resuelve cada categoría a su sobre de gasto del mes. Itera sobre
  * `gastoCategoriaOptions` (no `Object.keys(porCategoria)`) para garantizar
- * las 7 categorías siempre presentes y en el mismo orden, con fallback al
+ * las 9 categorías siempre presentes y en el mismo orden, con fallback al
  * default si el documento de Firestore llegara parcial (ej. una categoría
  * agregada después de que el doc ya existía). */
 export function calcularSobresGasto(

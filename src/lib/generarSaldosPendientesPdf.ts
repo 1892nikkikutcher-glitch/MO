@@ -1,5 +1,6 @@
 import { ConstructorPdf, dineroPdf, nombreArchivoPdf } from "./pdfDocumento";
 import type { SaldoPendienteEntry } from "./saldosPendientes";
+import { toISODate } from "./agendaHelpers";
 
 export type DatosSaldosPendientesPdf = {
   saldos: SaldoPendienteEntry[];
@@ -65,5 +66,5 @@ export async function generarSaldosPendientesPdf(datos: DatosSaldosPendientesPdf
     { vacio: "Ningún paciente tiene saldo pendiente." }
   );
 
-  return { blob: pdf.finalizar(), nombre: nombreArchivoPdf("Saldos pendientes", fecha.toISOString().slice(0, 10), datos.clinicaNombre) };
+  return { blob: pdf.finalizar(), nombre: nombreArchivoPdf("Saldos pendientes", toISODate(fecha), datos.clinicaNombre) };
 }

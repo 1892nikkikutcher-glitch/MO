@@ -2,6 +2,8 @@
  * de uso limitado, descuentos) y las membresías activas/históricas de cada
  * paciente, con su propio conteo de usos por beneficio. */
 
+import { toISODate } from "./agendaHelpers";
+
 export type DuracionTipo = "mensual" | "trimestral" | "semestral" | "anual" | "personalizada";
 
 export const duracionOptions: { value: DuracionTipo; label: string }[] = [
@@ -70,7 +72,7 @@ export function calcularFechaFin(fechaInicioISO: string, tipo: DuracionTipo, dia
 
 export function estatusReal(membresia: PatientMembership): EstatusMembresia {
   if (membresia.estatus === "cancelada") return "cancelada";
-  const hoyISO = new Date().toISOString().slice(0, 10);
+  const hoyISO = toISODate(new Date());
   return membresia.fechaFin < hoyISO ? "vencida" : "activa";
 }
 

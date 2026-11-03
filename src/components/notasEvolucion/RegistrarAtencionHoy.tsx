@@ -105,7 +105,7 @@ export default function RegistrarAtencionHoy({
       const nombre = recursos.find((r) => r.id === cita.medicoId)?.nombre;
       if (nombre) return nombre;
     }
-    const hoyISO = new Date().toISOString().slice(0, 10);
+    const hoyISO = toISODate(new Date());
     const citasPaciente = citas.filter((c) => c.patientId === patientId && c.estatus !== "Cancelada");
     const proxima = citasPaciente
       .filter((c) => c.fecha >= hoyISO)
@@ -349,7 +349,7 @@ export default function RegistrarAtencionHoy({
             </button>
           )}
           <button onClick={empezarNueva} className="text-xs text-ink/40 hover:text-danger">
-            Descartar borrador
+            Empezar una nota nueva
           </button>
         </div>
       </div>

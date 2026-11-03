@@ -4,6 +4,7 @@ import { useState } from "react";
 import { usePatientData } from "@/context/PatientDataContext";
 import { calcularEdadDetallada, identidadDoctorDe } from "@/lib/patientData";
 import { manejarCambioNombre } from "@/lib/textoNombre";
+import { toISODate } from "@/lib/agendaHelpers";
 
 type Patient = {
   id: string;
@@ -59,7 +60,7 @@ export default function ConsentimientoInformado({
   // (la próxima si tiene una agendada, si no la más reciente pasada) y
   // siempre queda editable.
   const [medico, setMedico] = useState(() => {
-    const hoyISO = new Date().toISOString().slice(0, 10);
+    const hoyISO = toISODate(new Date());
     const citasPaciente = citas.filter((c) => c.patientId === patient.id && c.estatus !== "Cancelada");
     const proxima = citasPaciente
       .filter((c) => c.fecha >= hoyISO)

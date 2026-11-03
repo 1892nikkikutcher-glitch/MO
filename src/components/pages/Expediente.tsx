@@ -439,7 +439,7 @@ function PresupuestosTab({
     const estamparDiagnosticosLigados = (nuevoId: string, budgetItems: LineItem[]) => {
       const itemsConOrigen = budgetItems.filter((it) => it.origenClinico);
       if (itemsConOrigen.length === 0) return;
-      const hoyISO = new Date().toISOString().slice(0, 10);
+      const hoyISO = toISODate(new Date());
 
       const actuales = historiaClinicaPorPaciente[patient.id] ?? respuestasVacias;
       const porPreguntaActualizado = { ...actuales.porPregunta };
@@ -1437,7 +1437,7 @@ export default function Expediente({
             </button>
 
             <button
-              onClick={() => setActiveTab("MO Conecta")}
+              onClick={() => cambiarTab("MO Conecta")}
               title="Ver interconsultas de este paciente en MO Conecta"
               className="flex items-center justify-center gap-2 rounded-lg border border-accent/50 bg-accent/10 px-3 py-2 text-xs font-semibold text-accent transition-colors hover:bg-accent/20"
             >

@@ -70,21 +70,21 @@ export default function DatosPaciente({
 
   const [nombreCompleto, setNombreCompleto] = useState(patient.name);
   const [birthDate, setBirthDate] = useState(patient.birthDate ?? "");
-  const [sexo, setSexo] = useState(patient.sexo ?? sexoOptions[0]);
-  const [estadoCivil, setEstadoCivil] = useState(patient.estadoCivil ?? estadoCivilOptions[0]);
+  const [sexo, setSexo] = useState(patient.sexo ?? "");
+  const [estadoCivil, setEstadoCivil] = useState(patient.estadoCivil ?? "");
   const [ocupacion, setOcupacion] = useState(patient.ocupacion ?? "");
-  const [escolaridad, setEscolaridad] = useState(patient.escolaridad ?? escolaridadOptions[0]);
+  const [escolaridad, setEscolaridad] = useState(patient.escolaridad ?? "");
   const [lugarNacimiento, setLugarNacimiento] = useState(patient.lugarNacimiento ?? "");
   const [nombreTutor, setNombreTutor] = useState(patient.nombreTutor ?? "");
 
   const [nivelSocioeconomico, setNivelSocioeconomico] = useState(
-    patient.nivelSocioeconomico ?? nivelSocioeconomicoOptions[0]
+    patient.nivelSocioeconomico ?? ""
   );
   const [ingresoFamiliar, setIngresoFamiliar] = useState(
-    patient.ingresoFamiliar ?? ingresoFamiliarOptions[0]
+    patient.ingresoFamiliar ?? ""
   );
   const [dependientes, setDependientes] = useState(patient.dependientes ?? "");
-  const [tipoVivienda, setTipoVivienda] = useState(patient.tipoVivienda ?? tipoViviendaOptions[0]);
+  const [tipoVivienda, setTipoVivienda] = useState(patient.tipoVivienda ?? "");
   const [servicios, setServicios] = useState<string[]>(patient.servicios ?? []);
   const [responsablePago, setResponsablePago] = useState(patient.responsablePago ?? "");
 
@@ -129,16 +129,16 @@ export default function DatosPaciente({
   useEffect(() => {
     setNombreCompleto(patient.name);
     setBirthDate(patient.birthDate ?? "");
-    setSexo(patient.sexo ?? sexoOptions[0]);
-    setEstadoCivil(patient.estadoCivil ?? estadoCivilOptions[0]);
+    setSexo(patient.sexo ?? "");
+    setEstadoCivil(patient.estadoCivil ?? "");
     setOcupacion(patient.ocupacion ?? "");
-    setEscolaridad(patient.escolaridad ?? escolaridadOptions[0]);
+    setEscolaridad(patient.escolaridad ?? "");
     setLugarNacimiento(patient.lugarNacimiento ?? "");
     setNombreTutor(patient.nombreTutor ?? "");
-    setNivelSocioeconomico(patient.nivelSocioeconomico ?? nivelSocioeconomicoOptions[0]);
-    setIngresoFamiliar(patient.ingresoFamiliar ?? ingresoFamiliarOptions[0]);
+    setNivelSocioeconomico(patient.nivelSocioeconomico ?? "");
+    setIngresoFamiliar(patient.ingresoFamiliar ?? "");
     setDependientes(patient.dependientes ?? "");
-    setTipoVivienda(patient.tipoVivienda ?? tipoViviendaOptions[0]);
+    setTipoVivienda(patient.tipoVivienda ?? "");
     setServicios(patient.servicios ?? []);
     setResponsablePago(patient.responsablePago ?? "");
     setCelular(patient.phone);
@@ -199,6 +199,10 @@ export default function DatosPaciente({
   };
 
   const guardarCambios = () => {
+    if (!nombreCompleto.trim()) {
+      alert("El nombre del paciente no puede quedar vacío.");
+      return;
+    }
     updatePatient(patient.id, {
       name: nombreCompleto.trim(),
       birthDate,
@@ -282,6 +286,7 @@ export default function DatosPaciente({
               }}
               className={inputClass}
             >
+              <option value="">Sin especificar</option>
               {sexoOptions.map((o) => (
                 <option key={o} value={o}>
                   {o}
@@ -298,6 +303,7 @@ export default function DatosPaciente({
               }}
               className={inputClass}
             >
+              <option value="">Sin especificar</option>
               {estadoCivilOptions.map((o) => (
                 <option key={o} value={o}>
                   {o}
@@ -326,6 +332,7 @@ export default function DatosPaciente({
               }}
               className={inputClass}
             >
+              <option value="">Sin especificar</option>
               {escolaridadOptions.map((o) => (
                 <option key={o} value={o}>
                   {o}
@@ -472,6 +479,7 @@ export default function DatosPaciente({
               }}
               className={inputClass}
             >
+              <option value="">Sin especificar</option>
               {nivelSocioeconomicoOptions.map((o) => (
                 <option key={o} value={o}>
                   {o}
@@ -504,6 +512,7 @@ export default function DatosPaciente({
               }}
               className={inputClass}
             >
+              <option value="">Sin especificar</option>
               {ingresoFamiliarOptions.map((o) => (
                 <option key={o} value={o}>
                   {o}
@@ -533,6 +542,7 @@ export default function DatosPaciente({
               }}
               className={inputClass}
             >
+              <option value="">Sin especificar</option>
               {tipoViviendaOptions.map((o) => (
                 <option key={o} value={o}>
                   {o}

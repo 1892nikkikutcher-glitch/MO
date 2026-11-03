@@ -8,6 +8,7 @@ import {
   consentimientosEspecialidad,
   type TipoConsentimientoEspecialidad,
 } from "@/lib/consentimientosEspecialidad";
+import { toISODate } from "@/lib/agendaHelpers";
 
 const inputClass =
   "w-full rounded-lg border border-edge/10 bg-field px-3 py-2 text-sm text-ink outline-none focus:border-accent/60";
@@ -46,7 +47,7 @@ export default function ConsentimientoEspecialidad({
   // va a atender al paciente (identidadDoctorDe) — se sugiere el médico de
   // la cita más cercana del paciente y queda editable.
   const [medico, setMedico] = useState(() => {
-    const hoyISO = new Date().toISOString().slice(0, 10);
+    const hoyISO = toISODate(new Date());
     const citasPaciente = citas.filter((c) => c.patientId === patient.id && c.estatus !== "Cancelada");
     const proxima = citasPaciente
       .filter((c) => c.fecha >= hoyISO)

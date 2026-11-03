@@ -3,9 +3,10 @@
 import type { ReactNode } from "react";
 import { usePatientData } from "@/context/PatientDataContext";
 import { promocionVigente } from "@/lib/catalogosVarios";
+import { toISODate } from "@/lib/agendaHelpers";
 
 function hoyIso(): string {
-  return new Date().toISOString().slice(0, 10);
+  return toISODate(new Date());
 }
 
 function IconDiente() {

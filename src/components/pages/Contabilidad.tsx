@@ -261,9 +261,8 @@ export default function Contabilidad() {
             <CandadoPrivacidad />
           </div>
           <p className="mt-1 text-xs text-ink/40">
-            Ingresos y gastos de este mes, para compartir con tu contador. Más adelante este módulo
-            podrá separar automáticamente qué ingresos requieren factura, una vez que capturemos la
-            constancia de situación fiscal de los pacientes que la piden.
+            Ingresos y gastos de este mes, para compartir con tu contador. Los pagos que piden factura
+            los controlas en el módulo Facturación.
           </p>
           <div className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-2">
             <div className="rounded-2xl border border-edge/10 bg-surface p-5">

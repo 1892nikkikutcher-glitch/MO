@@ -11,6 +11,7 @@ import { descargarBlob } from "@/lib/pdfDocumento";
 import { fechaPagoAIso } from "@/lib/metas";
 import { calcularRangoPeriodo, type PeriodoId } from "@/lib/dashboardMetrics";
 import PeriodSelector from "@/components/dashboard/PeriodSelector";
+import { toISODate } from "@/lib/agendaHelpers";
 
 /** Fecha límite a partir de la cual existe la bitácora de Pagos
  * Realizados — se desplegó junto con este reporte, así que no hay forma
@@ -91,8 +92,8 @@ export default function ReportePagos() {
   const hoy = new Date();
   const [periodoId, setPeriodoId] = useState<PeriodoId>("mes");
   const [personalizado, setPersonalizado] = useState(() => ({
-    desdeISO: `${hoy.toISOString().slice(0, 7)}-01`,
-    hastaISO: hoy.toISOString().slice(0, 10),
+    desdeISO: `${toISODate(hoy).slice(0, 7)}-01`,
+    hastaISO: toISODate(hoy),
   }));
   const [anclaFecha, setAnclaFecha] = useState<Date>(() => new Date());
 

@@ -22,7 +22,7 @@ export default function BorrarCitas() {
   const seleccionadas = filtroActivo
     ? citas
         .filter((c) => enRangoFecha(c.fecha, desde, hasta))
-        .filter((c) => !recursoId || c.recursoId === recursoId)
+        .filter((c) => !recursoId || c.recursoId === recursoId || c.medicoId === recursoId || c.unidadId === recursoId)
         .filter((c) => !estatus || c.estatus === estatus)
     : [];
 

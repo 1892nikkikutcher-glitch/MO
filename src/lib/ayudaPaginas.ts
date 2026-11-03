@@ -191,7 +191,7 @@ export const ayudaPaginas: Record<string, AyudaPagina> = {
     resumen: "Un porcentaje de lo que el paciente paga en sus tratamientos vuelve como saldo para su siguiente tratamiento. Tú apruebas cada cashback.",
     puntos: [
       "Define aquí el porcentaje (por ejemplo 3%: $30 por cada $1,000), cuánto dura el saldo y si se puede transferir.",
-      "Cada pago de tratamiento genera un cashback por aprobar: puedes aprobarlo, rechazarlo o cambiar el monto antes.",
+      "Cada pago de tratamiento genera un cashback: se aprueba solo si así lo configuraste; si no, queda por aprobar y puedes aprobarlo, rechazarlo o cambiar el monto.",
       "El paciente usa su saldo eligiendo Cashback como forma de pago, y puede transferirlo a un conocido o familiar que ya sea paciente (también lo apruebas tú).",
     ],
   },
@@ -226,7 +226,7 @@ export const ayudaPaginas: Record<string, AyudaPagina> = {
     titulo: "Administración — Colaboradores",
     resumen: "Invita a otras personas a tu clínica y controla qué pueden ver o hacer (ej. si tienen acceso a finanzas).",
     puntos: [
-      "Genera una invitación por correo; la persona la acepta y queda ligada a tu clínica con el rol que le asignes.",
+      "Genera una invitación y compártela por WhatsApp; la persona la acepta y queda ligada a tu clínica con el rol que le asignes.",
     ],
   },
   "administracion-perfil": {
@@ -268,7 +268,7 @@ export const ayudaPaginas: Record<string, AyudaPagina> = {
   },
   rpbi: {
     titulo: "RPBI",
-    resumen: "Control de Residuos Peligrosos Biológico-Infecciosos: empresa recolectora y bitácora de recolección.",
+    resumen: "Control de Residuos Peligrosos Biológico-Infecciosos: directorio de la empresa recolectora y su responsable.",
     puntos: [],
   },
   "mantenimiento-equipos": {

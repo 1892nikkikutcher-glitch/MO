@@ -36,7 +36,7 @@ export default function BitacoraCitas() {
 
   const filtradas = citas
     .filter((c) => enRangoFecha(c.fecha, desde, hasta))
-    .filter((c) => !recursoId || c.recursoId === recursoId)
+    .filter((c) => !recursoId || c.recursoId === recursoId || c.medicoId === recursoId || c.unidadId === recursoId)
     .filter((c) => !estatus || c.estatus === estatus)
     .filter((c) => {
       if (!razon) return true;
