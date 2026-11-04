@@ -11,6 +11,7 @@ import { crearEnlaceReciboApi } from "@/lib/recibosCompartidosApi";
 import { mensajeConEnlaceRecibo } from "@/lib/recibosCompartidos";
 import { generarReciboPagoPdf } from "@/lib/generarReciboPagoPdf";
 import { buildReciboTexto, formatCurrency, type Pago } from "@/lib/patientData";
+import { resumenCuentaRecibo } from "@/lib/resumenCuentaRecibo";
 import { slugify } from "@/lib/textoNombre";
 
 type EstadoPdf =
@@ -43,7 +44,20 @@ export default function ReciboPagoPanel({
   /** Encabezado opcional (ej. "Recibo de pago"); sin él se asume que viene del registro de un pago. */
   titulo?: string;
 }) {
-  const { citas, patients, clinicInfo, formatosWhatsapp, perfilDoctor, saldoCashbackDe, cashbackConfig, clinicUid, miRol } = usePatientData();
+  const {
+    citas,
+    patients,
+    clinicInfo,
+    formatosWhatsapp,
+    perfilDoctor,
+    saldoCashbackDe,
+    cashbackConfig,
+    clinicUid,
+    miRol,
+    presupuestosPorPaciente,
+    pagosPorPaciente,
+    devolucionesPorPaciente,
+  } = usePatientData();
   const [mensajeWa, setMensajeWa] = useState<string | undefined>(undefined);
   const [estadoEnlace, setEstadoEnlace] = useState<EstadoEnlace>({ tipo: "creando" });
   const [estado, setEstado] = useState<EstadoPdf>({ tipo: "generando" });
@@ -60,9 +74,22 @@ export default function ReciboPagoPanel({
     return `Cashback: $${total.toLocaleString("es-MX", { maximumFractionDigits: 2 })}${vence}`;
   };
 
-  // Pie del recibo (próxima cita y saldo). El saldo de cashback llega por el listener un instante después de
-  // registrar el pago: por eso entra a las dependencias de abajo y el recibo se vuelve a armar con el saldo ya al día.
-  const notaPie = [buildProximaCitaTexto(citas, patientId, pago.fecha), textoSaldoCashback()].filter(Boolean).join("\n");
+  // Estado de cuenta del paciente con este pago incluido. Llega por los listeners un instante después de registrar el
+  // pago, así que también entra a las dependencias de abajo y el recibo se rearma con las cifras al día.
+  const resumenCuenta = resumenCuentaRecibo({
+    presupuestos: presupuestosPorPaciente[patientId] ?? [],
+    pagos: pagosPorPaciente[patientId] ?? [],
+    devoluciones: devolucionesPorPaciente[patientId] ?? [],
+    pago,
+    citas,
+    patientId,
+  });
+  const resumenClave = JSON.stringify(resumenCuenta);
+
+  // Pie del recibo (próxima cita y saldo). Si el estado de cuenta ya trae la próxima cita no se repite en el pie. El saldo
+  // de cashback llega por el listener un instante después de registrar el pago: por eso entra a las dependencias de abajo
+  // y el recibo se vuelve a armar con el saldo ya al día.
+  const notaPie = [resumenCuenta?.proximaCita ? "" : buildProximaCitaTexto(citas, patientId, pago.fecha), textoSaldoCashback()].filter(Boolean).join("\n");
 
   // Genera el PDF al abrir y cada vez que el pago cambia (por ejemplo, al agregarle la firma).
   useEffect(() => {
@@ -75,6 +102,7 @@ export default function ReciboPagoPanel({
       clinicaNombre: clinicInfo?.nombre || "",
       perfilDoctor,
       notaPie,
+      resumenCuenta,
     })
       .then((blob) => {
         if (cancelado) return;
@@ -91,7 +119,7 @@ export default function ReciboPagoPanel({
     };
     // El recibo depende del pago y de su pie; el resto (clínica) es contexto fijo.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [pago, intento, notaPie]);
+  }, [pago, intento, notaPie, resumenClave]);
 
   const listo = estado.tipo === "listo" ? estado : null;
   const urlPdf = listo?.url;
@@ -113,6 +141,7 @@ export default function ReciboPagoPanel({
       logoClinicaUrl: perfilDoctor.logoClinicaUrl || "",
       direccionClinica: perfilDoctor.direccionClinica || "",
       notaPie,
+      resumenCuenta,
       pago: {
         id: pago.id,
         fecha: pago.fecha,
@@ -230,6 +259,30 @@ export default function ReciboPagoPanel({
           <span>Total pagado</span>
           <span className="font-semibold text-success">{formatCurrency(pago.total)}</span>
         </div>
+        {resumenCuenta && (
+          <div className="mt-2 space-y-1 border-t border-edge/10 pt-2">
+            <div className="flex justify-between">
+              <span>Total presupuestado</span>
+              <span>{formatCurrency(resumenCuenta.totalPresupuestado)}</span>
+            </div>
+            <div className="flex justify-between">
+              <span>Pagado a la fecha</span>
+              <span>{formatCurrency(resumenCuenta.totalPagado)}</span>
+            </div>
+            <div className="flex justify-between font-semibold">
+              <span>Saldo pendiente</span>
+              <span className={resumenCuenta.saldo > 0 ? "text-danger" : "text-success"}>{formatCurrency(resumenCuenta.saldo)}</span>
+            </div>
+            {resumenCuenta.proximaCita && (
+              <div className="flex justify-between pt-1">
+                <span>Próxima cita · {resumenCuenta.proximaCita.fecha.split("-").reverse().join("/")}</span>
+                <span className="font-semibold">
+                  {resumenCuenta.proximaCita.costo !== null ? formatCurrency(resumenCuenta.proximaCita.costo) : "Sin costo estimado"}
+                </span>
+              </div>
+            )}
+          </div>
+        )}
         {pago.firma && (
           <div className="mt-2 border-t border-edge/10 pt-2">
             <p className="mb-1 text-xs text-ink/40">Firma registrada</p>

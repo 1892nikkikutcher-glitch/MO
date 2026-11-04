@@ -5,7 +5,7 @@
 
 import { redondearDinero } from "./dinero";
 import { MESES_ABR, addDays, addMonths } from "./agendaHelpers";
-import { inicioSemana } from "./metas";
+import { fechaPagoAIso, inicioSemana } from "./metas";
 import { esFormaPagoCashback } from "./cashback";
 
 export type FondoAsignacion = { label: string; porcentaje: number };
@@ -79,6 +79,30 @@ export function sumarRangoPorFormaPago(
       else electronico += monto;
     });
   });
+  return { efectivo: redondearDinero(efectivo), electronico: redondearDinero(electronico) };
+}
+
+/** La bitácora de Pagos realizados solo existe desde este día (ver pagosRealizados.ts): antes no se puede comparar. */
+export const PAGOS_REALIZADOS_DESDE = "2026-09-22";
+
+/** Lo mismo que `sumarRangoPorFormaPago`, pero sumando la bitácora de Pagos realizados (lo que ve Reportes → Pagos) en
+ * vez del resumen de cobros. Sirve para cruzar las dos fuentes: si no coinciden, un cobro quedó fuera de alguna. */
+export function sumarRangoPagosRealizados(
+  registros: { pago: { fecha: string; formaPago: string; total: number } }[],
+  desde: Date,
+  hasta: Date
+): { efectivo: number; electronico: number } {
+  let efectivo = 0;
+  let electronico = 0;
+  for (const { pago } of registros) {
+    const iso = fechaPagoAIso(pago.fecha);
+    if (!iso) continue;
+    const d = new Date(`${iso}T00:00:00`);
+    if (d < desde || d > hasta) continue;
+    if (esFormaPagoCashback(pago.formaPago)) continue;
+    if (pago.formaPago === "Efectivo") efectivo += pago.total;
+    else electronico += pago.total;
+  }
   return { efectivo: redondearDinero(efectivo), electronico: redondearDinero(electronico) };
 }
 

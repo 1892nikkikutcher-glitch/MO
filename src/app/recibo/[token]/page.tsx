@@ -45,6 +45,7 @@ export default function ReciboPublicoPage({ params }: { params: Promise<{ token:
           clinicaNombre: recibo.clinicaNombre,
           perfilDoctor: { logoClinicaUrl: recibo.logoClinicaUrl, direccionClinica: recibo.direccionClinica },
           notaPie: recibo.notaPie,
+          resumenCuenta: recibo.resumenCuenta,
         });
         if (cancelado) return;
         urlCreada = URL.createObjectURL(blob);

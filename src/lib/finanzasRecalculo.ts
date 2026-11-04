@@ -7,6 +7,7 @@
 import { redondearDinero } from "./dinero";
 import { fechaPagoAIso, sumarRango, type FinanzasConfig } from "./metas";
 import { sumarRangoPorFormaPago } from "./fondosFinancieros";
+import { claveDeResumen } from "./finanzasIncrementos";
 import type { Pago } from "./patientData";
 
 export type ResultadoRecalculo = {
@@ -33,12 +34,18 @@ export function construirFinanzasDesdePagos(pagos: Pago[], actual: FinanzasConfi
     }
     porFecha[iso] = (porFecha[iso] ?? 0) + p.total;
     pagosCountPorFecha[iso] = (pagosCountPorFecha[iso] ?? 0) + 1;
+    // Mismas claves que usa la suma al vuelo (calcularDeltasFinanzas): un
+    // pago sin médico o sin forma de pago cae en el mismo cajón por los dos
+    // caminos, y la reconstrucción no puede terminar en un documento con un
+    // nombre de campo vacío, que Firestore rechaza.
+    const claveForma = claveDeResumen(p.formaPago);
+    const claveMedico = claveDeResumen(p.medico);
     const forma = (porFechaYFormaPago[iso] ??= {});
-    forma[p.formaPago] = (forma[p.formaPago] ?? 0) + p.total;
+    forma[claveForma] = (forma[claveForma] ?? 0) + p.total;
     const medico = (porFechaYMedico[iso] ??= {});
-    medico[p.medico] = (medico[p.medico] ?? 0) + p.total;
-    const delMedico = ((porFechaMedicoYFormaPago[iso] ??= {})[p.medico] ??= {});
-    delMedico[p.formaPago] = (delMedico[p.formaPago] ?? 0) + p.total;
+    medico[claveMedico] = (medico[claveMedico] ?? 0) + p.total;
+    const delMedico = ((porFechaMedicoYFormaPago[iso] ??= {})[claveMedico] ??= {});
+    delMedico[claveForma] = (delMedico[claveForma] ?? 0) + p.total;
   }
 
   const redondear = <T extends Record<string, number>>(m: T) =>

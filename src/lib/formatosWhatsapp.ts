@@ -118,6 +118,15 @@ function sumarMeses(fechaISO: string, meses: number): string {
   return `${fecha.getFullYear()}-${String(fecha.getMonth() + 1).padStart(2, "0")}-${String(fecha.getDate()).padStart(2, "0")}`;
 }
 
+/** La siguiente cita agendada del paciente después de hoy, sin contar canceladas ni reagendadas. */
+export function siguienteCita(citas: CitaAgenda[], patientId: string): CitaAgenda | undefined {
+  const hoy = new Date();
+  const hoyISO = `${hoy.getFullYear()}-${String(hoy.getMonth() + 1).padStart(2, "0")}-${String(hoy.getDate()).padStart(2, "0")}`;
+  return citas
+    .filter((c) => c.patientId === patientId && c.estatus !== "Cancelada" && c.estatus !== "Reagendada" && c.fecha > hoyISO)
+    .sort((a, b) => (a.fecha + a.horaInicio).localeCompare(b.fecha + b.horaInicio))[0];
+}
+
 /** Texto listo para insertar en {{proximaCita}} del recibo de pago: la
  * siguiente cita agendada de ESTE paciente, DESPUÉS de hoy (no cuenta la
  * cita de hoy mismo — normalmente es la que se está pagando ahora, no una
@@ -132,15 +141,7 @@ export function buildProximaCitaTexto(citas: CitaAgenda[], patientId: string, fe
   const hoy = new Date();
   const hoyISO = `${hoy.getFullYear()}-${String(hoy.getMonth() + 1).padStart(2, "0")}-${String(hoy.getDate()).padStart(2, "0")}`;
 
-  const proxima = citas
-    .filter(
-      (c) =>
-        c.patientId === patientId &&
-        c.estatus !== "Cancelada" &&
-        c.estatus !== "Reagendada" &&
-        c.fecha > hoyISO
-    )
-    .sort((a, b) => (a.fecha + a.horaInicio).localeCompare(b.fecha + b.horaInicio))[0];
+  const proxima = siguienteCita(citas, patientId);
 
   if (proxima) {
     return `\n\nSu próxima cita es el ${formatFechaLarga(proxima.fecha)} a las ${formatHora12(proxima.horaInicio)}.`;

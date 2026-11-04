@@ -6,8 +6,10 @@ import { usePrivacidad } from "@/context/PrivacidadContext";
 import { formatCurrency } from "@/lib/patientData";
 import { cobradoEnRango, cobradoTotal, type ResultadoRecalculo } from "@/lib/finanzasRecalculo";
 import type { FinanzasConfig } from "@/lib/metas";
+import { toISODate } from "@/lib/agendaHelpers";
 import {
   GRUPOS_EFECTIVO,
+  PAGOS_REALIZADOS_DESDE,
   GRUPOS_ELECTRONICO,
   calcularAsignacionFondos,
   desglosePorMedicoCompleto,
@@ -15,6 +17,7 @@ import {
   navegarVistaFondos,
   rangoVistaFondos,
   sumarRangoPorFormaPago,
+  sumarRangoPagosRealizados,
   sumarRangoPorMedico,
   totalCobrado,
   tituloTotalFondos,
@@ -244,7 +247,7 @@ function RevisarContraPagos({
  * porcentajes son fijos (definidos por el usuario), no editables desde
  * aquí todavía. */
 export default function FondosFinancieros() {
-  const { puedeVerFinanzas, finanzas, recursos } = usePatientData();
+  const { puedeVerFinanzas, finanzas, recursos, resumenCobrosFallo, pagosRealizados } = usePatientData();
   const { oculto } = usePrivacidad();
   const [vista, setVista] = useState<VistaFondos>("mes");
   // Ancla independiente de "hoy": las flechas la mueven, pero
@@ -266,6 +269,12 @@ export default function FondosFinancieros() {
   const porMedico = sumarRangoPorMedico(finanzas.porFechaMedicoYFormaPago ?? {}, rangoActivo.desde, rangoActivo.hasta);
   const desgloseCompleto = desglosePorMedicoCompleto(porMedico, ingresos);
   const totalClinica = totalCobrado(ingresos);
+  // Cruce con Reportes → Pagos: si esa lista suma otra cosa en este periodo, un cobro quedó fuera de este cuadro (o de la lista).
+  const enReportePagos = sumarRangoPagosRealizados(pagosRealizados, rangoActivo.desde, rangoActivo.hasta);
+  const noCuadraConReporte =
+    toISODate(rangoActivo.desde) >= PAGOS_REALIZADOS_DESDE &&
+    (Math.abs(enReportePagos.efectivo - ingresos.efectivo) >= 0.01 || Math.abs(enReportePagos.electronico - ingresos.electronico) >= 0.01);
+
   // Todos los médicos y especialistas registrados (con su especialidad) y, aparte, cualquier nombre que cobró sin estar registrado.
   // Una misma persona escrita de dos formas, o registrada dos veces, sale una sola vez.
   const doctores = doctoresDelPeriodo(recursos.filter((r) => r.tipo === "medico"), porMedico);
@@ -338,6 +347,31 @@ export default function FondosFinancieros() {
           </div>
         </div>
       </div>
+      {/* Una suma al resumen que no se pudo guardar deja este cuadro corto
+          sin que nada lo delate: el pago sí está en el expediente, con su
+          recibo. Antes esto solo quedaba en la consola del navegador. */}
+      {resumenCobrosFallo && (
+        <div
+          role="alert"
+          className="mb-3 rounded-lg border border-warning/40 bg-warning/10 px-3 py-2 text-xs leading-relaxed text-ink/80"
+        >
+          <strong className="font-semibold">Un cobro no se alcanzó a sumar a este cuadro.</strong> El pago
+          quedó guardado en el expediente y el dinero no se perdió; lo que está corto es el total de aquí.
+          Revísalo contra los pagos reales y corrígelo.
+        </div>
+      )}
+      {noCuadraConReporte && (
+        <div role="alert" className="mb-3 rounded-lg border border-warning/40 bg-warning/10 px-3 py-2 text-xs leading-relaxed text-ink/80">
+          <strong className="font-semibold">Este cuadro no coincide con Reportes → Pagos en {rangoActivo.label}.</strong> Aquí:{" "}
+          {oculto ? "••••" : `${formatCurrency(ingresos.efectivo)} en efectivo y ${formatCurrency(ingresos.electronico)} electrónico`}. En Reportes → Pagos:{" "}
+          {oculto ? "••••" : `${formatCurrency(enReportePagos.efectivo)} en efectivo y ${formatCurrency(enReportePagos.electronico)} electrónico`}. Algún cobro no
+          quedó sumado en una de las dos;{" "}
+          <button onClick={() => setRevisando(true)} className="font-semibold text-accent hover:underline">
+            revisa contra los pagos reales y corrígelo
+          </button>
+          .
+        </div>
+      )}
       <div className="mb-5">
         <span className="text-xs text-ink/40">
           Reparto fijo de {rangoActivo.label} entre fondos, según cómo pagó el paciente.{" "}

@@ -1,6 +1,8 @@
 import jsPDF from "jspdf";
 import { cargarImagen, type ImagenCargada } from "./imagenesPdf";
+import { formatFechaLarga, formatHora12 } from "./formatosWhatsapp";
 import type { Pago, PerfilDoctor } from "./patientData";
+import type { ResumenCuentaRecibo } from "./resumenCuentaRecibo";
 
 export type DatosReciboPagoPdf = {
   pago: Pago;
@@ -10,6 +12,8 @@ export type DatosReciboPagoPdf = {
   perfilDoctor: Pick<PerfilDoctor, "logoClinicaUrl" | "direccionClinica">;
   /** Texto libre al pie (ej. la próxima cita del paciente); puede venir con saltos de línea al inicio. */
   notaPie?: string;
+  /** Presupuestado, pagado a la fecha, saldo y costo de la próxima cita; sin él el recibo sale como siempre. */
+  resumenCuenta?: ResumenCuentaRecibo | null;
 };
 
 function dinero(valor: number): string {
@@ -121,7 +125,8 @@ export async function generarReciboPagoPdf(datos: DatosReciboPagoPdf): Promise<B
   }
 
   // Total, firma y notas necesitan lugar completo: si no caben, van en otra hoja.
-  if (y + 52 > pageHeight - marginBottom) {
+  const resumen = datos.resumenCuenta ?? null;
+  if (y + 52 + (resumen ? 40 : 0) > pageHeight - marginBottom) {
     doc.addPage();
     y = 20;
   }
@@ -139,6 +144,47 @@ export async function generarReciboPagoPdf(datos: DatosReciboPagoPdf): Promise<B
     doc.setFontSize(9);
     doc.text("Requiere factura.", marginX, y);
     y += 6;
+  }
+
+  if (resumen) {
+    y += 2;
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(10);
+    doc.text("Estado de cuenta", marginX, y);
+    y += 2.5;
+    doc.setLineWidth(0.2);
+    doc.line(marginX, y, xDerecha, y);
+    y += 5.5;
+    const filaCuenta = (etiqueta: string, monto: number, negrita = false) => {
+      doc.setFont("helvetica", negrita ? "bold" : "normal");
+      doc.setFontSize(10);
+      doc.text(etiqueta, marginX, y);
+      doc.text(dinero(monto), xMonto, y, { align: "right" });
+      y += 5.5;
+    };
+    filaCuenta("Total presupuestado", resumen.totalPresupuestado);
+    filaCuenta("Pagado a la fecha (incluye este pago)", resumen.totalPagado);
+    filaCuenta("Saldo pendiente", resumen.saldo, true);
+    if (resumen.proximaCita) {
+      const { fecha, horaInicio, tratamientos, costo } = resumen.proximaCita;
+      y += 1.5;
+      doc.setFont("helvetica", "bold");
+      doc.setFontSize(10);
+      doc.text("Próxima cita", marginX, y);
+      doc.setFont("helvetica", "normal");
+      doc.text(`${formatFechaLarga(fecha)}, ${formatHora12(horaInicio)}`, marginX + 38, y);
+      y += 5.5;
+      if (tratamientos.length > 0) {
+        doc.setFontSize(9);
+        const lineas: string[] = doc.splitTextToSize(`Tratamiento: ${tratamientos.join(", ")}`, xDerecha - marginX - 38);
+        doc.text(lineas, marginX + 38, y);
+        y += lineas.length * 4.5 + 1;
+      }
+      if (costo !== null) {
+        filaCuenta("Costo estimado de la próxima cita", costo, true);
+      }
+    }
+    y += 2;
   }
 
   if (firma) {

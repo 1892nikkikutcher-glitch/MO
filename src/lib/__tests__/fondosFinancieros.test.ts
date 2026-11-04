@@ -6,6 +6,7 @@ import {
   claveMedico,
   desglosePorMedicoCompleto,
   doctoresDelPeriodo,
+  sumarRangoPagosRealizados,
   sumarRangoPorMedico,
   etiquetaTotalFondos,
   semanaDelAnio,
@@ -366,5 +367,20 @@ describe("un mismo doctor escrito de varias formas sale una sola vez", () => {
     const lista = doctoresDelPeriodo([{ nombre: "Dra. Ana" }], [{ clave: claveMedico("Diplomado"), medico: "Diplomado", efectivo: 100, electronico: 0 }]);
     expect(lista.find((d) => d.medico === "Diplomado")).toMatchObject({ registrado: false });
     expect(lista.find((d) => d.medico === "Dra. Ana")).toMatchObject({ registrado: true, efectivo: 0 });
+  });
+});
+
+describe("sumarRangoPagosRealizados", () => {
+  const reg = (fecha: string, formaPago: string, total: number) => ({ pago: { fecha, formaPago, total } });
+  it("separa efectivo de electrónico y respeta el rango", () => {
+    const r = sumarRangoPagosRealizados(
+      [reg("03/11/2026", "Efectivo", 550), reg("03/11/2026", "Transferencia", 1100), reg("02/11/2026", "Efectivo", 2270), reg("31/10/2026", "Efectivo", 999)],
+      new Date(2026, 10, 1),
+      new Date(2026, 10, 3)
+    );
+    expect(r).toEqual({ efectivo: 2820, electronico: 1100 });
+  });
+  it("ignora pagos con fecha ilegible", () => {
+    expect(sumarRangoPagosRealizados([reg("¿?", "Efectivo", 5)], new Date(2026, 0, 1), new Date(2026, 11, 31))).toEqual({ efectivo: 0, electronico: 0 });
   });
 });

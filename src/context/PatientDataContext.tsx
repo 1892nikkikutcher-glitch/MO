@@ -11,7 +11,6 @@ import {
 } from "react";
 import { sedesInicial, type Sede, type SedesConfig } from "@/lib/sedesBloques";
 import { balanceInicial, type BalanceConsultorio } from "@/lib/balanceConsultorio";
-import { redondearDinero } from "@/lib/dinero";
 import { toISODate } from "@/lib/agendaHelpers";
 import { detectarDispositivo, dispositivosConfigInicial, type DispositivosConfig, type NombresDeDispositivos } from "@/lib/dispositivo";
 import {
@@ -24,6 +23,7 @@ import {
   type MovimientoCashback,
   type SaldoCashback,
 } from "@/lib/cashback";
+import { aIncrementos, calcularDeltasFinanzas } from "@/lib/finanzasIncrementos";
 import {
   arrayUnion,
   collection,
@@ -32,6 +32,7 @@ import {
   doc,
   getDoc,
   getDocs,
+  increment,
   onSnapshot,
   query,
   serverTimestamp,
@@ -807,6 +808,9 @@ type PatientDataContextValue = {
     duplicados: PosibleDuplicado[];
     controles: PropuestaControl[];
   }>;
+  /** true si alguna suma al resumen de cobros no se pudo guardar en esta
+   * sesión: los totales por día están cortos y hay que reconstruirlos. */
+  resumenCobrosFallo: boolean;
   /** Lee los pagos reales de todos los expedientes y arma el resumen de cobros que
    * debería existir, SIN guardar nada: devuelve lo guardado y lo reconstruido para
    * compararlos (ver FondosFinancieros → "Revisar contra los pagos reales"). */
@@ -1149,7 +1153,13 @@ export function PatientDataProvider({
     "presupuestoGastos",
     presupuestoGastosInicial
   );
-  const [finanzas, setFinanzas] = useFirestoreDoc<FinanzasConfig>(clinicUid, "finanzas", finanzasInicial);
+  // Solo de lectura desde aquí: el resumen de cobros ya no se sobreescribe
+  // con la copia local, se le mandan incrementos (ver registrarDeltaFinanzas).
+  const [finanzas] = useFirestoreDoc<FinanzasConfig>(clinicUid, "finanzas", finanzasInicial);
+  /** Una suma al resumen de cobros que no se pudo guardar. Mientras esté
+   * encendida, lo que enseñan Fondos y Corte de Caja está corto respecto de
+   * los pagos reales, y la única reparación es reconstruirlo. */
+  const [resumenCobrosFallo, setResumenCobrosFallo] = useState(false);
   const [estadisticas, setEstadisticas] = useFirestoreDoc<EstadisticasGlobales>(
     clinicUid,
     "estadisticas",
@@ -1877,84 +1887,49 @@ export function PatientDataProvider({
     sincronizarEtiquetasPagos(patientId, prevArr, next);
   };
 
-  /** Refleja en `config/finanzas` el neto por fecha (alta, edición o baja de
-   * un pago) para que el KPI de Metas se calcule con ingresos reales de toda
-   * la clínica, sin depender de tener cada expediente de paciente cargado. */
+  /** Suma este movimiento de pagos al resumen de cobros (`config/finanzas`),
+   * de donde salen el Corte de Caja, Fondos · Regla de Sobres y el KPI de
+   * Metas, sin depender de tener cada expediente de paciente cargado.
+   *
+   * LA SUMA LA HACE EL SERVIDOR, NO ESTE NAVEGADOR
+   *
+   * Antes se guardaba la cifra final: esta pestaña tomaba la copia del
+   * resumen que tenía en memoria, le sumaba el pago y escribía el resultado.
+   * Dos aparatos cobrando el mismo día —la recepción y el consultorio, o dos
+   * pestañas abiertas— calculan sobre bases distintas, y el segundo en
+   * guardar borraba lo del primero: el pago seguía en el expediente, con su
+   * recibo, pero el total del día ya no lo contaba. Lo mismo si el documento
+   * todavía no terminaba de cargar, porque entonces la base era cero.
+   *
+   * Ahora solo se manda cuánto cambia, como incremento atómico, y Firestore
+   * lo suma sobre lo que de verdad hay guardado. El resumen que se ve en
+   * pantalla se actualiza solo: el onSnapshot que ya escucha el documento
+   * recibe el valor nuevo, también mientras la escritura sigue en cola por
+   * falta de internet. */
   const registrarDeltaFinanzas = (prevArr: Pago[], next: Pago[]) => {
-    const conIso = (arr: Pago[]) =>
-      arr.map((p) => ({ ...p, _iso: fechaPagoAIso(p.fecha) })).filter((p) => p._iso);
-    const prevConIso = conIso(prevArr);
-    const nextConIso = conIso(next);
-    const fechas = new Set([...prevConIso, ...nextConIso].map((p) => p._iso as string));
-    if (fechas.size === 0) return;
-    const formasDePago = new Set([...prevConIso, ...nextConIso].map((p) => p.formaPago));
-    const medicosEnPagos = new Set([...prevConIso, ...nextConIso].map((p) => p.medico));
-    setFinanzas((prevFin) => {
-      const porFecha = { ...prevFin.porFecha };
-      // porFechaYFormaPago/porFechaYMedico no existían antes de esos
-      // campos — los documentos ya guardados en Firestore no los traen
-      // hasta la primera vez que se escribe aquí, así que siempre se
-      // respaldan con {} en vez de asumir que existen.
-      const porFechaYFormaPago = { ...(prevFin.porFechaYFormaPago ?? {}) };
-      const porFechaYMedico = { ...(prevFin.porFechaYMedico ?? {}) };
-      const pagosCountPorFecha = { ...(prevFin.pagosCountPorFecha ?? {}) };
-      const porFechaMedicoYFormaPago = { ...(prevFin.porFechaMedicoYFormaPago ?? {}) };
-      fechas.forEach((iso) => {
-        const sumPrev = prevConIso.filter((p) => p._iso === iso).reduce((s, p) => s + p.total, 0);
-        const sumNext = nextConIso.filter((p) => p._iso === iso).reduce((s, p) => s + p.total, 0);
-        const delta = sumNext - sumPrev;
-        if (delta !== 0) porFecha[iso] = (porFecha[iso] ?? 0) + delta;
-
-        const countPrev = prevConIso.filter((p) => p._iso === iso).length;
-        const countNext = nextConIso.filter((p) => p._iso === iso).length;
-        const deltaCount = countNext - countPrev;
-        if (deltaCount !== 0) pagosCountPorFecha[iso] = (pagosCountPorFecha[iso] ?? 0) + deltaCount;
-
-        const porForma = { ...(porFechaYFormaPago[iso] ?? {}) };
-        formasDePago.forEach((forma) => {
-          const sumPrevForma = prevConIso
-            .filter((p) => p._iso === iso && p.formaPago === forma)
-            .reduce((s, p) => s + p.total, 0);
-          const sumNextForma = nextConIso
-            .filter((p) => p._iso === iso && p.formaPago === forma)
-            .reduce((s, p) => s + p.total, 0);
-          const deltaForma = sumNextForma - sumPrevForma;
-          if (deltaForma !== 0) porForma[forma] = (porForma[forma] ?? 0) + deltaForma;
-        });
-        porFechaYFormaPago[iso] = porForma;
-
-        const porMedico = { ...(porFechaYMedico[iso] ?? {}) };
-        medicosEnPagos.forEach((medico) => {
-          const sumPrevMedico = prevConIso
-            .filter((p) => p._iso === iso && p.medico === medico)
-            .reduce((s, p) => s + p.total, 0);
-          const sumNextMedico = nextConIso
-            .filter((p) => p._iso === iso && p.medico === medico)
-            .reduce((s, p) => s + p.total, 0);
-          const deltaMedico = sumNextMedico - sumPrevMedico;
-          if (deltaMedico !== 0) porMedico[medico] = (porMedico[medico] ?? 0) + deltaMedico;
-        });
-        porFechaYMedico[iso] = porMedico;
-
-        // Por médico y por forma de pago a la vez (reparto de sobres por doctor).
-        const porMedicoYForma = { ...(porFechaMedicoYFormaPago[iso] ?? {}) };
-        medicosEnPagos.forEach((medico) => {
-          const formasDelMedico = { ...(porMedicoYForma[medico] ?? {}) };
-          formasDePago.forEach((forma) => {
-            const sumPrevMF = prevConIso.filter((p) => p._iso === iso && p.medico === medico && p.formaPago === forma).reduce((s, p) => s + p.total, 0);
-            const sumNextMF = nextConIso.filter((p) => p._iso === iso && p.medico === medico && p.formaPago === forma).reduce((s, p) => s + p.total, 0);
-            const deltaMF = sumNextMF - sumPrevMF;
-            if (deltaMF !== 0) formasDelMedico[forma] = redondearDinero((formasDelMedico[forma] ?? 0) + deltaMF);
-          });
-          porMedicoYForma[medico] = formasDelMedico;
-        });
-        porFechaMedicoYFormaPago[iso] = porMedicoYForma;
-      });
-      // Spread de prevFin PRIMERO — nunca se debe perder un campo que otra
-      // parte de la app ya haya escrito aquí (ej. devolucionesPorFecha) solo
-      // porque esta función todavía no lo conocía cuando se escribió.
-      return { ...prevFin, porFecha, porFechaYFormaPago, porFechaYMedico, porFechaMedicoYFormaPago, pagosCountPorFecha };
-    });
+    if (!clinicUid) return;
+    const deltas = calcularDeltasFinanzas(prevArr, next);
+    if (!deltas) return; // editar la firma o la factura no mueve ninguna cifra
+    const fallo = (err: unknown) => {
+      // Esto solo iba a la consola: el pago quedaba guardado, el total del
+      // día se quedaba corto y nada en pantalla lo decía. La bandera no se
+      // apaga sola — se apaga al reconstruir el resumen contra los pagos
+      // reales, que es lo único que de verdad lo repara.
+      console.error("No se pudo sumar el pago al resumen de cobros", err);
+      setResumenCobrosFallo(true);
+    };
+    try {
+      // El try no sobra: Firestore valida el documento ANTES de devolver la
+      // promesa y avienta la excepción en el acto (ej. un nombre de campo
+      // vacío), así que un .catch() solo no la atrapa. Y lo que viene
+      // después de esta función —estadísticas, saldo pendiente, cashback y
+      // la lista en pantalla— se quedaba sin correr.
+      setDoc(doc(db, `users/${clinicUid}/config/finanzas`), aIncrementos(deltas, increment), {
+        merge: true,
+      }).catch(fallo);
+    } catch (err) {
+      fallo(err);
+    }
   };
 
   /** OJO: prevArr/next y los efectos secundarios (Firestore + delta de
@@ -2321,6 +2296,9 @@ export function PatientDataProvider({
     if (!clinicUid) throw new Error("Sin clínica activa.");
     // Sin merge: reemplaza el documento completo, así también se quitan fechas que sobraban.
     await setDoc(doc(db, `users/${clinicUid}/config/finanzas`), nuevo);
+    // Reconstruido contra los pagos reales: lo que se hubiera perdido ya está
+    // de vuelta, así que el aviso deja de tener de qué avisar.
+    setResumenCobrosFallo(false);
   };
 
   const quitarPresupuestosDeCitasNoAtendidas = async (items: PresupuestoDeCitaNoAtendida[]) => {
@@ -3258,6 +3236,7 @@ export function PatientDataProvider({
         quitarPresupuestosDeCitasNoAtendidas,
         unirPresupuestoDuplicado,
         revisarFinanzasContraPagos,
+        resumenCobrosFallo,
         aplicarFinanzasRecalculadas,
         corregirControlPorError,
         limpiarPresupuestoDeCita,

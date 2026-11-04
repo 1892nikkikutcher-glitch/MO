@@ -19,6 +19,25 @@ export const reciboCompartidoSchema = z
     direccionClinica: texto(1000).default(""),
     /** Próxima cita y saldo de Cashback, que van al pie del recibo. */
     notaPie: texto(1000).default(""),
+    /** Estado de cuenta (presupuestado, pagado, saldo y costo de la próxima cita); los recibos viejos no lo traen. */
+    resumenCuenta: z
+      .object({
+        totalPresupuestado: z.number().finite().min(0).max(100_000_000),
+        totalPagado: z.number().finite().min(-100_000_000).max(100_000_000),
+        saldo: z.number().finite().min(0).max(100_000_000),
+        proximaCita: z
+          .object({
+            fecha: texto(20),
+            horaInicio: texto(10),
+            tratamientos: z.array(texto(200)).max(20),
+            costo: z.number().finite().min(0).max(100_000_000).nullable(),
+          })
+          .strict()
+          .nullable(),
+      })
+      .strict()
+      .nullable()
+      .default(null),
     pago: z
       .object({
         id: texto(100).min(1),

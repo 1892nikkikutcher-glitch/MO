@@ -34,6 +34,18 @@ describe("generarReciboPagoPdf", () => {
     expect(await paginas(await generarReciboPagoPdf({ ...base, pago: pago(60) }))).toBeGreaterThan(1);
   });
 
+  it("con estado de cuenta sigue cabiendo en una hoja", async () => {
+    const resumenCuenta = {
+      totalPresupuestado: 8500,
+      totalPagado: 3000,
+      saldo: 5500,
+      proximaCita: { fecha: "2026-11-20", horaInicio: "10:00", tratamientos: ["Endodoncia molar"], costo: 1200 },
+    };
+    const blob = await generarReciboPagoPdf({ ...base, pago: pago(2), resumenCuenta });
+    expect(await paginas(blob)).toBe(1);
+    expect(blob.size).toBeGreaterThan(1000);
+  });
+
   it("el folio son los últimos 8 caracteres del pago, en mayúsculas", () => {
     expect(folioReciboPago({ id: "pago-1700000000-abcdef12" })).toBe("ABCDEF12");
   });
