@@ -973,7 +973,7 @@ function DashboardBody({
           {activePage === "rpbi" && <Rpbi />}
           {activePage === "mantenimiento-equipos" && <MantenimientoEquipos />}
           {activePage === "contabilidad" && <Contabilidad />}
-          {activePage === "educacion" && <Educacion />}
+          {activePage === "educacion" && <Educacion esAdmin={esAdmin} />}
           {activePage === "deposito-dental" && <DepositoDental />}
           {activePage === "centro-radiodiagnostico" && <CentroRadiodiagnostico />}
           {activePage === "laboratorio-dental" && <LaboratorioDental />}

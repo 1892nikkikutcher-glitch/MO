@@ -2,6 +2,7 @@
 
 import { useRef, useState } from "react";
 import { usePatientData } from "@/context/PatientDataContext";
+import CursosFormacion from "./CursosFormacion";
 import {
   categoriaLaminaOptions,
   redimensionarImagen,
@@ -222,7 +223,33 @@ function LaminaDialog({
   );
 }
 
-export default function Educacion() {
+export default function Educacion({ esAdmin = false }: { esAdmin?: boolean }) {
+  const [seccion, setSeccion] = useState<"laminas" | "cursos">("laminas");
+  const pestana = (id: typeof seccion, etiqueta: string) => (
+    <button
+      onClick={() => setSeccion(id)}
+      className={`rounded-lg border px-4 py-2 text-xs font-semibold transition-colors ${
+        seccion === id
+          ? "border-accent/60 bg-accent/15 text-accent"
+          : "border-edge/15 text-ink/60 hover:bg-surface"
+      }`}
+    >
+      {etiqueta}
+    </button>
+  );
+
+  return (
+    <div className="space-y-6">
+      <div className="flex flex-wrap gap-2">
+        {pestana("laminas", "Educación para la salud")}
+        {pestana("cursos", "Educación para el profesional de la salud")}
+      </div>
+      {seccion === "laminas" ? <LaminasPacientes /> : <CursosFormacion esAdmin={esAdmin} />}
+    </div>
+  );
+}
+
+function LaminasPacientes() {
   const { laminas, setLaminas } = usePatientData();
   const [dialogAbierto, setDialogAbierto] = useState(false);
   const [editando, setEditando] = useState<Lamina | null>(null);
@@ -250,10 +277,10 @@ export default function Educacion() {
       <div className="flex items-center justify-between">
         <div>
           <h3 className="text-sm font-semibold uppercase tracking-wide text-ink/60">
-            Láminas de Atención Odontológica
+            Educación para la salud
           </h3>
           <p className="mt-1 text-xs text-ink/40">
-            Material informativo para reforzar indicaciones y enviarlo a tus pacientes.
+            Láminas y mensajes para tus pacientes: higiene bucal, indicaciones, cuidados. Envíalos por WhatsApp.
           </p>
         </div>
         <button

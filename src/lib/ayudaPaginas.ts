@@ -209,8 +209,11 @@ export const ayudaPaginas: Record<string, AyudaPagina> = {
   },
   educacion: {
     titulo: "Educación",
-    resumen: "Material educativo/visual para mostrar o enviar a pacientes.",
-    puntos: [],
+    resumen: "Dos secciones: educación para la salud (láminas y mensajes para tus pacientes) y educación para el profesional de la salud (escuelas y cursos de educación continua).",
+    puntos: [
+      "«Educación para la salud»: crea láminas con título, categoría, texto e imagen y envíalas a tus pacientes por WhatsApp.",
+      "«Educación para el profesional de la salud»: cursos y posgrados que recomienda MO. «Quiero inscribirme» abre WhatsApp con el contacto del curso; «Recomendar por WhatsApp» manda el curso a un colega.",
+    ],
   },
   "panel-admin": {
     titulo: "Panel de administrador",
