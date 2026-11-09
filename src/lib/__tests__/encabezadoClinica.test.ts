@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { fechaDeHoyLarga, msHastaMedianoche, tituloYNombre, TITULOS_SUGERIDOS } from "../encabezadoClinica";
+import { fechaDeHoyLarga, fechaYLugar, lugarDelEncabezado, msHastaMedianoche, tituloYNombre, TITULOS_SUGERIDOS } from "../encabezadoClinica";
 
 describe("encabezado de la clínica", () => {
   it("escribe la fecha de hoy con el día de la semana", () => {
@@ -32,5 +32,24 @@ describe("encabezado de la clínica", () => {
     expect(TITULOS_SUGERIDOS).toContain("C.D.");
     expect(TITULOS_SUGERIDOS).toContain("C.D.E.O.");
     expect(TITULOS_SUGERIDOS).toContain("Dr.");
+  });
+});
+
+describe("lugar junto a la fecha", () => {
+  it("lo escrito en Consultorio manda sobre la sede", () => {
+    expect(lugarDelEncabezado("Tulancingo, Hgo.", "EMSA")).toBe("Tulancingo, Hgo.");
+  });
+
+  it("sin lo escrito usa la sede donde más se trabaja", () => {
+    expect(lugarDelEncabezado("  ", "San Francisco Tlalcilalcalpan Centro")).toBe("San Francisco Tlalcilalcalpan Centro");
+    expect(lugarDelEncabezado(undefined, undefined)).toBe("");
+  });
+
+  it("pone primero la fecha y después el lugar", () => {
+    expect(fechaYLugar("lunes 9 de noviembre de 2026", "San Francisco Tlalcilalcalpan Centro")).toBe(
+      "lunes 9 de noviembre de 2026 · San Francisco Tlalcilalcalpan Centro"
+    );
+    expect(fechaYLugar("lunes 9 de noviembre de 2026", "")).toBe("lunes 9 de noviembre de 2026");
+    expect(fechaYLugar("", "EMSA")).toBe("EMSA");
   });
 });

@@ -12,6 +12,7 @@ import {
   mensajeFueraDeBloque,
   normalizarBloques,
   sedeDeCita,
+  sedePrincipal,
   type BloqueAtencion,
   type Sede,
 } from "../sedesBloques";
@@ -239,5 +240,48 @@ describe("horasDisponiblesPorBloques", () => {
   it("hayBloquesCapturados distingue clínicas con y sin bloques", () => {
     expect(hayBloquesCapturados(medicos)).toBe(true);
     expect(hayBloquesCapturados([{}, { bloques: [] }])).toBe(false);
+  });
+});
+
+describe("sedePrincipal", () => {
+  const cita = (fecha: string, sedeId: string, estatus = "Atendida") => ({
+    fecha,
+    horaInicio: "10:00",
+    horaFin: "11:00",
+    sedeId,
+    estatus,
+  });
+  const medicos = [{ id: "m1", tipo: "medico", bloques: [enrique, nicolas] }];
+
+  it("sin sedes no hay principal y con una sola es esa", () => {
+    expect(sedePrincipal([], medicos, [], "2026-01-01")).toBeUndefined();
+    expect(sedePrincipal([], medicos, [sedes[1]], "2026-01-01")?.id).toBe("emsa");
+  });
+
+  it("gana la sede con más citas", () => {
+    const citas = [cita("2026-10-01", "emsa"), cita("2026-10-02", "emsa"), cita("2026-10-03", "jc")];
+    expect(sedePrincipal(citas, medicos, sedes, "2026-01-01")?.id).toBe("emsa");
+  });
+
+  it("no cuenta canceladas, inasistencias ni reagendadas", () => {
+    const citas = [
+      cita("2026-10-01", "emsa", "Cancelada"),
+      cita("2026-10-02", "emsa", "No Asistió"),
+      cita("2026-10-03", "emsa", "Reagendada"),
+      cita("2026-10-04", "jc"),
+    ];
+    expect(sedePrincipal(citas, medicos, sedes, "2026-01-01")?.id).toBe("jc");
+  });
+
+  it("ignora las citas anteriores a la fecha de corte", () => {
+    const citas = [cita("2025-01-01", "emsa"), cita("2025-01-02", "emsa"), cita("2026-10-01", "jc")];
+    expect(sedePrincipal(citas, medicos, sedes, "2026-05-01")?.id).toBe("jc");
+  });
+
+  it("sin citas usa la sede con más bloques y con empate la primera de la lista", () => {
+    const dosEnEmsa = [{ id: "m1", tipo: "medico", bloques: [enrique, nicolas, { ...nicolas, id: "b3", dias: [6] }] }];
+    expect(sedePrincipal([], dosEnEmsa, sedes, "2026-01-01")?.id).toBe("emsa");
+    expect(sedePrincipal([], medicos, sedes, "2026-01-01")?.id).toBe("jc");
+    expect(sedePrincipal([], [], sedes, "2026-01-01")?.id).toBe("jc");
   });
 });

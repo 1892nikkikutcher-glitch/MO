@@ -104,7 +104,7 @@ export default function Consultorio() {
               disabled={soloLectura}
               className={inputClass}
             />
-            <p className="mt-1 text-[11px] text-ink/40">Se muestra en la barra de arriba, junto a la fecha.</p>
+            <p className="mt-1 text-[11px] text-ink/40">Se muestra en la barra de arriba, después de la fecha. Si lo dejas vacío, se pone la sede donde más atiendes.</p>
           </div>
           <div>
             <label className="mb-1 block text-xs font-medium text-ink/60">Título del administrador</label>

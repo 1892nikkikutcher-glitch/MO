@@ -24,3 +24,16 @@ export function msHastaMedianoche(ahora: Date): number {
   const manana = new Date(ahora.getFullYear(), ahora.getMonth(), ahora.getDate() + 1, 0, 0, 0, 0);
   return manana.getTime() - ahora.getTime();
 }
+
+/** Lugar que va junto a la fecha: el que la clínica escribió en Consultorio y, si lo dejó vacío, el nombre de
+ * la sede donde más trabaja. */
+export function lugarDelEncabezado(ciudadEscrita: string | undefined, sedePrincipalNombre: string | undefined): string {
+  const escrito = (ciudadEscrita ?? "").replace(/\s+/g, " ").trim();
+  if (escrito) return escrito;
+  return (sedePrincipalNombre ?? "").replace(/\s+/g, " ").trim();
+}
+
+/** "lunes 9 de noviembre de 2026 · San Francisco Tlalcilalcalpan Centro": primero la fecha, luego el lugar. */
+export function fechaYLugar(fechaTexto: string, lugar: string): string {
+  return [fechaTexto, lugar].filter(Boolean).join(" · ");
+}

@@ -1,7 +1,9 @@
 "use client";
 
-import { useEffect, useLayoutEffect, useRef, useState } from "react";
-import { fechaDeHoyLarga, msHastaMedianoche, tituloYNombre } from "@/lib/encabezadoClinica";
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
+import { fechaDeHoyLarga, fechaYLugar, lugarDelEncabezado, msHastaMedianoche, tituloYNombre } from "@/lib/encabezadoClinica";
+import { sedePrincipal } from "@/lib/sedesBloques";
+import { addDays, toISODate } from "@/lib/agendaHelpers";
 import { etiquetaRolClinica, moduloVisibleParaRol } from "@/lib/permisosRol";
 import { useLadoNavegacion } from "@/lib/useLadoNavegacion";
 import { ladoOpuesto } from "@/lib/ladoNavegacion";
@@ -643,9 +645,9 @@ function SelectorTemaModal({
   );
 }
 
-/** Quién administra la clínica, dónde está y la fecha de hoy. La fecha se pone al montar (no en el servidor, para no
+/** Quién administra la clínica, la fecha de hoy y dónde trabaja (después de la fecha). La fecha se pone al montar (no en el servidor, para no
  * chocar con la hidratación) y se refresca sola a medianoche. */
-function IdentidadYFecha({ administrador, ciudad }: { administrador: string; ciudad: string }) {
+function IdentidadYFecha({ administrador, lugar }: { administrador: string; lugar: string }) {
   const [hoy, setHoy] = useState<Date | null>(null);
   useEffect(() => {
     setHoy(new Date());
@@ -659,7 +661,7 @@ function IdentidadYFecha({ administrador, ciudad }: { administrador: string; ciu
     programar();
     return () => clearTimeout(temporizador);
   }, []);
-  const linea2 = [ciudad, hoy ? fechaDeHoyLarga(hoy) : ""].filter(Boolean).join(" · ");
+  const linea2 = fechaYLugar(hoy ? fechaDeHoyLarga(hoy) : "", lugar);
   if (!administrador && !linea2) return null;
   return (
     <div className="hidden min-w-0 shrink-0 flex-col leading-tight sm:flex" suppressHydrationWarning>
@@ -690,7 +692,16 @@ function DashboardBody({
   onLogout: () => void;
   esAdmin: boolean;
 }) {
-  const { clinicInfo, suscripcion, membresiasDisponibles, seleccionarClinica, miRol, puedeEliminar } = usePatientData();
+  const { clinicInfo, suscripcion, membresiasDisponibles, seleccionarClinica, miRol, puedeEliminar, citas, recursos, sedes } = usePatientData();
+  // Junto a la fecha va lo escrito en Consultorio o, si está vacío, la sede donde más se atiende (citas de los últimos 6 meses en adelante).
+  const lugarEncabezado = useMemo(
+    () =>
+      lugarDelEncabezado(
+        clinicInfo?.ciudad,
+        sedePrincipal(citas, recursos, sedes, toISODate(addDays(new Date(), -180)))?.nombre
+      ),
+    [clinicInfo?.ciudad, citas, recursos, sedes]
+  );
   const { casosRecibidos, uid: miUidConecta, novedades: novedadesConecta } = useMoConecta();
   const porAtenderConecta = casosPorAtender(casosRecibidos, miUidConecta).length + novedadesConecta.length;
   // De qué lado va la barra lateral (solo computadora): preferencia de cada usuario.
@@ -883,7 +894,7 @@ function DashboardBody({
 
                 <BuscadorPlataforma onNavigate={setActivePage} />
 
-                <IdentidadYFecha administrador={tituloYNombre(clinicInfo?.administradorTitulo, clinicInfo?.administradorNombre)} ciudad={clinicInfo?.ciudad ?? ""} />
+                <IdentidadYFecha administrador={tituloYNombre(clinicInfo?.administradorTitulo, clinicInfo?.administradorNombre)} lugar={lugarEncabezado} />
                 <span className="hidden shrink-0 truncate text-sm text-ink/50 sm:inline">{userEmail}</span>
                 {membresiasDisponibles.length > 1 && (
                   <button

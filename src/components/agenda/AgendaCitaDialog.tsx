@@ -8,6 +8,7 @@ import {
   mensajeFueraDeBloque,
   nombreDeSede,
   normalizarBloques,
+  sedePrincipal,
 } from "@/lib/sedesBloques";
 import EstrellasPaciente from "@/components/EstrellasPaciente";
 import HorarioPreferenteCita from "./HorarioPreferenteCita";
@@ -36,7 +37,8 @@ import {
   intervaloValido,
 } from "@/lib/seguimientoAutomatico";
 import { manejarCambioNombre } from "@/lib/textoNombre";
-import { medicoPreferidoDePaciente } from "@/lib/agendaHelpers";
+import { addDays, medicoPreferidoDePaciente } from "@/lib/agendaHelpers";
+import { citaAnteriorDelPaciente, datosFaltantesDeCita } from "@/lib/citaAnteriorDelPaciente";
 import { pareceControlOMensualidad } from "@/lib/autoriaRegistros";
 import {
   estatusAdmiteMotivo,
@@ -293,7 +295,16 @@ export default function AgendaCitaDialog({
     duracion !== (timeToMinutes(initial.horaFin ?? initial.horaInicio) - timeToMinutes(initial.horaInicio) || duracion) ||
     medicoId !== (initial.medicoId ?? initial.recursoId ?? "");
   const [autorizaFueraDeBloque, setAutorizaFueraDeBloque] = useState(initial.fueraDeBloque === true);
-  const [sedeManual, setSedeManual] = useState(initial.sedeId ?? "");
+  // Al agendar una cita nueva la sede no se pide de cero: la de la cita anterior del paciente o, si es la primera,
+  // la sede donde más se atiende. Sigue siendo editable.
+  const [sedeManual, setSedeManual] = useState(() => {
+    if (initial.sedeId) return initial.sedeId;
+    if (isEditing) return "";
+    const anterior = initial.patientId
+      ? citaAnteriorDelPaciente(citas, initial.patientId, initial.fecha, initial.id, recursos, sedes)
+      : null;
+    return anterior?.sedeId ?? sedePrincipal(citas, recursos, sedes, toISODate(addDays(new Date(), -180)))?.id ?? "";
+  });
   const requiereAutorizacion = evaluacionBloque.estado === "fuera" && cambioElLugar && !autorizaFueraDeBloque;
   /** Sede de esta cita: la del bloque que la cubre; si no cae en ninguno, la que se elija a mano. */
   const sedeDeEstaCita = evaluacionBloque.estado === "dentro" ? evaluacionBloque.bloque.sedeId : sedeManual;
@@ -311,6 +322,18 @@ export default function AgendaCitaDialog({
         initial.id
       )
     : [];
+
+  // Cómo vino la última vez este paciente, para proponérselo otra vez (solo al agendar una cita nueva).
+  const ultimaDelPaciente =
+    !isEditing && patientId ? citaAnteriorDelPaciente(citas, patientId, fecha, initial.id, recursos, sedes) : null;
+  const datosFaltantes = datosFaltantesDeCita({
+    pideSede: Boolean(medicoId) && sedes.length > 0,
+    sedeElegida: sedeDeEstaCita,
+    hayPaciente: Boolean(patientId || searchText.trim()),
+    telefono,
+    citaPorVenir: estatus === "Agendada" || estatus === "Confirmada",
+    tratamientos,
+  });
 
   const puedeGuardar =
     (medicoId || unidadId) && fecha && horaInicio && (patientId || searchText.trim().length > 0) && !requiereAutorizacion;
@@ -343,6 +366,9 @@ export default function AgendaCitaDialog({
     if (!isEditing) {
       const preferido = medicoPreferidoDePaciente(citas, id);
       if (preferido) setMedicoId(preferido);
+      // Misma idea con la sede: la de su cita anterior, para no elegirla en cada cita.
+      const anterior = citaAnteriorDelPaciente(citas, id, fecha, initial.id, recursos, sedes);
+      if (anterior?.sedeId) setSedeManual(anterior.sedeId);
     }
   };
 
@@ -1048,6 +1074,32 @@ export default function AgendaCitaDialog({
             </div>
           </div>
 
+          {ultimaDelPaciente && (
+            <div className="flex flex-wrap items-center gap-x-3 gap-y-1.5 rounded-lg border border-edge/10 bg-surface p-2.5 text-xs">
+              <span className="text-ink/60">
+                Su cita anterior:{" "}
+                <span className="font-semibold text-ink">
+                  {formatFechaLarga(ultimaDelPaciente.fecha)} · {formatHora12(ultimaDelPaciente.horaInicio)}
+                  {ultimaDelPaciente.duracionMin > 0 ? ` · ${formatDuracion(ultimaDelPaciente.duracionMin)}` : ""}
+                  {ultimaDelPaciente.sedeId ? ` · ${nombreDeSede(ultimaDelPaciente.sedeId, sedes)}` : ""}
+                </span>
+              </span>
+              {(horaInicio !== ultimaDelPaciente.horaInicio ||
+                (duracionOptions.includes(ultimaDelPaciente.duracionMin) && duracion !== ultimaDelPaciente.duracionMin)) && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setHoraInicio(ultimaDelPaciente.horaInicio);
+                    if (duracionOptions.includes(ultimaDelPaciente.duracionMin)) setDuracion(ultimaDelPaciente.duracionMin);
+                  }}
+                  className="rounded-full border border-accent/40 px-2.5 py-0.5 font-semibold text-accent transition-colors hover:bg-accent/10"
+                >
+                  Proponer la misma hora
+                </button>
+              )}
+            </div>
+          )}
+
           {pacienteSeleccionado && (
             <HorarioPreferenteCita
               horario={pacienteSeleccionado.horarioPreferente}
@@ -1291,6 +1343,17 @@ export default function AgendaCitaDialog({
             {conflictos.map((c, i) => (
               <p key={i}>⚠️ {c}</p>
             ))}
+          </div>
+        )}
+
+        {datosFaltantes.length > 0 && (
+          <div className="mt-4 rounded-lg border border-warning/30 bg-warning/10 p-3 text-xs text-warning">
+            <p className="font-semibold">Recordatorio: todavía falta</p>
+            <ul className="mt-1 space-y-0.5">
+              {datosFaltantes.map((d) => (
+                <li key={d.clave}>• {d.texto}</li>
+              ))}
+            </ul>
           </div>
         )}
 

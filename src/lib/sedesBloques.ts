@@ -259,3 +259,45 @@ export function sedeDeCita(cita: CitaConSede, recursos: RecursoConBloques[], sed
   if (evaluacion.estado !== "dentro") return undefined;
   return sedes.find((s) => s.id === evaluacion.bloque.sedeId);
 }
+
+type CitaParaSedePrincipal = CitaConSede & { estatus: string };
+
+/** Citas que no cuentan como trabajo hecho en una sede: no se atendieron ahí. */
+const ESTATUS_SIN_ATENCION = ["Cancelada", "No Asistió", "Reagendada"];
+
+/** Sede donde más se trabaja, para mostrarla junto a la fecha. Cuenta las citas desde `desdeISO` (así una
+ * mudanza de sede se nota en unos meses y no pesa todo el historial) que sí se atendieron o están por atenderse.
+ * Sin citas, la que tiene más bloques de atención; con empate, la primera de la lista. Sin sedes, undefined. */
+export function sedePrincipal(
+  citas: CitaParaSedePrincipal[],
+  recursos: RecursoConBloques[],
+  sedes: Sede[],
+  desdeISO: string
+): Sede | undefined {
+  if (sedes.length === 0) return undefined;
+  if (sedes.length === 1) return sedes[0];
+
+  const conteo = new Map<string, number>();
+  for (const cita of citas) {
+    if (cita.fecha < desdeISO || ESTATUS_SIN_ATENCION.includes(cita.estatus)) continue;
+    const sede = sedeDeCita(cita, recursos, sedes);
+    if (sede) conteo.set(sede.id, (conteo.get(sede.id) ?? 0) + 1);
+  }
+  if (conteo.size === 0) {
+    for (const r of recursos) {
+      if (r.tipo !== "medico") continue;
+      for (const b of r.bloques ?? []) conteo.set(b.sedeId, (conteo.get(b.sedeId) ?? 0) + 1);
+    }
+  }
+  // Se recorre en el orden de la lista para que el empate lo gane la primera.
+  let ganadora: Sede | undefined;
+  let max = 0;
+  for (const sede of sedes) {
+    const n = conteo.get(sede.id) ?? 0;
+    if (n > max) {
+      max = n;
+      ganadora = sede;
+    }
+  }
+  return ganadora ?? sedes[0];
+}
