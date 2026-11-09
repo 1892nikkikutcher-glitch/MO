@@ -14,7 +14,7 @@ const VISTA_PREVIA_VARS = {
   hora: "05:30 PM",
   procedimiento: "Limpieza dental",
   costo: "$1,200",
-  medico: "Dr. Nicolás Medina",
+  medico: "Dr. Ricardo Salazar",
   formaPago: "Tarjeta",
   conceptos: "- Limpieza dental: $1,200",
   total: "$1,200",

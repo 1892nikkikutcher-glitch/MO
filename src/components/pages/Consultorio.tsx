@@ -137,7 +137,7 @@ export default function Consultorio() {
                   setGuardado(false);
                 })
               }
-              placeholder="Ej. Nicolás Medina González"
+              placeholder="Ej. Ricardo Salazar Fuentes"
               disabled={soloLectura}
               className={inputClass}
             />

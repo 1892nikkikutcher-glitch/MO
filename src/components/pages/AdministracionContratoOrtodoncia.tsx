@@ -12,7 +12,7 @@ const VISTA_PREVIA_VARS = {
   dia: "12",
   mes: "Agosto",
   anio: "2026",
-  medico: "Nicolás Medina González",
+  medico: "Ricardo Salazar Fuentes",
   paciente: "Fernanda Firo Hernández",
   duracionMeses: "18",
   pagoInicial: "$3,000",
