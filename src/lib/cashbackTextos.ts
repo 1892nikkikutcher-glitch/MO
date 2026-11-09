@@ -1,7 +1,7 @@
 /** Textos del programa de cashback para el paciente: los términos y condiciones (siempre iguales a lo configurado)
  * y el mensaje de saldo por WhatsApp. Lógica pura. */
 
-import type { CashbackConfig, SaldoCashback } from "./cashback";
+import { montoMaximoCanje, type CashbackConfig, type SaldoCashback } from "./cashback";
 
 const pesos = (n: number) => `$${n.toLocaleString("es-MX", { maximumFractionDigits: 2 })}`;
 const num = (n: number) => (Number.isInteger(n) ? String(n) : String(n));
@@ -81,4 +81,62 @@ export function lineaCashbackRecordatorio(saldo: Pick<SaldoCashback, "disponible
   const cubre = limite.length > 0 ? ` Puedes usarlo en tu cita: ${limite.join(", ")}.` : " Puedes usarlo en tu cita.";
   const vence = saldo.proximoAVencer ? ` Vence el ${fechaLarga(saldo.proximoAVencer.fecha)}.` : "";
   return `\n\n💰 Tienes *${pesos(total)}* de cashback disponible.${cubre}${vence}`;
+}
+
+/** El aviso que se muestra al cobrar: cuánto Cashback tiene el paciente y si ya lo puede usar hoy (null si no tiene nada
+ * que decir). Lo ganado hoy se libera mañana y lo que espera aprobación todavía no cuenta, y se dice así. */
+export function avisoCashbackEnPago(
+  saldo: Pick<SaldoCashback, "disponible" | "porLiberar" | "porAprobar" | "proximoAVencer">,
+  config: CashbackConfig
+): { titulo: string; detalle: string[]; puedeUsar: boolean } | null {
+  if (saldo.disponible > 0) {
+    const detalle: string[] = [];
+    const limite: string[] = [];
+    if (config.porcentajeMaxCanje > 0) limite.push(`hasta ${num(config.porcentajeMaxCanje)}% del valor de la atención`);
+    if (config.topeCanjePorVisita > 0) limite.push(`máximo ${pesos(config.topeCanjePorVisita)} por visita`);
+    if (limite.length > 0) detalle.push(`Puede cubrir ${limite.join(", ")}.`);
+    if (saldo.proximoAVencer) detalle.push(`Vence el ${fechaLarga(saldo.proximoAVencer.fecha)}.`);
+    if (saldo.porLiberar > 0) detalle.push(`Además tiene ${pesos(saldo.porLiberar)} que podrá usar desde mañana.`);
+    return { titulo: `Este paciente tiene ${pesos(saldo.disponible)} de Cashback disponible.`, detalle, puedeUsar: true };
+  }
+  if (!config.activo) return null;
+  if (saldo.porLiberar > 0) {
+    return { titulo: `Este paciente tiene ${pesos(saldo.porLiberar)} de Cashback que podrá usar desde mañana.`, detalle: [], puedeUsar: false };
+  }
+  if (saldo.porAprobar > 0) {
+    return { titulo: `Este paciente tiene ${pesos(saldo.porAprobar)} de Cashback esperando aprobación.`, detalle: [], puedeUsar: false };
+  }
+  return null;
+}
+
+/** El "Monedero electrónico" del paciente dentro de su cita: cuánto tiene y cuánto podría usar con el costo estimado de
+ * esta cita (null si no hay nada que mostrar, por ejemplo con el programa apagado y sin saldo). */
+export function monederoEnCita(
+  saldo: Pick<SaldoCashback, "disponible" | "porLiberar" | "porAprobar" | "proximoAVencer">,
+  config: CashbackConfig,
+  costoTexto: string
+): { titulo: string; lineas: string[] } | null {
+  const lineas: string[] = [];
+  const costo = Number(costoTexto.replace(/[^0-9.]/g, ""));
+
+  if (saldo.disponible > 0) {
+    if (costo > 0) {
+      lineas.push(`Con el costo estimado de ${pesos(costo)} puede usar hasta ${pesos(montoMaximoCanje(saldo.disponible, costo, config))} en esta cita.`);
+    } else {
+      const limite: string[] = [];
+      if (config.porcentajeMaxCanje > 0) limite.push(`hasta ${num(config.porcentajeMaxCanje)}% del valor de la atención`);
+      if (config.topeCanjePorVisita > 0) limite.push(`máximo ${pesos(config.topeCanjePorVisita)} por visita`);
+      if (limite.length > 0) lineas.push(`Puede usar ${limite.join(", ")}. Escribe el costo estimado para ver cuánto sería.`);
+    }
+    if (saldo.proximoAVencer) lineas.push(`Vence el ${fechaLarga(saldo.proximoAVencer.fecha)}.`);
+    if (saldo.porLiberar > 0) lineas.push(`Además tiene ${pesos(saldo.porLiberar)} que podrá usar desde mañana.`);
+    lineas.push("El recordatorio de WhatsApp le avisa su saldo.");
+    return { titulo: `${pesos(saldo.disponible)} disponibles`, lineas };
+  }
+  if (saldo.porLiberar > 0) {
+    return { titulo: `${pesos(saldo.porLiberar)} que podrá usar desde mañana`, lineas: ["El recordatorio de WhatsApp le avisa su saldo."] };
+  }
+  if (!config.activo) return null;
+  if (saldo.porAprobar > 0) return { titulo: `${pesos(saldo.porAprobar)} esperando aprobación`, lineas: [] };
+  return { titulo: "Sin saldo por ahora", lineas: [`Gana ${num(config.porcentaje)}% de lo que pague en tratamientos.`] };
 }

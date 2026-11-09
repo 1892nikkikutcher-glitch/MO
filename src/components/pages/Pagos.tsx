@@ -21,6 +21,7 @@ import { calcularDisponibleDevolucion, resumenDesdeDevoluciones } from "@/lib/de
 import { fechaPagoAIso } from "@/lib/metas";
 import { medicoPredeterminadoParaPago } from "@/lib/medicoDelPago";
 import { FORMA_PAGO_CASHBACK, baseCashbackDePago, calcularCashback, esFormaPagoCashback, montoMaximoCanje } from "@/lib/cashback";
+import { avisoCashbackEnPago } from "@/lib/cashbackTextos";
 import { toISODate } from "@/lib/agendaHelpers";
 
 const formasDePago = ["Efectivo", "Tarjeta de crédito", "Tarjeta de débito", "Transferencia", "Cheque"];
@@ -403,7 +404,9 @@ export function AgregarPagoDialog({
   // ingresos por médico, en vez de un valor que nadie más lee.
   const { recursos, saldoCashbackDe, cashbackConfig, patients, citas } = usePatientData();
   const medicosDisponibles = recursos.filter((r) => r.tipo === "medico").map((r) => r.nombre);
-  const cashbackDisponible = saldoCashbackDe(patientId).disponible;
+  const saldoCashbackPaciente = saldoCashbackDe(patientId);
+  const cashbackDisponible = saldoCashbackPaciente.disponible;
+  const avisoCashback = avisoCashbackEnPago(saldoCashbackPaciente, cashbackConfig);
   const [sinCashback, setSinCashback] = useState(false);
   // Una promoción, cortesía o tarifa especial no acumula ni se paga con cashback.
   const formasDisponibles = cashbackDisponible > 0 && !sinCashback ? [...formasDePago, FORMA_PAGO_CASHBACK] : formasDePago;
@@ -568,6 +571,36 @@ export function AgregarPagoDialog({
             </div>
           </div>
 
+          {avisoCashback && (
+            <div className="rounded-lg border border-success/30 bg-success/10 px-3 py-2 text-xs">
+              <p className="font-semibold text-success">💰 {avisoCashback.titulo}</p>
+              {avisoCashback.detalle.map((linea) => (
+                <p key={linea} className="mt-0.5 text-ink/60">
+                  {linea}
+                </p>
+              ))}
+              {avisoCashback.puedeUsar && sinCashback && (
+                <p className="mt-1 text-ink/60">No se puede usar en una promoción, cortesía o tarifa especial.</p>
+              )}
+              {avisoCashback.puedeUsar && !sinCashback && (
+                <>
+                  {seleccionados.length > 0 && (
+                    <p className="mt-0.5 text-ink/60">
+                      Con lo que vas a cobrar puede cubrir hasta {formatCurrency(maxCashbackAhora)} ahora.
+                    </p>
+                  )}
+                  <button
+                    type="button"
+                    onClick={() => setFormaPago(pagaConCashback ? formasDePago[0] : FORMA_PAGO_CASHBACK)}
+                    className="mt-2 rounded-lg border border-success/50 px-3 py-1.5 font-semibold text-success transition-colors hover:bg-success/10"
+                  >
+                    {pagaConCashback ? "Quitar Cashback" : "Usar Cashback"}
+                  </button>
+                </>
+              )}
+            </div>
+          )}
+
           <div>
             <label className="mb-1 block text-xs font-medium text-ink/60">Nombre del paciente</label>
             <input type="text" readOnly value={patientName} className={`${inputClass} cursor-not-allowed text-ink/60`} />
@@ -610,7 +643,10 @@ export function AgregarPagoDialog({
                   monto y cobra el resto en otro pago.
                 </p>
               )}
-              {pagaConCashback && !excedeCashback && (
+              {pagaConCashback && valorAtencion === 0 && (
+                <p className="mt-1 text-[11px] text-ink/50">El Cashback se aplica a tratamientos del presupuesto: marca abajo el tratamiento que se paga con él.</p>
+              )}
+              {pagaConCashback && valorAtencion > 0 && !excedeCashback && (
                 <p className="mt-1 text-[11px] text-ink/50">Puedes cubrir hasta {formatCurrency(maxCashbackAhora)} con Cashback en esta atención; el resto cóbralo en otro pago.</p>
               )}
               {cashbackConfig.activo && !pagaConCashback && (

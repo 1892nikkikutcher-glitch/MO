@@ -27,7 +27,7 @@ import {
   type SavedBudget,
   type UnidadSeguimiento,
 } from "@/lib/patientData";
-import { lineaCashbackRecordatorio } from "@/lib/cashbackTextos";
+import { lineaCashbackRecordatorio, monederoEnCita } from "@/lib/cashbackTextos";
 import { renderPlantilla, formatFechaLarga, formatHora12, plantillaConUbicacion, ubicacionParaMensaje } from "@/lib/formatosWhatsapp";
 import {
   PRESETS_INTERVALO,
@@ -334,6 +334,9 @@ export default function AgendaCitaDialog({
     citaPorVenir: estatus === "Agendada" || estatus === "Confirmada",
     tratamientos,
   });
+
+  // Monedero electrónico (Cashback) del paciente de esta cita, con lo que podría usar según el costo estimado.
+  const monedero = patientId ? monederoEnCita(saldoCashbackDe(patientId), cashbackConfig, costo) : null;
 
   const puedeGuardar =
     (medicoId || unidadId) && fecha && horaInicio && (patientId || searchText.trim().length > 0) && !requiereAutorizacion;
@@ -1025,6 +1028,18 @@ export default function AgendaCitaDialog({
                 </span>
               </span>
             </label>
+          )}
+
+          {monedero && (
+            <div className="rounded-lg border border-success/30 bg-success/10 px-3 py-2 text-xs sm:col-span-2">
+              <p className="font-semibold uppercase tracking-wide text-ink/50">Monedero electrónico</p>
+              <p className="mt-0.5 text-sm font-semibold text-success">💰 {monedero.titulo}</p>
+              {monedero.lineas.map((linea) => (
+                <p key={linea} className="mt-0.5 text-ink/60">
+                  {linea}
+                </p>
+              ))}
+            </div>
           )}
 
           <div>
