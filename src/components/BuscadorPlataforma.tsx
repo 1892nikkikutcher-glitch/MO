@@ -121,6 +121,11 @@ export default function BuscadorPlataforma({ onNavigate }: { onNavigate: (pageId
       <input
         ref={inputRef}
         type="search"
+        // Sin esto el navegador cree que es el campo de usuario y le ofrece al doctor sus contraseñas guardadas encima del buscador.
+        name="buscar-en-mo"
+        autoComplete="off"
+        data-lpignore="true"
+        data-1p-ignore
         role="combobox"
         aria-expanded={abierto && consulta.trim().length > 0}
         aria-label="Buscar en la plataforma"

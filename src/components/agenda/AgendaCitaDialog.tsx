@@ -129,6 +129,7 @@ export default function AgendaCitaDialog({
     sedes,
     saldoCashbackDe,
     cashbackConfig,
+    puedeVerFinanzas,
   } = usePatientData();
   const medicos = recursos.filter((r) => r.tipo === "medico");
   const unidades = recursos.filter((r) => r.tipo === "unidad");
@@ -336,7 +337,9 @@ export default function AgendaCitaDialog({
   });
 
   // Monedero electrónico (Cashback) del paciente de esta cita, con lo que podría usar según el costo estimado.
-  const monedero = patientId ? monederoEnCita(saldoCashbackDe(patientId), cashbackConfig, costo) : null;
+  // Solo el administrador puede leer los movimientos de Cashback (son financieros): para los demás roles el saldo
+  // siempre saldría en cero, y decir "Sin saldo" sería falso. Ahí el apartado no se muestra.
+  const monedero = patientId && puedeVerFinanzas ? monederoEnCita(saldoCashbackDe(patientId), cashbackConfig, costo) : null;
 
   const puedeGuardar =
     (medicoId || unidadId) && fecha && horaInicio && (patientId || searchText.trim().length > 0) && !requiereAutorizacion;

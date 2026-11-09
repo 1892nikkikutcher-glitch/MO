@@ -704,16 +704,49 @@ export function identidadDoctorDe(
  * en globals.css), así que puede ser tan vivo como se quiera sin afectar
  * la legibilidad. El estatus de la cita se distingue aparte, con su
  * propio badge (ver CITA_ESTATUS_HEX en agendaHelpers.ts). */
-export const RECURSO_COLOR_PALETTE = [
-  "#5D00FF", // Azul violeta
-  "#CEFF05", // Amarillo neón
-  "#3FD3F3", // Azul neón
-  "#8723C4", // Púrpura
-  "#FE0500", // Rojo
-  "#FF2E9B", // Rosa eléctrico
-  "#FF6602", // Naranja
-  "#7E3AEC", // Púrpura azulado
+export const RECURSO_COLORES: { hex: string; nombre: string }[] = [
+  // Los de siempre, primero y en este orden: así cada médico o unidad nuevo sigue estrenando los mismos.
+  { hex: "#5D00FF", nombre: "Azul violeta" },
+  { hex: "#CEFF05", nombre: "Amarillo neón" },
+  { hex: "#3FD3F3", nombre: "Cian" },
+  { hex: "#8723C4", nombre: "Púrpura" },
+  { hex: "#FE0500", nombre: "Rojo" },
+  { hex: "#FF2E9B", nombre: "Rosa eléctrico" },
+  { hex: "#FF6602", nombre: "Naranja" },
+  { hex: "#7E3AEC", nombre: "Púrpura azulado" },
+  // Los de Google Calendar, del rojo al gris pasando por los verdes y los azules.
+  { hex: "#C0352A", nombre: "Tomate" },
+  { hex: "#E0542E", nombre: "Mandarina" },
+  { hex: "#E2751F", nombre: "Calabaza" },
+  { hex: "#E39B1C", nombre: "Mango" },
+  { hex: "#F2C340", nombre: "Girasol" },
+  { hex: "#E4C04A", nombre: "Mostaza" },
+  { hex: "#C3CC54", nombre: "Aguacate" },
+  { hex: "#8CC05A", nombre: "Pistacho" },
+  { hex: "#2E7D43", nombre: "Albahaca" },
+  { hex: "#3B8C78", nombre: "Eucalipto" },
+  { hex: "#5BC08D", nombre: "Menta" },
+  { hex: "#45A9E0", nombre: "Turquesa" },
+  { hex: "#4A7BF7", nombre: "Cobalto" },
+  { hex: "#35409C", nombre: "Índigo" },
+  { hex: "#8089CC", nombre: "Lavanda" },
+  { hex: "#BCA4E0", nombre: "Malva" },
+  { hex: "#9B6FA8", nombre: "Amatista" },
+  { hex: "#9C27B0", nombre: "Uva" },
+  { hex: "#A61E4D", nombre: "Vino" },
+  { hex: "#D62E5E", nombre: "Rosa" },
+  { hex: "#E08370", nombre: "Flamenco" },
+  { hex: "#6B4A3E", nombre: "Chocolate" },
+  { hex: "#4F5050", nombre: "Grafito" },
+  { hex: "#B0A89B", nombre: "Gris" },
 ];
+
+export const RECURSO_COLOR_PALETTE = RECURSO_COLORES.map((c) => c.hex);
+
+/** Cómo se llama un color de la paleta (para mostrarlo al pasar el cursor); vacío si es uno guardado de antes que ya no está. */
+export function nombreDeColorRecurso(hex: string): string {
+  return RECURSO_COLORES.find((c) => c.hex.toLowerCase() === hex.toLowerCase())?.nombre ?? "";
+}
 
 /** Da un color que ningún recurso existente esté usando todavía, para que
  * cada médico/unidad se distinga a simple vista (y en los emojis de color

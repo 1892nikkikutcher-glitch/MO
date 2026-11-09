@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { elegirColorDisponible, RECURSO_COLOR_PALETTE, type Recurso } from "@/lib/patientData";
+import { elegirColorDisponible, nombreDeColorRecurso, RECURSO_COLOR_PALETTE, type Recurso } from "@/lib/patientData";
 import { capitalizarNombre, manejarCambioNombre } from "@/lib/textoNombre";
 import { inputClass } from "@/lib/agendaHelpers";
 import BloquesEditor from "@/components/agenda/BloquesEditor";
@@ -186,11 +186,15 @@ export default function AgendaRecursoDialog({
             </label>
             <p className="mb-1.5 text-[11px] text-ink/40">
               Se utilizará para identificar visualmente al médico o unidad en las citas.
+              {nombreDeColorRecurso(color) && <span className="font-semibold text-ink/60"> Elegido: {nombreDeColorRecurso(color)}.</span>}
             </p>
             <div className="flex flex-wrap gap-2">
               {RECURSO_COLOR_PALETTE.map((c) => (
                 <button
                   key={c}
+                  type="button"
+                  title={nombreDeColorRecurso(c)}
+                  aria-label={nombreDeColorRecurso(c) || c}
                   onClick={() => setColor(c)}
                   className="h-7 w-7 rounded-full border-2 transition-transform"
                   style={{
