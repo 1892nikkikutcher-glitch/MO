@@ -74,6 +74,8 @@ import GlobalAgregarPago from "./GlobalAgregarPago";
 import GlobalNuevoPaciente from "./GlobalNuevoPaciente";
 import PanelAdministrador from "./pages/PanelAdministrador";
 import AsistenteFlotante from "./AsistenteFlotante";
+import TutorialInicio from "./TutorialInicio";
+import type { DestinoTutorial } from "@/lib/tutorialInicio";
 import { PatientDataProvider, usePatientData } from "@/context/PatientDataContext";
 import { useTheme, type TemaPreferencia } from "@/context/ThemeContext";
 import { PrivacidadProvider } from "@/context/PrivacidadContext";
@@ -374,15 +376,20 @@ function InvitePrompt() {
  * sesión (sessionStorage, no localStorage: reaparece si cierran sesión y
  * vuelven a entrar, pero no en cada recarga/navegación mientras siguen
  * adentro). Se muestra antes de que el dentista capture cualquier dato. */
-function AvisoConfidencialidad() {
+function AvisoConfidencialidad({ onListo }: { onListo: () => void }) {
   const [visible, setVisible] = useState(false);
   const [noMostrarDeNuevo, setNoMostrarDeNuevo] = useState(false);
 
   useEffect(() => {
     const uid = auth.currentUser?.uid;
     if (!uid) return;
-    if (localStorage.getItem(`avisoConfidencialidadOculto:${uid}`)) return;
+    if (localStorage.getItem(`avisoConfidencialidadOculto:${uid}`)) {
+      onListo();
+      return;
+    }
     if (!sessionStorage.getItem(`avisoConfidencialidadVisto:${uid}`)) setVisible(true);
+    else onListo();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   function cerrar() {
@@ -392,6 +399,7 @@ function AvisoConfidencialidad() {
       if (noMostrarDeNuevo) localStorage.setItem(`avisoConfidencialidadOculto:${uid}`, "1");
     }
     setVisible(false);
+    onListo();
   }
 
   if (!visible) return null;
@@ -1083,13 +1091,21 @@ export default function Dashboard({
   const [activePage, setActivePage] = useState("inicio");
   const [showRegistrarPago, setShowRegistrarPago] = useState(false);
   const [showNuevoPaciente, setShowNuevoPaciente] = useState(false);
+  const [avisoListo, setAvisoListo] = useState(false);
   const esAdmin = uid === process.env.NEXT_PUBLIC_ADMIN_UID;
+
+  function irDesdeTutorial(destino: DestinoTutorial) {
+    if (destino.tipo === "pagina") setActivePage(destino.pagina);
+    else if (destino.tipo === "nuevo-paciente") setShowNuevoPaciente(true);
+    else setShowRegistrarPago(true);
+  }
 
   return (
     <PatientDataProvider uid={uid} userEmail={userEmail} onIrAPagina={setActivePage} onLogout={onLogout}>
       <MoConectaProvider uid={uid}>
         <IndicadorSinConexion />
-        <AvisoConfidencialidad />
+        <AvisoConfidencialidad onListo={() => setAvisoListo(true)} />
+        <TutorialInicio uid={uid} avisoListo={avisoListo} onIr={irDesdeTutorial} />
         <InvitePrompt />
         <DashboardBody
           activePage={activePage}
