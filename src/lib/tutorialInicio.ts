@@ -20,6 +20,7 @@ export type DatosTutorial = {
 export type DestinoTutorial =
   | { tipo: "pagina"; pagina: string }
   | { tipo: "nuevo-paciente" }
+  | { tipo: "guia-primer-paciente" }
   | { tipo: "registrar-pago" };
 
 export type PasoTutorial = {
@@ -83,11 +84,11 @@ export const PASOS_TUTORIAL: PasoTutorial[] = [
     titulo: "Da de alta a tu primer paciente",
     que: "Cada paciente tiene su expediente: datos, historia clínica, citas, presupuestos y pagos en un solo lugar.",
     como: [
-      "Presiona «Nuevo Paciente» arriba, o entra a Pacientes y usa «+ Nuevo Paciente».",
-      "Captura su nombre y su celular: el celular sirve para sus recordatorios por WhatsApp.",
-      "Si ya tienes una lista en Excel, usa «Importar Pacientes» en Pacientes para cargarla de una vez.",
+      "La guía del primer paciente te acompaña: lo das de alta con su nombre y celular (el celular sirve para sus recordatorios por WhatsApp).",
+      "Luego te lleva pestaña por pestaña de su expediente, diciéndote qué llenar en cada una.",
+      "Al final agendas su primera cita. Si ya tienes una lista en Excel, usa «Importar Pacientes» en Pacientes.",
     ],
-    accion: { etiqueta: "Nuevo paciente", destino: { tipo: "nuevo-paciente" } },
+    accion: { etiqueta: "Empezar la guía del primer paciente", destino: { tipo: "guia-primer-paciente" } },
     hecho: (d) => d.hayPacientes,
   },
   {

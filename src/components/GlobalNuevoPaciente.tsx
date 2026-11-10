@@ -7,7 +7,14 @@ import { manejarCambioNombre } from "@/lib/textoNombre";
 const inputClass =
   "w-full rounded-lg border border-edge/10 bg-field px-3 py-2 text-sm text-ink placeholder-ink/30 outline-none focus:border-accent/60";
 
-export default function GlobalNuevoPaciente({ onClose }: { onClose: () => void }) {
+/** `alGuardar`: lo usa la guía del primer paciente, que lleva al expediente en vez de abrir la Agenda. */
+export default function GlobalNuevoPaciente({
+  onClose,
+  alGuardar,
+}: {
+  onClose: () => void;
+  alGuardar?: (patientId: string) => void;
+}) {
   const { addPatient, sugerirNuevaCita } = usePatientData();
   const [nombre, setNombre] = useState("");
   const [telefono, setTelefono] = useState("");
@@ -22,7 +29,8 @@ export default function GlobalNuevoPaciente({ onClose }: { onClose: () => void }
       phone: telefono.trim(),
       birthDate: fechaNacimiento || undefined,
     });
-    sugerirNuevaCita(nuevo.id, "Consulta de valoración");
+    if (alGuardar) alGuardar(nuevo.id);
+    else sugerirNuevaCita(nuevo.id, "Consulta de valoración");
     onClose();
   };
 
@@ -39,8 +47,9 @@ export default function GlobalNuevoPaciente({ onClose }: { onClose: () => void }
           </button>
         </div>
         <p className="mb-4 text-xs text-ink/40">
-          Al guardar se abrirá la Agenda para agendar su primera cita — una consulta de
-          valoración.
+          {alGuardar
+            ? "Con su nombre y celular basta por ahora: al guardar te llevo a su expediente para completar el resto."
+            : "Al guardar se abrirá la Agenda para agendar su primera cita — una consulta de valoración."}
         </p>
 
         <div className="space-y-3">

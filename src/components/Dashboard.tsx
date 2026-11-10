@@ -76,6 +76,7 @@ import GlobalNuevoPaciente from "./GlobalNuevoPaciente";
 import PanelAdministrador from "./pages/PanelAdministrador";
 import AsistenteFlotante from "./AsistenteFlotante";
 import TutorialInicio from "./TutorialInicio";
+import GuiaPrimerPaciente, { EVENTO_INICIAR_GUIA } from "./GuiaPrimerPaciente";
 import type { DestinoTutorial } from "@/lib/tutorialInicio";
 import { PatientDataProvider, usePatientData } from "@/context/PatientDataContext";
 import { useTheme, type TemaPreferencia } from "@/context/ThemeContext";
@@ -1100,6 +1101,7 @@ export default function Dashboard({
   function irDesdeTutorial(destino: DestinoTutorial) {
     if (destino.tipo === "pagina") setActivePage(destino.pagina);
     else if (destino.tipo === "nuevo-paciente") setShowNuevoPaciente(true);
+    else if (destino.tipo === "guia-primer-paciente") window.dispatchEvent(new Event(EVENTO_INICIAR_GUIA));
     else setShowRegistrarPago(true);
   }
 
@@ -1109,6 +1111,7 @@ export default function Dashboard({
         <IndicadorSinConexion />
         <AvisoConfidencialidad onListo={() => setAvisoListo(true)} />
         <TutorialInicio uid={uid} avisoListo={avisoListo} onIr={irDesdeTutorial} />
+        <GuiaPrimerPaciente uid={uid} avisoListo={avisoListo} paginaActiva={activePage} />
         <InvitePrompt />
         <DashboardBody
           activePage={activePage}

@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { usePatientData } from "@/context/PatientDataContext";
 import { obtenerAyuda } from "@/lib/ayudaPaginas";
 import { EVENTO_ABRIR_TUTORIAL } from "./TutorialInicio";
+import { EVENTO_INICIAR_GUIA } from "./GuiaPrimerPaciente";
 
 function IconoAsistente() {
   return (
@@ -104,6 +105,15 @@ export default function AsistenteFlotante({
               className="mt-4 w-full rounded-lg border border-accent/40 bg-accent/10 py-2 text-sm font-semibold text-accent hover:bg-accent/20"
             >
               Primeros pasos: ver el tutorial
+            </button>
+            <button
+              onClick={() => {
+                setAbierto(false);
+                window.dispatchEvent(new Event(EVENTO_INICIAR_GUIA));
+              }}
+              className="mt-2 w-full rounded-lg border border-accent/40 bg-accent/10 py-2 text-sm font-semibold text-accent hover:bg-accent/20"
+            >
+              Guía del primer paciente
             </button>
           </div>
         </>
