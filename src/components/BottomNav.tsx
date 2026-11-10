@@ -217,6 +217,7 @@ export const navItems = [
       { id: "administracion-perfil", label: "Médicos y Recetas" },
       { id: "administracion-colaboradores", label: "Colaboradores" },
       { id: "administracion-contrato-ortodoncia", label: "Contrato de Ortodoncia" },
+      { id: "administracion-consentimientos", label: "Consentimientos Informados" },
     ],
   },
   {

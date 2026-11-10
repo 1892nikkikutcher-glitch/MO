@@ -120,6 +120,7 @@ import {
 import { estadoRegulacionInicial, type EstadoRegulacionSanitaria } from "@/lib/regulacionSanitaria";
 import { formatosWhatsAppInicial, type FormatosWhatsApp } from "@/lib/formatosWhatsapp";
 import { contratoOrtodonciaInicial, type ContratoOrtodonciaConfig } from "@/lib/contratoOrtodoncia";
+import { consentimientosConfigInicial, type ConsentimientosConfig } from "@/lib/consentimientosConfig";
 import { calcularFechaFin, type MembershipPlan, type PatientMembership, type UsoBeneficio } from "@/lib/membresias";
 import type { Lamina } from "@/lib/laminas";
 import type { Deposito, ArticuloFaltante, ArticuloCaducidad } from "@/lib/depositoDental";
@@ -996,6 +997,8 @@ type PatientDataContextValue = {
   setFormatosWhatsapp: (updater: Updater<FormatosWhatsApp>) => void;
   contratoOrtodoncia: ContratoOrtodonciaConfig;
   setContratoOrtodoncia: (updater: Updater<ContratoOrtodonciaConfig>) => void;
+  consentimientosConfig: ConsentimientosConfig;
+  setConsentimientosConfig: (updater: Updater<ConsentimientosConfig>) => void;
   cargarDatosPaciente: (patientId: string) => void;
   navegacionExpediente: NavegacionExpediente;
   irAExpediente: (patientId: string, tab?: string, citaId?: string) => void;
@@ -1212,6 +1215,11 @@ export function PatientDataProvider({
     clinicUid,
     "contratoOrtodoncia",
     contratoOrtodonciaInicial
+  );
+  const [consentimientosConfig, setConsentimientosConfig] = useFirestoreDoc<ConsentimientosConfig>(
+    clinicUid,
+    "consentimientosTextos",
+    consentimientosConfigInicial
   );
   const [membershipPlanes, setMembershipPlanes] = useFirestoreList<MembershipPlan>(
     clinicUid,
@@ -3369,6 +3377,8 @@ export function PatientDataProvider({
         setFormatosWhatsapp,
         contratoOrtodoncia,
         setContratoOrtodoncia,
+        consentimientosConfig,
+        setConsentimientosConfig,
         cargarDatosPaciente,
         navegacionExpediente,
         irAExpediente,

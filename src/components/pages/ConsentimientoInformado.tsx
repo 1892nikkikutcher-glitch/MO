@@ -5,6 +5,11 @@ import { usePatientData } from "@/context/PatientDataContext";
 import { calcularEdadDetallada, identidadDoctorDe } from "@/lib/patientData";
 import { manejarCambioNombre } from "@/lib/textoNombre";
 import { toISODate } from "@/lib/agendaHelpers";
+import {
+  CLAVE_CONSENTIMIENTO_GENERAL,
+  contenidoConsentimiento,
+  renderConsentimiento,
+} from "@/lib/consentimientosConfig";
 
 type Patient = {
   id: string;
@@ -29,16 +34,6 @@ function nowFormatted() {
   return new Date().toLocaleTimeString("es-MX", { hour: "2-digit", minute: "2-digit" });
 }
 
-const parrafoDeclaracion = `Declaro que he sido informado(a) de manera clara, suficiente y comprensible sobre la naturaleza y propósito del procedimiento clínico bucal que se me realizará. Se me han explicado verbalmente los riesgos y posibles complicaciones inherentes al procedimiento, así como la existencia de otras alternativas de tratamiento disponibles.
-Comprendo los posibles riesgos y complicaciones involucradas en los tratamientos médico, estéticos y quirúrgicos, y que en mi caso la duración de estos fenómenos no está determinada, pudiendo ser irreversible. Comprendo que la odontología no es una ciencia exacta.
-Así mismo, que existen riesgos imprevistos que pueden alterar el buen resultado del tratamiento.
-Sabiendo que siempre se buscará el bienestar, seguridad y calidad de los procedimientos clínicos realizados. Me han explicado de otros problemas y complicaciones poco frecuentes, derivadas del tratamiento bucal que consiste en:`;
-
-function parrafoAceptacion(nombreDoctor: string) {
-  return `Acepto que después de explicar procedimientos, elijo el procedimiento clínico que se detalla a realizar. Acepto y me comprometo a seguir responsablemente las recomendaciones e indicaciones recibidas, antes, durante y después del tratamiento, así como, acudir a las citas para las revisiones durante el tiempo pertinente. Acepto y reconozco que no se me pueden dar garantías o seguridad absoluta respecto a que el resultado del procedimiento clínico sea el más satisfactorio, por lo que acepto la posibilidad de necesitar cualquier posterior intervención para mejorar el resultado final. Comprendo que la medicina no es una ciencia exacta. Si surgiese cualquier situación inesperada o sobrevenida durante la intervención o tratamiento, autorizo al profesional a realizar cualquier procedimiento o maniobra distinta de las proyectadas o usuales que a su juicio estimase oportuna para la resolución, en su caso, de la complicación surgida. Acepto no obligar al cirujano dentista a realizar un procedimiento cuando ello implique mayor riesgo que beneficio. Acepto firmar este consentimiento informado y manifiesto que ${nombreDoctor || "el profesional que me atiende"} y/o su equipo de ayudantes me han informado del procedimiento clínico al que deseo ser sometida/o.
-Si tiene alguna duda sobre el procedimiento, no dude en preguntar. Estamos aquí para ayudarle a obtener la asistencia que quiere y necesita.`;
-}
-
 export default function ConsentimientoInformado({
   patient,
   onVolver,
@@ -46,7 +41,14 @@ export default function ConsentimientoInformado({
   patient: Patient;
   onVolver?: () => void;
 }) {
-  const { perfilDoctor, recursos, citas } = usePatientData();
+  const { perfilDoctor, clinicInfo, recursos, citas, consentimientosConfig } = usePatientData();
+  const contenido = contenidoConsentimiento(CLAVE_CONSENTIMIENTO_GENERAL, consentimientosConfig);
+  const textoDe = (plantilla: string) =>
+    renderConsentimiento(plantilla, CLAVE_CONSENTIMIENTO_GENERAL, {
+      medico,
+      paciente: patient.name,
+      clinica: clinicInfo?.nombre,
+    });
   const medicos = recursos.filter((r) => r.tipo === "medico");
   const esMenorDeEdad = (calcularEdadDetallada(patient.birthDate)?.years ?? 18) < 18;
   const fechaInicial = todayFormatted();
@@ -208,7 +210,7 @@ export default function ConsentimientoInformado({
 
       <div className="rounded-2xl bg-white p-8 text-black shadow-lg print:rounded-none print:p-0 print:shadow-none">
         <h2 className="text-center text-base font-bold uppercase tracking-wide print:text-sm">
-          Carta de Consentimiento Informado General
+          {contenido.titulo}
         </h2>
         <div className="mt-3 text-center text-sm leading-snug print:mt-1.5 print:text-xs">
           <p className="font-semibold">{medico || "Consultorio dental"}</p>
@@ -229,7 +231,7 @@ export default function ConsentimientoInformado({
           Declaración del paciente
         </h3>
         <p className="mt-1 whitespace-pre-line text-justify text-[13px] leading-relaxed print:text-[10.5px] print:leading-snug">
-          {parrafoDeclaracion}
+          {textoDe(contenido.declaracion)}
         </p>
         <div className="mt-2 min-h-[3rem] border-b border-dashed border-black/40 text-[13px] print:min-h-[2rem] print:text-[10.5px]">
           {procedimiento}
@@ -239,7 +241,7 @@ export default function ConsentimientoInformado({
           Aceptación del paciente
         </h3>
         <p className="mt-1 whitespace-pre-line text-justify text-[13px] leading-relaxed print:text-[10.5px] print:leading-snug">
-          {parrafoAceptacion(medico)}
+          {textoDe(contenido.aceptacion)}
         </p>
 
         <div className="mt-10 grid grid-cols-2 gap-x-10 gap-y-10 text-center text-[11px] print:mt-5 print:gap-x-8 print:gap-y-5 print:text-[9.5px]">

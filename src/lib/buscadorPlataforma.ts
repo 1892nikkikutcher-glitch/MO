@@ -63,6 +63,7 @@ export const PALABRAS_CLAVE: Record<string, string> = {
   "administracion-marketing": "campanas promociones redes mensajes",
   "administracion-catalogos": "catalogos listas opciones",
   "administracion-contrato-ortodoncia": "contrato ortodoncia mensualidades",
+  "administracion-consentimientos": "consentimientos informados cartas textos editar riesgos declaracion aceptacion",
   facturacion: "facturas cfdi sat timbrar factura fiscal rfc datos fiscales activo para facturar",
   gastos: "egresos compras renta nomina insumos inversion impuestos categoria pagos de la clinica",
   contabilidad: "finanzas indicadores utilidad margen fondos regla de sobres balance flujo de efectivo estados financieros punto de equilibrio contador capital de trabajo endeudamiento",

@@ -4,10 +4,8 @@ import { useState } from "react";
 import { usePatientData } from "@/context/PatientDataContext";
 import { calcularEdadDetallada, identidadDoctorDe, type Patient } from "@/lib/patientData";
 import { manejarCambioNombre } from "@/lib/textoNombre";
-import {
-  consentimientosEspecialidad,
-  type TipoConsentimientoEspecialidad,
-} from "@/lib/consentimientosEspecialidad";
+import type { TipoConsentimientoEspecialidad } from "@/lib/consentimientosEspecialidad";
+import { contenidoConsentimiento, renderConsentimiento } from "@/lib/consentimientosConfig";
 import { toISODate } from "@/lib/agendaHelpers";
 
 const inputClass =
@@ -34,9 +32,9 @@ export default function ConsentimientoEspecialidad({
   tipo: TipoConsentimientoEspecialidad;
   onVolver?: () => void;
 }) {
-  const { perfilDoctor, recursos, citas } = usePatientData();
+  const { perfilDoctor, clinicInfo, recursos, citas, consentimientosConfig } = usePatientData();
   const medicos = recursos.filter((r) => r.tipo === "medico");
-  const contenido = consentimientosEspecialidad[tipo];
+  const contenido = contenidoConsentimiento(tipo, consentimientosConfig);
   const esMenorDeEdad = (calcularEdadDetallada(patient.birthDate)?.years ?? 18) < 18;
   const fechaInicial = todayFormatted();
   const [dia, setDia] = useState(fechaInicial.dia);
@@ -60,6 +58,8 @@ export default function ConsentimientoEspecialidad({
     return medicoSugerido || medicos[0]?.nombre || "";
   });
   const cedula = identidadDoctorDe(medico, recursos).cedulaProfesional;
+  const textoDe = (plantilla: string) =>
+    renderConsentimiento(plantilla, tipo, { medico, paciente: patient.name, clinica: clinicInfo?.nombre });
   const [procedimiento, setProcedimiento] = useState("");
   const [nombreFirmante, setNombreFirmante] = useState(
     esMenorDeEdad ? patient.nombreTutor || "" : patient.name
@@ -214,7 +214,7 @@ export default function ConsentimientoEspecialidad({
           Declaración del paciente
         </h3>
         <p className="mt-1 whitespace-pre-line text-justify text-[13px] leading-relaxed print:text-[10.5px] print:leading-snug">
-          {contenido.declaracion}
+          {textoDe(contenido.declaracion)}
         </p>
         <div className="mt-2 min-h-[3rem] border-b border-dashed border-black/40 text-[13px] print:min-h-[2rem] print:text-[10.5px]">
           {procedimiento}
@@ -224,7 +224,7 @@ export default function ConsentimientoEspecialidad({
           Aceptación del paciente
         </h3>
         <p className="mt-1 whitespace-pre-line text-justify text-[13px] leading-relaxed print:text-[10.5px] print:leading-snug">
-          {contenido.aceptacion(medico)}
+          {textoDe(contenido.aceptacion)}
         </p>
 
         <div className="mt-10 grid grid-cols-2 gap-x-10 gap-y-10 text-center text-[11px] print:mt-5 print:gap-x-8 print:gap-y-5 print:text-[9.5px]">
