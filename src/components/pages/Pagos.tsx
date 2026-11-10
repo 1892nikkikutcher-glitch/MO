@@ -20,7 +20,7 @@ import RegistrarDevolucionDialog from "@/components/RegistrarDevolucionDialog";
 import { calcularDisponibleDevolucion, resumenDesdeDevoluciones } from "@/lib/devolucionesPago";
 import { fechaPagoAIso } from "@/lib/metas";
 import { medicoPredeterminadoParaPago } from "@/lib/medicoDelPago";
-import { FORMA_PAGO_CASHBACK, baseCashbackDePago, calcularCashback, esFormaPagoCashback, montoMaximoCanje } from "@/lib/cashback";
+import { FORMA_PAGO_CASHBACK, baseCashbackDePago, calcularCashback, esFormaPagoCashback, montoMaximoCanje, otorgarCashbackAPago, puedeOtorgarCashback } from "@/lib/cashback";
 import { avisoCashbackEnPago } from "@/lib/cashbackTextos";
 import { toISODate } from "@/lib/agendaHelpers";
 
@@ -306,87 +306,12 @@ export function EditarPagoDialog({
   );
 }
 
-function AgregarPagoExtraDialog({
-  onClose,
-  onAdd,
-}: {
-  onClose: () => void;
-  onAdd: (extra: { label: string; monto: number }) => void;
-}) {
-  const [concepto, setConcepto] = useState("");
-  const [monto, setMonto] = useState("");
-
-  const montoNumerico = Number(monto);
-  const puedeAgregar = concepto.trim().length > 0 && montoNumerico > 0;
-
-  return (
-    <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/70 p-4">
-      <div className="w-full max-w-sm rounded-2xl border border-edge/10 bg-modal p-6">
-        <div className="mb-4 flex items-center justify-between">
-          <h3 className="text-base font-semibold text-ink">Pago Extra</h3>
-          <button
-            onClick={onClose}
-            className="flex h-6 w-6 items-center justify-center rounded-full text-ink/50 hover:bg-surface hover:text-ink"
-          >
-            ✕
-          </button>
-        </div>
-        <p className="mb-4 text-xs text-ink/40">
-          Para un tratamiento o concepto que no está presupuestado pero es necesario pagar.
-        </p>
-
-        <div className="space-y-3">
-          <div>
-            <label className="mb-1 block text-xs font-medium text-ink/60">Concepto</label>
-            <input
-              type="text"
-              value={concepto}
-              onChange={(e) => setConcepto(e.target.value)}
-              placeholder="Ej. Medicamento recetado"
-              className={inputClass}
-            />
-          </div>
-          <div>
-            <label className="mb-1 block text-xs font-medium text-ink/60">Monto</label>
-            <input
-              type="number"
-              min={0}
-              value={monto}
-              onChange={(e) => setMonto(e.target.value)}
-              placeholder="0.00"
-              className={inputClass}
-            />
-          </div>
-        </div>
-
-        <div className="mt-6 flex gap-3">
-          <button
-            onClick={onClose}
-            className="flex-1 rounded-lg border border-edge/15 py-2 text-sm font-semibold text-ink/80 transition-colors hover:bg-surface"
-          >
-            Cancelar
-          </button>
-          <button
-            onClick={() => {
-              if (!puedeAgregar) return;
-              onAdd({ label: concepto.trim(), monto: montoNumerico });
-            }}
-            disabled={!puedeAgregar}
-            className="flex-1 rounded-lg border border-accent/60 bg-accent/15 py-2 text-sm font-semibold text-accent transition-opacity hover:bg-accent/25 disabled:cursor-not-allowed disabled:opacity-40"
-          >
-            Agregar
-          </button>
-        </div>
-      </div>
-    </div>
-  );
-}
-
 export function AgregarPagoDialog({
   patientId,
   patientName,
   saldoPendienteTotal,
   tratamientosPendientes,
+  formaPagoInicial,
   onClose,
   onSave,
 }: {
@@ -394,6 +319,8 @@ export function AgregarPagoDialog({
   patientName: string;
   saldoPendienteTotal: number;
   tratamientosPendientes: TratamientoPendiente[];
+  /** Con "Cashback" el pago se abre listo para pagarse con el saldo del paciente (si tiene). */
+  formaPagoInicial?: string;
   onClose: () => void;
   onSave: (pago: Pago) => void;
 }) {
@@ -427,11 +354,12 @@ export function AgregarPagoDialog({
       hoyISO: hoyIsoPago,
     }) || (medicosDisponibles.length === 1 ? medicosDisponibles[0] : "");
   const [medico, setMedico] = useState(medicoSugerido);
-  const [formaPago, setFormaPago] = useState(formasDePago[0]);
+  const [formaPago, setFormaPago] = useState(formaPagoInicial === FORMA_PAGO_CASHBACK && cashbackDisponible > 0 ? FORMA_PAGO_CASHBACK : formasDePago[0]);
   const [seleccionados, setSeleccionados] = useState<string[]>([]);
   const [montos, setMontos] = useState<Record<string, number>>({});
   const [extras, setExtras] = useState<{ id: string; label: string; monto: number }[]>([]);
-  const [showExtraDialog, setShowExtraDialog] = useState(false);
+  const [extraConcepto, setExtraConcepto] = useState("");
+  const [extraMonto, setExtraMonto] = useState("");
   const [facturar, setFacturar] = useState(false);
 
   const toggleTratamiento = (t: TratamientoPendiente) => {
@@ -446,12 +374,24 @@ export function AgregarPagoDialog({
     (sum, id) => sum + (montos[id] ?? 0),
     0
   );
+  const extraMontoNumerico = Number(extraMonto);
+  const puedeAgregarExtra = extraMontoNumerico > 0;
+  const agregarExtra = () => {
+    if (!puedeAgregarExtra) return;
+    setExtras((prev) => [
+      ...prev,
+      { id: `${Date.now()}`, label: extraConcepto.trim() || "Pago extra", monto: extraMontoNumerico },
+    ]);
+    setExtraConcepto("");
+    setExtraMonto("");
+  };
   const totalExtras = extras.reduce((sum, e) => sum + e.monto, 0);
   const totalAPagar = totalTratamientosSeleccionados + totalExtras;
 
   const pagaConCashback = esFormaPagoCashback(formaPago);
   // Lo que se puede cubrir con saldo: lo menor entre el saldo, el % del valor de los tratamientos que se pagan y el tope por visita.
-  const valorAtencion = seleccionados.reduce((sum, id) => sum + (tratamientosPendientes.find((t) => t.id === id)?.price ?? 0), 0);
+  const valorAtencion =
+    seleccionados.reduce((sum, id) => sum + (tratamientosPendientes.find((t) => t.id === id)?.price ?? 0), 0) + totalExtras;
   const maxCashbackAhora = montoMaximoCanje(cashbackDisponible, valorAtencion, cashbackConfig);
   const excedeCashback = pagaConCashback && totalAPagar > maxCashbackAhora + 0.001;
   useEffect(() => {
@@ -644,7 +584,7 @@ export function AgregarPagoDialog({
                 </p>
               )}
               {pagaConCashback && valorAtencion === 0 && (
-                <p className="mt-1 text-[11px] text-ink/50">El Cashback se aplica a tratamientos del presupuesto: marca abajo el tratamiento que se paga con él.</p>
+                <p className="mt-1 text-[11px] text-ink/50">El Cashback se aplica a un tratamiento del presupuesto o a un pago extra: márcalo o agrégalo abajo.</p>
               )}
               {pagaConCashback && valorAtencion > 0 && !excedeCashback && (
                 <p className="mt-1 text-[11px] text-ink/50">Puedes cubrir hasta {formatCurrency(maxCashbackAhora)} con Cashback en esta atención; el resto cóbralo en otro pago.</p>
@@ -663,26 +603,17 @@ export function AgregarPagoDialog({
               <label className="block text-xs font-medium text-ink/60">
                 Tratamientos pendientes por pagar
               </label>
-              <button
-                onClick={() => setShowExtraDialog(true)}
-                title="Agregar pago extra (no presupuestado)"
-                className="flex h-6 w-6 items-center justify-center rounded-full border border-accent/40 text-accent transition-colors hover:bg-accent/10"
-              >
-                +
-              </button>
             </div>
 
             {tratamientosPendientes.length > 0 && (
               <p className="mb-1.5 rounded-lg border border-warning/30 bg-warning/10 p-2 text-[11px] text-ink/70">
-                Si este pago es de alguno de estos tratamientos, <strong>márcalo aquí abajo</strong> (no uses «+ pago
-                extra»): así el saldo del presupuesto baja. Un pago extra se cuenta como trabajo aparte y el
+                Si este pago es de alguno de estos tratamientos, <strong>márcalo aquí abajo</strong> (no uses «Pago extra»): así el saldo del presupuesto baja. Un pago extra se cuenta como trabajo aparte y el
                 tratamiento seguiría apareciendo como deuda.
               </p>
             )}
             {tratamientosPendientes.length === 0 && extras.length === 0 ? (
               <p className="rounded-lg border border-dashed border-edge/15 p-4 text-center text-xs text-ink/30">
-                Este paciente no tiene tratamientos pendientes por pagar. Usa el botón + para un pago
-                extra.
+                Este paciente no tiene tratamientos pendientes por pagar. Si necesita pagar algo, agrégalo abajo como pago extra.
               </p>
             ) : (
               <div className="max-h-56 space-y-1.5 overflow-y-auto rounded-lg border border-edge/10 p-2">
@@ -754,6 +685,48 @@ export function AgregarPagoDialog({
                 ))}
               </div>
             )}
+
+            <div className="mt-2 rounded-lg border border-dashed border-accent/30 p-2.5">
+              <p className="mb-1.5 text-[11px] text-ink/50">
+                <strong className="text-ink/70">Pago extra</strong> · algo que no está presupuestado pero es necesario
+                pagar (ej. medicamento recetado). Solo escribe el monto.
+              </p>
+              <div className="space-y-2">
+                <input
+                  type="text"
+                  value={extraConcepto}
+                  onChange={(e) => setExtraConcepto(e.target.value)}
+                  placeholder="Concepto (opcional)"
+                  aria-label="Concepto del pago extra"
+                  className={inputClass}
+                />
+                <div className="flex gap-2">
+                  <div className="relative min-w-0 flex-1">
+                    <span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-sm text-ink/40">$</span>
+                    <input
+                      type="number"
+                      min={0}
+                      value={extraMonto}
+                      onChange={(e) => setExtraMonto(e.target.value)}
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter") agregarExtra();
+                      }}
+                      placeholder="Monto"
+                      aria-label="Monto del pago extra"
+                      className={`${inputClass} pl-7`}
+                    />
+                  </div>
+                  <button
+                    type="button"
+                    onClick={agregarExtra}
+                    disabled={!puedeAgregarExtra}
+                    className="shrink-0 rounded-lg border border-accent/60 bg-accent/15 px-4 text-sm font-semibold text-accent transition-opacity hover:bg-accent/25 disabled:cursor-not-allowed disabled:opacity-40"
+                  >
+                    Agregar
+                  </button>
+                </div>
+              </div>
+            </div>
           </div>
 
           <div className="rounded-lg border border-edge/10 bg-inset px-3 py-2">
@@ -788,15 +761,6 @@ export function AgregarPagoDialog({
           </button>
         </div>
 
-        {showExtraDialog && (
-          <AgregarPagoExtraDialog
-            onClose={() => setShowExtraDialog(false)}
-            onAdd={(extra) => {
-              setExtras((prev) => [...prev, { id: `${Date.now()}`, ...extra }]);
-              setShowExtraDialog(false);
-            }}
-          />
-        )}
       </div>
     </div>
   );
@@ -817,7 +781,37 @@ export default function Pagos({
   devoluciones: DevolucionPago[];
   setPagos: Dispatch<SetStateAction<Pago[]>>;
 }) {
-  const { userEmail, setPagosEliminados, setPagosRealizados } = usePatientData();
+  const { userEmail, setPagosEliminados, setPagosRealizados, puedeVerFinanzas, cashbackConfig, cashbackMovimientos, setCashbackMovimientos, saldoCashbackDe } = usePatientData();
+  const [formaPagoInicial, setFormaPagoInicial] = useState<string | undefined>(undefined);
+  const [avisoOtorgado, setAvisoOtorgado] = useState("");
+  const mostrarCashback = puedeVerFinanzas && cashbackConfig.activo;
+  const saldoCashback = saldoCashbackDe(patientId);
+
+  const abrirAgregarPago = (forma?: string) => {
+    setFormaPagoInicial(forma);
+    setShowDialog(true);
+  };
+
+  /** Genera el cashback de un pago que ya estaba registrado y no lo había generado. */
+  const otorgarCashback = (pago: Pago) => {
+    const r = otorgarCashbackAPago(cashbackMovimientos, pago, patientId, patientName, cashbackConfig, new Date().toISOString());
+    if (r.resultado === "no-aplica") return;
+    // Si el pago estaba marcado como promoción o cortesía, deja de estarlo: así el cashback no se anula al recalcular.
+    if (pago.sinCashback) {
+      const { sinCashback: _quitado, ...sinMarca } = pago;
+      upsertPago(sinMarca);
+    }
+    // Idempotente por id: si el cambio del pago de arriba ya generó el cashback, esto no lo duplica.
+    const ahoraIso = new Date().toISOString();
+    setCashbackMovimientos((prev) => otorgarCashbackAPago(prev, pago, patientId, patientName, cashbackConfig, ahoraIso).movimientos);
+    setAvisoOtorgado(
+      r.resultado === "sin-espacio"
+        ? "No se otorgó: el paciente ya tiene el saldo máximo acumulable."
+        : r.resultado === "recortado"
+        ? `Se otorgaron ${formatCurrency(r.monto)} de Cashback (limitado al saldo máximo acumulable).`
+        : `Se otorgaron ${formatCurrency(r.monto)} de Cashback por el pago del ${pago.fecha}.`
+    );
+  };
   const [reciboAbierto, setReciboAbierto] = useState<Pago | null>(null);
   const [showDialog, setShowDialog] = useState(false);
   const [pagoAEliminar, setPagoAEliminar] = useState<Pago | null>(null);
@@ -920,7 +914,7 @@ export default function Pagos({
             ↩ Registrar devolución
           </button>
           <button
-            onClick={() => setShowDialog(true)}
+            onClick={() => abrirAgregarPago()}
             className="rounded-lg border border-accent/50 bg-accent/10 px-4 py-2 text-xs font-semibold text-accent transition-colors hover:bg-accent/20"
             style={{ boxShadow: "0 0 12px -2px rgb(var(--accent-rgb) / 0.5)" }}
           >
@@ -938,7 +932,7 @@ export default function Pagos({
         </div>
       )}
 
-      <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+      <div className={`grid grid-cols-1 gap-3 ${mostrarCashback ? "sm:grid-cols-2 lg:grid-cols-4" : "sm:grid-cols-3"}`}>
         <div className="rounded-xl border border-edge/10 bg-surface p-4">
           <div className="text-[11px] uppercase tracking-wide text-ink/40">Total Presupuestado</div>
           <div className="mt-1 text-lg font-bold text-ink">{formatCurrency(totalPresupuestado)}</div>
@@ -951,7 +945,40 @@ export default function Pagos({
           <div className="text-[11px] uppercase tracking-wide text-ink/40">Saldo Pendiente</div>
           <div className="mt-1 text-lg font-bold text-danger">{formatCurrency(Math.max(saldoPendiente, 0))}</div>
         </div>
+        {mostrarCashback && (
+          <div className="rounded-xl border border-success/30 bg-success/5 p-4">
+            <div className="text-[11px] uppercase tracking-wide text-ink/40">Cashback disponible</div>
+            <div className="mt-1 flex items-center justify-between gap-2">
+              <div className="text-lg font-bold text-success">{formatCurrency(saldoCashback.disponible)}</div>
+              {saldoCashback.disponible > 0 && (
+                <button
+                  onClick={() => abrirAgregarPago(FORMA_PAGO_CASHBACK)}
+                  title="Registrar un pago usando el saldo de Cashback del paciente"
+                  className="rounded-lg border border-success/50 bg-success/10 px-2.5 py-1 text-[11px] font-semibold text-success transition-colors hover:bg-success/20"
+                >
+                  Usar Cashback
+                </button>
+              )}
+            </div>
+            {(saldoCashback.porLiberar > 0 || saldoCashback.porAprobar > 0) && (
+              <div className="mt-1 text-[11px] text-ink/50">
+                {saldoCashback.porLiberar > 0 && `${formatCurrency(saldoCashback.porLiberar)} se libera mañana`}
+                {saldoCashback.porLiberar > 0 && saldoCashback.porAprobar > 0 && " · "}
+                {saldoCashback.porAprobar > 0 && `${formatCurrency(saldoCashback.porAprobar)} por aprobar`}
+              </div>
+            )}
+          </div>
+        )}
       </div>
+
+      {avisoOtorgado && (
+        <div className="flex items-start justify-between gap-3 rounded-xl border border-success/30 bg-success/10 p-3 text-xs text-ink/80">
+          <span>💰 {avisoOtorgado}</span>
+          <button onClick={() => setAvisoOtorgado("")} className="text-ink/40 hover:text-ink" aria-label="Cerrar aviso">
+            ✕
+          </button>
+        </div>
+      )}
 
       {pagos.length === 0 ? (
         <div className="rounded-2xl border border-dashed border-edge/15 bg-surface p-10 text-center text-sm text-ink/40">
@@ -1033,6 +1060,15 @@ export default function Pagos({
                   </td>
                   <td className="px-6 py-3 text-right">
                     <div className="ml-auto flex w-fit items-center gap-1.5">
+                      {mostrarCashback && puedeOtorgarCashback(pago, cashbackMovimientos, cashbackConfig) && (
+                        <button
+                          onClick={() => otorgarCashback(pago)}
+                          title="Otorgar el Cashback de este pago (no se había generado)"
+                          className="flex h-7 w-7 items-center justify-center rounded-full border border-success/30 text-xs text-success/70 transition-colors hover:border-success hover:text-success"
+                        >
+                          💰
+                        </button>
+                      )}
                       {disponiblePago.disponible > 0 && (
                         <button
                           onClick={() => setPagoParaDevolver(pago)}
@@ -1104,6 +1140,7 @@ export default function Pagos({
           patientName={patientName}
           saldoPendienteTotal={saldoPendienteTratamientos}
           tratamientosPendientes={tratamientosPendientes}
+          formaPagoInicial={formaPagoInicial}
           onClose={() => setShowDialog(false)}
           onSave={upsertPago}
         />

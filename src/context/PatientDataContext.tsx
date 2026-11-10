@@ -97,6 +97,7 @@ import {
 } from "@/lib/metas";
 import { presupuestoGastosInicial, type Gasto, type PresupuestoGastosConfig } from "@/lib/gastos";
 import { migrarIdentidadDoctor } from "@/lib/migracionIdentidadDoctor";
+import { asegurarMedicoAdministrador } from "@/lib/medicoAdministrador";
 import { estamparNuevos } from "@/lib/autoriaRegistros";
 import { aplicarMovimientosAPagos, controlesPorError, type PropuestaControl } from "@/lib/controlesPorError";
 import { construirFinanzasDesdePagos, type ResultadoRecalculo } from "@/lib/finanzasRecalculo";
@@ -1111,14 +1112,24 @@ export function PatientDataProvider({
   // solo evita repetir la llamada en re-renders de la MISMA sesión; la
   // corrección ante recargas la da la condición de datos, no este ref.
   const migracionIdentidadIntentada = useRef<string | null>(null);
+  const migracionIdentidadPromesa = useRef<Promise<unknown>>(Promise.resolve());
   useEffect(() => {
     if (!clinicUid) return;
     if (migracionIdentidadIntentada.current === clinicUid) return;
     migracionIdentidadIntentada.current = clinicUid;
-    migrarIdentidadDoctor(db, clinicUid).catch((err) =>
+    migracionIdentidadPromesa.current = migrarIdentidadDoctor(db, clinicUid).catch((err) =>
       console.error("No se pudo migrar la identidad de receta a Recurso", err)
     );
   }, [clinicUid]);
+  // El administrador (nombre de Consultorio) también es médico de la Agenda — solo si no hay ninguno todavía.
+  // Espera a la migración de arriba para no duplicar al médico que ella crea desde el perfil anterior.
+  const nombreAdministrador = clinicInfo?.administradorNombre;
+  useEffect(() => {
+    if (!clinicUid || rol !== "admin" || !nombreAdministrador?.trim()) return;
+    migracionIdentidadPromesa.current
+      .then(() => asegurarMedicoAdministrador(db, clinicUid, nombreAdministrador))
+      .catch((err) => console.error("No se pudo dar de alta al administrador como médico", err));
+  }, [clinicUid, rol, nombreAdministrador]);
   const [suscripcionInicial] = useState<SuscripcionPlan>(() => ({
     planActivo: "prueba",
     pruebaIniciadaEl: toISODate(new Date()),

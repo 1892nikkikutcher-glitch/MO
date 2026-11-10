@@ -381,6 +381,44 @@ export function revertirCashbackPorDevolucion(
   return movimientos.map((m) => (m.id === generado.id ? actualizado : m));
 }
 
+/** ¿Se le puede otorgar cashback a un pago ya registrado? Solo si el programa está activo, el pago aún no generó el suyo
+ * y tiene tratamientos pagados con dinero (no con el propio cashback) — aunque se haya marcado como promoción o cortesía. */
+export function puedeOtorgarCashback(pago: Pago, movimientos: MovimientoCashback[], config: CashbackConfig): boolean {
+  if (!config.activo) return false;
+  if (movimientos.some((m) => m.id === idCashbackGenerado(pago.id))) return false;
+  return baseCashbackDePago({ ...pago, sinCashback: false }) > 0;
+}
+
+export type ResultadoOtorgarCashback = {
+  movimientos: MovimientoCashback[];
+  resultado: "otorgado" | "recortado" | "sin-espacio" | "no-aplica";
+  /** Lo que quedó otorgado (0 si no se otorgó nada). */
+  monto: number;
+};
+
+/** Genera el cashback de un pago que ya existía y no lo había generado (programa apagado en ese momento, promoción o cortesía
+ * que luego se decidió premiar…). Respeta la aprobación automática y el saldo máximo igual que un pago nuevo. */
+export function otorgarCashbackAPago(
+  movimientos: MovimientoCashback[],
+  pago: Pago,
+  patientId: string,
+  patientName: string,
+  config: CashbackConfig,
+  ahoraIso: string
+): ResultadoOtorgarCashback {
+  if (!puedeOtorgarCashback(pago, movimientos, config)) return { movimientos, resultado: "no-aplica", monto: 0 };
+  const nuevo = movimientoGenerado({ ...pago, sinCashback: false }, patientId, patientName, config, ahoraIso);
+  if (!nuevo) return { movimientos, resultado: "no-aplica", monto: 0 };
+  const conNota = { ...nuevo, nota: "Otorgado después de registrar el pago" };
+  const final = config.aprobarAutomaticamente ? aprobarSolo(conNota, movimientos, config, ahoraIso) : conNota;
+  const resultado = final.estado === "rechazado" ? "sin-espacio" : final.monto < nuevo.monto ? "recortado" : "otorgado";
+  return {
+    movimientos: [final, ...movimientos],
+    resultado,
+    monto: final.estado === "rechazado" ? 0 : final.monto,
+  };
+}
+
 /** Pone al día los movimientos de cashback según lo que cambió en los pagos del paciente: un pago nuevo genera su cashback
  * (o descuenta el saldo si se pagó con cashback), uno editado lo recalcula si nadie lo ha resuelto, y uno eliminado lo revierte. */
 export function sincronizarCashbackConPagos(

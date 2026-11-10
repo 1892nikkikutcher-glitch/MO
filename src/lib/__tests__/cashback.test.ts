@@ -14,6 +14,8 @@ import {
   espacioParaAcumular,
   montoMaximoCanje,
   normalizarConfigCashback,
+  otorgarCashbackAPago,
+  puedeOtorgarCashback,
   revertirCashbackPorDevolucion,
   rechazarMovimiento,
   saldoCashback,
@@ -362,5 +364,54 @@ describe("totales", () => {
 
   it("de toda la clínica: otorgado, usado, por redimir, por aprobar y pacientes con saldo; lo rechazado no cuenta", () => {
     expect(totalesCashback(movs, config, HOY)).toEqual({ otorgado: 160, usado: 40, porRedimir: 120, vencido: 0, porAprobar: 25, pacientesConSaldo: 2 });
+  });
+});
+
+describe("otorgar cashback a un pago ya registrado", () => {
+  const apagado: CashbackConfig = { ...config, activo: false };
+  const p = pago("p1", "2026-10-01", [{ monto: 1000 }]);
+
+  it("lo genera cuando el pago no lo había generado", () => {
+    expect(puedeOtorgarCashback(p, [], config)).toBe(true);
+    const r = otorgarCashbackAPago([], p, "pac1", "Ana", config, AHORA);
+    expect(r.resultado).toBe("otorgado");
+    expect(r.monto).toBe(30);
+    expect(r.movimientos).toHaveLength(1);
+    expect(r.movimientos[0]).toMatchObject({ id: "cb-p1", tipo: "generado", estado: "pendiente", pagoId: "p1", fecha: "2026-10-01" });
+  });
+
+  it("también premia un pago marcado como promoción o cortesía", () => {
+    const promo = { ...p, sinCashback: true };
+    expect(puedeOtorgarCashback(promo, [], config)).toBe(true);
+    expect(otorgarCashbackAPago([], promo, "pac1", "Ana", config, AHORA).monto).toBe(30);
+  });
+
+  it("con aprobación automática lo deja aprobado y disponible", () => {
+    const auto = { ...config, aprobarAutomaticamente: true };
+    const r = otorgarCashbackAPago([], p, "pac1", "Ana", auto, AHORA);
+    expect(r.movimientos[0]).toMatchObject({ estado: "aprobado", resueltoPor: APROBADO_AUTOMATICO });
+    expect(saldoCashback(r.movimientos, "pac1", auto, HOY).disponible).toBe(30);
+  });
+
+  it("no hace nada con el programa apagado, si ya generó el suyo o si se pagó con cashback", () => {
+    expect(puedeOtorgarCashback(p, [], apagado)).toBe(false);
+    const ya = otorgarCashbackAPago([], p, "pac1", "Ana", config, AHORA).movimientos;
+    expect(puedeOtorgarCashback(p, ya, config)).toBe(false);
+    expect(otorgarCashbackAPago(ya, p, "pac1", "Ana", config, AHORA)).toMatchObject({ resultado: "no-aplica", movimientos: ya });
+    const conCashback = pago("p2", "2026-10-01", [{ monto: 500 }], FORMA_PAGO_CASHBACK);
+    expect(puedeOtorgarCashback(conCashback, [], config)).toBe(false);
+  });
+
+  it("no aplica a pagos de conceptos sueltos (sin tratamiento)", () => {
+    const suelto = pago("p3", "2026-10-01", [{ monto: 300, ligado: false }]);
+    expect(puedeOtorgarCashback(suelto, [], config)).toBe(false);
+  });
+
+  it("respeta el saldo máximo: se recorta o no entra nada", () => {
+    const tope = { ...config, aprobarAutomaticamente: true, saldoMaximo: 20 };
+    const recortado = otorgarCashbackAPago([], p, "pac1", "Ana", tope, AHORA);
+    expect(recortado).toMatchObject({ resultado: "recortado", monto: 20 });
+    const lleno = otorgarCashbackAPago(recortado.movimientos, pago("p4", "2026-10-02", [{ monto: 1000 }]), "pac1", "Ana", tope, AHORA);
+    expect(lleno).toMatchObject({ resultado: "sin-espacio", monto: 0 });
   });
 });
