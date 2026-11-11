@@ -75,6 +75,7 @@ import GlobalAgregarPago from "./GlobalAgregarPago";
 import GlobalNuevoPaciente from "./GlobalNuevoPaciente";
 import PanelAdministrador from "./pages/PanelAdministrador";
 import AsistenteFlotante from "./AsistenteFlotante";
+import CompartirMoModal, { CompartirIcon } from "./CompartirMoModal";
 import TutorialInicio from "./TutorialInicio";
 import GuiaPrimerPaciente, { EVENTO_INICIAR_GUIA } from "./GuiaPrimerPaciente";
 import type { DestinoTutorial } from "@/lib/tutorialInicio";
@@ -721,6 +722,7 @@ function DashboardBody({
   const { resuelto: temaResuelto, preferencia: temaPreferencia, setPreferencia: setTemaPreferencia } = useTheme();
   const isLight = temaResuelto === "light";
   const [mostrarSugerencia, setMostrarSugerencia] = useState(false);
+  const [mostrarCompartir, setMostrarCompartir] = useState(false);
   const [mostrarSelectorClinica, setMostrarSelectorClinica] = useState(false);
   const [mostrarSelectorTema, setMostrarSelectorTema] = useState(false);
   // Comparten esquina: el Asistente se esconde mientras el abanico de
@@ -917,6 +919,14 @@ function DashboardBody({
                   </button>
                 )}
                 <button
+                  onClick={() => setMostrarCompartir(true)}
+                  title="Compartir MO por WhatsApp, redes sociales o enlace"
+                  className="flex shrink-0 items-center gap-1.5 rounded-lg border border-accent/40 bg-accent/10 px-2.5 py-1.5 text-xs font-semibold text-accent transition-colors hover:bg-accent/20 sm:px-3"
+                >
+                  <CompartirIcon />
+                  Compartir MO
+                </button>
+                <button
                   onClick={onLogout}
                   className="shrink-0 rounded-lg border border-edge/10 bg-surface px-2.5 py-1.5 text-xs text-ink/70 transition-colors hover:text-ink sm:px-3"
                 >
@@ -1052,6 +1062,7 @@ function DashboardBody({
         <GlobalNuevoPaciente onClose={() => setShowNuevoPaciente(false)} />
       )}
       {mostrarSugerencia && <SugerenciaModal onClose={() => setMostrarSugerencia(false)} />}
+      {mostrarCompartir && <CompartirMoModal onClose={() => setMostrarCompartir(false)} />}
       {mostrarSelectorTema && (
         <SelectorTemaModal
           preferencia={temaPreferencia}

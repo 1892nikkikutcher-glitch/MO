@@ -1011,6 +1011,12 @@ type PatientDataContextValue = {
   solicitudNuevaCitaBlanco: boolean;
   abrirNuevaCitaDesdeInicio: () => void;
   consumirSolicitudNuevaCitaBlanco: () => void;
+  /** La Guía del primer paciente está en su paso de la cita: el diálogo de nueva cita muestra su ayuda por campo. */
+  guiaEnPasoCita: boolean;
+  setGuiaEnPasoCita: (valor: boolean) => void;
+  /** El diálogo de nueva cita está abierto (la guía flotante se hace a un lado para no taparlo). */
+  dialogoNuevaCitaAbierto: boolean;
+  setDialogoNuevaCitaAbierto: (valor: boolean) => void;
   irAPagina: (pageId: string) => void;
   cambiosSinGuardar: string | null;
   setCambiosSinGuardar: (mensaje: string | null) => void;
@@ -1350,6 +1356,8 @@ export function PatientDataProvider({
   const [navegacionExpediente, setNavegacionExpediente] = useState<NavegacionExpediente>(null);
   const [navegacionNuevaCita, setNavegacionNuevaCita] = useState<NavegacionNuevaCita>(null);
   const [solicitudNuevaCitaBlanco, setSolicitudNuevaCitaBlanco] = useState(false);
+  const [guiaEnPasoCita, setGuiaEnPasoCita] = useState(false);
+  const [dialogoNuevaCitaAbierto, setDialogoNuevaCitaAbierto] = useState(false);
   // Bandera compartida para pantallas con "Guardar" manual (Historia Clínica,
   // Datos del Paciente): mientras tenga un mensaje, se avisa antes de salir
   // por navegación dentro de la app (irAPagina) o al cerrar/recargar la
@@ -3389,6 +3397,10 @@ export function PatientDataProvider({
         solicitudNuevaCitaBlanco,
         abrirNuevaCitaDesdeInicio,
         consumirSolicitudNuevaCitaBlanco,
+        guiaEnPasoCita,
+        setGuiaEnPasoCita,
+        dialogoNuevaCitaAbierto,
+        setDialogoNuevaCitaAbierto,
         irAPagina,
         cambiosSinGuardar,
         setCambiosSinGuardar,

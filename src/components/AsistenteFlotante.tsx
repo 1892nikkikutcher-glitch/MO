@@ -5,6 +5,12 @@ import { usePatientData } from "@/context/PatientDataContext";
 import { obtenerAyuda } from "@/lib/ayudaPaginas";
 import { EVENTO_ABRIR_TUTORIAL } from "./TutorialInicio";
 import { EVENTO_INICIAR_GUIA } from "./GuiaPrimerPaciente";
+import {
+  claveSesionAsistente,
+  claveVisitasAsistente,
+  debeLlamarLaAtencion,
+  leerVisitasAsistente,
+} from "@/lib/llamadaAsistente";
 
 function IconoAsistente() {
   return (
@@ -37,8 +43,34 @@ export default function AsistenteFlotante({
   activeLabel: string;
   oculto: boolean;
 }) {
-  const { ayudaContexto } = usePatientData();
+  const { ayudaContexto, miUid } = usePatientData();
   const [abierto, setAbierto] = useState(false);
+  const [llamando, setLlamando] = useState(false);
+
+  // Cuenta una visita por sesión del navegador (la bandera de sesión evita contar dos veces un mismo ingreso).
+  useEffect(() => {
+    if (!miUid) return;
+    try {
+      let visitas = leerVisitasAsistente(localStorage.getItem(claveVisitasAsistente(miUid)));
+      if (!sessionStorage.getItem(claveSesionAsistente(miUid))) {
+        visitas += 1;
+        localStorage.setItem(claveVisitasAsistente(miUid), String(visitas));
+        sessionStorage.setItem(claveSesionAsistente(miUid), "llamando");
+      }
+      setLlamando(debeLlamarLaAtencion(visitas) && sessionStorage.getItem(claveSesionAsistente(miUid)) === "llamando");
+    } catch {
+      // Sin almacenamiento (ventana privada, datos bloqueados): simplemente no se llama la atención.
+    }
+  }, [miUid]);
+
+  function dejarDeLlamar() {
+    setLlamando(false);
+    try {
+      sessionStorage.setItem(claveSesionAsistente(miUid), "atendida");
+    } catch {
+      // ignorado: solo se pierde recordar que ya la tocó en esta sesión
+    }
+  }
   const contexto = ayudaContexto ?? activePage;
   const ayuda = obtenerAyuda(contexto, activeLabel || "esta sección");
 
@@ -52,13 +84,49 @@ export default function AsistenteFlotante({
 
   return (
     <>
+      {llamando && !abierto && (
+        <button
+          onClick={() => {
+            dejarDeLlamar();
+            setAbierto(true);
+          }}
+          className="fixed bottom-[154px] right-[4.5rem] z-40 max-w-[12rem] rounded-xl border border-accent/70 bg-modal-solid px-3 py-2 text-left text-xs font-semibold text-accent shadow-xl motion-safe:animate-bounce print:hidden lg:bottom-11 lg:right-[7.5rem] lg:max-w-none lg:text-sm"
+        >
+          ¿Dudas? Toca aquí y te ayudo
+        </button>
+      )}
       <button
-        onClick={() => setAbierto((v) => !v)}
+        onClick={() => {
+          if (llamando) dejarDeLlamar();
+          setAbierto((v) => !v);
+        }}
         title="Asistente — qué puedo hacer aquí"
-        style={{ boxShadow: "0 0 18px -2px rgb(var(--accent-rgb) / 0.7)" }}
-        className="fixed bottom-[150px] right-6 z-40 flex h-10 w-10 items-center justify-center rounded-full border border-accent/50 bg-accent/20 text-accent backdrop-blur transition-transform hover:scale-105 print:hidden lg:bottom-6 lg:h-20 lg:w-20"
+        style={{
+          boxShadow: llamando
+            ? "0 0 26px 2px rgb(var(--accent-rgb) / 0.95)"
+            : "0 0 18px -2px rgb(var(--accent-rgb) / 0.7)",
+        }}
+        className={`fixed bottom-[150px] right-6 z-40 flex h-10 w-10 items-center justify-center rounded-full border text-accent backdrop-blur transition-transform hover:scale-105 print:hidden lg:bottom-6 lg:h-20 lg:w-20 ${
+          llamando ? "border-accent bg-accent/45" : "border-accent/50 bg-accent/20"
+        }`}
       >
-        <IconoAsistente />
+        {llamando && (
+          <>
+            <span
+              aria-hidden
+              className="pointer-events-none absolute inset-0 rounded-full bg-accent/50 motion-safe:animate-ping"
+            />
+            <span
+              aria-hidden
+              className="absolute -right-1 -top-1 flex h-5 min-w-5 items-center justify-center rounded-full bg-danger px-1 text-[11px] font-bold leading-none text-white"
+            >
+              !
+            </span>
+          </>
+        )}
+        <span className="relative">
+          <IconoAsistente />
+        </span>
       </button>
 
       {abierto && (

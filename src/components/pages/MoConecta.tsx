@@ -689,7 +689,7 @@ function PerfilTab() {
     tiposCasosRecibe: (perfilPublico?.tiposCasosRecibe ?? []).join(", "),
     aceptaUrgencias: perfilPublico?.aceptaUrgencias ?? false,
     tiempoRespuestaHabitual: perfilPublico?.tiempoRespuestaHabitual ?? "",
-    activoEnDirectorio: perfilPublico?.activoEnDirectorio ?? false,
+    activoEnDirectorio: perfilPublico?.activoEnDirectorio ?? true,
     cedulaProfesional: perfilPrivado?.cedulaProfesional ?? "",
     cedulaEspecialidad: perfilPrivado?.cedulaEspecialidad ?? "",
     especialidadCedula: perfilPrivado?.especialidadCedula ?? "",
@@ -921,7 +921,7 @@ function PerfilTab() {
             checked={form.activoEnDirectorio}
             onChange={(e) => setForm((f) => ({ ...f, activoEnDirectorio: e.target.checked }))}
           />
-          Mostrar mi perfil en el directorio
+          Mostrar mi perfil en el directorio (recomendado: así tus colegas pueden encontrarte)
         </label>
       </div>
 
@@ -1449,7 +1449,10 @@ function NuevaInterconsultaDialog({
               </button>
             ))}
             {colegasFiltrados.length === 0 && (
-              <p className="py-2 text-sm text-ink/50">Ningún colega coincide con esa búsqueda.</p>
+              <p className="py-2 text-sm text-ink/50">
+                Ningún colega coincide con esa búsqueda. Si tu colega ya usa MO, pídele que complete su perfil en MO
+                Conecta (Mi perfil) para aparecer aquí.
+              </p>
             )}
           </div>
 

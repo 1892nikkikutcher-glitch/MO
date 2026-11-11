@@ -12,6 +12,7 @@ import {
 } from "@/lib/sedesBloques";
 import EstrellasPaciente from "@/components/EstrellasPaciente";
 import HorarioPreferenteCita from "./HorarioPreferenteCita";
+import AyudaNuevaCita from "./AyudaNuevaCita";
 import { usePatientData } from "@/context/PatientDataContext";
 import {
   calcularEdadDetallada,
@@ -130,7 +131,16 @@ export default function AgendaCitaDialog({
     saldoCashbackDe,
     cashbackConfig,
     puedeVerFinanzas,
+    guiaEnPasoCita,
+    setDialogoNuevaCitaAbierto,
   } = usePatientData();
+  const [ayudaOculta, setAyudaOculta] = useState(false);
+  // La guía flotante se hace a un lado mientras este diálogo está abierto (la ayuda por campo va aquí dentro).
+  useEffect(() => {
+    if (isEditing) return;
+    setDialogoNuevaCitaAbierto(true);
+    return () => setDialogoNuevaCitaAbierto(false);
+  }, [isEditing, setDialogoNuevaCitaAbierto]);
   const medicos = recursos.filter((r) => r.tipo === "medico");
   const unidades = recursos.filter((r) => r.tipo === "unidad");
   /** Prioriza medicoId/unidadId; si la cita es legada (solo tiene
@@ -626,7 +636,10 @@ export default function AgendaCitaDialog({
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4">
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center p-4"
+      style={{ backgroundColor: "var(--cita-fondo-ventana)" }}
+    >
       {/* En celular el panel es tan alto que hay que hacer scroll para
           llegar a "Cancelar" — el ✕ del encabezado (junto a expediente/
           notas/WhatsApp/pago) se va con ese scroll porque vive dentro del
@@ -646,7 +659,7 @@ export default function AgendaCitaDialog({
         className="max-h-[90vh] w-full max-w-5xl overflow-y-auto overscroll-contain rounded-2xl border-2 bg-modal-solid p-4 sm:p-6"
         style={{
           borderColor: CITA_ESTATUS_HEX[estatus] ?? CITA_BORDE_NEUTRO,
-          boxShadow: `0 0 24px -4px ${statusAlpha(CITA_ESTATUS_HEX[estatus] ?? CITA_BORDE_NEUTRO, 0.65)}`,
+          boxShadow: `var(--cita-aro), 0 0 var(--cita-brillo) ${statusAlpha(CITA_ESTATUS_HEX[estatus] ?? CITA_BORDE_NEUTRO, 0.65)}`,
         }}
       >
         <div className="mb-4 flex flex-col gap-3 sm:relative sm:flex-row sm:items-center sm:justify-between">
@@ -805,6 +818,20 @@ export default function AgendaCitaDialog({
             </button>
           </div>
         </div>
+
+        {/* Se ofrece con la guía del primer paciente y mientras la clínica no tenga ninguna cita. */}
+        {!isEditing && !ayudaOculta && (guiaEnPasoCita || citas.length === 0) && (
+          <AyudaNuevaCita
+            campos={{
+              paciente: !!patientId,
+              medicoOUnidad: !!(medicoId || unidadId),
+              procedimiento: tratamientos.length > 0,
+              fechaYHora: !!(fecha && horaInicio),
+              telefono: telefono.trim().length > 0,
+            }}
+            onCerrar={() => setAyudaOculta(true)}
+          />
+        )}
 
         <div className="space-y-4">
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">

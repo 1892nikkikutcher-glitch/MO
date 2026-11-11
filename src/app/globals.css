@@ -59,6 +59,11 @@
 
   --shadow-card: 0 8px 24px -14px rgba(0, 0, 0, 0.55);
   --shadow-modal: 0 30px 60px -18px rgba(0, 0, 0, 0.6);
+
+  /* Ventana de cita: en oscuro el color del estatus ya resalta solo. */
+  --cita-fondo-ventana: rgba(0, 0, 0, 0.7);
+  --cita-aro: 0 0 0 0 transparent;
+  --cita-brillo: 24px -4px;
 }
 
 [data-theme="light"] {
@@ -320,6 +325,12 @@ select option {
 [data-theme="light"] {
   --glow-calido: 245 184 46;
   --glow-frio: 70 130 255;
+
+  /* Ventana de cita: sobre fondo claro el color del estatus se pierde. Fondo más oscuro alrededor y un aro negro
+     bajo el color (que además brilla hacia afuera) para que el contorno se aprecie. */
+  --cita-fondo-ventana: rgba(0, 0, 0, 0.84);
+  --cita-aro: 0 0 0 4px rgba(0, 0, 0, 0.92);
+  --cita-brillo: 30px 6px;
 }
 
 /* Módulo activo del menú (barra lateral y abanico del celular). */
@@ -520,4 +531,12 @@ h1.logo-mo,
 }
 [data-theme="dark"] .text-ink\/50 {
   color: rgb(var(--ink-rgb) / 0.68);
+}
+
+/* Una ventana (fixed) dentro de un contenedor space-y-* heredaba su margen superior y se bajaba: dejaba sin
+   oscurecer una franja arriba de la pantalla. Las capas fijas no participan de ese espaciado. */
+[class*="space-y-"] > .fixed,
+.fixed.inset-0 {
+  margin-top: 0 !important;
+  margin-bottom: 0 !important;
 }

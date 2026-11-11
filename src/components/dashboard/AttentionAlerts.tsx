@@ -17,7 +17,12 @@ import {
 import { incidentesPendientesDeSeguimiento, VENTANA_INCIDENTES_DIAS } from "@/lib/incidentesPendientes";
 import { DIAS_AVISO_MANTENIMIENTO, resumenMantenimiento } from "@/lib/mantenimientoEquipos";
 import { pagosPendientesDeFacturar, totalDePagos } from "@/lib/facturacion";
+import { primerosPendientes } from "@/lib/primerosPendientes";
+import { EVENTO_INICIAR_GUIA } from "@/components/GuiaPrimerPaciente";
 import LaboratoriosPendientesPanel from "./LaboratoriosPendientesPanel";
+
+// Los pacientes y las citas llegan por suscripción: antes de este tiempo "no hay pacientes" puede ser solo "no ha cargado".
+const ESPERA_DATOS_MS = 2500;
 
 function toIso(d: Date): string {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
@@ -85,9 +90,25 @@ export default function AttentionAlerts({ rango }: { rango: RangoPeriodo }) {
     registrosEquipos,
     pagosRealizados,
     facturas,
+    patients,
+    clinicInfo,
+    pendingInvite,
+    abrirNuevaCitaDesdeInicio,
   } = usePatientData();
   const [mostrarLaboratorios, setMostrarLaboratorios] = useState(false);
-  const { casosRecibidos, casosEnviados, uid: miUidConecta, novedades: novedadesConecta } = useMoConecta();
+  const [datosListos, setDatosListos] = useState(false);
+  useEffect(() => {
+    const t = setTimeout(() => setDatosListos(true), ESPERA_DATOS_MS);
+    return () => clearTimeout(t);
+  }, []);
+  const {
+    casosRecibidos,
+    casosEnviados,
+    uid: miUidConecta,
+    novedades: novedadesConecta,
+    perfilPublico,
+    cargando: cargandoConecta,
+  } = useMoConecta();
   const compartiendoConcluidos = casosConcluidosCompartiendo(casosEnviados, miUidConecta).length;
   const conectaPorAtender = casosPorAtender(casosRecibidos, miUidConecta).length;
 
@@ -173,6 +194,53 @@ export default function AttentionAlerts({ rango }: { rango: RangoPeriodo }) {
   const incidentes = incidentesPendientesDeSeguimiento(notasEvolucionPorPaciente, citas, toIso(hoy));
 
   const alertas: Alerta[] = [];
+
+  // Primeros pasos de una clínica nueva: van al frente de su prioridad y se quitan solos al completarse.
+  if (datosListos && miRol && !pendingInvite) {
+    const accionPendiente = {
+      consultorio: () => irAPagina("administracion-consultorio"),
+      "guia-primer-paciente": () => window.dispatchEvent(new Event(EVENTO_INICIAR_GUIA)),
+      "nueva-cita": () => abrirNuevaCitaDesdeInicio(),
+    };
+    for (const p of primerosPendientes({
+      esAdmin: miRol === "admin",
+      consultorioCapturado: !!(clinicInfo?.nombre?.trim() && (clinicInfo.telefono?.trim() || clinicInfo.direccion?.trim())),
+      hayPacientes: patients.length > 0,
+      hayCitas: citas.length > 0,
+    })) {
+      alertas.push({
+        key: p.key,
+        emoji: "🚀",
+        texto: p.texto,
+        prioridad: "alta",
+        categoria: "configuracion",
+        onClick: accionPendiente[p.accion],
+      });
+    }
+  }
+
+  // La red de MO Conecta solo funciona si los colegas se pueden encontrar en el directorio.
+  if (datosListos && !cargandoConecta && (miRol === "admin" || miRol === "odontologo") && !pendingInvite) {
+    if (!perfilPublico) {
+      alertas.push({
+        key: "conecta-sin-perfil",
+        emoji: "🚀",
+        texto: "Completa tu perfil de MO Conecta para aparecer en el directorio — así tus colegas te encuentran",
+        prioridad: "media",
+        categoria: "conecta",
+        onClick: () => irAPagina("mo-conecta"),
+      });
+    } else if (!perfilPublico.activoEnDirectorio) {
+      alertas.push({
+        key: "conecta-fuera-directorio",
+        emoji: "🟡",
+        texto: "Tu perfil no aparece en el directorio de MO Conecta — tus colegas no pueden encontrarte",
+        prioridad: "baja",
+        categoria: "conecta",
+        onClick: () => irAPagina("mo-conecta"),
+      });
+    }
+  }
 
   if (incidentes.length > 0) {
     const primero = incidentes[0];

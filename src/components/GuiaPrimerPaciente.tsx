@@ -86,6 +86,8 @@ export default function GuiaPrimerPaciente({
     pendingInvite,
     irAExpediente,
     sugerirNuevaCita,
+    setGuiaEnPasoCita,
+    dialogoNuevaCitaAbierto,
   } = usePatientData();
 
   const [estado, setEstado] = useState<EstadoGuia>(estadoGuiaInicial);
@@ -140,6 +142,14 @@ export default function GuiaPrimerPaciente({
     ]
   );
 
+  // En el paso de la cita, el diálogo de nueva cita trae su propia ayuda por campo: la tarjeta flotante le cede el
+  // lugar mientras esté abierto (si no, taparía campos) y vuelve al cerrarlo, ya con el paso marcado si se agendó.
+  const enPasoCita = estado.activa && pasos[Math.min(estado.paso, pasos.length - 1)]?.tipo === "cita" && !!patientId;
+  useEffect(() => {
+    setGuiaEnPasoCita(enPasoCita);
+    return () => setGuiaEnPasoCita(false);
+  }, [enPasoCita, setGuiaEnPasoCita]);
+
   // Se ofrece sola justo cuando el consultorio y el responsable quedan dados de alta (de vacío a completo mientras se
   // está en Administración → Consultorio). Quien ya tenía todo capturado al entrar no la recibe: la abre desde la ayuda.
   const consultorioListo = !!(
@@ -184,6 +194,7 @@ export default function GuiaPrimerPaciente({
   }, [cargado, estado.activa, estado.patientId, patients, cambiar]);
 
   if (!cargado || !estado.activa || pasos.length === 0) return null;
+  if (enPasoCita && dialogoNuevaCitaAbierto) return null;
 
   const indice = Math.min(estado.paso, pasos.length - 1);
   const actual = pasos[indice];

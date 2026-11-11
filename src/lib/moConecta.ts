@@ -119,7 +119,9 @@ export function perfilPublicoVacio(uid: string, ahora: string): PerfilProfesiona
     especialidadesVerificadas: [],
     aceptaInterconsultas: true,
     aceptaUrgencias: false,
-    activoEnDirectorio: false,
+    // La red solo funciona si los colegas se pueden encontrar: un perfil nuevo entra al directorio y cada quien
+    // puede salirse desde "Mostrar mi perfil en el directorio".
+    activoEnDirectorio: true,
     creadoEl: ahora,
     actualizadoEl: ahora,
   };
