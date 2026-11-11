@@ -862,6 +862,15 @@ function DashboardBody({
           >
             {(necesitaCarrusel ? ["a", "b", "c"] : ["a"]).map((copia) => (
               <div key={copia} className="flex shrink-0 items-center gap-2 sm:gap-4">
+                {/* En teléfono y tableta el botón con texto queda hasta el final del carrusel, fuera de vista; aquí va un ícono al principio. */}
+                <button
+                  onClick={() => setMostrarCompartir(true)}
+                  title="Compartir MO"
+                  aria-label="Compartir MO por WhatsApp, redes sociales o enlace"
+                  className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-accent/40 bg-accent/10 text-accent transition-colors hover:bg-accent/20 lg:hidden"
+                >
+                  <CompartirIcon />
+                </button>
                 <QuickActionsBar
                   isLight={isLight}
                   onNavigate={setActivePage}
@@ -921,7 +930,7 @@ function DashboardBody({
                 <button
                   onClick={() => setMostrarCompartir(true)}
                   title="Compartir MO por WhatsApp, redes sociales o enlace"
-                  className="flex shrink-0 items-center gap-1.5 rounded-lg border border-accent/40 bg-accent/10 px-2.5 py-1.5 text-xs font-semibold text-accent transition-colors hover:bg-accent/20 sm:px-3"
+                  className="hidden shrink-0 items-center gap-1.5 rounded-lg border border-accent/40 bg-accent/10 px-2.5 py-1.5 text-xs font-semibold text-accent transition-colors hover:bg-accent/20 sm:px-3 lg:flex"
                 >
                   <CompartirIcon />
                   Compartir MO
