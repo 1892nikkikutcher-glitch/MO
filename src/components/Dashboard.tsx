@@ -1103,6 +1103,8 @@ function DashboardBody({
   );
 }
 
+const sincronizacionesDeCorreoEnVuelo = new Set<string>();
+
 export default function Dashboard({
   uid,
   userEmail,
@@ -1117,6 +1119,40 @@ export default function Dashboard({
   const [showNuevoPaciente, setShowNuevoPaciente] = useState(false);
   const [avisoListo, setAvisoListo] = useState(false);
   const esAdmin = uid === process.env.NEXT_PUBLIC_ADMIN_UID;
+
+  // Si el correo de la cuenta cambió (lo confirmó el usuario, o lo cambió
+  // soporte), pone al día las copias que MO guarda: equipo de la clínica y
+  // correo de contacto. Solo corre cuando el correo es distinto al de la última
+  // vez en este navegador; el servidor toma el correo del token, no de aquí.
+  useEffect(() => {
+    if (!userEmail) return;
+    const clave = `mo:correoSincronizado:${uid}`;
+    try {
+      if (localStorage.getItem(clave) === userEmail) return;
+    } catch {
+      return;
+    }
+    // El modo estricto de React (y los remontajes) corren este efecto más de una
+    // vez seguida; con una sola petición en vuelo por cuenta y correo basta.
+    const enVuelo = `${uid}|${userEmail}`;
+    if (sincronizacionesDeCorreoEnVuelo.has(enVuelo)) return;
+    sincronizacionesDeCorreoEnVuelo.add(enVuelo);
+    (async () => {
+      try {
+        const token = await auth.currentUser?.getIdToken();
+        if (!token) return;
+        const res = await fetch("/api/cuenta/sincronizar-correo", {
+          method: "POST",
+          headers: { Authorization: `Bearer ${token}` },
+        });
+        if (res.ok) localStorage.setItem(clave, userEmail);
+      } catch {
+        // Sin red o sin localStorage: se reintenta en el siguiente inicio de sesión.
+      } finally {
+        sincronizacionesDeCorreoEnVuelo.delete(enVuelo);
+      }
+    })();
+  }, [uid, userEmail]);
 
   function irDesdeTutorial(destino: DestinoTutorial) {
     if (destino.tipo === "pagina") setActivePage(destino.pagina);

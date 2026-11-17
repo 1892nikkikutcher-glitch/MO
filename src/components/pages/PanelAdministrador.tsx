@@ -7,6 +7,7 @@ import CandadoPrivacidad from "@/components/CandadoPrivacidad";
 import { planesDisponibles, type PlanId, type CategoriaSugerencia, type EstadoSugerencia } from "@/lib/patientData";
 import { adminOtorgarFundadoraApi, adminVerificarPerfilApi, verEvidenciaVerificacionApi } from "@/lib/conectaApi";
 import type { EstadoVerificacion } from "@/lib/moConecta";
+import { errorDeCambioAdmin, normalizarCorreo } from "@/lib/cambioCorreo";
 
 type ClinicaResumen = {
   id: string;
@@ -288,14 +289,181 @@ function EliminarClinicaModal({ clinica, onClose, onEliminado }: { clinica: Clin
   );
 }
 
+/** Soporte: cambia el correo de una cuenta cuando su dueño ya no puede hacerlo.
+ * Ver /api/admin/cuentas/[uid]/correo para las garantías del lado servidor. */
+function CambiarCorreoCuentaModal({
+  miembro,
+  onClose,
+  onListo,
+}: {
+  miembro: { uid: string; nombre?: string; correo: string };
+  onClose: () => void;
+  onListo: () => void;
+}) {
+  const [correoNuevo, setCorreoNuevo] = useState("");
+  const [confirmacion, setConfirmacion] = useState("");
+  const [verificacion, setVerificacion] = useState("");
+  const [invalidarContrasena, setInvalidarContrasena] = useState(true);
+  const [enviando, setEnviando] = useState(false);
+  const [error, setError] = useState("");
+  const [resultado, setResultado] = useState<{ correoEnviado: boolean } | null>(null);
+
+  const falla = errorDeCambioAdmin({
+    correoActual: miembro.correo,
+    correoNuevo,
+    confirmacionCorreoActual: confirmacion,
+    verificacion,
+  });
+
+  async function aplicar() {
+    if (falla) {
+      setError(falla);
+      return;
+    }
+    setEnviando(true);
+    setError("");
+    try {
+      const data = await llamarApi(`/api/admin/cuentas/${miembro.uid}/correo`, {
+        method: "POST",
+        body: JSON.stringify({
+          correoNuevo,
+          confirmacionCorreoActual: confirmacion,
+          verificacion,
+          invalidarContrasena,
+        }),
+      });
+      setResultado({ correoEnviado: data.correoEnviado === true });
+      onListo();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "No se pudo cambiar el correo.");
+    } finally {
+      setEnviando(false);
+    }
+  }
+
+  return (
+    <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/70 p-4">
+      <div className="max-h-[90vh] w-full max-w-md overflow-y-auto rounded-2xl border border-edge/10 bg-modal p-6">
+        <div className="flex items-center justify-between">
+          <h3 className="text-base font-semibold text-ink">Cambiar correo de una cuenta</h3>
+          <button onClick={onClose} className="text-ink/40 hover:text-ink">
+            ✕
+          </button>
+        </div>
+
+        {resultado ? (
+          <div className="mt-4 space-y-3 text-sm">
+            <p className="rounded-lg border border-success/30 bg-success/10 p-3 text-success">
+              Listo. El correo de {miembro.nombre || "la cuenta"} ahora es{" "}
+              <span className="font-semibold">{normalizarCorreo(correoNuevo)}</span>. Se cerraron sus sesiones
+              abiertas
+              {invalidarContrasena ? " y su contraseña anterior ya no sirve" : ""}.
+            </p>
+            {resultado.correoEnviado ? (
+              <p className="text-ink/70">
+                Le enviamos un enlace a ese correo para que elija su contraseña nueva. Si no lo ve, que revise
+                Spam; también puede usar «¿Olvidé mi contraseña?» en la pantalla de entrada.
+              </p>
+            ) : (
+              <p className="rounded-lg border border-warning/30 bg-warning/10 p-3 text-warning">
+                El cambio se hizo, pero no pudimos mandar el enlace. Pídele que use «¿Olvidé mi contraseña?» en la
+                pantalla de entrada con su correo nuevo.
+              </p>
+            )}
+            <button
+              onClick={onClose}
+              className="rounded-lg border border-accent/60 bg-accent/15 px-5 py-2 text-sm font-semibold text-accent"
+            >
+              Cerrar
+            </button>
+          </div>
+        ) : (
+          <div className="mt-4 space-y-3 text-sm">
+            <p className="rounded-lg border border-warning/30 bg-warning/10 p-3 text-xs text-warning">
+              Quien cambia el correo de una cuenta puede quedarse con el expediente del consultorio. Haz esto solo
+              después de comprobar que quien lo pide es el dueño de la cuenta. Queda en la bitácora.
+            </p>
+            <p className="text-ink/60">
+              Cuenta: <span className="font-semibold text-ink">{miembro.nombre || "(sin nombre)"}</span> ·{" "}
+              {miembro.correo}
+            </p>
+
+            <label className="block">
+              <span className="text-ink/60">Correo nuevo</span>
+              <input
+                type="email"
+                value={correoNuevo}
+                onChange={(e) => setCorreoNuevo(e.target.value)}
+                className="mt-1 w-full rounded-lg border border-edge/15 bg-inset px-3 py-2 text-ink focus:border-accent/60 focus:outline-none"
+              />
+            </label>
+            <label className="block">
+              <span className="text-ink/60">Para confirmar, escribe el correo ACTUAL de la cuenta</span>
+              <input
+                type="email"
+                value={confirmacion}
+                onChange={(e) => setConfirmacion(e.target.value)}
+                placeholder={miembro.correo}
+                className="mt-1 w-full rounded-lg border border-edge/15 bg-inset px-3 py-2 text-ink placeholder:text-ink/25 focus:border-accent/60 focus:outline-none"
+              />
+            </label>
+            <label className="block">
+              <span className="text-ink/60">¿Cómo verificaste su identidad?</span>
+              <textarea
+                value={verificacion}
+                onChange={(e) => setVerificacion(e.target.value)}
+                rows={3}
+                placeholder="Ej. Videollamada: mostró su cédula profesional y confirmó el teléfono del consultorio."
+                className="mt-1 w-full rounded-lg border border-edge/15 bg-inset px-3 py-2 text-ink placeholder:text-ink/25 focus:border-accent/60 focus:outline-none"
+              />
+            </label>
+            <label className="flex items-start gap-2 text-ink/70">
+              <input
+                type="checkbox"
+                checked={invalidarContrasena}
+                onChange={(e) => setInvalidarContrasena(e.target.checked)}
+                className="mt-0.5"
+              />
+              <span>
+                Invalidar la contraseña anterior (recomendado). La persona elige una nueva con el enlace que le
+                llega al correo nuevo.
+              </span>
+            </label>
+
+            {error && <p className="text-danger">{error}</p>}
+
+            <div className="flex justify-end gap-2 pt-1">
+              <button onClick={onClose} className="rounded-lg px-4 py-2 text-ink/60 hover:text-ink">
+                Cancelar
+              </button>
+              <button
+                onClick={aplicar}
+                disabled={enviando || Boolean(falla)}
+                className="rounded-lg border border-accent/60 bg-accent/15 px-5 py-2 font-semibold text-accent disabled:opacity-40"
+              >
+                {enviando ? "Cambiando…" : "Cambiar correo"}
+              </button>
+            </div>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
 function DetalleClinicaModal({ clinicId, onClose }: { clinicId: string; onClose: () => void }) {
   const [detalle, setDetalle] = useState<any>(null);
   const [error, setError] = useState("");
+  const [cuentaACambiar, setCuentaACambiar] = useState<{ uid: string; nombre?: string; correo: string } | null>(null);
 
-  useEffect(() => {
+  const cargar = () =>
     llamarApi(`/api/admin/clinicas/${clinicId}`)
       .then(setDetalle)
       .catch((err) => setError(err instanceof Error ? err.message : "No se pudo cargar."));
+
+  useEffect(() => {
+    cargar();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [clinicId]);
 
   return (
@@ -370,9 +538,20 @@ function DetalleClinicaModal({ clinicId, onClose }: { clinicId: string; onClose:
               <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-ink/50">Usuarios ({detalle.miembros.length})</p>
               <div className="space-y-1.5">
                 {detalle.miembros.map((m: any) => (
-                  <div key={m.uid} className="flex items-center justify-between rounded-lg border border-edge/10 px-3 py-1.5 text-xs">
-                    <span className="text-ink">{m.nombre || m.correo}</span>
-                    <span className="text-ink/40">{m.role === "admin" ? "Admin" : "Colaborador"}</span>
+                  <div key={m.uid} className="flex items-center justify-between gap-2 rounded-lg border border-edge/10 px-3 py-1.5 text-xs">
+                    <span className="min-w-0">
+                      <span className="block truncate text-ink">{m.nombre || m.correo}</span>
+                      {m.nombre && <span className="block truncate text-ink/40">{m.correo}</span>}
+                    </span>
+                    <span className="flex shrink-0 items-center gap-2">
+                      <span className="text-ink/40">{m.role === "admin" ? "Admin" : "Colaborador"}</span>
+                      <button
+                        onClick={() => setCuentaACambiar({ uid: m.uid, nombre: m.nombre, correo: m.correo })}
+                        className="rounded-md border border-edge/15 px-2 py-0.5 text-ink/60 hover:text-ink"
+                      >
+                        Cambiar correo
+                      </button>
+                    </span>
                   </div>
                 ))}
               </div>
@@ -398,6 +577,13 @@ function DetalleClinicaModal({ clinicId, onClose }: { clinicId: string; onClose:
           </div>
         )}
       </div>
+      {cuentaACambiar && (
+        <CambiarCorreoCuentaModal
+          miembro={cuentaACambiar}
+          onClose={() => setCuentaACambiar(null)}
+          onListo={cargar}
+        />
+      )}
     </div>
   );
 }
