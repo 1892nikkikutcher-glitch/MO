@@ -129,16 +129,6 @@ function PlanDialog({
             )}
           </div>
 
-          <label className="flex items-center gap-2 text-sm text-ink/70">
-            <input
-              type="checkbox"
-              checked={form.renovacionAutomatica}
-              onChange={(e) => setForm((prev) => ({ ...prev, renovacionAutomatica: e.target.checked }))}
-              className="h-4 w-4 rounded border-edge/30"
-            />
-            Renovación automática
-          </label>
-
           <div>
             <div className="mb-2 flex items-center justify-between">
               <label className="text-xs font-medium text-ink/60">

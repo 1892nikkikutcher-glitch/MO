@@ -274,6 +274,19 @@ export const ayudaPaginas: Record<string, AyudaPagina> = {
     resumen: "Control de Residuos Peligrosos Biológico-Infecciosos: directorio de la empresa recolectora y su responsable.",
     puntos: [],
   },
+  "campanas-salud": {
+    titulo: "Campañas de salud",
+    resumen: "Sección en construcción: llegará en una próxima actualización. El resto de la plataforma sigue funcionando con normalidad.",
+    puntos: [],
+  },
+  inventario: {
+    titulo: "Inventario",
+    resumen: "El inventario del consultorio, separado en cuatro pestañas: Instrumental, Material, Equipo y Muebles. Por ahora son solo la estructura; el contenido llegará en una próxima actualización.",
+    puntos: [
+      "Instrumental: lo que se esteriliza y se reutiliza. Material: los consumibles. Equipo: los aparatos. Muebles: el mobiliario.",
+      "Para el mantenimiento y las fallas de los aparatos, usa «Mantenimiento de equipos», que ya funciona.",
+    ],
+  },
   "mantenimiento-equipos": {
     titulo: "Mantenimiento de equipos",
     resumen: "Inventario del equipo del consultorio con su bitácora de mantenimientos y fallas, y aviso al ingeniero biomédico.",

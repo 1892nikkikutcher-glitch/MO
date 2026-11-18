@@ -6,6 +6,7 @@
  * firmadas: un borrador nunca se presenta como si ya formara parte del
  * expediente clínico definitivo. */
 
+import { useState } from "react";
 import { usePatientData } from "@/context/PatientDataContext";
 import {
   esNotaAdministrativa,
@@ -83,7 +84,91 @@ function TarjetaBorrador({ nota, onContinuar }: { nota: NotaEvolucionV2; onConti
   );
 }
 
-function TarjetaFirmadaV2({ nota, diagnosticosCatalogo }: { nota: NotaEvolucionV2; diagnosticosCatalogo: DiagnosticoPaciente[] }) {
+const MOTIVOS_ACLARACION = ["Error de captura", "Dato omitido", "Información adicional", "Otro"] as const;
+
+/** Una nota firmada no se edita: lo que falte o esté mal se corrige agregando una aclaración con fecha y autor
+ * (NOM-004). La nota original queda tal cual. */
+function AgregarAclaracion({ patientId, notaId }: { patientId: string; notaId: string }) {
+  const { agregarAclaracionNota } = usePatientData();
+  const [abierto, setAbierto] = useState(false);
+  const [motivo, setMotivo] = useState<string>(MOTIVOS_ACLARACION[0]);
+  const [contenido, setContenido] = useState("");
+  const [guardando, setGuardando] = useState(false);
+  const [error, setError] = useState("");
+
+  const guardar = async () => {
+    if (!contenido.trim()) {
+      setError("Escribe qué quieres aclarar.");
+      return;
+    }
+    setGuardando(true);
+    setError("");
+    try {
+      await agregarAclaracionNota(patientId, notaId, { motivo, contenido: contenido.trim() });
+      setAbierto(false);
+      setContenido("");
+      setMotivo(MOTIVOS_ACLARACION[0]);
+    } catch {
+      setError("No se pudo guardar la aclaración. Revisa tu conexión e inténtalo de nuevo.");
+    } finally {
+      setGuardando(false);
+    }
+  };
+
+  if (!abierto) {
+    return (
+      <button onClick={() => setAbierto(true)} className="mt-3 text-xs font-semibold text-accent hover:underline">
+        + Agregar aclaración
+      </button>
+    );
+  }
+  return (
+    <div className="mt-3 space-y-2 rounded-xl border border-edge/10 bg-ink/[0.03] p-3">
+      <p className="text-xs text-ink/50">La nota firmada no cambia: tu aclaración se agrega debajo con tu nombre y la fecha.</p>
+      <select
+        value={motivo}
+        onChange={(e) => setMotivo(e.target.value)}
+        className="w-full rounded-lg border border-edge/15 bg-surface px-3 py-2 text-sm text-ink"
+        aria-label="Motivo de la aclaración"
+      >
+        {MOTIVOS_ACLARACION.map((m) => (
+          <option key={m} value={m}>
+            {m}
+          </option>
+        ))}
+      </select>
+      <textarea
+        value={contenido}
+        onChange={(e) => setContenido(e.target.value)}
+        rows={3}
+        placeholder="Qué quieres aclarar o corregir"
+        className="w-full rounded-lg border border-edge/15 bg-surface px-3 py-2 text-sm text-ink"
+        aria-label="Texto de la aclaración"
+      />
+      {error && <p className="text-xs text-danger">{error}</p>}
+      <div className="flex gap-2">
+        <button
+          onClick={guardar}
+          disabled={guardando}
+          className="rounded-lg bg-accent px-3 py-1.5 text-xs font-semibold text-white disabled:opacity-50"
+        >
+          {guardando ? "Guardando…" : "Guardar aclaración"}
+        </button>
+        <button
+          onClick={() => {
+            setAbierto(false);
+            setError("");
+          }}
+          className="rounded-lg px-3 py-1.5 text-xs font-semibold text-ink/60 hover:bg-ink/5"
+        >
+          Cancelar
+        </button>
+      </div>
+    </div>
+  );
+}
+
+function TarjetaFirmadaV2({ nota, patientId, diagnosticosCatalogo }: { nota: NotaEvolucionV2; patientId: string; diagnosticosCatalogo: DiagnosticoPaciente[] }) {
   // Notas firmadas ANTES de que la generación de narrativa se activara al
   // firmar se quedaron con `narrativa.texto` vacío — en vez de mostrar una
   // tarjeta ilegible (solo fecha/médico/estatus), se calcula la narrativa
@@ -144,6 +229,7 @@ function TarjetaFirmadaV2({ nota, diagnosticosCatalogo }: { nota: NotaEvolucionV
           ))}
         </div>
       )}
+      <AgregarAclaracion patientId={patientId} notaId={nota.id} />
     </div>
   );
 }
@@ -253,7 +339,7 @@ export default function HistorialNotas({ patientId, onContinuarBorrador }: { pat
         <div className="space-y-3">
           {historial.map((entrada) =>
             entrada.tipo === "v2" ? (
-              <TarjetaFirmadaV2 key={entrada.nota.id} nota={entrada.nota} diagnosticosCatalogo={diagnosticosCatalogo} />
+              <TarjetaFirmadaV2 key={entrada.nota.id} nota={entrada.nota} patientId={patientId} diagnosticosCatalogo={diagnosticosCatalogo} />
             ) : (
               <TarjetaAdministrativa key={entrada.nota.id} nota={entrada.nota} />
             )

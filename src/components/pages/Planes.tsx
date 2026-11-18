@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { usePatientData } from "@/context/PatientDataContext";
+import { auth } from "@/lib/firebase";
 import { INICIO_DEL_COBRO, MO_ES_GRATIS } from "@/lib/planesConfig";
 import {
   DURACION_PRUEBA_DIAS,
@@ -31,9 +32,10 @@ export default function Planes() {
     setError("");
     setCargando(plan);
     try {
+      const token = await auth.currentUser?.getIdToken();
       const res = await fetch("/api/stripe/checkout", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token ?? ""}` },
         body: JSON.stringify({ clinicUid, plan, email: userEmail }),
       });
       const data = await res.json();

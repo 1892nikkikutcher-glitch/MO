@@ -42,6 +42,7 @@ import DepositoDental from "./pages/DepositoDental";
 import CentroRadiodiagnostico from "./pages/CentroRadiodiagnostico";
 import LaboratorioDental from "./pages/LaboratorioDental";
 import ProximamenteStub from "./pages/ProximamenteStub";
+import Inventario from "./pages/Inventario";
 import Contrasena from "./pages/Contrasena";
 import ReportePagos from "./pages/ReportePagos";
 import ReporteDevoluciones from "./pages/ReporteDevoluciones";
@@ -114,6 +115,7 @@ const paginasConstruidas = new Set([
   "regulacion-sanitaria",
   "rpbi",
   "mantenimiento-equipos",
+  "inventario",
   "contabilidad",
   "educacion",
   "deposito-dental",
@@ -1014,6 +1016,7 @@ function DashboardBody({
           {activePage === "regulacion-sanitaria" && <RegulacionSanitaria />}
           {activePage === "rpbi" && <Rpbi />}
           {activePage === "mantenimiento-equipos" && <MantenimientoEquipos />}
+          {activePage === "inventario" && <Inventario />}
           {activePage === "contabilidad" && <Contabilidad />}
           {activePage === "educacion" && <Educacion esAdmin={esAdmin} />}
           {activePage === "deposito-dental" && <DepositoDental />}

@@ -1,7 +1,13 @@
 import { NextRequest, NextResponse } from "next/server";
 import { stripe, STRIPE_PRICE_IDS } from "@/lib/stripe";
+import { verificarSesion } from "@/lib/adminAuth";
+import { esAdminDeClinica } from "@/lib/conectaServer";
 
 export async function POST(req: NextRequest) {
+  // Solo el administrador de la clínica puede abrir el pago de su propio plan.
+  const sesion = await verificarSesion(req);
+  if (sesion instanceof NextResponse) return sesion;
+
   try {
     if (!process.env.STRIPE_SECRET_KEY) {
       return NextResponse.json(
@@ -17,6 +23,10 @@ export async function POST(req: NextRequest) {
 
     if (typeof clinicUid !== "string" || (plan !== "consultorio" && plan !== "clinicas")) {
       return NextResponse.json({ error: "Datos inválidos" }, { status: 400 });
+    }
+
+    if (!(await esAdminDeClinica(sesion.uid, clinicUid))) {
+      return NextResponse.json({ error: "Solo el administrador de la clínica puede contratar un plan." }, { status: 403 });
     }
 
     const priceId = STRIPE_PRICE_IDS[plan];

@@ -71,6 +71,8 @@ export const PALABRAS_CLAVE: Record<string, string> = {
   "regulacion-sanitaria": "cofepris aviso de funcionamiento licencia sanitaria normas",
   rpbi: "residuos peligrosos biologico infecciosos bitacora",
   "mantenimiento-equipos": "equipos aparatos autoclave compresor sillon rayos x falla descompuesto reparacion ingeniero biomedico bitacora garantia fecha de compra calibracion",
+  "campanas-salud": "campanas de salud jornadas brigadas revisiones gratuitas prevencion comunidad escuelas",
+  inventario: "inventario existencias instrumental material equipo muebles consumibles insumos almacen stock",
   contrasena: "cambiar contrasena seguridad clave acceso",
   planes: "plan suscripcion pago prueba precio",
 };

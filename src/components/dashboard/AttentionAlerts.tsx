@@ -509,11 +509,10 @@ export default function AttentionAlerts({ rango }: { rango: RangoPeriodo }) {
     <div className="rounded-2xl border border-edge/10 bg-surface p-6">
       <h2 className="mb-1 text-sm font-semibold uppercase tracking-wide text-ink/60">Requieren Atención</h2>
       <p className="mb-4 text-xs text-ink/40">
-        Tratamientos sin próxima cita y control de ortodoncia atrasado no están aquí — el modelo de
-        datos actual no tiene forma de calcularlos de manera confiable todavía. Saldo pendiente,
-        presupuestos por seguimiento, materiales, laboratorios, firma y horario reflejan el estado
-        de hoy sin importar el periodo elegido arriba (no hay historial guardado de cómo estaban
-        en el pasado); inasistencias y notas de evolución sí cambian con ese periodo.
+        Saldos, presupuestos por seguimiento, materiales, laboratorios, firma y horario siempre
+        muestran cómo están hoy, aunque cambies el periodo de arriba; inasistencias y notas de
+        evolución sí cambian con el periodo. Todavía no avisa de tratamientos sin próxima cita ni
+        de controles de ortodoncia atrasados.
       </p>
 
       {alertasOrdenadas.length === 0 ? (
