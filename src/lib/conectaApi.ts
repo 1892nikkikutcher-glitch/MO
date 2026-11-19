@@ -274,6 +274,17 @@ export function crearInvitacionApi(body: CrearInvitacionBody) {
   return llamarApi("/api/conecta/invitaciones", { method: "POST", body: JSON.stringify(body) });
 }
 
+/** Reenvía un caso pendiente de aceptar: enlace nuevo con los mismos datos del colega (el anterior deja de servir). */
+export function reenviarInvitacionApi(interconsultaId: string): Promise<{
+  id: string;
+  enlace: string;
+  venceEl: string;
+  destinatarioNombre: string | null;
+  destinatarioCorreo: string | null;
+}> {
+  return llamarApi("/api/conecta/invitaciones/reenviar", { method: "POST", body: JSON.stringify({ interconsultaId }) });
+}
+
 import type { ResumenInvitacionDeCaso } from "./colegaDelCaso";
 
 /** A quién se invitó en cada caso (solo invitaciones propias). */

@@ -29,6 +29,7 @@ export default function HojaIndicaciones({
       `Paciente: ${patient.name}`,
       "",
       ...hoja.instrucciones.map((texto, i) => `${i + 1}. ${texto}`),
+      ...(hoja.destacado ? ["", `*${hoja.destacado}*`] : []),
       "",
       "Ante cualquier duda o urgencia, contáctanos.",
     ];
@@ -86,6 +87,8 @@ export default function HojaIndicaciones({
             <li key={i}>{texto}</li>
           ))}
         </ol>
+
+        {hoja.destacado && <p className="mt-4 text-sm font-bold">{hoja.destacado}</p>}
 
         <p className="mt-6 text-sm font-medium">
           Ante cualquier duda, molestia fuera de lo esperado o urgencia, contáctanos de inmediato.

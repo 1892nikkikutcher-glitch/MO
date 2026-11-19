@@ -29,6 +29,7 @@ import {
   editarPerfilProfesionalApi,
   registrarContrarreferenciaApi,
   registrarEventoApi,
+  reenviarInvitacionApi,
   resolverAfiliacionApi,
   resolverSolicitudAccesoApi,
   revocarAccesoApi,
@@ -46,6 +47,7 @@ import { buildMensajeInvitacionConecta } from "@/lib/invitacionesConecta";
 import type { MensajeInterconsulta } from "@/lib/conectaMensajes";
 import type { SolicitudAcceso } from "@/lib/invitacionesConecta";
 import { colegaDelCaso } from "@/lib/colegaDelCaso";
+import { normalizarNombre } from "@/lib/contactosColegas";
 import ExpedienteCompartidoVista, { ElegirQueCompartirRapido } from "./ExpedienteCompartidoVista";
 import CompartirExpedientePanel from "./CompartirExpedientePanel";
 import LeyendaProteccion from "@/components/conecta/LeyendaProteccion";
@@ -433,7 +435,7 @@ function ResumenTab({
                 >
                   <span className="truncate text-sm font-medium text-ink">
                     {m.nombre}
-                    {m.pendiente && <span className="ml-2 text-xs font-normal text-warning">pendiente de aceptar</span>}
+                    {m.pendiente && <span className="ml-2 text-xs font-normal text-warning">pendiente de aceptar · toca para reenviar</span>}
                   </span>
                   <span className="truncate text-xs text-ink/50">
                     {[
@@ -1802,6 +1804,108 @@ function AvisoCorreoDelCaso({ estado }: { estado: NonNullable<Interconsulta["avi
   return <p className={`text-xs ${bien ? "text-success" : "text-warning"}`}>{texto}</p>;
 }
 
+/** Un caso que el colega todavía no acepta se puede mandar otra vez por WhatsApp. El enlace de antes no se
+ * puede recuperar (MO solo guarda su huella), así que se genera uno nuevo con los mismos datos del colega y el
+ * anterior deja de funcionar. */
+function ReenviarCasoPendiente({ interconsultaId }: { interconsultaId: string }) {
+  const invitacion = useInvitacionesDeCasos([interconsultaId])[interconsultaId];
+  const { contactos, recordar } = useContactosColegas();
+  const [numero, setNumero] = useState("");
+  const [enviando, setEnviando] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [nuevo, setNuevo] = useState<{ enlace: string; nombre: string; venceEl: string } | null>(null);
+  const [copiado, setCopiado] = useState(false);
+  const nombre = invitacion?.destinatarioNombre ?? "";
+
+  useEffect(() => {
+    if (numero || !nombre) return;
+    const guardado = contactos.find((c) => c.whatsapp && normalizarNombre(c.nombre) === normalizarNombre(nombre));
+    if (guardado) setNumero(guardado.whatsapp);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [contactos, nombre]);
+
+  async function reenviar() {
+    setEnviando(true);
+    setError(null);
+    setCopiado(false);
+    try {
+      const r = await reenviarInvitacionApi(interconsultaId);
+      const nombreFinal = r.destinatarioNombre || nombre;
+      if (nombreFinal.trim()) recordar({ nombre: nombreFinal, whatsapp: numero, correo: r.destinatarioCorreo ?? "" });
+      setNuevo({ enlace: r.enlace, nombre: nombreFinal, venceEl: r.venceEl });
+      enviarInvitacionPorWhatsApp(nombreFinal, r.enlace, numero);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "No se pudo reenviar el caso.");
+    } finally {
+      setEnviando(false);
+    }
+  }
+
+  async function copiar() {
+    if (!nuevo) return;
+    try {
+      await navigator.clipboard.writeText(nuevo.enlace);
+      setCopiado(true);
+    } catch {
+      // El navegador puede bloquear el portapapeles: el enlace se puede seleccionar del cuadro de abajo.
+    }
+    registrarEventoApi("invite_shared", { interconsultaId }).catch(() => {});
+  }
+
+  // Si ya abrió el enlace, lo que falta es aprobar su acceso (arriba), no mandarle otro.
+  if (invitacion?.estado === "reclamada") return null;
+
+  const fecha = (iso: string) => new Date(iso).toLocaleDateString("es-MX", { day: "2-digit", month: "short" });
+  const estadoTexto = !invitacion
+    ? ""
+    : invitacion.estado === "activa"
+      ? `Tu invitación vence el ${fecha(invitacion.venceEl)}.`
+      : invitacion.estado === "vencida"
+        ? "Tu invitación venció sin que la aceptara."
+        : "";
+
+  return (
+    <div className="rounded-2xl border border-accent/30 bg-accent/10 p-4">
+      <p className="text-sm font-medium text-ink">Reenviar el caso a {nombre || "tu colega"}</p>
+      <p className="mt-0.5 text-xs text-ink/60">
+        {[estadoTexto, "Se arma un enlace nuevo y el anterior deja de funcionar. La información clínica solo se ve después de que tu colega se identifique."]
+          .filter(Boolean)
+          .join(" ")}
+      </p>
+      {!nuevo ? (
+        <div className="mt-3 flex flex-wrap gap-2">
+          <input
+            type="tel"
+            value={numero}
+            onChange={(e) => setNumero(e.target.value)}
+            placeholder="WhatsApp (10 dígitos), opcional"
+            className="min-w-0 flex-1 rounded-lg border border-edge/10 bg-field px-3 py-2 text-sm text-ink outline-none focus:border-accent/60"
+          />
+          <button onClick={reenviar} disabled={enviando} className={botonPrimario}>
+            {enviando ? "Preparando…" : "Reenviar por WhatsApp"}
+          </button>
+        </div>
+      ) : (
+        <div className="mt-3 space-y-2">
+          <p className="text-xs text-success">
+            Enlace nuevo listo (vence el {fecha(nuevo.venceEl)}). Si WhatsApp no se abrió, usa el botón de abajo.
+          </p>
+          <input readOnly className={inputClass} value={nuevo.enlace} onFocus={(e) => e.target.select()} />
+          <div className="flex flex-wrap gap-2">
+            <button onClick={() => enviarInvitacionPorWhatsApp(nuevo.nombre, nuevo.enlace, numero)} className={botonPrimario}>
+              Abrir WhatsApp
+            </button>
+            <button onClick={copiar} className={botonSecundario}>
+              {copiado ? "¡Copiado!" : "Copiar enlace"}
+            </button>
+          </div>
+        </div>
+      )}
+      {error && <p className="mt-2 text-xs text-danger">{error}</p>}
+    </div>
+  );
+}
+
 function SalaDelCaso({ interconsulta, onVolver }: { interconsulta: Interconsulta; onVolver: () => void }) {
   const { uid, directorio } = useMoConecta();
   const { irAPagina } = usePatientData();
@@ -2042,6 +2146,10 @@ function SalaDelCaso({ interconsulta, onVolver }: { interconsulta: Interconsulta
           </div>
         )}
       </div>
+
+      {esRemitente && !interconsulta.destinatarioUid && interconsulta.estado === "sent" && (
+        <ReenviarCasoPendiente interconsultaId={interconsulta.id} />
+      )}
 
       {esRemitente && interconsulta.avisoCorreo && (
         <AvisoCorreoDelCaso estado={interconsulta.avisoCorreo.estado} />

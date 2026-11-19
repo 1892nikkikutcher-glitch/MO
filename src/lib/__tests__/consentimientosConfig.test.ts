@@ -26,6 +26,18 @@ describe("consentimientosConfig", () => {
     }
   });
 
+  it("el consentimiento general autoriza compartir el expediente (interconsulta, estudios, caso clínico) con el médico rellenado", () => {
+    const texto = renderConsentimiento(contenidoOriginal("consentimientoGeneral").aceptacion, "consentimientoGeneral", {
+      medico: "Dra. Ana Torres",
+    });
+    expect(texto).toContain("Autorizo a Dra. Ana Torres a compartir mi expediente clínico");
+    expect(texto).toContain("interconsulta");
+    expect(texto).toContain("metaanálisis");
+    expect(texto).toContain("enfoque multidisciplinario");
+    expect(texto).toContain("revocar esta autorización");
+    expect(texto).not.toContain("{{");
+  });
+
   it("sin médico elegido usa el mismo texto de respaldo que antes", () => {
     const base = (clave: "consentimientoEndodoncia" | "consentimientoUsoImagen") =>
       renderConsentimiento(contenidoOriginal(clave).aceptacion, clave, {});

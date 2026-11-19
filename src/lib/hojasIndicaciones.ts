@@ -8,6 +8,8 @@ export type TipoHojaIndicaciones = "protesis" | "ortodoncia" | "cirugiaBucal" | 
 export type HojaIndicaciones = {
   titulo: string;
   instrucciones: string[];
+  /** Una línea que se resalta debajo de la lista (por ejemplo, durante cuánto tiempo aplican los cuidados). */
+  destacado?: string;
 };
 
 export const hojasIndicaciones: Record<TipoHojaIndicaciones, HojaIndicaciones> = {
@@ -39,14 +41,17 @@ export const hojasIndicaciones: Record<TipoHojaIndicaciones, HojaIndicaciones> =
     titulo: "Indicaciones Posteriores a Cirugía Bucal",
     instrucciones: [
       "Muerde la gasa con presión firme durante 30 a 45 minutos; si sigue sangrando, coloca una gasa nueva.",
-      "No enjuagues, escupas con fuerza ni uses popote durante las primeras 24 horas — puede desprender el coágulo y retrasar la cicatrización.",
-      "Aplica hielo local (20 minutos sí, 20 minutos no) durante las primeras 24 horas para reducir la inflamación.",
+      "Evita el calor: no planches, laves, cocines, levantes objetos pesados, hagas ejercicio ni te asolees. El calor aumenta la temperatura del cuerpo e inflama la zona, que debe mantenerse fría.",
+      "Mantén la zona fría: aplica hielo por fuera de la mejilla (20 minutos sí, 20 minutos no) durante las primeras 24 horas y, si quieres, chupa una paleta de hielo de limón sin semillas.",
+      "Evita todo movimiento que meta o saque agua o aire de la boca: buches, gárgaras, tomar con popote, escupir con fuerza, estornudar con la boca cerrada y fumar. El coágulo puede desprenderse y retrasar la cicatrización.",
+      "Evita los alimentos calientes, las semillas, los irritantes (te darán ardor mientras cicatriza) y la carne de cerdo y los mariscos, que son ricos en proteínas e interfieren con la cicatrización. Las semillas que entran en la herida producen infección, y la herida es propensa a que se llene de bacterias (alveolitis).",
+      "Lo recomendable es comer huevo duro, papaya, melón, yogur y caldo de pollo tibio y sin semillas; es decir, alimentos que no entren en la lista anterior.",
       "Toma los medicamentos recetados en el horario indicado, aunque el dolor haya disminuido.",
-      "Come alimentos blandos, fríos o tibios el primer día (yogur, puré, licuados); evita alimentos calientes, picantes, duros o con semillas pequeñas.",
-      "No fumes ni consumas alcohol durante al menos 72 horas — retrasan la cicatrización y aumentan el riesgo de infección.",
-      "A partir del segundo día, realiza enjuagues suaves con agua tibia y sal después de cada alimento.",
+      "No consumas alcohol durante al menos 72 horas — retrasa la cicatrización y aumenta el riesgo de infección.",
+      "Pasadas las 72 horas, realiza enjuagues suaves con agua tibia y sal después de cada alimento.",
       "Es normal cierta inflamación los primeros 2 a 3 días; si el sangrado es abundante, hay fiebre o el dolor aumenta en vez de disminuir, contáctanos de inmediato.",
     ],
+    destacado: "Estos cuidados deben aplicarse al menos durante las 72 horas posteriores al procedimiento.",
   },
   odontopediatria: {
     titulo: "Indicaciones para Tratamiento de Odontopediatría",

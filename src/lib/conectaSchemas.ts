@@ -152,6 +152,12 @@ export const invitacionCrearSchema = z
   })
   .strict();
 
+export const invitacionReenviarSchema = z
+  .object({
+    interconsultaId: z.string().trim().min(1).max(200),
+  })
+  .strict();
+
 export const compartirExpedienteSchema = z
   .object({
     activo: z.boolean(),

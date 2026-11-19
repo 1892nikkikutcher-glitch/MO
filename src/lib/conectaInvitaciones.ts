@@ -43,7 +43,8 @@ async function obtenerInterconsultaComoParticipante(uid: string, interconsultaId
 
 export async function crearInvitacion(
   remitenteUid: string,
-  input: CrearInvitacionInput
+  input: CrearInvitacionInput,
+  opciones: { reemplazaActivas?: boolean } = {}
 ): Promise<{ id: string; tokenCrudo: string; venceEl: string }> {
   const permitido = await aplicarRateLimit(`invitacion_crear_${remitenteUid}`, 20, 60);
   if (!permitido) throw new ConectaError(429, "Demasiadas invitaciones creadas — intenta de nuevo más tarde.");
@@ -55,7 +56,8 @@ export async function crearInvitacion(
     .where("interconsultaId", "==", input.interconsultaId)
     .get();
   const existentes = existentesSnap.docs.map((d) => d.data() as InvitacionConecta);
-  if (existeInvitacionActivaDuplicada(existentes, input.interconsultaId, input.destinatarioCorreo)) {
+  // Al reenviar, la invitación activa de antes se reemplaza (se cancela abajo), así que no cuenta como duplicada.
+  if (!opciones.reemplazaActivas && existeInvitacionActivaDuplicada(existentes, input.interconsultaId, input.destinatarioCorreo)) {
     throw new ConectaError(409, "Ya existe una invitación activa para este destinatario en este caso.");
   }
 
@@ -84,7 +86,57 @@ export async function crearInvitacion(
   });
   await ref.set(invitacion);
 
+  if (opciones.reemplazaActivas) {
+    // Recién con la nueva ya guardada se apagan las anteriores: si algo fallara antes, el enlace viejo sigue sirviendo.
+    const anteriores = existentesSnap.docs.filter((d) => (d.data() as InvitacionConecta).estado === "activa");
+    await Promise.all(anteriores.map((d) => d.ref.update({ estado: "cancelada" })));
+  }
+
   return { id: ref.id, tokenCrudo, venceEl: invitacion.venceEl };
+}
+
+/** Reenvía un caso que sigue pendiente de aceptar: genera un enlace NUEVO con los mismos datos del colega
+ * (el enlace crudo no se puede recuperar porque solo se guarda su hash) y deja sin efecto el anterior, así
+ * nunca hay dos enlaces vivos del mismo caso. Solo quien envió el caso, y solo mientras ningún colega de MO
+ * lo haya tomado. */
+export async function reenviarInvitacion(
+  remitenteUid: string,
+  interconsultaId: string
+): Promise<{ id: string; tokenCrudo: string; venceEl: string; destinatarioNombre: string | null; destinatarioCorreo: string | null }> {
+  const interconsulta = await obtenerInterconsultaComoParticipante(remitenteUid, interconsultaId);
+  if (interconsulta.odontologoRemitenteUid !== remitenteUid) {
+    throw new ConectaError(403, "Solo quien envió el caso puede reenviarlo.");
+  }
+  if (interconsulta.destinatarioUid) {
+    throw new ConectaError(409, "Este caso ya lo tiene un colega en MO: avísale por WhatsApp desde el caso.");
+  }
+  if (interconsulta.estado !== "sent") {
+    throw new ConectaError(409, "Este caso ya no está pendiente de aceptar.");
+  }
+
+  const snap = await dbAdmin.collection("invitacionesConecta").where("interconsultaId", "==", interconsultaId).get();
+  const propias = snap.docs
+    .map((d) => d.data() as InvitacionConecta)
+    .filter((i) => i.remitenteUid === remitenteUid)
+    .sort((a, b) => b.creadoEl.localeCompare(a.creadoEl));
+  const ultima = propias[0];
+
+  const nueva = await crearInvitacion(
+    remitenteUid,
+    {
+      interconsultaId,
+      destinatarioNombre: ultima?.destinatarioNombre,
+      destinatarioCorreo: ultima?.destinatarioCorreoNormalizado,
+      grupoId: ultima?.grupoId,
+      canal: "whatsapp",
+    },
+    { reemplazaActivas: true }
+  );
+  return {
+    ...nueva,
+    destinatarioNombre: ultima?.destinatarioNombre ?? null,
+    destinatarioCorreo: ultima?.destinatarioCorreoNormalizado ?? null,
+  };
 }
 
 export type ResumenInvitacionDeCaso = {
