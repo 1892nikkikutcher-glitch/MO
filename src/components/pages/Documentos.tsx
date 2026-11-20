@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { usePatientData } from "@/context/PatientDataContext";
 import ConsentimientoInformado from "./ConsentimientoInformado";
 import ConsentimientoEspecialidad from "./ConsentimientoEspecialidad";
@@ -9,6 +9,8 @@ import HojaIndicaciones from "./HojaIndicaciones";
 import AvisoPrivacidad from "./AvisoPrivacidad";
 import DocumentosPago, { type TipoDocumentoPago } from "./DocumentosPago";
 import { formatNombreConEdad } from "@/lib/patientData";
+import { FORMATOS_FLUJO, type FormatoFlujo } from "@/lib/flujoFormatos";
+import { consumirDocumentoPendiente } from "@/lib/documentoPendiente";
 import type { TipoHojaIndicaciones } from "@/lib/hojasIndicaciones";
 import {
   consentimientosEspecialidad,
@@ -127,9 +129,11 @@ const documentosDisponibles: { tipo: TipoDocumento; titulo: string; descripcion:
   },
 ];
 
-/** Formatos del flujo del consultorio que todavía no se pueden generar desde aquí.
- * Se muestran para que el equipo vea el flujo completo; se activan conforme se definan. */
-const documentosProximos: { clave: string; titulo: string; descripcion: string }[] = [
+/** Formatos del flujo del consultorio que no son una hoja para imprimir desde aquí: unos ya
+ * viven dentro de MO (el expediente, Recetas, Encuestas…) y se abren desde su tarjeta; otros
+ * todavía no existen y salen como "Próximamente". Cuál es cuál lo decide `FORMATOS_FLUJO`
+ * (src/lib/flujoFormatos.ts), la misma fuente que usa la pestaña "Flujo de formatos". */
+const formatosSinHoja: { clave: string; titulo: string; descripcion: string }[] = [
   {
     clave: "datosGenerales",
     titulo: "Datos Generales del Paciente",
@@ -240,12 +244,15 @@ const etapasFlujo: { titulo: string; claves: string[] }[] = [
 ];
 
 type TarjetaDocumento =
-  | { clave: string; titulo: string; descripcion: string; tipo: TipoDocumento }
-  | { clave: string; titulo: string; descripcion: string; tipo: null };
+  | { clave: string; titulo: string; descripcion: string; tipo: TipoDocumento; formato?: undefined }
+  | { clave: string; titulo: string; descripcion: string; tipo: null; formato: FormatoFlujo };
 
 const tarjetasPorClave = new Map<string, TarjetaDocumento>([
   ...documentosDisponibles.map((d): [string, TarjetaDocumento] => [d.tipo, { ...d, clave: d.tipo }]),
-  ...documentosProximos.map((d): [string, TarjetaDocumento] => [d.clave, { ...d, tipo: null }]),
+  ...formatosSinHoja.flatMap((d): [string, TarjetaDocumento][] => {
+    const formato = FORMATOS_FLUJO.find((f) => f.clave === d.clave);
+    return formato ? [[d.clave, { ...d, tipo: null, formato }]] : [];
+  }),
 ]);
 
 const clavesEnEtapas = new Set(etapasFlujo.flatMap((e) => e.claves));
@@ -262,10 +269,22 @@ const etapasConDocumentos: { titulo: string; tarjetas: TarjetaDocumento[] }[] = 
 ];
 
 export default function Documentos() {
-  const { patients } = usePatientData();
+  const { patients, irAExpediente, irAPagina } = usePatientData();
   const [patientId, setPatientId] = useState("");
   const [searchText, setSearchText] = useState("");
   const [documentoActivo, setDocumentoActivo] = useState<TipoDocumento | null>(null);
+
+  // Viene de "Generar" en el Flujo de formatos del expediente: abre ese documento ya con el paciente elegido.
+  useEffect(() => {
+    const pendiente = consumirDocumentoPendiente();
+    if (!pendiente) return;
+    const documento = documentosDisponibles.find((d) => d.tipo === pendiente.tipo);
+    if (!documento || !patients.some((p) => p.id === pendiente.patientId)) return;
+    setPatientId(pendiente.patientId);
+    setDocumentoActivo(documento.tipo);
+    // Solo al entrar a la página.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const patient = patients.find((p) => p.id === patientId) ?? null;
 
@@ -353,6 +372,31 @@ export default function Documentos() {
             <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
               {etapa.tarjetas.map((doc) => {
                 const tipo = doc.tipo;
+                if (tipo === null && doc.formato.modo !== "proximamente") {
+                  // Ya vive dentro de MO: la tarjeta lleva al lugar donde se llena.
+                  const { pestana, pagina } = doc.formato;
+                  const lugar = pestana ? `expediente → ${pestana}` : pagina === "recetas" ? "Recetas" : "Reportes → Encuestas";
+                  return (
+                    <button
+                      key={doc.clave}
+                      onClick={() => {
+                        if (pestana && patient) irAExpediente(patient.id, pestana);
+                        else if (pagina) irAPagina(pagina);
+                      }}
+                      disabled={!!pestana && !patient}
+                      className="rounded-2xl border border-edge/10 bg-surface p-5 text-left transition-colors hover:border-accent/40 hover:bg-surface disabled:cursor-not-allowed disabled:opacity-40"
+                    >
+                      <div className="flex items-start justify-between gap-3">
+                        <p className="text-sm font-semibold text-ink">{doc.titulo}</p>
+                        <span className="shrink-0 rounded-full border border-success/40 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-success">
+                          Ya en MO
+                        </span>
+                      </div>
+                      <p className="mt-1 text-xs text-ink/50">{doc.descripcion}</p>
+                      <p className="mt-2 text-xs font-medium text-accent">Se llena en {lugar}</p>
+                    </button>
+                  );
+                }
                 if (tipo === null) {
                   return (
                     <div

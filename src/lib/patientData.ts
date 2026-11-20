@@ -82,6 +82,10 @@ export type Patient = {
   /** ISO datetime — cuándo se fusionó. */
   fusionadoEn?: string;
 
+  /** Marcas a mano del "Flujo de formatos" del expediente (ver lib/flujoFormatos.ts):
+   * clave del formato → fecha ISO en que se realizó, o "na" si no aplica a este paciente. */
+  flujoFormatos?: Record<string, string>;
+
   /** Estado de la migración hacia el expediente clínico compartido
    * (arquitectura MO Conecta v3, §11) — ausente equivale a "no_migrado".
    * `firestore.rules` (`escrituraClinicaLocalPermitida`) lee este mismo

@@ -11,6 +11,7 @@ import PresupuestoTotalImpreso from "./PresupuestoTotalImpreso";
 import NuevaComparativaRehabilitacion from "./NuevaComparativaRehabilitacion";
 import ComparativaImpresa from "./ComparativaImpresa";
 import DatosPaciente from "./DatosPaciente";
+import FlujoFormatos from "./FlujoFormatos";
 import HistoriaClinica from "./HistoriaClinica";
 import ListadoCitas from "./ListadoCitas";
 import Fotografias from "./Fotografias";
@@ -83,6 +84,7 @@ const estadoPresupuestoColor: Record<EstadoPresupuesto, string> = {
 
 const expedienteTabs = [
   "Datos del Paciente",
+  "Flujo de Formatos",
   "Consentimientos Informados",
   "Historia Clínica",
   "Plan de Tratamiento y Presupuesto",
@@ -1608,6 +1610,14 @@ export default function Expediente({
           {activeTab === "Datos del Paciente" && (
             <DatosPaciente patient={patient} formatDate={formatDate} />
           )}
+          {activeTab === "Flujo de Formatos" && (
+            <FlujoFormatos
+              patient={patient}
+              onIrAPestana={(pestana) => {
+                if ((expedienteTabs as readonly string[]).includes(pestana)) cambiarTab(pestana as ExpedienteTab);
+              }}
+            />
+          )}
           {activeTab === "Historia Clínica" && (
             <HistoriaClinica
               patientId={patient.id}
@@ -1687,6 +1697,7 @@ export default function Expediente({
           )}
           {activeTab !== "Plan de Tratamiento y Presupuesto" &&
             activeTab !== "Datos del Paciente" &&
+            activeTab !== "Flujo de Formatos" &&
             activeTab !== "Historia Clínica" &&
             activeTab !== "Listado de Citas" &&
             activeTab !== "Fotografías" &&
