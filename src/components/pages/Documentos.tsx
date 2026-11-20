@@ -127,6 +127,140 @@ const documentosDisponibles: { tipo: TipoDocumento; titulo: string; descripcion:
   },
 ];
 
+/** Formatos del flujo del consultorio que todavía no se pueden generar desde aquí.
+ * Se muestran para que el equipo vea el flujo completo; se activan conforme se definan. */
+const documentosProximos: { clave: string; titulo: string; descripcion: string }[] = [
+  {
+    clave: "datosGenerales",
+    titulo: "Datos Generales del Paciente",
+    descripcion: "Ficha de identificación del paciente con copia de su INE.",
+  },
+  {
+    clave: "estudioSocioeconomico",
+    titulo: "Estudio Socioeconómico",
+    descripcion: "Cuestionario para conocer la situación económica del paciente y su familia.",
+  },
+  {
+    clave: "historiaClinica",
+    titulo: "Historia Clínica",
+    descripcion: "Antecedentes médicos y odontológicos del paciente.",
+  },
+  {
+    clave: "diagnosticoTratamiento",
+    titulo: "Diagnóstico y Tratamiento",
+    descripcion: "Diagnóstico del caso y plan de tratamiento propuesto.",
+  },
+  {
+    clave: "presupuesto",
+    titulo: "Presupuesto Odontológico",
+    descripcion: "Costo de cada tratamiento del plan, para entregar al paciente.",
+  },
+  {
+    clave: "calendarioCitas",
+    titulo: "Calendario de Citas",
+    descripcion: "Calendario impreso con las citas programadas del paciente.",
+  },
+  {
+    clave: "seguimientoCita",
+    titulo: "Seguimiento de Cita",
+    descripcion: "Control de asistencia, evolución y reprogramaciones de cada cita.",
+  },
+  {
+    clave: "notasEvolucion",
+    titulo: "Notas de Evolución",
+    descripcion: "Registro por cita de lo realizado y la evolución del paciente.",
+  },
+  {
+    clave: "receta",
+    titulo: "Receta Médico Odontológica",
+    descripcion: "Receta con los medicamentos indicados al paciente.",
+  },
+  {
+    clave: "historialPagos",
+    titulo: "Historial de Pagos",
+    descripcion: "Pagos, abonos y saldo pendiente del paciente.",
+  },
+  {
+    clave: "formatoLaboratorio",
+    titulo: "Formato para Laboratorio Dental",
+    descripcion: "Orden de trabajo para enviar al laboratorio dental.",
+  },
+  {
+    clave: "encuestaSatisfaccion",
+    titulo: "Encuesta de Satisfacción",
+    descripcion: "Opinión del paciente sobre la atención recibida al terminar su tratamiento.",
+  },
+];
+
+/** Etapas del flujo de formatos del consultorio, en orden. Cada clave es un `tipo` de
+ * `documentosDisponibles` o una `clave` de `documentosProximos`. Lo que no esté en ninguna
+ * etapa se muestra al final en "Otros documentos". */
+const etapasFlujo: { titulo: string; claves: string[] }[] = [
+  {
+    titulo: "Admisión",
+    claves: ["datosGenerales", "estudioSocioeconomico", "avisoPrivacidad", "consentimientoUsoImagen"],
+  },
+  {
+    titulo: "Historia clínica y diagnóstico",
+    claves: [
+      "historiaClinica",
+      "consentimiento",
+      "diagnosticoTratamiento",
+      "presupuesto",
+      "acuerdoPago",
+      "contratoServicios",
+    ],
+  },
+  {
+    titulo: "Consentimientos específicos",
+    claves: [
+      "consentimientoOrtodoncia",
+      "consentimientoCirugiaBucal",
+      "consentimientoEndodoncia",
+      "consentimientoProtesisDental",
+      "consentimientoOdontopediatria",
+    ],
+  },
+  {
+    titulo: "Ejecución clínica y seguimiento",
+    claves: [
+      "carnetPaciente",
+      "calendarioCitas",
+      "seguimientoCita",
+      "notasEvolucion",
+      "receta",
+      "historialPagos",
+      "formatoLaboratorio",
+    ],
+  },
+  {
+    titulo: "Finalización del tratamiento",
+    claves: ["consentimientoConclusionOrtodoncia", "consentimientoConformidadProtesis", "encuestaSatisfaccion"],
+  },
+];
+
+type TarjetaDocumento =
+  | { clave: string; titulo: string; descripcion: string; tipo: TipoDocumento }
+  | { clave: string; titulo: string; descripcion: string; tipo: null };
+
+const tarjetasPorClave = new Map<string, TarjetaDocumento>([
+  ...documentosDisponibles.map((d): [string, TarjetaDocumento] => [d.tipo, { ...d, clave: d.tipo }]),
+  ...documentosProximos.map((d): [string, TarjetaDocumento] => [d.clave, { ...d, tipo: null }]),
+]);
+
+const clavesEnEtapas = new Set(etapasFlujo.flatMap((e) => e.claves));
+
+const etapasConDocumentos: { titulo: string; tarjetas: TarjetaDocumento[] }[] = [
+  ...etapasFlujo.map((e) => ({
+    titulo: e.titulo,
+    tarjetas: e.claves.flatMap((c) => tarjetasPorClave.get(c) ?? []),
+  })),
+  {
+    titulo: "Otros documentos",
+    tarjetas: documentosDisponibles.filter((d) => !clavesEnEtapas.has(d.tipo)).map((d) => ({ ...d, clave: d.tipo })),
+  },
+];
+
 export default function Documentos() {
   const { patients } = usePatientData();
   const [patientId, setPatientId] = useState("");
@@ -211,24 +345,46 @@ export default function Documentos() {
         )}
       </div>
 
-      <div>
-        <h3 className="mb-3 text-sm font-semibold uppercase tracking-wide text-ink/60">
-          Documentos disponibles
-        </h3>
-        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
-          {documentosDisponibles.map((doc) => (
-            <button
-              key={doc.tipo}
-              onClick={() => patient && setDocumentoActivo(doc.tipo)}
-              disabled={!patient}
-              className="rounded-2xl border border-edge/10 bg-surface p-5 text-left transition-colors hover:border-accent/40 hover:bg-surface disabled:cursor-not-allowed disabled:opacity-40"
-            >
-              <p className="text-sm font-semibold text-ink">{doc.titulo}</p>
-              <p className="mt-1 text-xs text-ink/50">{doc.descripcion}</p>
-            </button>
-          ))}
-        </div>
-      </div>
+      {etapasConDocumentos
+        .filter((etapa) => etapa.tarjetas.length > 0)
+        .map((etapa) => (
+          <div key={etapa.titulo}>
+            <h3 className="mb-3 text-sm font-semibold uppercase tracking-wide text-ink/60">{etapa.titulo}</h3>
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
+              {etapa.tarjetas.map((doc) => {
+                const tipo = doc.tipo;
+                if (tipo === null) {
+                  return (
+                    <div
+                      key={doc.clave}
+                      aria-disabled="true"
+                      className="rounded-2xl border border-dashed border-edge/10 bg-surface p-5 text-left opacity-60"
+                    >
+                      <div className="flex items-start justify-between gap-3">
+                        <p className="text-sm font-semibold text-ink">{doc.titulo}</p>
+                        <span className="shrink-0 rounded-full border border-accent/40 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-accent">
+                          Próximamente
+                        </span>
+                      </div>
+                      <p className="mt-1 text-xs text-ink/50">{doc.descripcion}</p>
+                    </div>
+                  );
+                }
+                return (
+                  <button
+                    key={doc.clave}
+                    onClick={() => patient && setDocumentoActivo(tipo)}
+                    disabled={!patient}
+                    className="rounded-2xl border border-edge/10 bg-surface p-5 text-left transition-colors hover:border-accent/40 hover:bg-surface disabled:cursor-not-allowed disabled:opacity-40"
+                  >
+                    <p className="text-sm font-semibold text-ink">{doc.titulo}</p>
+                    <p className="mt-1 text-xs text-ink/50">{doc.descripcion}</p>
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+        ))}
     </div>
   );
 }
