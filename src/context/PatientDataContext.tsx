@@ -186,6 +186,7 @@ import type { PlanTratamientoItem, PresupuestoVinculado } from "@/lib/planTratam
 import { actualizarFrecuencias, vocabularioNotasInicial, type VocabularioNotas } from "@/lib/vocabularioNotas";
 import type { ComparativaRehabilitacion } from "@/lib/comparativaRehabilitacion";
 import SelectorClinica from "@/components/SelectorClinica";
+import { avisarFalloGuardado } from "@/lib/avisoFalloGuardado";
 
 type Updater<T> = T | ((prev: T) => T);
 
@@ -199,9 +200,7 @@ function syncFirestoreList<T extends { id: string }>(path: string, prev: T[], ne
   next.forEach((item) => {
     const before = prev.find((p) => p.id === item.id);
     if (!before || JSON.stringify(before) !== JSON.stringify(item)) {
-      setDoc(doc(db, path, item.id), item).catch((err) =>
-        console.error(`No se pudo guardar en ${path}/${item.id}`, err)
-      );
+      setDoc(doc(db, path, item.id), item).catch((err) => avisarFalloGuardado(`${path}/${item.id}`, err));
     }
   });
 
@@ -340,7 +339,7 @@ function useFirestoreDoc<T extends object>(clinicUid: string | null, name: strin
       // documento completo con datos incompletos.
       const next = resolveUpdater(updater, prev);
       setDoc(doc(db, path, name), conBajasPersistentes(name, prev, next), { merge: true }).catch((err) =>
-        console.error(`No se pudo guardar ${path}/${name}`, err)
+        avisarFalloGuardado(`${path}/${name}`, err)
       );
       return next;
     });
@@ -372,7 +371,7 @@ function useClinicInfo(clinicUid: string | null) {
     // config — este ya tenía el guard `!value` que evita el caso más común
     // (guardar antes de cargar), pero mismo defensivo por si acaso.
     setDoc(doc(db, "clinics", clinicUid), next, { merge: true }).catch((err) =>
-      console.error(`No se pudo guardar clinics/${clinicUid}`, err)
+      avisarFalloGuardado(`clinics/${clinicUid}`, err)
     );
   };
 
@@ -2825,7 +2824,9 @@ export function PatientDataProvider({
     const next = resolveUpdater(updater, prev);
     setDoc(doc(db, `users/${clinicUid}/pacientes/${patientId}/historiaClinica`, "respuestas"), next, {
       merge: true,
-    }).catch((err) => console.error(`No se pudo guardar historiaClinica de ${patientId}`, err));
+    }).catch((err) =>
+      avisarFalloGuardado(`users/${clinicUid}/pacientes/${patientId}/historiaClinica/respuestas`, err)
+    );
     setHistoriaClinicaPorPacienteState((p) => ({ ...p, [patientId]: next }));
   };
 
@@ -2837,7 +2838,7 @@ export function PatientDataProvider({
     const prev = fotosPorPaciente[patientId] ?? fotosVacias;
     const next = resolveUpdater(updater, prev);
     setDoc(doc(db, `users/${clinicUid}/pacientes/${patientId}/fotos`, "datos"), next, { merge: true }).catch((err) =>
-      console.error(`No se pudo guardar fotos de ${patientId}`, err)
+      avisarFalloGuardado(`users/${clinicUid}/pacientes/${patientId}/fotos/datos`, err)
     );
     setFotosPorPacienteState((p) => ({ ...p, [patientId]: next }));
   };
