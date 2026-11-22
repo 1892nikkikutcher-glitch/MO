@@ -75,7 +75,29 @@ export function avisarFalloGuardado(ruta: string, err: unknown): void {
   window.alert(mensajeFalloGuardado(ruta, err));
 }
 
+/** Cuando la sesión no tiene una clínica activa, los guardados se descartaban sin
+ * decir nada (cada función de guardado salía con `if (!clinicUid) return`). Pasa,
+ * por ejemplo, si la clínica propia de una cuenta nueva no se pudo crear. Se avisa
+ * una vez por minuto, porque el autoguardado de la historia clínica reintenta cada segundo. */
+export const MENSAJE_SIN_CLINICA =
+  "No se pudo guardar: tu sesión no tiene una clínica activa, así que MO no tiene dónde guardar los datos. " +
+  "Cierra sesión y vuelve a entrar. Si el aviso sigue saliendo, avisa al administrador de la clínica " +
+  "(puede faltar aceptar tu invitación) y no captures más datos hasta resolverlo.";
+
+const VENTANA_SIN_CLINICA_MS = 60000;
+let ultimoAvisoSinClinica = 0;
+
+export function avisarSinClinica(): void {
+  console.error("Guardado descartado: la sesión no tiene clínica activa (clinicUid nulo).");
+  if (typeof window === "undefined") return;
+  const ahora = Date.now();
+  if (ahora - ultimoAvisoSinClinica < VENTANA_SIN_CLINICA_MS) return;
+  ultimoAvisoSinClinica = ahora;
+  window.alert(MENSAJE_SIN_CLINICA);
+}
+
 /** Solo para pruebas: reinicia la ventana anti-ráfaga. */
 export function reiniciarAvisoFalloGuardado(): void {
   ultimoAviso = 0;
+  ultimoAvisoSinClinica = 0;
 }

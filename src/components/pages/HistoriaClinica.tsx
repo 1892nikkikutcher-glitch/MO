@@ -1266,6 +1266,15 @@ export default function HistoriaClinica({
 
   const [borrador, setBorrador] = useState<RespuestasHistoriaClinica>(guardadas);
   const [guardando, setGuardando] = useState(false);
+  // Respuesta visible al tocar el botón: el botón nunca debe sentirse "muerto"
+  // (antes se quedaba gris y sin decir nada cuando no había cambios pendientes —
+  // justo lo que pasa un segundo después de que el autoguardado ya guardó todo).
+  const [mensajeGuardado, setMensajeGuardado] = useState<string | null>(null);
+  useEffect(() => {
+    if (!mensajeGuardado) return;
+    const t = setTimeout(() => setMensajeGuardado(null), 5000);
+    return () => clearTimeout(t);
+  }, [mensajeGuardado]);
 
   // Al cambiar de paciente (o cuando llegan datos guardados por primera vez
   // desde Firestore), se recarga el borrador local desde lo guardado — pero
@@ -1346,6 +1355,18 @@ export default function HistoriaClinica({
     setGuardando(false);
   };
 
+  /** Clic en el botón: guarda si hay algo pendiente y SIEMPRE dice qué pasó. */
+  const guardarDesdeBoton = () => {
+    if (hayCambiosSinGuardar) {
+      guardar();
+      setMensajeGuardado("✓ Historial guardado");
+    } else if (yaGuardado) {
+      setMensajeGuardado("✓ Todo está guardado — no hay cambios pendientes");
+    } else {
+      setMensajeGuardado("Todavía no hay nada que guardar: responde alguna pregunta y se guarda solo.");
+    }
+  };
+
   // Auto-guardado: cada 1s, si quedaron ediciones sin guardar, se guardan
   // solas — para no depender de que el doctor se acuerde de dar clic en
   // "Guardar" (información clínica delicada no debe depender de eso). Un
@@ -1383,7 +1404,7 @@ export default function HistoriaClinica({
 
   return (
     <div className="space-y-6">
-      <p className="text-xs text-ink/30">
+      <p className="text-xs text-ink/50">
         💡 Este historial se guarda automáticamente mientras escribes. Aun así, para información
         delicada (diagnósticos, alergias), te recomendamos tomar una captura de pantalla como
         respaldo adicional por si acaso.
@@ -1510,13 +1531,20 @@ export default function HistoriaClinica({
             </span>
           )}
         </p>
-        <button
-          onClick={guardar}
-          disabled={guardando || !hayCambiosSinGuardar}
-          className="shrink-0 rounded-lg border border-accent/60 bg-accent/15 px-5 py-2.5 text-sm font-semibold text-accent transition-opacity hover:bg-accent/25 disabled:cursor-not-allowed disabled:opacity-40"
-        >
-          {guardando ? "Guardando…" : yaGuardado ? "Actualizar Historial" : "Guardar Historial"}
-        </button>
+        <div className="flex shrink-0 flex-col items-end gap-1">
+          <button
+            onClick={guardarDesdeBoton}
+            disabled={guardando}
+            className="rounded-lg border border-accent/60 bg-accent/15 px-5 py-2.5 text-sm font-semibold text-accent transition-opacity hover:bg-accent/25 disabled:cursor-not-allowed disabled:opacity-40"
+          >
+            {guardando ? "Guardando…" : yaGuardado ? "Actualizar Historial" : "Guardar Historial"}
+          </button>
+          {mensajeGuardado && (
+            <span role="status" className="max-w-[16rem] text-right text-xs text-success">
+              {mensajeGuardado}
+            </span>
+          )}
+        </div>
       </div>
     </div>
   );

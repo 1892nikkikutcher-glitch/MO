@@ -186,7 +186,7 @@ import type { PlanTratamientoItem, PresupuestoVinculado } from "@/lib/planTratam
 import { actualizarFrecuencias, vocabularioNotasInicial, type VocabularioNotas } from "@/lib/vocabularioNotas";
 import type { ComparativaRehabilitacion } from "@/lib/comparativaRehabilitacion";
 import SelectorClinica from "@/components/SelectorClinica";
-import { avisarFalloGuardado } from "@/lib/avisoFalloGuardado";
+import { avisarFalloGuardado, avisarSinClinica } from "@/lib/avisoFalloGuardado";
 
 type Updater<T> = T | ((prev: T) => T);
 
@@ -1561,6 +1561,10 @@ export function PatientDataProvider({
   };
 
   const updatePatient = (patientId: string, data: Partial<Omit<Patient, "id">>) => {
+    if (!clinicUid) {
+      avisarSinClinica();
+      return;
+    }
     setPatients((prev) => prev.map((p) => (p.id === patientId ? { ...p, ...data } : p)));
   };
 
@@ -2812,7 +2816,10 @@ export function PatientDataProvider({
     patientId: string,
     updater: Updater<RespuestasHistoriaClinica>
   ) => {
-    if (!clinicUid) return;
+    if (!clinicUid) {
+      avisarSinClinica();
+      return;
+    }
     // `prev` puede venir de `respuestasVacias` si la suscripción de este
     // paciente todavía no había resuelto cuando se llama esto (ej. el
     // doctor entró a Historia Clínica y guardó antes de que llegara la
@@ -2831,7 +2838,10 @@ export function PatientDataProvider({
   };
 
   const setFotosPaciente = (patientId: string, updater: Updater<FotosPaciente>) => {
-    if (!clinicUid) return;
+    if (!clinicUid) {
+      avisarSinClinica();
+      return;
+    }
     // Mismo riesgo que setRespuestasHistoriaClinica (ver su comentario) —
     // merge: true evita reemplazar todo el documento si `prev` viene de
     // fotosVacias por una suscripción aún no resuelta.

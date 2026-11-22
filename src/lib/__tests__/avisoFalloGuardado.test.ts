@@ -2,6 +2,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import {
   areaDeRuta,
   avisarFalloGuardado,
+  avisarSinClinica,
   mensajeFalloGuardado,
   motivoDeFallo,
   reiniciarAvisoFalloGuardado,
@@ -45,6 +46,14 @@ describe("avisoFalloGuardado", () => {
     afterEach(() => {
       vi.unstubAllGlobals();
       vi.restoreAllMocks();
+    });
+
+    it("sin clínica activa explica qué hacer, y solo una vez por minuto aunque el autoguardado insista", () => {
+      avisarSinClinica();
+      avisarSinClinica();
+      expect(alerta).toHaveBeenCalledTimes(1);
+      expect(alerta.mock.calls[0][0]).toContain("no tiene una clínica activa");
+      expect(alerta.mock.calls[0][0]).toContain("Cierra sesión");
     });
 
     it("avisa una sola vez ante una ráfaga de fallos y siempre deja el error en consola", () => {
