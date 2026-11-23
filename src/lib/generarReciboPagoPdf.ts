@@ -162,9 +162,9 @@ export async function generarReciboPagoPdf(datos: DatosReciboPagoPdf): Promise<B
       doc.text(dinero(monto), xMonto, y, { align: "right" });
       y += 5.5;
     };
-    filaCuenta("Total presupuestado", resumen.totalPresupuestado);
+    filaCuenta("Cargos por tratamientos realizados", resumen.totalPresupuestado);
     filaCuenta("Pagado a la fecha (incluye este pago)", resumen.totalPagado);
-    filaCuenta("Saldo pendiente", resumen.saldo, true);
+    filaCuenta("Saldo por cobrar", resumen.saldo, true);
     if (resumen.proximaCita) {
       const { fecha, horaInicio, tratamientos, costo } = resumen.proximaCita;
       y += 1.5;

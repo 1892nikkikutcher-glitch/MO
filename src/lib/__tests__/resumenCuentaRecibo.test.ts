@@ -2,7 +2,13 @@ import { describe, expect, it } from "vitest";
 import { montoDeCostoCita, resumenCuentaRecibo } from "../resumenCuentaRecibo";
 import type { CitaAgenda, Pago, SavedBudget } from "../patientData";
 
-const presupuesto = { id: "b1", total: 5000 } as unknown as SavedBudget;
+// Un presupuesto aceptado (de los que ya generan cargo): cotizar solo no genera deuda.
+const presupuesto = {
+  id: "b1",
+  total: 5000,
+  estado: "aceptado",
+  items: [{ id: "t1", procedure: "x", price: 5000, teeth: [], note: "" }],
+} as unknown as SavedBudget;
 const pagoCon = (id: string, monto: number, fecha = "01/01/2026"): Pago =>
   ({ id, fecha, medico: "", formaPago: "Efectivo", total: monto, facturar: false, firma: null, lineas: [{ id: id + "l", tratamientoId: "t1", folio: null, label: "x", monto }] }) as Pago;
 const cita = (fecha: string, costo?: string): CitaAgenda =>

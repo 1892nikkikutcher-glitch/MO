@@ -19,7 +19,7 @@ function toIso(d: Date): string {
  * Pendiente sigue siendo histórico (es un balance actual, no algo que
  * "ocurrió durante" un periodo — no tiene sentido filtrarlo). */
 export default function FinancialSummary({ rango }: { rango: RangoPeriodo }) {
-  const { puedeVerFinanzas, citas, finanzas, estadisticas } = usePatientData();
+  const { puedeVerFinanzas, citas, finanzas, saldosPendientes } = usePatientData();
 
   if (!puedeVerFinanzas) return null;
 
@@ -38,8 +38,13 @@ export default function FinancialSummary({ rango }: { rango: RangoPeriodo }) {
   const ingresosPeriodoAnterior = sumarRango(finanzas.porFecha, desdeAnterior, hastaAnterior);
   const comparacionIngresos = variacionPct(ingresosPeriodo, ingresosPeriodoAnterior);
 
-  const totalPagadoHistorico = Object.values(finanzas.porFecha).reduce((sum, v) => sum + v, 0);
-  const saldoPendiente = Math.max(0, estadisticas.totalPresupuestado - totalPagadoHistorico);
+  // Saldo por cobrar = lo que los pacientes deben por tratamientos aceptados que ya corresponde cobrar (cargos menos
+  // pagos), sumado desde el resumen por paciente. Antes era "todo lo presupuestado menos todo lo cobrado", que
+  // contaba como deuda las cotizaciones y mezclaba cualquier otro ingreso.
+  const saldoPendiente = Object.values(saldosPendientes.porPaciente ?? {}).reduce(
+    (sum, e) => sum + Math.max(0, e.totalPresupuestado - e.totalPagado),
+    0
+  );
 
   const cantidadPagosPeriodo = contarPagosEnRango(finanzas.pagosCountPorFecha, desdePeriodo, hastaPeriodo);
   const ticketPromedio = cantidadPagosPeriodo > 0 ? Math.round(ingresosPeriodo / cantidadPagosPeriodo) : 0;
@@ -88,11 +93,11 @@ export default function FinancialSummary({ rango }: { rango: RangoPeriodo }) {
       />
 
       <DashboardMetricCard
-        label="Saldo Pendiente"
+        label="Saldo por cobrar"
         value={formatCurrency(saldoPendiente)}
         color="#ff3b3b"
         sensible
-        tooltip="Presupuestado histórico menos lo efectivamente cobrado."
+        tooltip="Lo que los pacientes deben por tratamientos aceptados que ya corresponde cobrar (cargos menos pagos). Una cotización no cuenta. Si algo no cuadra, recalcúlalo en Reportes → Saldos pendientes."
       />
 
       <DashboardMetricCard

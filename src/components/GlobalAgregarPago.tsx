@@ -2,7 +2,8 @@
 
 import { useState } from "react";
 import { usePatientData } from "@/context/PatientDataContext";
-import { coincidePaciente, computeTratamientosPendientes, formatNombreConEdad } from "@/lib/patientData";
+import { coincidePaciente, formatNombreConEdad } from "@/lib/patientData";
+import { calcularCuenta, renglonesCobrables } from "@/lib/cuentaPaciente";
 import { manejarCambioNombre } from "@/lib/textoNombre";
 import { AgregarPagoDialog } from "./pages/Pagos";
 
@@ -12,11 +13,14 @@ const inputClass =
 export default function GlobalAgregarPago({
   onClose,
   initialPatientId,
+  servicioSugerido,
 }: {
   onClose: () => void;
   initialPatientId?: string;
+  /** Servicio que conviene cobrar (por ejemplo, el de la cita desde la que se abre): se ofrece ya capturado. */
+  servicioSugerido?: { origenId: string; concepto: string; monto: number };
 }) {
-  const { patients, presupuestosPorPaciente, pagosPorPaciente, setPagosPaciente, addPatient, userEmail, setPagosRealizados } =
+  const { patients, presupuestosPorPaciente, pagosPorPaciente, devolucionesPorPaciente, setPagosPaciente, addPatient, userEmail, setPagosRealizados } =
     usePatientData();
   const [patientId, setPatientId] = useState(initialPatientId ?? "");
   const [busqueda, setBusqueda] = useState("");
@@ -186,15 +190,18 @@ export default function GlobalAgregarPago({
   const patient = patients.find((p) => p.id === patientId)!;
   const presupuestos = presupuestosPorPaciente[patientId] ?? [];
   const pagos = pagosPorPaciente[patientId] ?? [];
-  const tratamientosPendientes = computeTratamientosPendientes(presupuestos, pagos);
-  const saldoPendienteTotal = tratamientosPendientes.reduce((sum, t) => sum + t.pendiente, 0);
+  const devoluciones = devolucionesPorPaciente[patientId] ?? [];
+  const tratamientosPendientes = renglonesCobrables(presupuestos, pagos, devoluciones);
+  const { resumen } = calcularCuenta(presupuestos, pagos, devoluciones);
 
   return (
     <AgregarPagoDialog
       patientId={patientId}
       patientName={patient.name}
-      saldoPendienteTotal={saldoPendienteTotal}
+      saldoPendienteTotal={resumen.porCobrar}
+      saldoAFavor={resumen.aFavor}
       tratamientosPendientes={tratamientosPendientes}
+      servicioSugerido={servicioSugerido}
       onClose={onClose}
       onSave={(pago) => {
         setPagosPaciente(patientId, (prev) => {

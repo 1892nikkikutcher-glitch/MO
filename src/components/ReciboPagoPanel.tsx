@@ -262,7 +262,7 @@ export default function ReciboPagoPanel({
         {resumenCuenta && (
           <div className="mt-2 space-y-1 border-t border-edge/10 pt-2">
             <div className="flex justify-between">
-              <span>Total presupuestado</span>
+              <span>Cargos por tratamientos realizados</span>
               <span>{formatCurrency(resumenCuenta.totalPresupuestado)}</span>
             </div>
             <div className="flex justify-between">
@@ -270,7 +270,7 @@ export default function ReciboPagoPanel({
               <span>{formatCurrency(resumenCuenta.totalPagado)}</span>
             </div>
             <div className="flex justify-between font-semibold">
-              <span>Saldo pendiente</span>
+              <span>Saldo por cobrar</span>
               <span className={resumenCuenta.saldo > 0 ? "text-danger" : "text-success"}>{formatCurrency(resumenCuenta.saldo)}</span>
             </div>
             {resumenCuenta.proximaCita && (

@@ -2,7 +2,7 @@ import { capitalizarNombre } from "./textoNombre";
 import type { BloqueAtencion } from "./sedesBloques";
 import type { HorarioPreferente } from "./horarioPreferente";
 import type { PrioridadTratamiento } from "./planTratamiento";
-import { montoMayorQue, redondearDinero } from "./dinero";
+import { renglonesCobrables } from "./cuentaPaciente";
 import type { MigracionEstado } from "./migracionExpedienteEstado";
 import type { RazonNoAsistencia } from "./noAsistencia";
 import type { DatosFiscales } from "./facturacion";
@@ -198,6 +198,47 @@ export type LineItem = {
    * generó, aunque el plan cambie después. Ausente en renglones capturados
    * a mano o directo del catálogo. */
   origenClinico?: { diagnosticoId: string; planTratamientoItemId: string; prioridad: PrioridadTratamiento };
+  /** Cómo se cobra este renglón. Ausente = por diente (el comportamiento de siempre). Un "paquete" o un
+   * "procedimiento" completo cobran un precio fijo sin importar cuántos dientes cubran: los dientes se
+   * conservan en `teeth` solo como información clínica. */
+  unidadCobro?: UnidadCobro;
+  /** Arcada, zona o fase en texto libre cuando no son dientes sueltos (ej. "arcada superior", "fase 2"). */
+  zona?: string;
+  /** Qué incluye un paquete (ej. ["Limpieza", "Resina OD 16", "Resina OD 26"]). */
+  incluye?: string[];
+  /** Avance clínico de este renglón, independiente de la decisión del paciente y del pago. Ausente = por iniciar. */
+  avance?: AvanceClinico;
+  avanceEl?: string;
+};
+
+export const unidadCobroOptions = ["diente", "superficie", "arcada", "sesion", "procedimiento", "paquete"] as const;
+export type UnidadCobro = (typeof unidadCobroOptions)[number];
+export const unidadCobroLabel: Record<UnidadCobro, string> = {
+  diente: "Por diente",
+  superficie: "Por superficie",
+  arcada: "Por arcada",
+  sesion: "Por sesión",
+  procedimiento: "Procedimiento completo",
+  paquete: "Paquete (precio fijo)",
+};
+
+export const avanceClinicoOptions = ["por_iniciar", "en_curso", "terminado", "cancelado"] as const;
+export type AvanceClinico = (typeof avanceClinicoOptions)[number];
+export const avanceClinicoLabel: Record<AvanceClinico, string> = {
+  por_iniciar: "Por iniciar",
+  en_curso: "En curso",
+  terminado: "Terminado",
+  cancelado: "Cancelado",
+};
+
+/** Cuándo se convierte en cargo lo que el paciente aceptó. "al_realizar" es lo normal en consultorio
+ * (se cobra al terminar cada procedimiento); "al_aceptar" cobra todo lo aceptado desde que se acepta
+ * (pago de contado, tratamientos largos con parcialidades). */
+export const modalidadCobroOptions = ["al_realizar", "al_aceptar"] as const;
+export type ModalidadCobro = (typeof modalidadCobroOptions)[number];
+export const modalidadCobroLabel: Record<ModalidadCobro, string> = {
+  al_realizar: "Cobrar cada procedimiento al realizarlo",
+  al_aceptar: "Cobrar todo lo aceptado desde ahora",
 };
 
 export type BudgetData = {
@@ -219,8 +260,22 @@ export type BudgetData = {
   fechaVigenciaHasta?: string;
 };
 
-export const presupuestoEstadoOptions = ["pendiente", "aceptado", "rechazado", "expirado"] as const;
+/** "no_elegida": una alternativa que el paciente no escogió (otra opción del mismo grupo sí se aceptó).
+ * No se elige a mano: se marca sola al aceptar la otra opción, y se conserva en el historial. */
+export const presupuestoEstadoOptions = ["pendiente", "aceptado", "rechazado", "expirado", "no_elegida"] as const;
 export type EstadoPresupuesto = (typeof presupuestoEstadoOptions)[number];
+
+/** Lo que el paciente autorizó de una propuesta. Aceptar solo registra la decisión: los cargos nacen
+ * según la modalidad (ver cuentaPaciente.ts). Sin esto, un presupuesto en estado "aceptado" se entiende
+ * como aceptado completo (así se guardaban antes). */
+export type AceptacionPresupuesto = {
+  fecha: string; // ISO AAAA-MM-DD
+  /** Renglones aceptados; los demás quedan pendientes para después. */
+  itemIds: string[];
+  modalidad: ModalidadCobro;
+  registradaPorEmail?: string;
+  registradaEl?: string;
+};
 
 export type SavedBudget = BudgetData & {
   id: string;
@@ -232,6 +287,17 @@ export type SavedBudget = BudgetData & {
    * cada vez que esa cita se vuelve a guardar — sin esta bandera, esa
    * regeneración pisaba en silencio cualquier ajuste manual de precio. */
   editadoManualmente?: boolean;
+  /** "servicio": un servicio ya realizado que se registró al cobrarlo (consulta, procedimiento no
+   * presupuestado). Es un cargo desde el primer momento. Ausente = una propuesta. */
+  origen?: "propuesta" | "servicio";
+  /** Lo que el paciente autorizó (ver AceptacionPresupuesto). */
+  aceptacion?: AceptacionPresupuesto;
+  /** Las propuestas con el mismo valor son alternativas excluyentes (opción A / opción B): el paciente
+   * elige una y las demás quedan como "no elegida". Ausente = tratamiento complementario. */
+  grupoAlternativas?: string;
+  /** Versiones anteriores de una propuesta que ya había sido aceptada y se editó después (la más reciente
+   * primero, hasta 20): lo aceptado nunca cambia en silencio. */
+  versiones?: { fecha: string; porEmail?: string; total: number; items: LineItem[] }[];
   /** Quién y cuándo lo creó — ausente en presupuestos anteriores a este
    * registro (ver autoriaRegistros.ts). */
   creadoPorUid?: string;
@@ -262,6 +328,9 @@ export type LineaPago = {
    * desincronizadas. Pagos que no son tratamientos (ej. membresías) no
    * deben marcar esto. */
   generarPresupuesto?: boolean;
+  /** Dinero recibido sin asignar todavía a un tratamiento: se conserva como saldo a favor del paciente
+   * hasta que se asigne (editando el pago). Los cobros que no son tratamientos (membresías…) no lo llevan. */
+  sinAsignar?: boolean;
 };
 
 export type Pago = {
@@ -911,37 +980,11 @@ export function computeTratamientosPendientes(
   pagos: Pago[],
   devoluciones: DevolucionPago[] = []
 ): TratamientoPendiente[] {
-  const pagadoPorTratamiento: Record<string, number> = {};
-  pagos.forEach((pago) => {
-    pago.lineas.forEach((linea) => {
-      if (linea.tratamientoId) {
-        pagadoPorTratamiento[linea.tratamientoId] =
-          (pagadoPorTratamiento[linea.tratamientoId] ?? 0) + linea.monto;
-      }
-    });
-  });
-  // La fuente de verdad es efectoTratamiento POR RENGLÓN de la devolución —
-  // solo "continua" reabre saldo; el resto (cancelado/referido/pendiente/
-  // solo_financiero) nunca genera una cuenta por cobrar automática solo
-  // porque hubo dinero devuelto.
-  devoluciones
-    .filter((d) => d.estado === "completada")
-    .forEach((d) => {
-      (d.itemsAfectados ?? [])
-        .filter((item) => item.efectoTratamiento === "continua")
-        .forEach((item) => {
-          if (item.tratamientoId) {
-            pagadoPorTratamiento[item.tratamientoId] = (pagadoPorTratamiento[item.tratamientoId] ?? 0) - item.montoDevuelto;
-          }
-        });
-    });
-
-  return tratamientosDeDisponibles(presupuestos)
-    .map((t) => ({
-      ...t,
-      pendiente: redondearDinero(t.price - (pagadoPorTratamiento[t.id] ?? 0)),
-    }))
-    .filter((t) => montoMayorQue(t.pendiente, 0));
+  // Lo que se le debe cobrar al paciente: solo renglones aceptados que ya generaron cargo (ver cuentaPaciente.ts).
+  // Una cotización, una alternativa no elegida o un renglón rechazado nunca aparece aquí.
+  return renglonesCobrables(presupuestos, pagos, devoluciones)
+    .filter((r) => r.tipo === "cargo")
+    .map((r) => ({ id: r.id, folio: r.folio, label: r.label, price: r.price, pendiente: r.pendiente }));
 }
 
 export const motivoDevolucionOptions = [

@@ -20,7 +20,8 @@ import { slugify } from "@/lib/textoNombre";
 import { calcularFechaVigencia } from "@/lib/presupuestoVigencia";
 import { prioridadTratamientoLabel } from "@/lib/planTratamiento";
 import type { PresupuestoPrefillItem } from "@/lib/historiaClinica";
-import { identidadDoctorDe, type BudgetData, type LineItem, type Patient } from "@/lib/patientData";
+import { identidadDoctorDe, unidadCobroLabel, unidadCobroOptions, type BudgetData, type LineItem, type Patient, type UnidadCobro } from "@/lib/patientData";
+import { cantidadDeCobro } from "@/lib/cuentaPaciente";
 import { medicoPredeterminadoParaPago } from "@/lib/medicoDelPago";
 import { toISODate } from "@/lib/agendaHelpers";
 
@@ -29,6 +30,10 @@ const VIGENCIA_DIAS_DEFECTO = 30;
 export type { BudgetData };
 
 const tiposDePrecios = ["Consultorio", "Convenio", "Particular", "Seguro Dental"];
+
+/** Arcada, superficie y sesión se cobran por la cantidad que se indique; diente depende de los dientes marcados;
+ * procedimiento completo y paquete son un precio fijo. */
+const unidadPideCantidad = (u?: UnidadCobro) => u === "arcada" || u === "superficie" || u === "sesion";
 
 function formatCurrency(value: number) {
   return `$${value.toLocaleString("es-MX")}`;
@@ -90,7 +95,7 @@ export default function NuevoPresupuesto({
   onSave: (budget: BudgetData) => void;
 }) {
   const patientName = patient.name;
-  const { recursos, citas, procedimientos, setProcedimientos, perfilDoctor, irAPagina, setCambiosSinGuardar } =
+  const { recursos, citas, procedimientos, setProcedimientos, perfilDoctor, irAPagina, setCambiosSinGuardar, miRol } =
     usePatientData();
   const medicos = recursos.filter((r) => r.tipo === "medico");
   const procedimientosActivos = procedimientos.filter(esProcedimientoActivo);
@@ -147,6 +152,13 @@ export default function NuevoPresupuesto({
   const [personalizadoNombre, setPersonalizadoNombre] = useState("");
   const [personalizadoPrecio, setPersonalizadoPrecio] = useState("");
   const [mostrarPersonalizado, setMostrarPersonalizado] = useState(false);
+  const [personalizadoUnidad, setPersonalizadoUnidad] = useState<UnidadCobro>("diente");
+  const [personalizadoIncluye, setPersonalizadoIncluye] = useState("");
+  /** Guardar un concepto único en el catálogo es una decisión aparte (y solo del administrador): por defecto el
+   * concepto vale solo para este presupuesto. */
+  const [guardarEnCatalogo, setGuardarEnCatalogo] = useState(false);
+  const puedeGuardarEnCatalogo = miRol === "admin";
+  const [cantidadManual, setCantidadManual] = useState("");
   const [selectedTeeth, setSelectedTeeth] = useState<number[]>([]);
   const [descuentoPct, setDescuentoPct] = useState("");
   const [items, setItems] = useState<LineItem[]>(
@@ -268,21 +280,38 @@ export default function NuevoPresupuesto({
     );
   };
 
-  /** El precio siempre se multiplica por la cantidad de dientes marcados en
-   * el odontograma (ej. una resina en 3 piezas cuesta 3 veces el precio
-   * unitario) — "Precio Unitario" es siempre el precio por diente. Para un
-   * tratamiento con un precio combinado fijo que cubre varios dientes,
-   * captura el precio total y marca solo un diente representativo. */
+  /** Cuánto se cobra depende de la unidad del procedimiento (ver cantidadDeCobro): por diente multiplica por los
+   * dientes marcados; un paquete o un procedimiento completo es un precio fijo aunque se marquen varios dientes
+   * (quedan como información clínica); arcada, superficie y sesión usan la cantidad que se indique. */
   const procedimientosSeleccionados = procedimientos.filter((p) =>
     procedimientosSeleccionadosIds.includes(p.id)
   );
+  const unidadActual: UnidadCobro | undefined = mostrarPersonalizado
+    ? personalizadoUnidad
+    : procedimientosSeleccionados.length === 1
+      ? procedimientosSeleccionados[0].unidadCobro
+      : undefined;
+  const multiplicadorDe = (unidad?: UnidadCobro) =>
+    cantidadDeCobro(unidad, selectedTeeth.length, Number(cantidadManual) || undefined);
   const precioUnitarioDelCatalogo =
     procedimientosSeleccionados.length === 1 ? procedimientosSeleccionados[0].costoPaciente : undefined;
-  const multiplicador = Math.max(selectedTeeth.length, 1);
+  const multiplicador = multiplicadorDe(unidadActual);
+  const pideCantidad =
+    procedimientosSeleccionados.some((p) => unidadPideCantidad(p.unidadCobro)) ||
+    (mostrarPersonalizado && unidadPideCantidad(personalizadoUnidad));
+  const palabraUnidad = (n: number) => (n === 1 ? "unidad" : !unidadActual || unidadActual === "diente" ? "dientes" : "unidades");
 
-  const agregarItem = (procedure: string, precioUnitario: number) => {
+  const limpiarCaptura = () => {
+    setSelectedTeeth([]);
+    setDescuentoPct("");
+    setNotaProcedimiento("");
+    setCantidadManual("");
+  };
+
+  const agregarItem = (procedure: string, precioUnitario: number, unidad?: UnidadCobro, incluye?: string[]) => {
     const descuento = Math.min(100, Math.max(0, Number(descuentoPct) || 0));
-    const precioTotal = Math.round(precioUnitario * multiplicador * (1 - descuento / 100) * 100) / 100;
+    const cantidad = multiplicadorDe(unidad);
+    const precioTotal = Math.round(precioUnitario * cantidad * (1 - descuento / 100) * 100) / 100;
     setItems((prev) => [
       ...prev,
       {
@@ -290,41 +319,42 @@ export default function NuevoPresupuesto({
         procedure,
         price: precioTotal,
         precioUnitario,
-        cantidad: multiplicador,
+        cantidad,
         descuentoPct: descuento,
         teeth: selectedTeeth,
         note: notaProcedimiento.trim(),
+        ...(unidad && unidad !== "diente" ? { unidadCobro: unidad } : {}),
+        ...(incluye && incluye.length > 0 ? { incluye } : {}),
       },
     ]);
-    setSelectedTeeth([]);
-    setDescuentoPct("");
-    setNotaProcedimiento("");
+    limpiarCaptura();
   };
 
   /** Igual que agregarItem pero reemplaza un renglón existente en vez de
-   * añadir uno — misma fórmula de precio (multiplicador × descuento). */
-  const actualizarItem = (id: string, procedure: string, precioUnitario: number) => {
+   * añadir uno — misma fórmula de precio (cantidad × descuento). */
+  const actualizarItem = (id: string, procedure: string, precioUnitario: number, unidad?: UnidadCobro, incluye?: string[]) => {
     const descuento = Math.min(100, Math.max(0, Number(descuentoPct) || 0));
-    const precioTotal = Math.round(precioUnitario * multiplicador * (1 - descuento / 100) * 100) / 100;
+    const cantidad = multiplicadorDe(unidad);
+    const precioTotal = Math.round(precioUnitario * cantidad * (1 - descuento / 100) * 100) / 100;
     setItems((prev) =>
-      prev.map((it) =>
-        it.id === id
-          ? {
-              ...it,
-              procedure,
-              price: precioTotal,
-              precioUnitario,
-              cantidad: multiplicador,
-              descuentoPct: descuento,
-              teeth: selectedTeeth,
-              note: notaProcedimiento.trim(),
-            }
-          : it
-      )
+      prev.map((it) => {
+        if (it.id !== id) return it;
+        const { unidadCobro: _u, incluye: _i, ...base } = it;
+        return {
+          ...base,
+          procedure,
+          price: precioTotal,
+          precioUnitario,
+          cantidad,
+          descuentoPct: descuento,
+          teeth: selectedTeeth,
+          note: notaProcedimiento.trim(),
+          ...(unidad && unidad !== "diente" ? { unidadCobro: unidad } : {}),
+          ...(incluye && incluye.length > 0 ? { incluye } : {}),
+        };
+      })
     );
-    setSelectedTeeth([]);
-    setDescuentoPct("");
-    setNotaProcedimiento("");
+    limpiarCaptura();
   };
 
   const iniciarEdicionItem = (item: LineItem) => {
@@ -334,6 +364,9 @@ export default function NuevoPresupuesto({
     setDescuentoPct(item.descuentoPct ? String(item.descuentoPct) : "");
     setPersonalizadoNombre(item.procedure);
     setPersonalizadoPrecio(String(item.precioUnitario ?? item.price));
+    setPersonalizadoUnidad(item.unidadCobro ?? "diente");
+    setPersonalizadoIncluye((item.incluye ?? []).join(", "));
+    setCantidadManual(unidadPideCantidad(item.unidadCobro) ? String(item.cantidad ?? 1) : "");
     setProcedimientosSeleccionadosIds([]);
     setMostrarPersonalizado(true);
   };
@@ -342,28 +375,26 @@ export default function NuevoPresupuesto({
     setMostrarPersonalizado(false);
     setPersonalizadoNombre("");
     setPersonalizadoPrecio("");
+    setPersonalizadoUnidad("diente");
+    setPersonalizadoIncluye("");
+    setGuardarEnCatalogo(false);
     if (editandoItemId) {
       setEditandoItemId(null);
-      setSelectedTeeth([]);
-      setDescuentoPct("");
-      setNotaProcedimiento("");
+      limpiarCaptura();
     }
   };
 
   const handleAgregarDelCatalogo = () => {
     if (procedimientosSeleccionados.length === 0) return;
     procedimientosSeleccionados.forEach((procedimiento) => {
-      agregarItem(procedimiento.nombre, procedimiento.costoPaciente);
+      agregarItem(procedimiento.nombre, procedimiento.costoPaciente, procedimiento.unidadCobro);
     });
     setProcedimientosSeleccionadosIds([]);
   };
 
-  /** Un procedimiento agregado aquí sin estar en el catálogo (ej. una resina
-   * que todavía no se da de alta) se guarda de una vez en el catálogo con
-   * el costo capturado, para que la próxima vez ya aparezca en el listado
-   * normal — el costo al odontólogo y el tiempo estimado quedan en 0/30 min
-   * hasta que se completen en Administración → Procedimientos. */
-  const guardarProcedimientoNoCatalogadoEnCatalogo = (nombre: string, costoPaciente: number) => {
+  /** Un concepto que no está en el catálogo vale solo para este presupuesto. Guardarlo en el catálogo es una decisión
+   * aparte (solo el administrador): queda con el costo al odontólogo "sin configurar", no en $0. */
+  const guardarProcedimientoNoCatalogadoEnCatalogo = (nombre: string, costoPaciente: number, unidad: UnidadCobro) => {
     const yaExiste = procedimientos.some(
       (p) => p.nombre.trim().toLowerCase() === nombre.toLowerCase()
     );
@@ -374,7 +405,9 @@ export default function NuevoPresupuesto({
       especialidad,
       costoPaciente,
       costoOdontologo: 0,
+      costoSinConfigurar: true,
       duracionMinutos: 30,
+      ...(unidad !== "diente" ? { unidadCobro: unidad } : {}),
     };
     setProcedimientos((prev) => [...prev, nuevo]);
   };
@@ -383,15 +416,19 @@ export default function NuevoPresupuesto({
     const nombre = personalizadoNombre.trim();
     const precio = Number(personalizadoPrecio);
     if (!nombre || !precio) return;
+    const incluye = personalizadoUnidad === "paquete" ? personalizadoIncluye.split(/[,\n]/).map((t) => t.trim()).filter(Boolean) : undefined;
     if (editandoItemId) {
-      actualizarItem(editandoItemId, nombre, precio);
+      actualizarItem(editandoItemId, nombre, precio, personalizadoUnidad, incluye);
       setEditandoItemId(null);
     } else {
-      agregarItem(nombre, precio);
-      guardarProcedimientoNoCatalogadoEnCatalogo(nombre, precio);
+      agregarItem(nombre, precio, personalizadoUnidad, incluye);
+      if (guardarEnCatalogo && puedeGuardarEnCatalogo) guardarProcedimientoNoCatalogadoEnCatalogo(nombre, precio, personalizadoUnidad);
     }
     setPersonalizadoNombre("");
     setPersonalizadoPrecio("");
+    setPersonalizadoUnidad("diente");
+    setPersonalizadoIncluye("");
+    setGuardarEnCatalogo(false);
     setMostrarPersonalizado(false);
   };
 
@@ -666,6 +703,7 @@ export default function NuevoPresupuesto({
                           </span>
                           <span className="whitespace-nowrap text-xs text-ink/50">
                             {formatCurrency(p.costoPaciente)}
+                            {p.unidadCobro && p.unidadCobro !== "diente" ? ` · ${unidadCobroLabel[p.unidadCobro]}` : ""}
                           </span>
                         </label>
                       );
@@ -690,16 +728,30 @@ export default function NuevoPresupuesto({
             <span className="text-xs text-ink/50">%</span>
           </div>
 
+          {pideCantidad && (
+            <div className="flex items-center gap-2">
+              <label className="text-xs font-medium text-ink/60">Cantidad</label>
+              <input
+                type="number"
+                min={1}
+                value={cantidadManual}
+                onChange={(e) => setCantidadManual(e.target.value)}
+                placeholder="1"
+                className="w-20 rounded-lg border border-edge/10 bg-field px-2 py-1.5 text-sm text-ink outline-none focus:border-accent/60"
+              />
+              <span className="text-xs text-ink/50">(arcadas, superficies o sesiones)</span>
+            </div>
+          )}
+
           {procedimientosSeleccionados.length > 1 ? (
             <p className="text-xs text-ink/50">
-              Se agregarán {procedimientosSeleccionados.length} renglones — cada uno ×{" "}
-              {multiplicador} {multiplicador === 1 ? "unidad" : "dientes"}
+              Se agregarán {procedimientosSeleccionados.length} renglones
               {Number(descuentoPct) > 0 ? `, con ${descuentoPct}% de descuento` : ""}. Total:{" "}
               {formatCurrency(
                 procedimientosSeleccionados.reduce(
                   (sum, p) =>
                     sum +
-                    Math.round(p.costoPaciente * multiplicador * (1 - (Number(descuentoPct) || 0) / 100) * 100) / 100,
+                    Math.round(p.costoPaciente * multiplicadorDe(p.unidadCobro) * (1 - (Number(descuentoPct) || 0) / 100) * 100) / 100,
                   0
                 )
               )}
@@ -709,8 +761,7 @@ export default function NuevoPresupuesto({
               <p className="text-xs text-ink/50">
                 {precioUnitarioDelCatalogo !== undefined ? (
                   <>
-                    {formatCurrency(precioUnitarioDelCatalogo)} × {multiplicador}{" "}
-                    {multiplicador === 1 ? "unidad" : "dientes"}
+                    {formatCurrency(precioUnitarioDelCatalogo)} × {multiplicador} {palabraUnidad(multiplicador)}
                     {Number(descuentoPct) > 0 ? ` − ${descuentoPct}%` : ""} ={" "}
                     {formatCurrency(
                       Math.round(precioUnitarioDelCatalogo * multiplicador * (1 - (Number(descuentoPct) || 0) / 100) * 100) /
@@ -718,7 +769,7 @@ export default function NuevoPresupuesto({
                     )}
                   </>
                 ) : (
-                  `Se multiplicará el precio × ${multiplicador} ${multiplicador === 1 ? "unidad" : "dientes"}${
+                  `Se multiplicará el precio × ${multiplicador} ${palabraUnidad(multiplicador)}${
                     Number(descuentoPct) > 0 ? `, con ${descuentoPct}% de descuento` : ""
                   }.`
                 )}
@@ -752,10 +803,8 @@ export default function NuevoPresupuesto({
                   "Editando este renglón — ajusta nombre, precio, dientes o descuento y presiona \"Aplicar al renglón\". Después, no olvides guardar todo el presupuesto con el botón de hasta abajo — eso es lo que realmente lo guarda en el expediente."
                 ) : (
                   <>
-                    Procedimiento no catalogado: aún no está en tu catálogo, pero sí se puede
-                    realizar. Se agregará también a{" "}
-                    <span className="font-medium text-ink/60">{especialidad}</span> para que
-                    aparezca en presupuestos futuros de cualquier paciente.
+                    Concepto para este presupuesto: no está en tu catálogo, pero sí se puede
+                    realizar. Vale solo para este presupuesto, salvo que el administrador lo guarde en el catálogo.
                   </>
                 )}
               </p>
@@ -776,6 +825,33 @@ export default function NuevoPresupuesto({
                   className="w-full rounded-lg border border-edge/10 bg-field px-3 py-2 text-sm text-ink placeholder-ink/30 outline-none focus:border-accent/60"
                 />
               </div>
+              <select
+                value={personalizadoUnidad}
+                onChange={(e) => setPersonalizadoUnidad(e.target.value as UnidadCobro)}
+                aria-label="Cómo se cobra"
+                className="w-full rounded-lg border border-edge/10 bg-field px-3 py-2 text-sm text-ink outline-none focus:border-accent/60"
+              >
+                {unidadCobroOptions.map((u) => (
+                  <option key={u} value={u}>
+                    {unidadCobroLabel[u]}
+                  </option>
+                ))}
+              </select>
+              {personalizadoUnidad === "paquete" && (
+                <input
+                  type="text"
+                  value={personalizadoIncluye}
+                  onChange={(e) => setPersonalizadoIncluye(e.target.value)}
+                  placeholder="Qué incluye (separado por comas)"
+                  className="w-full rounded-lg border border-edge/10 bg-field px-3 py-2 text-sm text-ink placeholder-ink/30 outline-none focus:border-accent/60"
+                />
+              )}
+              {!editandoItemId && puedeGuardarEnCatalogo && (
+                <label className="flex items-center gap-2 text-xs text-ink/60">
+                  <input type="checkbox" checked={guardarEnCatalogo} onChange={(e) => setGuardarEnCatalogo(e.target.checked)} className="accent-[color:var(--accent)]" />
+                  Guardar también en el catálogo (costo al odontólogo quedará «sin configurar»)
+                </label>
+              )}
               <div className="flex gap-2">
                 <button
                   onClick={handleAgregarPersonalizado}
@@ -839,6 +915,12 @@ export default function NuevoPresupuesto({
                         </span>
                       )}
                     </div>
+                    {item.unidadCobro && (
+                      <div className="text-xs text-ink/40">
+                        {unidadCobroLabel[item.unidadCobro]}
+                        {item.incluye && item.incluye.length > 0 ? ` — incluye: ${item.incluye.join(", ")}` : ""}
+                      </div>
+                    )}
                     {(item.cantidad ?? 1) > 1 && (
                       <div className="text-xs text-ink/40">
                         {formatCurrency(item.precioUnitario ?? item.price)} × {item.cantidad}

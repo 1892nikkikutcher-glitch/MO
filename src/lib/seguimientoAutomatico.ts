@@ -70,6 +70,7 @@ export type ResultadoSeguimiento =
       creada: false;
       motivo:
         | "ya_existe"
+        | "ya_programada"
         | "conflicto"
         | "fuera_de_horario"
         | "no_aplica"
@@ -98,6 +99,20 @@ export function crearSiguienteCitaSeguimiento({
   if (!citaAtendida.seguimientoAutomatico) return { creada: false, motivo: "no_aplica" };
   if (citasExistentes.some((c) => c.seguimientoOrigenCitaId === citaAtendida.id)) {
     return { creada: false, motivo: "ya_existe" }; // idempotencia — cambiar el intervalo después no genera una segunda
+  }
+  // Si el paciente ya tiene una próxima cita programada (agendada a mano, por
+  // recepción), no se genera otra encima: el seguimiento respeta lo ya acordado.
+  if (
+    citaAtendida.patientId &&
+    citasExistentes.some(
+      (c) =>
+        c.id !== citaAtendida.id &&
+        c.patientId === citaAtendida.patientId &&
+        (c.estatus === "Agendada" || c.estatus === "Confirmada") &&
+        c.fecha > citaAtendida.fecha
+    )
+  ) {
+    return { creada: false, motivo: "ya_programada" };
   }
   if (!intervaloValido(citaAtendida.seguimientoIntervalo)) return { creada: false, motivo: "intervalo_invalido" };
   // MO nunca inventa el motivo clínico — sin uno confirmado por el doctor,

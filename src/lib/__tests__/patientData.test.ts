@@ -116,8 +116,8 @@ describe("computeTratamientosPendientes — regresión sin devoluciones", () => 
     expect(pendientes).toEqual([]);
   });
 
-  it("presupuesto sin pagos sigue mostrando el pendiente completo", () => {
-    const pendientes = computeTratamientosPendientes([presupuesto], []);
+  it("un presupuesto aceptado sin pagos muestra el pendiente completo", () => {
+    const pendientes = computeTratamientosPendientes([{ ...presupuesto, estado: "aceptado" }], []);
     expect(pendientes.find((t) => t.id === "trat-A")?.pendiente).toBe(500);
     expect(pendientes.find((t) => t.id === "trat-B")?.pendiente).toBe(2500);
   });

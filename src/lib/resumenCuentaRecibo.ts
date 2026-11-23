@@ -1,7 +1,8 @@
 /** Estado de cuenta que acompaña al recibo de pago: cuánto se presupuestó, cuánto lleva pagado el paciente (con este
  * pago incluido) y cuánto falta; más lo que costaría su próxima cita, si ya está agendada con un costo estimado. */
 
-import { calcularSaldoPendiente } from "./saldosPendientes";
+import { calcularCuenta } from "./cuentaPaciente";
+import { redondearDinero } from "./dinero";
 import { siguienteCita } from "./formatosWhatsapp";
 import { fechaPagoAIso } from "./metas";
 import type { CitaAgenda, DevolucionPago, Pago, SavedBudget } from "./patientData";
@@ -41,7 +42,12 @@ export function resumenCuentaRecibo(datos: {
   if (datos.presupuestos.length === 0) return null;
   const limite = clave(datos.pago);
   const hastaEstePago = [datos.pago, ...datos.pagos.filter((p) => p.id !== datos.pago.id && clave(p) <= limite)];
-  const { totalPresupuestado, totalPagado, saldo } = calcularSaldoPendiente(datos.presupuestos, hastaEstePago, datos.devoluciones);
+  // Cargos = lo aceptado que ya corresponde cobrar. Lo pagado incluye anticipos y dinero sin asignar (si no, un recibo de
+  // un anticipo diría que no se ha pagado nada).
+  const { resumen } = calcularCuenta(datos.presupuestos, hastaEstePago, datos.devoluciones);
+  const totalPresupuestado = resumen.cargos;
+  const totalPagado = redondearDinero(resumen.pagadoACargos + resumen.aFavor);
+  const saldo = resumen.porCobrar;
   const cita = siguienteCita(datos.citas, datos.patientId);
   return {
     totalPresupuestado,

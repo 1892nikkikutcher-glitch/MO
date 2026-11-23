@@ -3,6 +3,8 @@
  * verdad que después alimentará presupuestos, comisiones y duración por
  * defecto en la Agenda. */
 
+import type { UnidadCobro } from "./patientData";
+
 export const especialidadesPredefinidas = [
   "Odontología General",
   "Ortodoncia",
@@ -37,6 +39,12 @@ export type Procedimiento = {
   /** Costo de insumos/laboratorio — distinto de costoOdontologo, que es la
    * comisión del odontólogo. */
   costoInterno?: number;
+  /** Cómo se cobra: por diente (lo habitual), superficie, arcada, sesión, procedimiento completo o paquete de precio
+   * fijo. Ausente = por diente. */
+  unidadCobro?: UnidadCobro;
+  /** true si el costo al odontólogo todavía no se ha capturado (por ejemplo, un procedimiento que se agregó al
+   * vuelo al presupuestar): se muestra como "sin configurar", no como $0, y no se usa para calcular comisiones. */
+  costoSinConfigurar?: boolean;
   notasInternas?: string;
   /** Código permanente del catálogo recomendado (ej. "CON-VAL") si este
    * procedimiento se creó a partir de una plantilla — es la clave que evita

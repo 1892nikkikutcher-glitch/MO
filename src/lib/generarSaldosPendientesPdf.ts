@@ -41,7 +41,7 @@ export async function generarSaldosPendientesPdf(datos: DatosSaldosPendientesPdf
   pdf.pares([
     ["Pacientes con saldo", String(filas.length)],
     ["Total por cobrar", dineroPdf(totalSaldo)],
-    ["Presupuestado", dineroPdf(totalPresupuestado)],
+    ["Cargos (tratamientos aceptados y realizados)", dineroPdf(totalPresupuestado)],
     ["Pagado", dineroPdf(totalPagado)],
   ]);
   if (datos.provisional) {
@@ -53,7 +53,7 @@ export async function generarSaldosPendientesPdf(datos: DatosSaldosPendientesPdf
     [
       { titulo: "Paciente", ancho: 3.2 },
       { titulo: "Teléfono", ancho: 1.6 },
-      { titulo: "Presupuestado", ancho: 1.5, alinear: "derecha" },
+      { titulo: "Cargos", ancho: 1.5, alinear: "derecha" },
       { titulo: "Pagado", ancho: 1.4, alinear: "derecha" },
       { titulo: "Saldo", ancho: 1.5, alinear: "derecha" },
     ],

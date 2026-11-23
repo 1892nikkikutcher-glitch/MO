@@ -1,14 +1,12 @@
 "use client";
 
-import { Fragment, useEffect, useState, type Dispatch, type SetStateAction } from "react";
+import { Fragment, useEffect, useRef, useState, type Dispatch, type SetStateAction } from "react";
 import {
   formatCurrency,
-  computeTratamientosPendientes,
   tratamientosDeDisponibles,
   motivoDevolucionLabel,
   type SavedBudget,
   type Tratamiento,
-  type TratamientoPendiente,
   type LineaPago,
   type Pago,
   type DevolucionPago,
@@ -23,6 +21,15 @@ import { medicoPredeterminadoParaPago } from "@/lib/medicoDelPago";
 import { FORMA_PAGO_CASHBACK, baseCashbackDePago, calcularCashback, esFormaPagoCashback, montoMaximoCanje, otorgarCashbackAPago, puedeOtorgarCashback } from "@/lib/cashback";
 import { avisoCashbackEnPago } from "@/lib/cashbackTextos";
 import { toISODate } from "@/lib/agendaHelpers";
+import {
+  calcularCuenta,
+  conServicios,
+  crearServicioRealizado,
+  idServicio,
+  marcarAvance,
+  renglonesCobrables,
+  type RenglonCobrable,
+} from "@/lib/cuentaPaciente";
 
 const formasDePago = ["Efectivo", "Tarjeta de crédito", "Tarjeta de débito", "Transferencia", "Cheque"];
 
@@ -157,9 +164,17 @@ export function EditarPagoDialog({
     setLineas((prev) =>
       prev.map((l) => {
         if (l.id !== id) return l;
-        if (valor === "__otro__") return { ...l, tratamientoId: null, folio: null };
+        if (valor === "__otro__") {
+          const { sinAsignar: _quitado, ...resto } = l;
+          return { ...resto, tratamientoId: null, folio: null };
+        }
+        // Dinero recibido sin asignar (anticipo): se conserva como saldo a favor del paciente.
+        if (valor === "__saldo_favor__") return { ...l, tratamientoId: null, folio: null, sinAsignar: true };
         const t = tratamientosDisponibles.find((x) => x.id === valor);
-        return t ? { ...l, tratamientoId: t.id, folio: t.folio, label: t.label } : l;
+        if (!t) return l;
+        // Asignar a un tratamiento es APLICAR el saldo a favor: la línea deja de ser "sin asignar".
+        const { sinAsignar: _aplicado, ...resto } = l;
+        return { ...resto, tratamientoId: t.id, folio: t.folio, label: t.label };
       })
     );
   };
@@ -236,7 +251,7 @@ export function EditarPagoDialog({
               >
                 <div className="flex items-center gap-2">
                   <select
-                    value={esLibre ? "__otro__" : l.tratamientoId!}
+                    value={l.sinAsignar && !l.tratamientoId ? "__saldo_favor__" : esLibre ? "__otro__" : l.tratamientoId!}
                     onChange={(e) => actualizarTratamiento(l.id, e.target.value)}
                     className="min-w-0 flex-1 rounded-md border border-edge/10 bg-field px-2 py-1.5 text-sm text-ink outline-none focus:border-accent/60"
                   >
@@ -245,6 +260,7 @@ export function EditarPagoDialog({
                         #{t.folio} — {t.label}
                       </option>
                     ))}
+                    <option value="__saldo_favor__">Sin asignar — saldo a favor del paciente</option>
                     <option value="__otro__">Otro concepto (texto libre)</option>
                   </select>
                   <span className="flex shrink-0 items-center gap-1 text-ink/60">
@@ -258,9 +274,14 @@ export function EditarPagoDialog({
                     />
                   </span>
                 </div>
-                {esLibre && (
+                {esLibre && l.sinAsignar && (
+                  <p className="text-[11px] text-ink/50">
+                    Este dinero queda a favor del paciente. Para aplicarlo, elige arriba el tratamiento al que corresponde.
+                  </p>
+                )}
+                {esLibre && !l.sinAsignar && (
                   <p className="text-[11px] text-warning">
-                    Este concepto NO descuenta de ningún presupuesto: el paciente seguirá apareciendo con saldo.
+                    Este concepto NO descuenta de ningún tratamiento: el paciente seguirá apareciendo con saldo.
                   </p>
                 )}
                 {esLibre && (
@@ -306,19 +327,30 @@ export function EditarPagoDialog({
   );
 }
 
+/** Un servicio realizado, o un anticipo sin asignar, que se agrega al cobrar. */
+type ExtraPago = { id: string; tipo: "servicio" | "anticipo"; label: string; monto: number; origenId?: string };
+
 export function AgregarPagoDialog({
   patientId,
   patientName,
   saldoPendienteTotal,
+  saldoAFavor = 0,
   tratamientosPendientes,
+  servicioSugerido,
   formaPagoInicial,
   onClose,
   onSave,
 }: {
   patientId: string;
   patientName: string;
+  /** Saldo por cobrar: cargos menos pagos aplicados. */
   saldoPendienteTotal: number;
-  tratamientosPendientes: TratamientoPendiente[];
+  /** Dinero recibido disponible para aplicar (anticipos y pagos sin asignar). */
+  saldoAFavor?: number;
+  /** Lo que se puede cobrar: cargos ya generados y, aparte, lo aceptado aún sin realizar (anticipo). */
+  tratamientosPendientes: RenglonCobrable[];
+  /** Servicio que la cita sugiere cobrar (concepto y costo): se ofrece ya capturado, y se registra al guardar. */
+  servicioSugerido?: { origenId: string; concepto: string; monto: number };
   /** Con "Cashback" el pago se abre listo para pagarse con el saldo del paciente (si tiene). */
   formaPagoInicial?: string;
   onClose: () => void;
@@ -329,7 +361,7 @@ export function AgregarPagoDialog({
   // de la clínica (Agenda → Recursos), nunca de una lista genérica — así
   // "Médico" en el recibo es el mismo nombre que alimenta el desglose de
   // ingresos por médico, en vez de un valor que nadie más lee.
-  const { recursos, saldoCashbackDe, cashbackConfig, patients, citas } = usePatientData();
+  const { recursos, saldoCashbackDe, cashbackConfig, patients, citas, presupuestosPorPaciente, setPresupuestosPaciente, userEmail } = usePatientData();
   const medicosDisponibles = recursos.filter((r) => r.tipo === "medico").map((r) => r.nombre);
   const saldoCashbackPaciente = saldoCashbackDe(patientId);
   const cashbackDisponible = saldoCashbackPaciente.disponible;
@@ -357,12 +389,25 @@ export function AgregarPagoDialog({
   const [formaPago, setFormaPago] = useState(formaPagoInicial === FORMA_PAGO_CASHBACK && cashbackDisponible > 0 ? FORMA_PAGO_CASHBACK : formasDePago[0]);
   const [seleccionados, setSeleccionados] = useState<string[]>([]);
   const [montos, setMontos] = useState<Record<string, number>>({});
-  const [extras, setExtras] = useState<{ id: string; label: string; monto: number }[]>([]);
+  /** En lo aceptado que aún no se realiza: encendido = se hizo hoy (se marca terminado y genera su cargo); apagado = anticipo. */
+  const [realizadoHoy, setRealizadoHoy] = useState<Record<string, boolean>>({});
+  // Si la cita ya tiene su servicio registrado (un pago anterior), no se vuelve a ofrecer: aparece como cargo por cobrar.
+  const sugerenciaYaRegistrada = servicioSugerido
+    ? (presupuestosPorPaciente[patientId] ?? []).some((p) => p.id === idServicio(servicioSugerido.origenId))
+    : false;
+  const [extras, setExtras] = useState<ExtraPago[]>(() =>
+    servicioSugerido && !sugerenciaYaRegistrada
+      ? [{ id: `sug-${servicioSugerido.origenId}`, tipo: "servicio", label: servicioSugerido.concepto, monto: servicioSugerido.monto, origenId: servicioSugerido.origenId }]
+      : []
+  );
+  const [extraTipo, setExtraTipo] = useState<"servicio" | "anticipo">("servicio");
   const [extraConcepto, setExtraConcepto] = useState("");
   const [extraMonto, setExtraMonto] = useState("");
   const [facturar, setFacturar] = useState(false);
+  // Guardar dos veces el mismo cobro (doble clic, reintento) nunca debe duplicar el pago ni el servicio.
+  const guardandoRef = useRef(false);
 
-  const toggleTratamiento = (t: TratamientoPendiente) => {
+  const toggleTratamiento = (t: RenglonCobrable) => {
     setSeleccionados((prev) => {
       if (prev.includes(t.id)) return prev.filter((s) => s !== t.id);
       setMontos((m) => (m[t.id] !== undefined ? m : { ...m, [t.id]: t.pendiente }));
@@ -380,7 +425,12 @@ export function AgregarPagoDialog({
     if (!puedeAgregarExtra) return;
     setExtras((prev) => [
       ...prev,
-      { id: `${Date.now()}`, label: extraConcepto.trim() || "Pago extra", monto: extraMontoNumerico },
+      {
+        id: `${Date.now()}`,
+        tipo: extraTipo,
+        label: extraConcepto.trim() || (extraTipo === "servicio" ? "Servicio realizado" : "Anticipo"),
+        monto: extraMontoNumerico,
+      },
     ]);
     setExtraConcepto("");
     setExtraMonto("");
@@ -401,37 +451,52 @@ export function AgregarPagoDialog({
   const puedeGuardar = totalAPagar > 0 && medico !== "" && !excedeCashback;
 
   const handleGuardar = () => {
-    if (!puedeGuardar) return;
+    if (!puedeGuardar || guardandoRef.current) return;
+    guardandoRef.current = true;
 
-    const lineasTratamientos: LineaPago[] = tratamientosPendientes
-      .filter((t) => seleccionados.includes(t.id))
-      .map((t) => ({
-        id: `${Date.now()}-${t.id}`,
-        tratamientoId: t.id,
-        folio: t.folio,
-        label: t.label,
-        monto: montos[t.id] ?? 0,
-      }));
+    const ahora = new Date();
+    const pagoId = `${ahora.getTime()}`;
+    const fecha = ahora.toLocaleDateString("es-MX", { day: "2-digit", month: "2-digit", year: "numeric" });
+    const fechaISO = toISODate(ahora);
+    const seleccion = tratamientosPendientes.filter((t) => seleccionados.includes(t.id));
 
-    const lineasExtras: LineaPago[] = extras.map((e) => ({
-      id: e.id,
-      tratamientoId: null,
-      folio: null,
-      label: e.label,
-      monto: e.monto,
-      // Por defecto, todo pago que no venga de un presupuesto existente se
-      // refleja como su propio presupuesto — así nunca queda como saldo
-      // pendiente algo que el paciente ya pagó.
-      generarPresupuesto: true,
+    const lineasTratamientos: LineaPago[] = seleccion.map((t) => ({
+      id: `${pagoId}-${t.id}`,
+      tratamientoId: t.id,
+      folio: t.folio,
+      label: t.label,
+      monto: montos[t.id] ?? 0,
     }));
 
+    // Un servicio nuevo se registra de forma EXPLÍCITA (con su cargo) y el pago se liga a él: el pago por sí solo
+    // nunca crea presupuestos. Un anticipo queda como saldo a favor hasta que se asigne a un tratamiento.
+    const serviciosNuevos: SavedBudget[] = [];
+    const lineasExtras: LineaPago[] = extras.map((e, i) => {
+      if (e.tipo === "anticipo") {
+        return { id: `${pagoId}-x${i}`, tratamientoId: null, folio: null, label: e.label, monto: e.monto, sinAsignar: true };
+      }
+      const servicio = crearServicioRealizado({
+        origenId: e.origenId ?? `pago-${pagoId}-${i}`,
+        concepto: e.label,
+        precio: e.monto,
+        medico,
+        fecha,
+        fechaISO,
+        porEmail: userEmail,
+      });
+      serviciosNuevos.push(servicio);
+      return { id: `${pagoId}-x${i}`, tratamientoId: servicio.items[0].id, folio: servicio.folio, label: e.label, monto: e.monto };
+    });
+
+    // Lo aceptado que se realizó hoy queda terminado: es lo que lo convierte en cargo cuando se cobra al realizar.
+    const terminadosHoy = seleccion.filter((t) => t.tipo === "anticipo" && (realizadoHoy[t.id] ?? true)).map((t) => t.id);
+    if (serviciosNuevos.length > 0 || terminadosHoy.length > 0) {
+      setPresupuestosPaciente(patientId, (prev) => marcarAvance(conServicios(prev, serviciosNuevos), terminadosHoy, "terminado", fechaISO));
+    }
+
     const pago: Pago = {
-      id: `${Date.now()}`,
-      fecha: new Date().toLocaleDateString("es-MX", {
-        day: "2-digit",
-        month: "2-digit",
-        year: "numeric",
-      }),
+      id: pagoId,
+      fecha,
       medico,
       formaPago,
       lineas: [...lineasTratamientos, ...lineasExtras],
@@ -504,11 +569,16 @@ export function AgregarPagoDialog({
         <div className="space-y-4">
           <div className="rounded-lg border border-accent/30 bg-accent/10 px-3 py-2">
             <div className="text-[11px] uppercase tracking-wide text-ink/50">
-              Saldo pendiente del paciente
+              Saldo por cobrar del paciente
             </div>
             <div className="text-xl font-bold text-accent">
               {formatCurrency(saldoPendienteTotal)}
             </div>
+            {saldoAFavor > 0 && (
+              <div className="mt-0.5 text-xs text-ink/60">
+                Además tiene <span className="font-semibold text-success">{formatCurrency(saldoAFavor)}</span> a favor (anticipos o pagos sin asignar).
+              </div>
+            )}
           </div>
 
           {avisoCashback && (
@@ -584,7 +654,7 @@ export function AgregarPagoDialog({
                 </p>
               )}
               {pagaConCashback && valorAtencion === 0 && (
-                <p className="mt-1 text-[11px] text-ink/50">El Cashback se aplica a un tratamiento del presupuesto o a un pago extra: márcalo o agrégalo abajo.</p>
+                <p className="mt-1 text-[11px] text-ink/50">El Cashback se aplica a un tratamiento o a un servicio realizado: márcalo o agrégalo abajo.</p>
               )}
               {pagaConCashback && valorAtencion > 0 && !excedeCashback && (
                 <p className="mt-1 text-[11px] text-ink/50">Puedes cubrir hasta {formatCurrency(maxCashbackAhora)} con Cashback en esta atención; el resto cóbralo en otro pago.</p>
@@ -600,20 +670,12 @@ export function AgregarPagoDialog({
 
           <div>
             <div className="mb-1 flex items-center justify-between">
-              <label className="block text-xs font-medium text-ink/60">
-                Tratamientos pendientes por pagar
-              </label>
+              <label className="block text-xs font-medium text-ink/60">¿Qué se está pagando?</label>
             </div>
 
-            {tratamientosPendientes.length > 0 && (
-              <p className="mb-1.5 rounded-lg border border-warning/30 bg-warning/10 p-2 text-[11px] text-ink/70">
-                Si este pago es de alguno de estos tratamientos, <strong>márcalo aquí abajo</strong> (no uses «Pago extra»): así el saldo del presupuesto baja. Un pago extra se cuenta como trabajo aparte y el
-                tratamiento seguiría apareciendo como deuda.
-              </p>
-            )}
             {tratamientosPendientes.length === 0 && extras.length === 0 ? (
               <p className="rounded-lg border border-dashed border-edge/15 p-4 text-center text-xs text-ink/30">
-                Este paciente no tiene tratamientos pendientes por pagar. Si necesita pagar algo, agrégalo abajo como pago extra.
+                Este paciente no tiene nada por cobrar ni tratamiento aceptado. Si se le hizo un servicio, regístralo abajo.
               </p>
             ) : (
               <div className="max-h-56 space-y-1.5 overflow-y-auto rounded-lg border border-edge/10 p-2">
@@ -632,27 +694,46 @@ export function AgregarPagoDialog({
                           <span className="text-ink/80">
                             <span className="mr-1 text-ink/40">#{t.folio}</span>
                             {t.label}
+                            {t.tipo === "anticipo" && (
+                              <span className="ml-2 rounded-full bg-accent/10 px-1.5 py-0.5 text-[10px] font-semibold text-accent">
+                                Aceptado, por realizar
+                              </span>
+                            )}
                           </span>
                         </span>
                         <span className="shrink-0 text-xs text-ink/40">
-                          Pendiente: {formatCurrency(t.pendiente)}
+                          {t.tipo === "cargo" ? "Por cobrar" : "Autorizado"}: {formatCurrency(t.pendiente)}
                         </span>
                       </label>
                       {isSelected && (
-                        <div className="mt-1.5 flex items-center justify-end gap-2 pl-6">
-                          <span className="text-xs text-ink/40">Abono / pago:</span>
-                          <span className="flex items-center gap-1 text-ink/60">
-                            $
-                            <input
-                              type="number"
-                              min={0}
-                              max={t.pendiente}
-                              value={montos[t.id] ?? t.pendiente}
-                              onChange={(e) =>
-                                setMontos((prev) => ({ ...prev, [t.id]: Math.min(Math.max(Number(e.target.value) || 0, 0), t.pendiente) }))
-                              }
-                              className="w-24 rounded-md border border-edge/10 bg-field px-1.5 py-1 text-right text-sm text-ink outline-none focus:border-accent/60"
-                            />
+                        <div className="mt-1.5 flex flex-wrap items-center justify-end gap-x-4 gap-y-1 pl-6">
+                          {t.tipo === "anticipo" && (
+                            <label className="flex items-center gap-1.5 text-xs text-ink/60">
+                              <input
+                                type="checkbox"
+                                checked={realizadoHoy[t.id] ?? true}
+                                onChange={(e) => setRealizadoHoy((prev) => ({ ...prev, [t.id]: e.target.checked }))}
+                                className="h-3.5 w-3.5 accent-accent"
+                              />
+                              Se realizó hoy
+                              <span className="text-ink/40">{(realizadoHoy[t.id] ?? true) ? "" : "(queda como anticipo)"}</span>
+                            </label>
+                          )}
+                          <span className="flex items-center gap-2">
+                            <span className="text-xs text-ink/40">Abono / pago:</span>
+                            <span className="flex items-center gap-1 text-ink/60">
+                              $
+                              <input
+                                type="number"
+                                min={0}
+                                max={t.pendiente}
+                                value={montos[t.id] ?? t.pendiente}
+                                onChange={(e) =>
+                                  setMontos((prev) => ({ ...prev, [t.id]: Math.min(Math.max(Number(e.target.value) || 0, 0), t.pendiente) }))
+                                }
+                                className="w-24 rounded-md border border-edge/10 bg-field px-1.5 py-1 text-right text-sm text-ink outline-none focus:border-accent/60"
+                              />
+                            </span>
                           </span>
                         </div>
                       )}
@@ -667,7 +748,7 @@ export function AgregarPagoDialog({
                   >
                     <span className="flex items-center gap-2 text-ink/80">
                       <span className="rounded bg-success/15 px-1.5 py-0.5 text-[10px] font-semibold uppercase text-success">
-                        Extra
+                        {e.tipo === "servicio" ? "Servicio" : "Anticipo"}
                       </span>
                       {e.label}
                     </span>
@@ -687,9 +768,19 @@ export function AgregarPagoDialog({
             )}
 
             <div className="mt-2 rounded-lg border border-dashed border-accent/30 p-2.5">
+              <select
+                value={extraTipo}
+                onChange={(e) => setExtraTipo(e.target.value as "servicio" | "anticipo")}
+                aria-label="Tipo de cobro adicional"
+                className={`${inputClass} mb-1.5`}
+              >
+                <option value="servicio">Servicio realizado que no estaba presupuestado</option>
+                <option value="anticipo">Anticipo o pago sin asignar (queda a favor del paciente)</option>
+              </select>
               <p className="mb-1.5 text-[11px] text-ink/50">
-                <strong className="text-ink/70">Pago extra</strong> · algo que no está presupuestado pero es necesario
-                pagar (ej. medicamento recetado). Solo escribe el monto.
+                {extraTipo === "servicio"
+                  ? "Se registra el servicio y su cargo, y este pago lo cubre. Ej. consulta de valoración, medicamento."
+                  : "El dinero queda como saldo a favor; después se asigna a un tratamiento desde Pagos (✎ Editar)."}
               </p>
               <div className="space-y-2">
                 <input
@@ -697,7 +788,7 @@ export function AgregarPagoDialog({
                   value={extraConcepto}
                   onChange={(e) => setExtraConcepto(e.target.value)}
                   placeholder="Concepto (opcional)"
-                  aria-label="Concepto del pago extra"
+                  aria-label="Concepto del cobro adicional"
                   className={inputClass}
                 />
                 <div className="flex gap-2">
@@ -712,7 +803,7 @@ export function AgregarPagoDialog({
                         if (e.key === "Enter") agregarExtra();
                       }}
                       placeholder="Monto"
-                      aria-label="Monto del pago extra"
+                      aria-label="Monto del cobro adicional"
                       className={`${inputClass} pl-7`}
                     />
                   </div>
@@ -860,29 +951,16 @@ export default function Pagos({
     setPagoAEliminar(null);
   };
 
-  const tratamientosPendientes: TratamientoPendiente[] = computeTratamientosPendientes(
-    presupuestos,
-    pagos,
-    devoluciones
-  );
-
-  const totalPresupuestado = presupuestos.reduce((sum, p) => sum + p.total, 0);
-  /** Dinero cobrado en líneas sin tratamiento: entra a caja pero no descuenta
-   * de ningún presupuesto (ver calcularSaldoPendiente). */
+  // Tres cosas distintas que antes se mezclaban en un solo "presupuestado": lo que el paciente solo está considerando,
+  // lo que autorizó y todavía no se cobra, y lo que ya se le debe cobrar (cargos menos pagos). Ver cuentaPaciente.ts.
+  const tratamientosPendientes = renglonesCobrables(presupuestos, pagos, devoluciones);
+  const { resumen } = calcularCuenta(presupuestos, pagos, devoluciones);
+  /** Dinero cobrado en líneas sin tratamiento que NO se dejaron a propósito como anticipo: entra a caja pero no
+   * baja ningún saldo (ver calcularSaldoPendiente). */
   const montoSinLigar = pagos.reduce(
-    (sum, p) => sum + p.lineas.reduce((ls, l) => ls + (!l.tratamientoId ? l.monto : 0), 0),
+    (sum, p) => sum + p.lineas.reduce((ls, l) => ls + (!l.tratamientoId && !l.sinAsignar ? l.monto : 0), 0),
     0
   );
-  const saldoPendienteTratamientos = tratamientosPendientes.reduce(
-    (sum, t) => sum + t.pendiente,
-    0
-  );
-  /** Solo cuenta pagos ligados a un tratamiento del presupuesto — pagos
-   * sueltos como membresías no cuentan como abono a un tratamiento, para
-   * que Saldo Pendiente no se vea "pagado" por dinero que en realidad es
-   * de otro concepto. */
-  const totalPagado = totalPresupuestado - saldoPendienteTratamientos;
-  const saldoPendiente = saldoPendienteTratamientos;
 
   const upsertPago = (pago: Pago) => {
     if (pagos.some((p) => p.id === pago.id)) {
@@ -934,16 +1012,16 @@ export default function Pagos({
 
       <div className={`grid grid-cols-1 gap-3 ${mostrarCashback ? "sm:grid-cols-2 lg:grid-cols-4" : "sm:grid-cols-3"}`}>
         <div className="rounded-xl border border-edge/10 bg-surface p-4">
-          <div className="text-[11px] uppercase tracking-wide text-ink/40">Total Presupuestado</div>
-          <div className="mt-1 text-lg font-bold text-ink">{formatCurrency(totalPresupuestado)}</div>
+          <div className="text-[11px] uppercase tracking-wide text-ink/40" title="Lo aceptado que ya corresponde cobrar (por ejemplo, tratamientos realizados).">Cargos</div>
+          <div className="mt-1 text-lg font-bold text-ink">{formatCurrency(resumen.cargos)}</div>
         </div>
         <div className="rounded-xl border border-edge/10 bg-surface p-4">
-          <div className="text-[11px] uppercase tracking-wide text-ink/40">Total Pagado</div>
-          <div className="mt-1 text-lg font-bold text-success">{formatCurrency(totalPagado)}</div>
+          <div className="text-[11px] uppercase tracking-wide text-ink/40">Pagado a cargos</div>
+          <div className="mt-1 text-lg font-bold text-success">{formatCurrency(resumen.pagadoACargos)}</div>
         </div>
         <div className="rounded-xl border border-edge/10 bg-surface p-4">
-          <div className="text-[11px] uppercase tracking-wide text-ink/40">Saldo Pendiente</div>
-          <div className="mt-1 text-lg font-bold text-danger">{formatCurrency(Math.max(saldoPendiente, 0))}</div>
+          <div className="text-[11px] uppercase tracking-wide text-ink/40" title="Cargos menos pagos aplicados y ajustes. Una cotización no cuenta.">Saldo por cobrar</div>
+          <div className="mt-1 text-lg font-bold text-danger">{formatCurrency(resumen.porCobrar)}</div>
         </div>
         {mostrarCashback && (
           <div className="rounded-xl border border-success/30 bg-success/5 p-4">
@@ -970,6 +1048,19 @@ export default function Pagos({
           </div>
         )}
       </div>
+
+      {(resumen.aFavor > 0 || resumen.aceptadoPendienteDeCobro > 0 || resumen.propuesto > 0) && (
+        <p className="text-xs text-ink/50">
+          {[
+            resumen.aFavor > 0 && `A favor del paciente: ${formatCurrency(resumen.aFavor)}`,
+            resumen.aceptadoPendienteDeCobro > 0 && `Aceptado, aún sin cobrar: ${formatCurrency(resumen.aceptadoPendienteDeCobro)}`,
+            resumen.propuesto > 0 && `Propuesto (en consideración): ${formatCurrency(resumen.propuesto)}`,
+          ]
+            .filter(Boolean)
+            .join(" · ")}
+          . Solo los cargos cuentan como saldo por cobrar.
+        </p>
+      )}
 
       {avisoOtorgado && (
         <div className="flex items-start justify-between gap-3 rounded-xl border border-success/30 bg-success/10 p-3 text-xs text-ink/80">
@@ -1138,7 +1229,8 @@ export default function Pagos({
         <AgregarPagoDialog
           patientId={patientId}
           patientName={patientName}
-          saldoPendienteTotal={saldoPendienteTratamientos}
+          saldoPendienteTotal={resumen.porCobrar}
+          saldoAFavor={resumen.aFavor}
           tratamientosPendientes={tratamientosPendientes}
           formaPagoInicial={formaPagoInicial}
           onClose={() => setShowDialog(false)}

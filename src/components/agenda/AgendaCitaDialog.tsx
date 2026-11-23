@@ -17,15 +17,12 @@ import { usePatientData } from "@/context/PatientDataContext";
 import {
   calcularEdadDetallada,
   citaEstatusOptions,
-  computeTratamientosPendientes,
   formatNombreConEdad,
   type CitaAgenda,
   type CitaEstatus,
   type FrecuenciaRecurrencia,
   type IntervaloSeguimiento,
   type Recurso,
-  type LineItem,
-  type SavedBudget,
   type UnidadSeguimiento,
 } from "@/lib/patientData";
 import { lineaCashbackRecordatorio, monederoEnCita } from "@/lib/cashbackTextos";
@@ -40,7 +37,6 @@ import {
 import { manejarCambioNombre } from "@/lib/textoNombre";
 import { addDays, medicoPreferidoDePaciente } from "@/lib/agendaHelpers";
 import { citaAnteriorDelPaciente, datosFaltantesDeCita } from "@/lib/citaAnteriorDelPaciente";
-import { pareceControlOMensualidad } from "@/lib/autoriaRegistros";
 import {
   estatusAdmiteMotivo,
   razonesNoAsistencia,
@@ -49,6 +45,7 @@ import {
 } from "@/lib/noAsistencia";
 import { formatDuracion } from "@/lib/procedimientos";
 import GlobalAgregarPago from "@/components/GlobalAgregarPago";
+import { calcularRenglones } from "@/lib/cuentaPaciente";
 import ConfirmarEliminar from "@/components/ConfirmarEliminar";
 import {
   timeToMinutes,
@@ -120,11 +117,9 @@ export default function AgendaCitaDialog({
     formatosWhatsapp,
     cargarDatosPaciente,
     presupuestosPorPaciente,
-    setPresupuestosPaciente,
     pagosPorPaciente,
     citas,
     horario,
-    limpiarPresupuestoDeCita,
     miUid,
     userEmail,
     sedes,
@@ -202,10 +197,6 @@ export default function AgendaCitaDialog({
   const [tratamientos, setTratamientos] = useState<string[]>(initial.tratamientos ?? []);
   const [procedimientoInput, setProcedimientoInput] = useState("");
   const [costo, setCosto] = useState(initial.costo ?? "");
-  // null = decidir solo: un control de ortodoncia o una mensualidad es una
-  // visita/cuota de un tratamiento que YA existe, no un tratamiento nuevo, y
-  // no debe crear su propio presupuesto. Recepción puede cambiarlo.
-  const [generarPresupuestoElegido, setGenerarPresupuestoElegido] = useState<boolean | null>(null);
   const [comentarios, setComentarios] = useState(initial.comentarios ?? "");
   const [fecha, setFecha] = useState(initial.fecha);
   const [horaInicio, setHoraInicio] = useState(initial.horaInicio);
@@ -408,11 +399,11 @@ export default function AgendaCitaDialog({
     setProcedimientoInput("");
   };
 
+  // Tratamiento ya aceptado por el paciente que todavía no se realiza (de ahí se agenda la siguiente visita).
   const tratamientosPendientes = patientId
-    ? computeTratamientosPendientes(
-        presupuestosPorPaciente[patientId] ?? [],
-        pagosPorPaciente[patientId] ?? []
-      )
+    ? calcularRenglones(presupuestosPorPaciente[patientId] ?? [], pagosPorPaciente[patientId] ?? [])
+        .filter((r) => r.decision === "aceptado" && (r.avance === "por_iniciar" || r.avance === "en_curso"))
+        .map((r) => ({ id: r.item.id, label: r.label }))
     : [];
 
   const agregarDelPresupuesto = (label: string) => {
@@ -523,58 +514,9 @@ export default function AgendaCitaDialog({
       ...(estatusAdmiteMotivo(estatus) && detalleNA.trim() ? { detalleNoAsistencia: detalleNA.trim() } : {}),
     };
 
-    // Si la cita queda ligada a un paciente y trae un costo estimado, se
-    // refleja de una vez en su Presupuesto — así el presupuesto y los pagos
-    // (que ya se calculan contra el presupuesto) quedan conectados desde
-    // el momento en que se agenda, sin esperar a que alguien lo capture a
-    // mano por separado. El presupuesto queda ligado 1 a 1 a esta cita
-    // (mismo id, "pres-cita-<id de la cita>"): si se vuelve a guardar la
-    // misma cita con otro costo o tratamientos, se actualiza ese mismo
-    // presupuesto en vez de crear uno nuevo. Antes se evitaba duplicar
-    // comparando el NOMBRE del procedimiento contra todo el historial del
-    // paciente, pero eso hacía que una limpieza (o cualquier tratamiento
-    // recurrente) ya facturada alguna vez dejara de generar presupuesto en
-    // citas futuras — quedaban sin nada pendiente por cobrar.
-    // Una cita que no se va a atender (cancelada, reagendada, no asistió) NO
-    // genera presupuesto — nadie puede pagarlo y solo infla el saldo — y el
-    // que ya tuviera, si nadie lo pagó, se quita (queda en la Papelera).
-    if (patientId && estatusAdmiteMotivo(estatus) && isEditing) {
-      void limpiarPresupuestoDeCita(patientId, base.id, estatus);
-    }
-    const generarPresupuesto = generarPresupuestoElegido ?? !pareceControlOMensualidad(tratamientos);
-    if (patientId && tratamientos.length > 0 && !estatusAdmiteMotivo(estatus) && generarPresupuesto) {
-      const montoCosto = Number(costo.replace(/[^\d.]/g, "")) || 0;
-      if (montoCosto > 0) {
-        const presupuestoId = `pres-cita-${base.id}`;
-        const items: LineItem[] = tratamientos.map((t, idx) => ({
-          id: `item-cita-${base.id}-${idx}`,
-          procedure: t,
-          price: idx === 0 ? montoCosto - Math.floor(montoCosto / tratamientos.length) * (tratamientos.length - 1) : Math.floor(montoCosto / tratamientos.length),
-          teeth: [],
-          note: "",
-        }));
-        const presupuestoDeCita: SavedBudget = {
-          id: presupuestoId,
-          folio: base.id.slice(-6),
-          fecha,
-          medico: recursos.find((r) => r.id === (medicoId || unidadId))?.nombre ?? "",
-          tipoDePrecio: "Consultorio",
-          especialidad: "Odontología General",
-          diagnostico: "Generado automáticamente a partir de una cita agendada.",
-          items,
-          total: montoCosto,
-        };
-        setPresupuestosPaciente(patientId, (prev) => {
-          const existente = prev.find((p) => p.id === presupuestoId);
-          // Si ya alguien lo editó a mano en Presupuestos (ej. ajustó el
-          // precio), no lo pisamos solo porque la cita se volvió a guardar.
-          if (existente?.editadoManualmente) return prev;
-          return existente
-            ? prev.map((p) => (p.id === presupuestoId ? presupuestoDeCita : p))
-            : [presupuestoDeCita, ...prev];
-        });
-      }
-    }
+    // Agendar una cita NO genera presupuestos, cargos ni deuda. El "Costo estimado" es solo informativo (sale en el
+    // recordatorio de WhatsApp). Si hay que cobrar la consulta o pedir un anticipo, se hace con el botón de pago de
+    // esta misma cita, que registra el servicio y su cobro de forma explícita.
 
     const citasAGuardar: CitaAgenda[] = [base];
     if (!isEditing && recurrente && repeticiones > 0) {
@@ -971,7 +913,7 @@ export default function AgendaCitaDialog({
             </label>
             {tratamientosPendientes.length > 0 && (
               <div className="mb-2 space-y-1">
-                <p className="text-[11px] text-ink/40">Del presupuesto de este paciente:</p>
+                <p className="text-[11px] text-ink/40">Tratamiento aceptado por realizar:</p>
                 <div className="flex flex-wrap gap-1.5">
                   {tratamientosPendientes.map((t) => (
                     <button
@@ -1032,7 +974,7 @@ export default function AgendaCitaDialog({
 
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
           <div>
-            <label className="mb-1 block text-xs font-medium text-ink/60">Costo estimado (aparece en el recordatorio de WhatsApp)</label>
+            <label className="mb-1 block text-xs font-medium text-ink/60">Costo estimado (informativo: sale en el recordatorio de WhatsApp y no genera deuda)</label>
             <input
               type="text"
               value={costo}
@@ -1041,24 +983,6 @@ export default function AgendaCitaDialog({
               className={inputClass}
             />
           </div>
-
-          {patientId && costo.trim() && tratamientos.length > 0 && (
-            <label className="flex cursor-pointer items-start gap-2 text-xs text-ink/70 sm:col-span-2">
-              <input
-                type="checkbox"
-                className="mt-0.5"
-                checked={generarPresupuestoElegido ?? !pareceControlOMensualidad(tratamientos)}
-                onChange={(e) => setGenerarPresupuestoElegido(e.target.checked)}
-              />
-              <span>
-                Crear un presupuesto con este costo en el expediente del paciente.
-                <span className="block text-ink/40">
-                  Déjalo apagado en controles de ortodoncia, mensualidades o revisiones: son visitas de un tratamiento
-                  que ya tiene su presupuesto, y cobrarlas se aplica a ese presupuesto desde la pestaña Pagos.
-                </span>
-              </span>
-            </label>
-          )}
 
           {monedero && (
             <div className="rounded-lg border border-success/30 bg-success/10 px-3 py-2 text-xs sm:col-span-2">
@@ -1428,7 +1352,15 @@ export default function AgendaCitaDialog({
       </div>
 
       {showAgregarPago && patientId && (
-        <GlobalAgregarPago initialPatientId={patientId} onClose={() => setShowAgregarPago(false)} />
+        <GlobalAgregarPago
+          initialPatientId={patientId}
+          onClose={() => setShowAgregarPago(false)}
+          servicioSugerido={
+            tratamientos.length > 0 && Number(costo.replace(/[^\d.]/g, "")) > 0
+              ? { origenId: `cita-${initial.id}`, concepto: tratamientos.join(", "), monto: Number(costo.replace(/[^\d.]/g, "")) }
+              : undefined
+          }
+        />
       )}
 
       {confirmandoEliminarCita && onDelete && (

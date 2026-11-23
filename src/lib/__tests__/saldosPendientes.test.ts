@@ -110,7 +110,7 @@ describe("calcularSaldosGlobales", () => {
 
   it("detecta pagos sin ligar a un tratamiento: no bajan el saldo pero se reportan", () => {
     const r = calcularSaldosGlobales(
-      [{ patientId: "a", patientName: "A", presupuestos: [presupuesto("b1", 1000)], pagos: [pago("p1", [{ tratamientoId: null, monto: 700 }])], devoluciones: [] }],
+      [{ patientId: "a", patientName: "A", presupuestos: [{ ...(presupuesto("b1", 1000) as unknown as object), estado: "aceptado" } as never], pagos: [pago("p1", [{ tratamientoId: null, monto: 700 }])], devoluciones: [] }],
       "2026-10-05T00:00:00Z"
     );
     expect(r.porPaciente.a.totalPagado).toBe(0);

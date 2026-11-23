@@ -7,6 +7,7 @@
  * reporte solo muestre a quien realmente debe algo. */
 
 import { redondearDinero } from "./dinero";
+import { calcularCuenta, propuestasAntiguasSinDecision } from "./cuentaPaciente";
 import type { DevolucionPago, Pago, SavedBudget } from "./patientData";
 
 export type SaldoPendienteEntry = {
@@ -35,29 +36,21 @@ export function calcularSaldoPendiente(
   pagos: Pago[],
   devoluciones: DevolucionPago[] = []
 ): { totalPresupuestado: number; totalPagado: number; saldo: number } {
-  const totalPresupuestado = redondearDinero(presupuestos.reduce((s, p) => s + p.total, 0));
-  const totalPagadoBruto = redondearDinero(
-    pagos.reduce((s, p) => s + p.lineas.reduce((ls, l) => ls + (l.tratamientoId ? l.monto : 0), 0), 0)
-  );
-  const totalDevueltoQueReabreDeuda = redondearDinero(
-    devoluciones
-      .filter((d) => d.estado === "completada")
-      .reduce(
-        (s, d) =>
-          s +
-          (d.itemsAfectados ?? [])
-            .filter((i) => i.efectoTratamiento === "continua")
-            .reduce((ls, i) => ls + (i.tratamientoId ? i.montoDevuelto : 0), 0),
-        0
-      )
-  );
-  const totalPagado = redondearDinero(totalPagadoBruto - totalDevueltoQueReabreDeuda);
-  return { totalPresupuestado, totalPagado, saldo: redondearDinero(totalPresupuestado - totalPagado) };
+  // Desde el modelo de cuenta (cuentaPaciente.ts), cotizar no genera deuda: el saldo por cobrar son los cargos
+  // (lo aceptado que ya corresponde cobrar) menos lo pagado. Por compatibilidad con lo ya guardado en
+  // `config/saldosPendientes`, los campos conservan su nombre: `totalPresupuestado` es el total de CARGOS y
+  // `totalPagado` lo pagado contra esos cargos.
+  const { resumen } = calcularCuenta(presupuestos, pagos, devoluciones);
+  return { totalPresupuestado: resumen.cargos, totalPagado: resumen.pagadoACargos, saldo: resumen.porCobrar };
 }
 
 /** Pagos (líneas) que no descuentan de ningún presupuesto porque no están
  * ligados a un tratamiento — el dinero entró a caja pero el saldo no baja. */
 export type PagosSinLigar = { patientId: string; patientName: string; monto: number; cantidad: number };
+
+/** Paciente con propuestas antiguas (anteriores al modelo de cuenta) sin decisión ni pagos: ya no cuentan como
+ * deuda y alguien debe confirmar si el paciente las aceptó. */
+export type PropuestaAntiguaPaciente = { patientId: string; patientName: string; cantidad: number; monto: number };
 
 export type EntradaRecalculo = {
   patientId: string;
@@ -74,10 +67,17 @@ export type EntradaRecalculo = {
 export function calcularSaldosGlobales(entradas: EntradaRecalculo[], ahoraISO: string): {
   porPaciente: Record<string, SaldoPendienteEntry>;
   sinLigar: PagosSinLigar[];
+  /** Presupuestos de antes del modelo de cuenta que antes sumaban al saldo y ahora son solo propuestas. */
+  revision: PropuestaAntiguaPaciente[];
 } {
   const porPaciente: Record<string, SaldoPendienteEntry> = {};
   const sinLigar: PagosSinLigar[] = [];
+  const revision: PropuestaAntiguaPaciente[] = [];
   entradas.forEach((e) => {
+    const antiguas = propuestasAntiguasSinDecision(e.presupuestos, e.pagos);
+    if (antiguas.cantidad > 0) {
+      revision.push({ patientId: e.patientId, patientName: e.patientName, cantidad: antiguas.cantidad, monto: antiguas.monto });
+    }
     const { totalPresupuestado, totalPagado, saldo } = calcularSaldoPendiente(e.presupuestos, e.pagos, e.devoluciones);
     if (saldo > 0) {
       porPaciente[e.patientId] = {
@@ -98,5 +98,9 @@ export function calcularSaldosGlobales(entradas: EntradaRecalculo[], ahoraISO: s
       });
     }
   });
-  return { porPaciente, sinLigar: sinLigar.sort((a, b) => b.monto - a.monto) };
+  return {
+    porPaciente,
+    sinLigar: sinLigar.sort((a, b) => b.monto - a.monto),
+    revision: revision.sort((a, b) => b.monto - a.monto),
+  };
 }

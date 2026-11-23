@@ -33,7 +33,11 @@ import { descargarBlob } from "@/lib/pdfDocumento";
 import AbrirWhatsAppPrompt from "@/components/AbrirWhatsAppPrompt";
 import AvisoNoCabeEnHoja from "@/components/AvisoNoCabeEnHoja";
 import { slugify } from "@/lib/textoNombre";
+import AceptacionPropuestaPanel from "./AceptacionPropuestaPanel";
+import { aceptarPropuesta, calcularCuenta, marcarAvance } from "@/lib/cuentaPaciente";
 import {
+  avanceClinicoLabel,
+  avanceClinicoOptions,
   computeTratamientosPendientes,
   formatCurrency,
   formatEdad,
@@ -42,6 +46,7 @@ import {
   identidadDoctorDe,
   presupuestoEstadoOptions,
   type CitaAgenda,
+  type AvanceClinico,
   type EstadoPresupuesto,
   type Patient,
   type SavedBudget,
@@ -73,6 +78,7 @@ const estadoPresupuestoLabel: Record<EstadoPresupuesto, string> = {
   aceptado: "Aceptado",
   rechazado: "Rechazado",
   expirado: "Expirado",
+  no_elegida: "Alternativa no elegida",
 };
 
 const estadoPresupuestoColor: Record<EstadoPresupuesto, string> = {
@@ -80,6 +86,7 @@ const estadoPresupuestoColor: Record<EstadoPresupuesto, string> = {
   aceptado: "bg-success/10 text-success",
   rechazado: "bg-danger/10 text-danger",
   expirado: "bg-warning/10 text-warning",
+  no_elegida: "bg-ink/10 text-ink/50",
 };
 
 const expedienteTabs = [
@@ -271,8 +278,13 @@ function PresupuestosTab({
     setComparativasPaciente,
     vincularPresupuestoAPlan,
     nombresDeDispositivos,
+    pagosPorPaciente: pagosDeTodos,
+    devolucionesPorPaciente: devolucionesDeTodos,
+    userEmail,
   } = usePatientData();
   const [view, setView] = useState<"list" | "form" | "comparativa">("list");
+  /** Presupuesto cuyo panel de "qué autorizó el paciente" está abierto. */
+  const [aceptandoId, setAceptandoId] = useState<string | null>(null);
   const [editingBudget, setEditingBudget] = useState<SavedBudget | null>(null);
   const [editingComparativa, setEditingComparativa] = useState<ComparativaRehabilitacion | null>(null);
   const [printComparativa, setPrintComparativa] = useState<ComparativaRehabilitacion | null>(null);
@@ -283,6 +295,37 @@ function PresupuestosTab({
    * ResultadoEnvioWhatsapp en enviarPdfWhatsapp.ts. */
   const [waUrlPendiente, setWaUrlPendiente] = useState<string | null>(null);
   const comparativas = comparativasPorPaciente[patient.id] ?? [];
+  // Decisión, avance y cargo de cada renglón se CALCULAN (cuentaPaciente.ts); aquí solo se muestran.
+  const cuenta = calcularCuenta(presupuestos, pagosDeTodos[patient.id] ?? [], devolucionesDeTodos[patient.id] ?? []);
+  const renglonPorId = new Map(cuenta.renglones.map((r) => [r.item.id, r]));
+  const hoyISO = toISODate(new Date());
+
+  /** Las propuestas de una misma comparativa son alternativas excluyentes: se marcan con un grupo en común para
+   * que el saldo no las sume y, al aceptar una, las demás queden como "no elegida". */
+  const marcarAlternativas = (comparativa: ComparativaRehabilitacion) => {
+    const ids = new Set(comparativa.opciones.map((o) => o.presupuestoId));
+    const grupo = `alt-${comparativa.id}`;
+    setPresupuestos((prev) =>
+      prev.map((p) => {
+        if (ids.has(p.id)) return p.grupoAlternativas === grupo ? p : { ...p, grupoAlternativas: grupo };
+        if (p.grupoAlternativas === grupo) {
+          const { grupoAlternativas: _quitado, ...resto } = p;
+          return resto;
+        }
+        return p;
+      })
+    );
+  };
+  const desmarcarAlternativas = (comparativa: ComparativaRehabilitacion) => {
+    const grupo = `alt-${comparativa.id}`;
+    setPresupuestos((prev) =>
+      prev.map((p) => {
+        if (p.grupoAlternativas !== grupo) return p;
+        const { grupoAlternativas: _quitado, ...resto } = p;
+        return resto;
+      })
+    );
+  };
 
   useEffect(() => {
     if (printComparativa) window.print();
@@ -490,13 +533,21 @@ function PresupuestosTab({
           const nuevoId = editingBudget ? editingBudget.id : `${Date.now()}`;
           setPresupuestos((prev) => {
             if (editingBudget) {
-              return prev.map((p) =>
-                p.id === editingBudget.id
-                  ? { ...budget, id: p.id, estado: p.estado, editadoManualmente: true }
-                  : p
-              );
+              return prev.map((p) => {
+                if (p.id !== editingBudget.id) return p;
+                // Se conserva todo lo que no es del formulario (aceptación, alternativas, origen, quién lo creó). Si ya
+                // estaba aceptado, la versión anterior queda en el historial: nada cambia en silencio.
+                const cambio = p.aceptacion || p.estado === "aceptado";
+                const versiones = cambio
+                  ? [
+                      { fecha: new Date().toISOString(), porEmail: userEmail, total: p.total, items: p.items },
+                      ...(p.versiones ?? []),
+                    ].slice(0, 20)
+                  : p.versiones;
+                return { ...p, ...budget, id: p.id, estado: p.estado, editadoManualmente: true, ...(versiones ? { versiones } : {}) };
+              });
             }
-            return [{ ...budget, id: nuevoId, estado: "pendiente", editadoManualmente: true }, ...prev];
+            return [{ ...budget, id: nuevoId, estado: "pendiente", origen: "propuesta", editadoManualmente: true }, ...prev];
           });
           if (!editingBudget) estamparDiagnosticosLigados(nuevoId, budget.items);
           onConsumirPrefillPresupuesto();
@@ -522,6 +573,7 @@ function PresupuestosTab({
             if (editingComparativa) return prev.map((c) => (c.id === comparativa.id ? comparativa : c));
             return [comparativa, ...prev];
           });
+          marcarAlternativas(comparativa);
           setEditingComparativa(null);
           setView("list");
         }}
@@ -637,8 +689,24 @@ function PresupuestosTab({
                             </span>
                           )}
                         </span>
-                        <span className="shrink-0 rounded bg-inset px-2 py-0.5 text-xs text-ink/60">
-                          {formatCurrency(item.price)}
+                        <span className="flex shrink-0 items-center gap-2">
+                          {renglonPorId.get(item.id)?.decision === "aceptado" && (
+                            <select
+                              value={renglonPorId.get(item.id)?.avance ?? "por_iniciar"}
+                              onChange={(e) =>
+                                setPresupuestos((prev) => marcarAvance(prev, [item.id], e.target.value as AvanceClinico, hoyISO))
+                              }
+                              title="Avance clínico de este procedimiento. Al marcarlo Terminado se genera su cargo (si se cobra al realizar)."
+                              className="rounded-full border border-edge/15 bg-field py-0.5 pl-2 pr-1 text-[10px] font-semibold uppercase tracking-wide text-ink/70 outline-none"
+                            >
+                              {avanceClinicoOptions.map((a) => (
+                                <option key={a} value={a}>
+                                  {avanceClinicoLabel[a]}
+                                </option>
+                              ))}
+                            </select>
+                          )}
+                          <span className="rounded bg-inset px-2 py-0.5 text-xs text-ink/60">{formatCurrency(item.price)}</span>
                         </span>
                       </div>
                     ))}
@@ -651,20 +719,54 @@ function PresupuestosTab({
                       value={p.estado ?? "pendiente"}
                       onChange={(e) => {
                         const nuevoEstado = e.target.value as EstadoPresupuesto;
+                        // Aceptar abre el panel de "qué autorizó": se puede aceptar todo o solo una parte.
+                        if (nuevoEstado === "aceptado") {
+                          setAceptandoId(p.id);
+                          return;
+                        }
                         setPresupuestos((prev) =>
                           prev.map((b) => (b.id === p.id ? { ...b, estado: nuevoEstado } : b))
                         );
                       }}
-                      title="Estado del presupuesto"
+                      title="Decisión del paciente"
                       className={`rounded-full border-0 py-0.5 pl-2 pr-1 text-[10px] font-semibold uppercase tracking-wide outline-none ${estadoPresupuestoColor[p.estado ?? "pendiente"]}`}
                     >
-                      {presupuestoEstadoOptions.map((estado) => (
-                        <option key={estado} value={estado}>
-                          {estadoPresupuestoLabel[estado]}
-                        </option>
-                      ))}
+                      {presupuestoEstadoOptions.map((estado) => {
+                        // Lo ya autorizado no se "rechaza" ni "vence": solo la parte pendiente. Y "no elegida" se
+                        // marca sola al aceptar la otra alternativa.
+                        const bloqueado =
+                          (estado === "no_elegida" && (p.estado ?? "pendiente") !== "no_elegida") ||
+                          (Boolean(p.aceptacion) && estado !== "aceptado") ||
+                          (p.origen === "servicio" && estado !== "aceptado");
+                        return (
+                          <option key={estado} value={estado} disabled={bloqueado}>
+                            {estadoPresupuestoLabel[estado]}
+                          </option>
+                        );
+                      })}
                     </select>
-                    {estaVencido(p.fechaVigenciaHasta, p.estado) && (
+                    {p.aceptacion && p.aceptacion.itemIds.length < p.items.length && (
+                      <span className="rounded-full bg-accent/10 px-2 py-0.5 text-[10px] font-semibold text-accent">
+                        Aceptación parcial: {p.aceptacion.itemIds.length} de {p.items.length}
+                      </span>
+                    )}
+                    {p.grupoAlternativas && (
+                      <span className="rounded-full bg-ink/10 px-2 py-0.5 text-[10px] font-semibold text-ink/60" title="Es una de las opciones de una comparativa: el paciente elige una.">
+                        Alternativa
+                      </span>
+                    )}
+                    {p.origen === "servicio" && (
+                      <span className="rounded-full bg-success/10 px-2 py-0.5 text-[10px] font-semibold text-success">Servicio realizado</span>
+                    )}
+                    {p.origen !== "servicio" && (
+                      <button
+                        onClick={() => setAceptandoId(aceptandoId === p.id ? null : p.id)}
+                        className="text-[11px] font-semibold text-accent underline decoration-accent/40 underline-offset-2 hover:decoration-accent"
+                      >
+                        {p.aceptacion || p.estado === "aceptado" ? "Ver o cambiar lo autorizado" : "Registrar aceptación"}
+                      </button>
+                    )}
+                    {!p.aceptacion && estaVencido(p.fechaVigenciaHasta, p.estado) && (
                       <span className="flex items-center gap-1.5 rounded-full bg-warning/15 px-2 py-0.5 text-[10px] font-semibold text-warning">
                         Vencido — verifica que los precios sigan vigentes
                         <button
@@ -699,6 +801,19 @@ function PresupuestosTab({
                       <WhatsAppIcon />
                     </button>
                   </div>
+                  {aceptandoId === p.id && (
+                    <AceptacionPropuestaPanel
+                      presupuesto={p}
+                      esAlternativa={Boolean(p.grupoAlternativas)}
+                      onCancelar={() => setAceptandoId(null)}
+                      onConfirmar={(itemIds, modalidad) => {
+                        setPresupuestos((prev) =>
+                          aceptarPropuesta(prev, p.id, { itemIds, modalidad, fechaISO: hoyISO, porEmail: userEmail, ahoraISO: new Date().toISOString() })
+                        );
+                        setAceptandoId(null);
+                      }}
+                    />
+                  )}
                 </div>
 
                 <div className="flex items-center gap-2">
@@ -800,6 +915,7 @@ function PresupuestosTab({
               <button
                 onClick={() => {
                   setComparativasPaciente(patient.id, (prev) => prev.filter((c) => c.id !== comparativaAEliminar.id));
+                  desmarcarAlternativas(comparativaAEliminar);
                   setComparativaAEliminar(null);
                 }}
                 className="flex-1 rounded-lg bg-danger py-2.5 text-sm font-semibold text-black transition-opacity hover:opacity-90"

@@ -5,7 +5,7 @@ import { usePatientData } from "@/context/PatientDataContext";
 import { formatCurrency } from "@/lib/patientData";
 import { generarSaldosPendientesPdf } from "@/lib/generarSaldosPendientesPdf";
 import { descargarBlob } from "@/lib/pdfDocumento";
-import type { PagosSinLigar, SaldoPendienteEntry } from "@/lib/saldosPendientes";
+import type { PagosSinLigar, PropuestaAntiguaPaciente, SaldoPendienteEntry } from "@/lib/saldosPendientes";
 import type { PosibleDuplicado, PresupuestoDeCitaNoAtendida } from "@/lib/saldosFalsos";
 import { textoAutoriaPresupuesto } from "@/lib/autoriaRegistros";
 import type { PropuestaControl } from "@/lib/controlesPorError";
@@ -43,6 +43,7 @@ export default function ReporteSaldosPendientes() {
     noAtendidas: PresupuestoDeCitaNoAtendida[];
     duplicados: PosibleDuplicado[];
     controles: PropuestaControl[];
+    revision: PropuestaAntiguaPaciente[];
   } | null>(null);
   const [calculadoEl, setCalculadoEl] = useState<Date | null>(null);
   const [errorRecalculo, setErrorRecalculo] = useState("");
@@ -153,7 +154,8 @@ export default function ReporteSaldosPendientes() {
           Saldos Pendientes
         </h3>
         <p className="mt-1 text-xs text-ink/40">
-          Los saldos se calculan al abrir este reporte con los presupuestos y pagos reales de cada
+          Saldo por cobrar = tratamientos aceptados y realizados (o aceptados con cobro al aceptar) menos lo pagado.
+          Las propuestas sin aceptar no cuentan. Se calcula al abrir este reporte con los presupuestos y pagos reales de cada
           expediente.
           {recalculando && " Mientras termina se muestra el último resumen guardado (provisional)."}
           {!recalculando &&
@@ -193,6 +195,35 @@ export default function ReporteSaldosPendientes() {
             Listo: se revisaron {resultado.pacientes} expedientes y {resultado.conSaldo}{" "}
             {resultado.conSaldo === 1 ? "paciente tiene" : "pacientes tienen"} saldo pendiente.
           </p>
+          {resultado.revision.length > 0 && (
+            <div className="rounded-xl border border-accent/30 bg-accent/5 p-3">
+              <p className="text-sm font-semibold text-ink/80">
+                {resultado.revision.length} {resultado.revision.length === 1 ? "paciente tiene" : "pacientes tienen"}{" "}
+                presupuestos antiguos que nadie marcó como aceptados
+                ({formatCurrency(resultado.revision.reduce((s, x) => s + x.monto, 0))})
+              </p>
+              <p className="mt-1 text-xs text-ink/60">
+                Un presupuesto es una propuesta: no es deuda hasta que el paciente lo acepta. Estos ya no suman al saldo.
+                Si el paciente sí los aceptó, abre su expediente → Presupuestos y regístrala en «Registrar aceptación».
+                No se borró ni se cambió nada.
+              </p>
+              <ul className="mt-2 divide-y divide-edge/5 text-sm">
+                {resultado.revision.map((x) => (
+                  <li key={x.patientId} className="flex items-center justify-between gap-3 py-1.5">
+                    <button
+                      onClick={() => irAExpediente(x.patientId, "Presupuestos")}
+                      className="text-left font-medium text-ink underline decoration-ink/20 underline-offset-2 hover:text-accent"
+                    >
+                      {x.patientName}
+                    </button>
+                    <span className="shrink-0 text-ink/60">
+                      {formatCurrency(x.monto)} · {x.cantidad} {x.cantidad === 1 ? "presupuesto" : "presupuestos"}
+                    </span>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
           {resultado.noAtendidas.length > 0 && (
             <div className="rounded-xl border border-danger/30 bg-danger/5 p-3">
               <p className="text-sm font-semibold text-danger">
@@ -381,7 +412,7 @@ export default function ReporteSaldosPendientes() {
       <div className="rounded-2xl border border-edge/10 bg-surface p-5">
         <div className="text-2xl font-bold text-danger">{formatCurrency(totalPendiente)}</div>
         <div className="mt-1 text-xs uppercase tracking-wide text-ink/40">
-          Total pendiente ({lista.length} {lista.length === 1 ? "paciente" : "pacientes"})
+          Total por cobrar ({lista.length} {lista.length === 1 ? "paciente" : "pacientes"})
         </div>
       </div>
 
@@ -395,9 +426,9 @@ export default function ReporteSaldosPendientes() {
             <thead>
               <tr className="border-b border-edge/10 text-xs uppercase tracking-wide text-ink/40">
                 <th className="px-6 py-3 font-medium">Paciente</th>
-                <th className="px-6 py-3 text-right font-medium">Presupuestado</th>
+                <th className="px-6 py-3 text-right font-medium">Cargos</th>
                 <th className="px-6 py-3 text-right font-medium">Pagado</th>
-                <th className="px-6 py-3 text-right font-medium">Pendiente</th>
+                <th className="px-6 py-3 text-right font-medium">Por cobrar</th>
               </tr>
             </thead>
             <tbody>

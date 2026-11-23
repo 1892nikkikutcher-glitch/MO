@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { usePatientData } from "@/context/PatientDataContext";
-import { formatCurrency } from "@/lib/patientData";
+import { formatCurrency, unidadCobroLabel, unidadCobroOptions, type UnidadCobro } from "@/lib/patientData";
 import {
   especialidadesPredefinidas,
   agruparPorEspecialidad,
@@ -137,11 +137,14 @@ function ProcedimientoDialog({
                 min={0}
                 value={form.costoOdontologo}
                 onChange={(e) =>
-                  setForm((prev) => ({ ...prev, costoOdontologo: Number(e.target.value) || 0 }))
+                  setForm((prev) => ({ ...prev, costoOdontologo: Number(e.target.value) || 0, costoSinConfigurar: false }))
                 }
                 className={inputClass}
                 title="Lo que le corresponde al odontólogo por este procedimiento (comisión)"
               />
+              {form.costoSinConfigurar && (
+                <p className="mt-1 text-[11px] text-warning">Sin configurar: se agregó al presupuestar. Captúralo para calcular la comisión.</p>
+              )}
             </div>
             <div>
               <label className="mb-1 block text-xs font-medium text-ink/60">Tiempo estimado (min)</label>
@@ -156,6 +159,24 @@ function ProcedimientoDialog({
                 className={inputClass}
               />
             </div>
+          </div>
+
+          <div>
+            <label className="mb-1 block text-xs font-medium text-ink/60">¿Cómo se cobra?</label>
+            <select
+              value={form.unidadCobro ?? "diente"}
+              onChange={(e) => setForm((prev) => ({ ...prev, unidadCobro: e.target.value as UnidadCobro }))}
+              className={inputClass}
+            >
+              {unidadCobroOptions.map((u) => (
+                <option key={u} value={u}>
+                  {unidadCobroLabel[u]}
+                </option>
+              ))}
+            </select>
+            <p className="mt-1 text-[11px] text-ink/40">
+              El costo al paciente es por esta unidad. En un paquete o procedimiento completo el precio es fijo, sin importar cuántos dientes cubra.
+            </p>
           </div>
 
           <div>
@@ -324,7 +345,7 @@ export default function Procedimientos() {
                             )}
                           </span>
                           <span className="text-sm text-ink/70">{formatCurrency(p.costoPaciente)}</span>
-                          <span className="text-sm text-ink/70">{formatCurrency(p.costoOdontologo)}</span>
+                          <span className="text-sm text-ink/70">{p.costoSinConfigurar ? <span className="text-warning">Sin configurar</span> : formatCurrency(p.costoOdontologo)}</span>
                           <span className="text-sm text-ink/70">{formatDuracion(p.duracionMinutos)}</span>
                           <div className="flex justify-end gap-2">
                             <button

@@ -59,7 +59,6 @@ import {
   type RolClinica,
   type SavedBudget,
   type EstadoPresupuesto,
-  type LineItem,
   type Pago,
   type DevolucionPago,
   type Receta,
@@ -143,6 +142,7 @@ import {
   calcularSaldosGlobales,
   type EntradaRecalculo,
   type PagosSinLigar,
+  type PropuestaAntiguaPaciente,
   type SaldosPendientesConfig,
 } from "@/lib/saldosPendientes";
 import {
@@ -808,6 +808,8 @@ type PatientDataContextValue = {
     noAtendidas: PresupuestoDeCitaNoAtendida[];
     duplicados: PosibleDuplicado[];
     controles: PropuestaControl[];
+    /** Pacientes con propuestas antiguas sin decisión: ya no cuentan como deuda. */
+    revision: PropuestaAntiguaPaciente[];
   }>;
   /** true si alguna suma al resumen de cobros no se pudo guardar en esta
    * sesión: los totales por día están cortos y hay que reconstruirlos. */
@@ -831,8 +833,6 @@ type PatientDataContextValue = {
    * (a la Papelera) y, si tenía pagos, los pasa antes al presupuesto principal
    * de ortodoncia. Re-valida con los datos reales; el dinero cobrado no cambia. */
   corregirControlPorError: (p: PropuestaControl) => Promise<{ ok: boolean; mensaje: string }>;
-  /** Al cancelar/reagendar/no asistir una cita, quita su presupuesto automático si nadie lo pagó. */
-  limpiarPresupuestoDeCita: (patientId: string, citaId: string, estatus: string) => Promise<void>;
   /** Adjunta la firma de recepción (ya subida a Storage) a una devolución
    * completada — no transaccional, nunca sugiere que la devolución falló. */
   agregarFirmaRecepcionDevolucion: (
@@ -1320,6 +1320,10 @@ export function PatientDataProvider({
   const [presupuestosPorPaciente, setPresupuestosPorPacienteState] = useState<
     Record<string, SavedBudget[]>
   >({});
+  // Copia SÍNCRONA de los presupuestos: dos guardados en el mismo instante (por ejemplo, registrar un servicio y su
+  // pago) deben ver el cambio del primero, no la foto del último render. Se re-sincroniza con el estado en cada render.
+  const presupuestosRecientes = useRef<Record<string, SavedBudget[]>>({});
+  presupuestosRecientes.current = presupuestosPorPaciente;
   const [pagosPorPaciente, setPagosPorPacienteState] = useState<Record<string, Pago[]>>({});
   const [recetasPorPaciente, setRecetasPorPacienteState] = useState<Record<string, Receta[]>>({});
   const [laboratoriosPorPaciente, setLaboratoriosPorPacienteState] = useState<
@@ -1658,8 +1662,12 @@ export function PatientDataProvider({
     const diasNext = conDiaYValor(next);
     const dias = new Set([...diasPrev, ...diasNext].map((p) => p.dia));
 
-    const estadoDe = (p: SavedBudget): EstadoPresupuesto => p.estado ?? "pendiente";
-    const estados: EstadoPresupuesto[] = ["pendiente", "aceptado", "rechazado", "expirado"];
+    // Una alternativa que el paciente no eligió cuenta como "no aceptada" en las estadísticas del Dashboard.
+    const estadoDe = (p: SavedBudget): Exclude<EstadoPresupuesto, "no_elegida"> => {
+      const e = p.estado ?? "pendiente";
+      return e === "no_elegida" ? "rechazado" : e;
+    };
+    const estados: Exclude<EstadoPresupuesto, "no_elegida">[] = ["pendiente", "aceptado", "rechazado", "expirado"];
     const deltasPorEstado = Object.fromEntries(
       estados.map((estado) => [
         estado,
@@ -1672,7 +1680,7 @@ export function PatientDataProvider({
             prevArr.filter((p) => estadoDe(p) === estado).reduce((s, p) => s + p.total, 0),
         },
       ])
-    ) as Record<EstadoPresupuesto, { cantidad: number; valor: number }>;
+    ) as Record<Exclude<EstadoPresupuesto, "no_elegida">, { cantidad: number; valor: number }>;
     const hayDeltaEstado = estados.some(
       (e) => deltasPorEstado[e].cantidad !== 0 || deltasPorEstado[e].valor !== 0
     );
@@ -1903,7 +1911,7 @@ export function PatientDataProvider({
 
   const setPresupuestosPaciente = (patientId: string, updater: Updater<SavedBudget[]>) => {
     if (!clinicUid) return;
-    const prevArr = presupuestosPorPaciente[patientId] ?? [];
+    const prevArr = presupuestosRecientes.current[patientId] ?? [];
     // Todo presupuesto NUEVO queda marcado con quién lo creó y cuándo (antes no
     // se guardaba y era imposible saber qué colaborador lo capturó).
     const next = estamparNuevos(prevArr, resolveUpdater(updater, prevArr), { uid, email: userEmail, dispositivo: dispositivoActual.current }, new Date().toISOString());
@@ -1913,6 +1921,7 @@ export function PatientDataProvider({
     registrarPresupuestosCreadosDetalle(patientId, prevArr, next);
     registrarSaldoPendiente(patientId, next, pagosPorPaciente[patientId] ?? [], devolucionesPorPaciente[patientId] ?? []);
     registrarLogPresupuestos(patientId, prevArr, next);
+    presupuestosRecientes.current = { ...presupuestosRecientes.current, [patientId]: next };
     setPresupuestosPorPacienteState((prev) => ({ ...prev, [patientId]: next }));
     sincronizarEtiquetasPagos(patientId, prevArr, next);
   };
@@ -1968,87 +1977,19 @@ export function PatientDataProvider({
    * los updaters funcionales se invocan dos veces, y como el delta de
    * finanzas es acumulativo (no una sobreescritura idempotente como
    * syncFirestoreList), duplicarlo inflaría el ingreso registrado. */
-  /** Todo pago que llegue con líneas "extra" (sin tratamiento asociado a un
-   * presupuesto existente — ej. el paciente paga su consulta antes de que
-   * exista un presupuesto formal) genera automáticamente un presupuesto que
-   * cubre exactamente esas líneas, y el pago se reescribe para apuntar a
-   * ese presupuesto nuevo. Así el presupuesto y lo realmente cobrado nunca
-   * quedan desincronizados: por defecto, todo pago se refleja en el
-   * presupuesto del paciente, y no aparece como saldo pendiente. */
-  /** Además de las citas ligadas, devuelve los presupuestos que acaba de
-   * generar (no solo los guarda vía setPresupuestosPaciente) para que quien
-   * llama pueda calcular el saldo pendiente correcto en el mismo tick, sin
-   * depender de `presupuestosPorPaciente` del contexto — que en este punto
-   * todavía no refleja el presupuesto recién creado. */
-  const generarPresupuestosDesdeExtras = (patientId: string, prevArr: Pago[], next: Pago[]) => {
-    const prevIds = new Set(prevArr.map((p) => p.id));
-    const pagosNuevos = next.filter((p) => !prevIds.has(p.id));
-    let nextConLigas = next;
-    const presupuestosAgregados: SavedBudget[] = [];
-
-    pagosNuevos.forEach((pago) => {
-      const lineasExtra = pago.lineas.filter((l) => l.generarPresupuesto);
-      if (lineasExtra.length === 0) return;
-
-      const items: LineItem[] = lineasExtra.map((l) => ({
-        id: `item-${l.id}`,
-        procedure: l.label,
-        price: l.monto,
-        teeth: [],
-        note: "",
-      }));
-      const total = items.reduce((sum, i) => sum + i.price, 0);
-      const folio = pago.id.slice(-6);
-      const nuevoPresupuesto: SavedBudget = {
-        id: `pres-${pago.id}`,
-        folio,
-        fecha: pago.fecha,
-        medico: pago.medico,
-        tipoDePrecio: "Consultorio",
-        especialidad: "Odontología General",
-        diagnostico: "Generado automáticamente a partir de un pago sin presupuesto previo.",
-        items,
-        total,
-      };
-      setPresupuestosPaciente(patientId, (prevPres) => [nuevoPresupuesto, ...prevPres]);
-      presupuestosAgregados.push(nuevoPresupuesto);
-
-      const idPorLinea = new Map(lineasExtra.map((l, i) => [l.id, items[i].id]));
-      nextConLigas = nextConLigas.map((p) =>
-        p.id !== pago.id
-          ? p
-          : {
-              ...p,
-              lineas: p.lineas.map((l) =>
-                idPorLinea.has(l.id) ? { ...l, tratamientoId: idPorLinea.get(l.id)!, folio } : l
-              ),
-            }
-      );
-    });
-
-    return { nextConLigas, presupuestosAgregados };
-  };
-
   const setPagosPaciente = (patientId: string, updater: Updater<Pago[]>, opciones?: { sinCashback?: boolean }) => {
     if (!clinicUid) return;
     const prevArr = pagosPorPaciente[patientId] ?? [];
-    const generado = resolveUpdater(updater, prevArr);
-    const { nextConLigas: next, presupuestosAgregados } = generarPresupuestosDesdeExtras(
-      patientId,
-      prevArr,
-      generado
-    );
+    // Un pago NUNCA crea presupuestos por su cuenta. Si cobra un servicio nuevo, quien cobra lo registra de forma
+    // explícita (ver AgregarPagoDialog → crearServicioRealizado) y el pago ya viene ligado a ese servicio.
+    const next = resolveUpdater(updater, prevArr);
     syncFirestoreList(`users/${clinicUid}/pacientes/${patientId}/pagos`, prevArr, next);
     registrarDeltaFinanzas(prevArr, next);
     const deltaCount = next.length - prevArr.length;
     if (deltaCount !== 0) {
       setEstadisticas((prevEst) => ({ ...prevEst, pagosCount: prevEst.pagosCount + deltaCount }));
     }
-    const presupuestosActuales = [
-      ...presupuestosAgregados,
-      ...(presupuestosPorPaciente[patientId] ?? []),
-    ];
-    registrarSaldoPendiente(patientId, presupuestosActuales, next, devolucionesPorPaciente[patientId] ?? []);
+    registrarSaldoPendiente(patientId, presupuestosRecientes.current[patientId] ?? [], next, devolucionesPorPaciente[patientId] ?? []);
     if (!opciones?.sinCashback) {
       const nombrePaciente = patients.find((p) => p.id === patientId)?.name ?? "";
       const ahoraIso = new Date().toISOString();
@@ -2161,7 +2102,7 @@ export function PatientDataProvider({
       hechos += grupo.length;
       onProgreso?.(hechos, lista.length);
     }
-    const { porPaciente, sinLigar } = calcularSaldosGlobales(entradas, new Date().toISOString());
+    const { porPaciente, sinLigar, revision } = calcularSaldosGlobales(entradas, new Date().toISOString());
     // Sin merge: reemplaza el documento completo (también quita lo obsoleto).
     await setDoc(doc(db, `users/${clinicUid}/config/saldosPendientes`), { porPaciente });
     // Saldos "falsos": con los mismos datos ya leídos, se detectan los
@@ -2176,7 +2117,7 @@ export function PatientDataProvider({
     const controles = entradas.flatMap((e) =>
       controlesPorError({ patientId: e.patientId, patientName: e.patientName, presupuestos: e.presupuestos, pagos: e.pagos })
     );
-    return { pacientes: lista.length, conSaldo: Object.keys(porPaciente).length, sinLigar, porPaciente, noAtendidas, duplicados, controles };
+    return { pacientes: lista.length, conSaldo: Object.keys(porPaciente).length, sinLigar, porPaciente, noAtendidas, duplicados, controles, revision };
   };
 
   /** Devuelve un registro de la Papelera a su lugar. Los que arrastran
@@ -2338,17 +2279,6 @@ export function PatientDataProvider({
     let total = 0;
     for (const [pid, ids] of porPaciente) total += (await quitarPresupuestosSinPagarDe(pid, citasPorId, ids)).length;
     return total;
-  };
-
-  const limpiarPresupuestoDeCita = async (patientId: string, citaId: string, estatus: string) => {
-    if (!clinicUid || !patientId) return;
-    try {
-      const citasPorId = new Map<string, CitaMinima>(citas.map((c) => [c.id, c]));
-      citasPorId.set(citaId, { id: citaId, patientId, fecha: "", estatus });
-      await quitarPresupuestosSinPagarDe(patientId, citasPorId, new Set([`pres-cita-${citaId}`]));
-    } catch (err) {
-      console.error("No se pudo limpiar el presupuesto de la cita", err);
-    }
   };
 
   const unirPresupuestoDuplicado = async (d: PosibleDuplicado): Promise<{ ok: boolean; mensaje: string }> => {
@@ -3090,10 +3020,8 @@ export function PatientDataProvider({
     opciones?: OpcionesEstatusCita
   ) => {
     setCitas((prev) => prev.map((c) => (c.id === citaId ? aplicarEstatusConMotivo(c, estatus, motivo, opciones) : c)));
-    // Una cita que no se va a atender no debe dejar un presupuesto "pendiente"
-    // que nadie puede pagar (infla el saldo del paciente).
-    const cita = citas.find((c) => c.id === citaId);
-    if (cita?.patientId && estatusAdmiteMotivo(estatus)) void limpiarPresupuestoDeCita(cita.patientId, citaId, estatus);
+    // Cambiar el estatus de una cita (cancelar, reagendar, inasistencia, atendida) NO toca tratamientos, cargos ni
+    // pagos: la agenda no tiene efectos económicos. Un cargo por cancelación, si se quiere, es una acción explícita.
   };
 
   const invitarColaborador = async (data: {
@@ -3277,7 +3205,6 @@ export function PatientDataProvider({
         resumenCobrosFallo,
         aplicarFinanzasRecalculadas,
         corregirControlPorError,
-        limpiarPresupuestoDeCita,
         restaurarDePapelera,
         agregarFirmaRecepcionDevolucion,
         comparativasPorPaciente,
