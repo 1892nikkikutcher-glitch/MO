@@ -16,12 +16,16 @@ import { modalidadDe } from "@/lib/cuentaPaciente";
 export default function AceptacionPropuestaPanel({
   presupuesto,
   esAlternativa,
+  modalidadInicial = "al_realizar",
   onConfirmar,
   onCancelar,
 }: {
   presupuesto: SavedBudget;
   /** La propuesta es una de varias opciones excluyentes: al aceptarla, las demás quedan como "no elegida". */
   esAlternativa: boolean;
+  /** Con qué modalidad abre cuando aún no se había aceptado. Un presupuesto de antes del modelo que ya tiene pagos
+   * aplicados abre en "al aceptar" para conservar su saldo tal como estaba. */
+  modalidadInicial?: ModalidadCobro;
   onConfirmar: (itemIds: string[], modalidad: ModalidadCobro) => void;
   onCancelar: () => void;
 }) {
@@ -29,7 +33,7 @@ export default function AceptacionPropuestaPanel({
   const [marcados, setMarcados] = useState<Set<string>>(
     () => new Set(presupuesto.aceptacion ? presupuesto.aceptacion.itemIds : presupuesto.items.map((i) => i.id))
   );
-  const [modalidad, setModalidad] = useState<ModalidadCobro>(() => (yaAceptada ? modalidadDe(presupuesto) : "al_realizar"));
+  const [modalidad, setModalidad] = useState<ModalidadCobro>(() => (yaAceptada ? modalidadDe(presupuesto) : modalidadInicial));
   const total = presupuesto.items.filter((i) => marcados.has(i.id)).reduce((s, i) => s + i.price, 0);
 
   const alternar = (id: string) =>
@@ -81,6 +85,7 @@ export default function AceptacionPropuestaPanel({
         {modalidad === "al_realizar"
           ? "cada procedimiento se cobra cuando lo marques como terminado (o puedes recibir un anticipo antes)."
           : "todo lo autorizado queda por cobrar desde ahora."}
+        {!yaAceptada && modalidadInicial === "al_aceptar" && " Este presupuesto ya tiene pagos aplicados, por eso se conserva el cobro desde ahora."}
         {esAlternativa && !yaAceptada && " Las demás opciones de la comparativa quedarán como «no elegida»."}
       </p>
       <div className="flex gap-2">

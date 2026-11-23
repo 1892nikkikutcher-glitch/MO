@@ -211,7 +211,8 @@ export function calcularCuenta(presupuestos: SavedBudget[], pagos: Pago[], devol
     renglones,
     resumen: {
       propuesto,
-      aceptadoPendienteDeCobro: suma((r) => r.aceptadoSinCargo),
+      // Lo autorizado y aún sin cargo, menos lo que ya se recibió por adelantado (eso se ve en "a favor").
+      aceptadoPendienteDeCobro: suma((r) => (r.aceptadoSinCargo > 0 ? Math.max(0, r.aceptadoSinCargo - Math.max(0, r.pagado)) : 0)),
       cargos,
       pagadoACargos: redondearDinero(cargos - porCobrar),
       porCobrar,

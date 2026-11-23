@@ -148,6 +148,7 @@ describe("cargo al realizar y pagos", () => {
     const r = resumen(ps, [pago("pg1", [{ tratamientoId: "a", monto: 400 }])]);
     expect(r.porCobrar).toBe(0);
     expect(r.aFavor).toBe(400);
+    expect(r.aceptadoPendienteDeCobro).toBe(600); // lo autorizado menos lo ya recibido: no se cuenta dos veces
     // Y sigue ofreciéndose para cobrar el resto como anticipo.
     expect(renglonesCobrables(ps, [pago("pg1", [{ tratamientoId: "a", monto: 400 }])])).toEqual([
       expect.objectContaining({ id: "a", pendiente: 600, tipo: "anticipo" }),

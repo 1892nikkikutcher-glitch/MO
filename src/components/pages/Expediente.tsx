@@ -805,6 +805,11 @@ function PresupuestosTab({
                     <AceptacionPropuestaPanel
                       presupuesto={p}
                       esAlternativa={Boolean(p.grupoAlternativas)}
+                      modalidadInicial={
+                        p.origen !== "propuesta" && cuenta.renglones.some((r) => r.presupuestoId === p.id && r.pagado > 0)
+                          ? "al_aceptar"
+                          : "al_realizar"
+                      }
                       onCancelar={() => setAceptandoId(null)}
                       onConfirmar={(itemIds, modalidad) => {
                         setPresupuestos((prev) =>
