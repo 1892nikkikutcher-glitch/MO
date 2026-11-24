@@ -203,7 +203,8 @@ export default function GlobalAgregarPago({
     );
   }
 
-  const patient = patients.find((p) => p.id === patientId)!;
+  const patient = patients.find((p) => p.id === patientId);
+  if (!patient) return null;
   const cuentaCargada =
     presupuestosPorPaciente[patientId] !== undefined &&
     pagosPorPaciente[patientId] !== undefined &&
@@ -256,6 +257,16 @@ export default function GlobalAgregarPago({
           ]);
           return [pago, ...prev];
         });
+      }}
+      onSaveVarios={(nuevos) => {
+        // Un cobro con Cashback son dos pagos (el del Cashback y el del dinero): entran juntos, en un solo cambio, el del dinero primero.
+        const ordenados = [...nuevos].reverse();
+        setPagosPaciente(patientId, (prev) => [...ordenados, ...prev]);
+        const ahoraIso = new Date().toISOString();
+        setPagosRealizados((prevRealizados) => [
+          ...ordenados.map((pago) => ({ id: pago.id, patientId, patientName: patient.name, pago, registradoEn: ahoraIso, registradoPor: userEmail })),
+          ...prevRealizados.filter((r) => !ordenados.some((n) => n.id === r.id)),
+        ]);
       }}
     />
   );

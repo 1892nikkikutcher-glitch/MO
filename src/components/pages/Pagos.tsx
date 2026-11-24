@@ -19,7 +19,9 @@ import { calcularDisponibleDevolucion, resumenDesdeDevoluciones } from "@/lib/de
 import { fechaPagoAIso } from "@/lib/metas";
 import { medicoPredeterminadoParaPago } from "@/lib/medicoDelPago";
 import { formaPagoHabitual } from "@/lib/formaPagoHabitual";
-import { FORMA_PAGO_CASHBACK, baseCashbackDePago, calcularCashback, esFormaPagoCashback, montoMaximoCanje, otorgarCashbackAPago, puedeOtorgarCashback } from "@/lib/cashback";
+import { cashbackAplicable, repartirLineasConCashback } from "@/lib/cashbackEnCobro";
+import { redondearDinero } from "@/lib/dinero";
+import { FORMA_PAGO_CASHBACK, baseCashbackDePago, calcularCashback, esFormaPagoCashback, otorgarCashbackAPago, puedeOtorgarCashback } from "@/lib/cashback";
 import { avisoCashbackEnPago } from "@/lib/cashbackTextos";
 import { toISODate } from "@/lib/agendaHelpers";
 import {
@@ -357,6 +359,7 @@ export function AgregarPagoDialog({
   formaPagoInicial,
   onClose,
   onSave,
+  onSaveVarios,
 }: {
   patientId: string;
   patientName: string;
@@ -368,10 +371,13 @@ export function AgregarPagoDialog({
   tratamientosPendientes: RenglonCobrable[];
   /** Servicio que la cita sugiere cobrar (concepto y costo): se ofrece ya capturado, y se registra al guardar. */
   servicioSugerido?: { origenId: string; concepto: string; monto: number };
-  /** Con "Cashback" el pago se abre listo para pagarse con el saldo del paciente (si tiene). */
+  /** Con "Cashback" el cobro se abre con la casilla de usar el saldo del paciente ya marcada (si tiene). */
   formaPagoInicial?: string;
   onClose: () => void;
+  /** Guarda un pago ya registrado que cambió (por ejemplo, al agregarle la firma). */
   onSave: (pago: Pago) => void;
+  /** Guarda de una sola vez los pagos nuevos de un cobro (dos si parte se cubrió con Cashback). */
+  onSaveVarios: (pagos: Pago[]) => void;
 }) {
   // Mismo criterio que ya usa Corte de Caja/Comisiones (ver
   // ReporteCorteCaja.tsx): el médico tratante viene de los Recursos reales
@@ -383,12 +389,15 @@ export function AgregarPagoDialog({
   const saldoCashbackPaciente = saldoCashbackDe(patientId);
   const cashbackDisponible = saldoCashbackPaciente.disponible;
   const avisoCashback = avisoCashbackEnPago(saldoCashbackPaciente, cashbackConfig);
-  const [sinCashback, setSinCashback] = useState(false);
   // Una promoción, cortesía o tarifa especial no acumula ni se paga con cashback.
-  const formasDisponibles = cashbackDisponible > 0 && !sinCashback ? [...formasDePago, FORMA_PAGO_CASHBACK] : formasDePago;
+  const [sinCashback, setSinCashback] = useState(false);
+  // El Cashback solo se usa si el paciente lo acepta: quien cobra marca la casilla (nunca se aplica solo).
+  const [usarCashback, setUsarCashback] = useState(formaPagoInicial === FORMA_PAGO_CASHBACK && cashbackDisponible > 0);
+  const [cashbackTexto, setCashbackTexto] = useState("");
 
   const [paso, setPaso] = useState<"form" | "firma" | "recibo">("form");
   const [pagoGuardado, setPagoGuardado] = useState<Pago | null>(null);
+  const [cashbackUsado, setCashbackUsado] = useState(0);
 
   // A quién se le atribuye el pago (de aquí sale lo que ingresó a cada doctor y su comisión): el médico responsable del
   // paciente, el de su cita de hoy o el de su última cita. Si no hay ninguno claro, quien cobra lo elige (no se adivina).
@@ -406,9 +415,7 @@ export function AgregarPagoDialog({
   // La forma de pago que este paciente normalmente usa (la que más veces ha usado). Sin historial no se adivina:
   // quien cobra la elige.
   const formaHabitual = formaPagoHabitual(pagosPorPaciente[patientId] ?? [], formasDePago);
-  const [formaPago, setFormaPago] = useState(
-    formaPagoInicial === FORMA_PAGO_CASHBACK && cashbackDisponible > 0 ? FORMA_PAGO_CASHBACK : formaHabitual ?? ""
-  );
+  const [formaPago, setFormaPago] = useState(formaHabitual ?? "");
   const [clavePago, setClavePago] = useState("");
   // Autocompletado de "Tratamientos": se escribe y se ofrecen los de la lista; lo que no esté se agrega como servicio.
   const [consulta, setConsulta] = useState("");
@@ -487,18 +494,31 @@ export function AgregarPagoDialog({
   };
   const totalAPagar = totalTratamientosSeleccionados + totalExtras;
 
-  const pagaConCashback = esFormaPagoCashback(formaPago);
-  // Lo que se puede cubrir con saldo: lo menor entre el saldo, el % del valor de los tratamientos que se pagan y el tope por visita.
+  // Cashback: se toma primero, antes de las cuentas. Cubre lo menor entre el saldo del paciente, el % del valor de la
+  // atención y el tope por visita, y nunca más de lo que hoy se cobra en tratamientos o servicios (un anticipo no se paga con él).
+  const extrasQueNoSonAnticipo = extras.filter((e) => e.tipo === "servicio");
+  const cobradoEnTratamientos = totalTratamientosSeleccionados + extrasQueNoSonAnticipo.reduce((sum, e) => sum + e.monto, 0);
   const valorAtencion =
-    seleccionados.reduce((sum, id) => sum + (tratamientosPendientes.find((t) => t.id === id)?.price ?? 0), 0) + totalExtras;
-  const maxCashbackAhora = montoMaximoCanje(cashbackDisponible, valorAtencion, cashbackConfig);
-  const excedeCashback = pagaConCashback && totalAPagar > maxCashbackAhora + 0.001;
+    seleccionados.reduce((sum, id) => sum + (tratamientosPendientes.find((t) => t.id === id)?.price ?? 0), 0) +
+    extrasQueNoSonAnticipo.reduce((sum, e) => sum + e.monto, 0);
+  const cashbackSolicitado = cashbackTexto.trim() === "" ? null : Number(cashbackTexto);
+  const { maximo: maxCashbackAhora, aplicado: cashbackPosible } = cashbackAplicable({
+    disponible: cashbackDisponible,
+    valorAtencion,
+    cobradoEnTratamientos,
+    config: cashbackConfig,
+    solicitado: cashbackSolicitado,
+  });
+  const cashbackAplicado = usarCashback && !sinCashback ? cashbackPosible : 0;
+  const aPagarEnDinero = redondearDinero(totalAPagar - cashbackAplicado);
   useEffect(() => {
-    // Al marcar promoción o cortesía ya no se puede pagar con cashback.
-    if (sinCashback && esFormaPagoCashback(formaPago)) setFormaPago(formaHabitual ?? "");
-  }, [sinCashback, formaPago, formaHabitual]);
-  // Un servicio o anticipo agregado sin monto no se puede guardar: se le captura primero.
-  const puedeGuardar = totalAPagar > 0 && medico !== "" && formaPago !== "" && extras.every((e) => e.monto > 0) && !excedeCashback;
+    // Una promoción, cortesía o tarifa especial no se paga con cashback.
+    if (sinCashback) setUsarCashback(false);
+  }, [sinCashback]);
+  // Un servicio o anticipo agregado sin monto no se puede guardar: se le captura primero. La forma de pago solo
+  // hace falta si queda algo por pagar con dinero.
+  const puedeGuardar =
+    totalAPagar > 0 && medico !== "" && (aPagarEnDinero <= 0 || formaPago !== "") && extras.every((e) => e.monto > 0);
 
   const handleGuardar = () => {
     if (!puedeGuardar || guardandoRef.current) return;
@@ -553,21 +573,36 @@ export function AgregarPagoDialog({
       );
     }
 
-    const pago: Pago = {
-      id: pagoId,
+    const todasLasLineas = [...lineasTratamientos, ...lineasExtras];
+    const pagoDe = (id: string, forma: string, lineas: LineaPago[], total: number, esDinero: boolean): Pago => ({
+      id,
       fecha,
       medico,
-      formaPago,
-      lineas: [...lineasTratamientos, ...lineasExtras],
-      total: totalAPagar,
-      facturar,
+      formaPago: forma,
+      lineas,
+      total,
+      facturar: esDinero ? facturar : false,
       firma: null,
-      ...(sinCashback && !pagaConCashback ? { sinCashback: true } : {}),
-      ...(clavePago.trim() ? { clavePago: clavePago.trim() } : {}),
-    };
+      ...(esDinero && sinCashback ? { sinCashback: true } : {}),
+      ...(esDinero && clavePago.trim() ? { clavePago: clavePago.trim() } : {}),
+    });
 
-    onSave(pago);
-    setPagoGuardado(pago);
+    const nuevos: Pago[] = [];
+    if (cashbackAplicado > 0) {
+      // Parte del cobro la cubre el Cashback: queda como un pago con esa forma y, aparte, el resto con la forma elegida.
+      const reparto = repartirLineasConCashback(todasLasLineas, cashbackAplicado);
+      nuevos.push(pagoDe(pagoId, FORMA_PAGO_CASHBACK, reparto.cashback, cashbackAplicado, false));
+      if (reparto.dinero.length > 0) {
+        nuevos.push(pagoDe(`${ahora.getTime() + 1}`, formaPago, reparto.dinero, aPagarEnDinero, true));
+      }
+    } else {
+      nuevos.push(pagoDe(pagoId, formaPago, todasLasLineas, totalAPagar, true));
+    }
+
+    onSaveVarios(nuevos);
+    setCashbackUsado(cashbackAplicado);
+    // El recibo es el del pago con dinero; si todo lo cubrió el Cashback, el del pago con Cashback.
+    setPagoGuardado(nuevos[nuevos.length - 1]);
     setPaso("recibo");
   };
 
@@ -596,6 +631,12 @@ export function AgregarPagoDialog({
     return (
       <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4 print:bg-transparent">
         <div className="w-full max-w-md rounded-2xl border border-edge/10 bg-modal p-6 print:border-none print:bg-transparent print:p-0">
+          {cashbackUsado > 0 && (
+            <p className="mb-4 rounded-lg border border-success/40 bg-success/10 px-3 py-2 text-sm text-success print:hidden">
+              Se aplicaron <span className="font-semibold">{formatCurrency(cashbackUsado)}</span> de Cashback a este cobro (queda registrado como un pago aparte).
+              {esFormaPagoCashback(pagoGuardado.formaPago) ? " Lo cubrió por completo." : " El recibo de abajo es por lo que se pagó con " + pagoGuardado.formaPago + "."}
+            </p>
+          )}
           {acumulaHoy > 0 && (
             <p className="mb-4 rounded-lg border border-success/40 bg-success/10 px-3 py-2 text-sm text-success print:hidden">
               Hoy acumulaste <span className="font-semibold">{formatCurrency(acumulaHoy)}</span> de Cashback para tu próxima atención. Se libera a partir de mañana{cashbackConfig.aprobarAutomaticamente ? "" : ", una vez aprobado"}.
@@ -621,7 +662,7 @@ export function AgregarPagoDialog({
   const faltantes: string[] = [];
   if (totalAPagar > 0 || extras.length > 0) {
     if (medico === "") faltantes.push("el médico tratante");
-    if (formaPago === "") faltantes.push("la forma de pago");
+    if (formaPago === "" && aPagarEnDinero > 0) faltantes.push("la forma de pago");
     if (extras.some((e) => e.monto <= 0)) faltantes.push("el monto del servicio o anticipo");
   }
   const inputMontoClass =
@@ -629,13 +670,12 @@ export function AgregarPagoDialog({
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-3">
-      <div className="max-h-[96vh] w-full max-w-lg overflow-y-auto rounded-2xl border border-edge/10 bg-modal p-5">
-        <div className="mb-3 flex items-start justify-between gap-3">
+      <div className="max-h-[96vh] w-full max-w-lg overflow-y-auto rounded-2xl border border-edge/10 bg-modal p-4">
+        <div className="mb-2.5 flex items-start justify-between gap-3">
           <div className="min-w-0">
-            <h2 className="text-lg font-semibold leading-tight text-ink">Agregar Pago</h2>
-            <p className="truncate text-sm text-ink/60" title={patientName}>
-              {patientName}
-            </p>
+            <h2 className="truncate text-lg font-semibold leading-tight text-ink" title={patientName}>
+              Agregar Pago <span className="text-sm font-normal text-ink/60">· {patientName}</span>
+            </h2>
           </div>
           <button
             onClick={onClose}
@@ -646,8 +686,8 @@ export function AgregarPagoDialog({
           </button>
         </div>
 
-        <div className="space-y-3">
-          <div className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-0.5 rounded-lg border border-accent/30 bg-accent/10 px-3 py-2">
+        <div className="space-y-2.5">
+          <div className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-0.5 rounded-lg border border-accent/30 bg-accent/10 px-3 py-1.5">
             <div className="flex items-baseline gap-2">
               <span className="text-[11px] uppercase tracking-wide text-ink/50">Saldo por cobrar</span>
               <span className="text-lg font-bold text-accent">{formatCurrency(saldoPendienteTotal)}</span>
@@ -658,39 +698,11 @@ export function AgregarPagoDialog({
               </span>
             )}
             {hayPropuestas && (
-              <p className="basis-full text-[11px] text-ink/60">
-                Hay presupuestos sin aceptar (no cuentan como saldo). Al cobrarlos se registra su aceptación.
-              </p>
+              <span className="text-[11px] text-ink/50" title="Los presupuestos sin aceptar no cuentan como saldo. Al cobrarlos se registra su aceptación.">
+                Hay presupuestos sin aceptar
+              </span>
             )}
           </div>
-
-          {avisoCashback && (
-            <div className="rounded-lg border border-success/30 bg-success/10 px-3 py-1.5 text-xs">
-              <div className="flex items-center justify-between gap-3">
-                <p className="font-semibold text-success">💰 {avisoCashback.titulo}</p>
-                {avisoCashback.puedeUsar && !sinCashback && (
-                  <button
-                    type="button"
-                    onClick={() => setFormaPago(pagaConCashback ? formaHabitual ?? "" : FORMA_PAGO_CASHBACK)}
-                    className="shrink-0 rounded-lg border border-success/50 px-2.5 py-1 font-semibold text-success transition-colors hover:bg-success/10"
-                  >
-                    {pagaConCashback ? "Quitar Cashback" : "Usar Cashback"}
-                  </button>
-                )}
-              </div>
-              {avisoCashback.detalle.map((linea) => (
-                <p key={linea} className="mt-0.5 text-ink/60">
-                  {linea}
-                </p>
-              ))}
-              {avisoCashback.puedeUsar && sinCashback && (
-                <p className="mt-0.5 text-ink/60">No se puede usar en una promoción, cortesía o tarifa especial.</p>
-              )}
-              {avisoCashback.puedeUsar && !sinCashback && seleccionados.length > 0 && (
-                <p className="mt-0.5 text-ink/60">Con lo que vas a cobrar puede cubrir hasta {formatCurrency(maxCashbackAhora)} ahora.</p>
-              )}
-            </div>
-          )}
 
           <div className="grid grid-cols-2 gap-3">
             <div>
@@ -727,27 +739,14 @@ export function AgregarPagoDialog({
                     Elige una…
                   </option>
                 )}
-                {formasDisponibles.map((f) => (
+                {formasDePago.map((f) => (
                   <option key={f} value={f}>
-                    {f === FORMA_PAGO_CASHBACK ? `Cashback (disponible ${formatCurrency(cashbackDisponible)})` : f}
+                    {f}
                   </option>
                 ))}
               </select>
             </div>
           </div>
-          {excedeCashback && (
-            <p className="text-[11px] text-danger">
-              Con Cashback solo puedes cubrir {formatCurrency(maxCashbackAhora)} (lo menor entre tu saldo de {formatCurrency(cashbackDisponible)}, {cashbackConfig.porcentajeMaxCanje}% de la atención y el tope por visita). Baja el
-              monto y cobra el resto en otro pago.
-            </p>
-          )}
-          {pagaConCashback && valorAtencion === 0 && (
-            <p className="text-[11px] text-ink/50">El Cashback se aplica a un tratamiento o a un servicio realizado: agrégalo abajo.</p>
-          )}
-          {pagaConCashback && valorAtencion > 0 && !excedeCashback && (
-            <p className="text-[11px] text-ink/50">Puedes cubrir hasta {formatCurrency(maxCashbackAhora)} con Cashback en esta atención; el resto cóbralo en otro pago.</p>
-          )}
-
           <div>
             <label htmlFor="pago-tratamientos" className="mb-1 block text-xs font-medium text-ink/60">
               Tratamientos
@@ -922,51 +921,120 @@ export function AgregarPagoDialog({
             )}
           </div>
 
-          <div className="grid grid-cols-2 gap-3">
-            <div>
-              <label htmlFor="pago-clave" className="mb-1 block text-xs font-medium text-ink/60">
-                Clave de pago <span className="font-normal text-ink/40">(opcional)</span>
-              </label>
-              <input
-                id="pago-clave"
-                type="text"
-                maxLength={60}
-                autoComplete="off"
-                value={clavePago}
-                onChange={(e) => setClavePago(e.target.value)}
-                placeholder="Folio o referencia"
-                className={inputClass}
-              />
+          {avisoCashback && (
+            <div className="rounded-lg border border-success/30 bg-success/10 px-3 py-2 text-xs">
+              <p className="font-semibold text-success">💰 {avisoCashback.titulo}</p>
+              {avisoCashback.detalle.length > 0 && (
+                <p className="mt-0.5 truncate text-[11px] text-ink/60" title={avisoCashback.detalle.join(" ")}>
+                  {avisoCashback.detalle.join(" ")}
+                </p>
+              )}
+              {avisoCashback.puedeUsar && sinCashback && (
+                <p className="mt-0.5 text-ink/60">No se puede usar en una promoción, cortesía o tarifa especial.</p>
+              )}
+              {avisoCashback.puedeUsar && !sinCashback && (
+                <div className="mt-1 flex flex-wrap items-center justify-between gap-x-3 gap-y-1">
+                  <label className="flex items-center gap-2 text-sm font-medium text-ink/80">
+                    <input
+                      type="checkbox"
+                      checked={usarCashback}
+                      onChange={(e) => setUsarCashback(e.target.checked)}
+                      className="h-4 w-4 accent-accent"
+                    />
+                    El paciente acepta usar su Cashback
+                  </label>
+                  {usarCashback &&
+                    (maxCashbackAhora > 0 ? (
+                      <span className="flex items-center gap-1.5 text-ink/60">
+                        Aplicar (máx. {formatCurrency(maxCashbackAhora)}) $
+                        <input
+                          type="number"
+                          min={0}
+                          max={maxCashbackAhora}
+                          value={cashbackTexto}
+                          placeholder={String(maxCashbackAhora)}
+                          aria-label="Cashback a aplicar"
+                          onChange={(e) => setCashbackTexto(e.target.value)}
+                          className="w-20 rounded-md border border-edge/10 bg-field px-1.5 py-1 text-right text-sm text-ink outline-none focus:border-accent/60"
+                        />
+                      </span>
+                    ) : (
+                      <span className="text-ink/60">Agrega un tratamiento para calcular cuánto cubre.</span>
+                    ))}
+                </div>
+              )}
             </div>
-            <div>
-              <div className="mb-1 text-xs font-medium text-ink/60">Total a pagar</div>
-              <div className="flex min-h-[38px] items-center rounded-lg border border-edge/10 bg-inset px-3 text-lg font-bold text-success">
-                {formatCurrency(totalAPagar)}
+          )}
+
+          <div className="grid grid-cols-2 items-start gap-3">
+            <div className="space-y-2">
+              <div>
+                <label htmlFor="pago-clave" className="mb-1 block text-xs font-medium text-ink/60">
+                  Clave de pago <span className="font-normal text-ink/40">(opcional)</span>
+                </label>
+                <input
+                  id="pago-clave"
+                  type="text"
+                  maxLength={60}
+                  autoComplete="off"
+                  value={clavePago}
+                  onChange={(e) => setClavePago(e.target.value)}
+                  placeholder="Folio o referencia"
+                  className={inputClass}
+                />
+              </div>
+              <div className="space-y-1.5 text-sm text-ink/70">
+                <label className="flex items-center gap-2">
+                  <input
+                    type="checkbox"
+                    checked={facturar}
+                    onChange={(e) => setFacturar(e.target.checked)}
+                    className="h-4 w-4 accent-accent"
+                  />
+                  Activo para facturar
+                </label>
+                {cashbackConfig.activo && (
+                  <label className="flex items-center gap-2" title="Una promoción, cortesía o tarifa especial no genera ni usa Cashback.">
+                    <input
+                      type="checkbox"
+                      checked={sinCashback}
+                      onChange={(e) => setSinCashback(e.target.checked)}
+                      className="h-4 w-4 accent-accent"
+                    />
+                    Promoción o cortesía
+                  </label>
+                )}
               </div>
             </div>
-          </div>
-
-          <div className="flex flex-wrap items-center gap-x-5 gap-y-1.5 text-sm text-ink/70">
-            <label className="flex items-center gap-2">
-              <input
-                type="checkbox"
-                checked={facturar}
-                onChange={(e) => setFacturar(e.target.checked)}
-                className="h-4 w-4 accent-accent"
-              />
-              Activo para facturar
-            </label>
-            {cashbackConfig.activo && !pagaConCashback && (
-              <label className="flex items-center gap-2">
-                <input
-                  type="checkbox"
-                  checked={sinCashback}
-                  onChange={(e) => setSinCashback(e.target.checked)}
-                  className="h-4 w-4 accent-accent"
-                />
-                Promoción o cortesía (sin Cashback)
-              </label>
-            )}
+            <div>
+              <div className="mb-1 text-xs font-medium text-ink/60">Resumen del cobro</div>
+              <div className="rounded-lg border border-edge/10 bg-inset px-3 py-2 text-sm">
+                {cashbackDisponible > 0 ? (
+                  <>
+                    <div className="flex items-baseline justify-between text-ink/70">
+                      <span>Total del cobro</span>
+                      <span>{formatCurrency(totalAPagar)}</span>
+                    </div>
+                    <div className={`flex items-baseline justify-between ${cashbackAplicado > 0 ? "text-success" : "text-ink/40"}`}>
+                      <span>Cashback</span>
+                      <span>
+                        {cashbackAplicado > 0 ? "−" : ""}
+                        {formatCurrency(cashbackAplicado)}
+                      </span>
+                    </div>
+                    <div className="mt-1 flex items-baseline justify-between border-t border-edge/10 pt-1">
+                      <span className="font-semibold text-ink/80">El paciente paga</span>
+                      <span className="text-lg font-bold text-success">{formatCurrency(aPagarEnDinero)}</span>
+                    </div>
+                  </>
+                ) : (
+                  <div className="flex items-baseline justify-between">
+                    <span className="font-semibold text-ink/80">Total a pagar</span>
+                    <span className="text-lg font-bold text-success">{formatCurrency(totalAPagar)}</span>
+                  </div>
+                )}
+              </div>
+            </div>
           </div>
         </div>
 
@@ -1373,6 +1441,16 @@ export default function Pagos({
           formaPagoInicial={formaPagoInicial}
           onClose={() => setShowDialog(false)}
           onSave={upsertPago}
+          onSaveVarios={(nuevos) => {
+            // Un cobro con Cashback son dos pagos (el del Cashback y el del dinero): entran juntos, en un solo cambio, el del dinero primero.
+            const ordenados = [...nuevos].reverse();
+            setPagos((prev) => [...ordenados, ...prev]);
+            const ahoraIso = new Date().toISOString();
+            setPagosRealizados((prevRealizados) => [
+              ...ordenados.map((pago) => ({ id: pago.id, patientId, patientName, pago, registradoEn: ahoraIso, registradoPor: userEmail })),
+              ...prevRealizados.filter((r) => !ordenados.some((n) => n.id === r.id)),
+            ]);
+          }}
         />
       )}
 
