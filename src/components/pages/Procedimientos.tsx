@@ -12,6 +12,7 @@ import {
 } from "@/lib/procedimientos";
 import ConfirmarEliminar from "@/components/ConfirmarEliminar";
 import ImportarCatalogoDialog from "@/components/procedimientos/ImportarCatalogoDialog";
+import ImportarListaPreciosDialog from "@/components/procedimientos/ImportarListaPreciosDialog";
 import GuiaConfiguracion from "@/components/procedimientos/GuiaConfiguracion";
 
 const inputClass =
@@ -230,6 +231,7 @@ export default function Procedimientos() {
   const [editando, setEditando] = useState<Procedimiento | "nuevo" | null>(null);
   const [procedimientoAEliminar, setProcedimientoAEliminar] = useState<Procedimiento | null>(null);
   const [mostrarImportar, setMostrarImportar] = useState(false);
+  const [mostrarListaPrecios, setMostrarListaPrecios] = useState(false);
   const [guiaAbiertaId, setGuiaAbiertaId] = useState<string | null>(null);
 
   if (miRol !== "admin") {
@@ -278,13 +280,22 @@ export default function Procedimientos() {
           Estos valores son la base para presupuestos, comisiones y duración de citas en otras
           áreas de la plataforma.
         </p>
-        <button
-          onClick={() => setEditando("nuevo")}
-          className="shrink-0 rounded-lg border border-accent/50 bg-accent/10 px-4 py-2.5 text-sm font-semibold text-accent transition-colors hover:bg-accent/20"
-          style={{ boxShadow: "0 0 12px -2px rgb(var(--accent-rgb) / 0.5)" }}
-        >
-          + Agregar procedimiento
-        </button>
+        <div className="flex shrink-0 flex-wrap justify-end gap-2">
+          <button
+            onClick={() => setMostrarListaPrecios(true)}
+            title="Sube tu lista de precios en Excel o Word y se cargan los tratamientos con su precio"
+            className="rounded-lg border border-accent/40 px-4 py-2.5 text-sm font-semibold text-accent transition-colors hover:bg-accent/10"
+          >
+            Agregar documento
+          </button>
+          <button
+            onClick={() => setEditando("nuevo")}
+            className="rounded-lg border border-accent/50 bg-accent/10 px-4 py-2.5 text-sm font-semibold text-accent transition-colors hover:bg-accent/20"
+            style={{ boxShadow: "0 0 12px -2px rgb(var(--accent-rgb) / 0.5)" }}
+          >
+            + Agregar procedimiento
+          </button>
+        </div>
       </div>
 
       <div className="rounded-2xl border border-edge/10 bg-surface p-5">
@@ -401,6 +412,7 @@ export default function Procedimientos() {
       )}
 
       {mostrarImportar && <ImportarCatalogoDialog onClose={() => setMostrarImportar(false)} />}
+      {mostrarListaPrecios && <ImportarListaPreciosDialog onClose={() => setMostrarListaPrecios(false)} />}
     </div>
   );
 }

@@ -928,6 +928,8 @@ type PatientDataContextValue = {
   procedimientos: Procedimiento[];
   setProcedimientos: (updater: Updater<Procedimiento[]>) => void;
   importarCatalogoProcedimientos: (nuevos: Procedimiento[]) => Promise<void>;
+  /** Agrega los tratamientos nuevos de una lista de precios y actualiza el precio al paciente de los que ya existían. */
+  importarListaPrecios: (nuevos: Procedimiento[], cambiosPrecio: { id: string; costoPaciente: number }[]) => Promise<void>;
   historiaClinicaTemplate: HistoriaClinicaTemplate;
   setHistoriaClinicaTemplate: (updater: Updater<HistoriaClinicaTemplate>) => void;
   historiaClinicaPorPaciente: Record<string, RespuestasHistoriaClinica>;
@@ -1609,7 +1611,27 @@ export function PatientDataProvider({
     await batch.commit();
   };
 
-  const irAExpediente = (patientId: string, tab?: string, citaId?: string) => {
+  /** Lista de precios importada de un documento: los tratamientos nuevos entran con id propio y, de los que ya existían,
+   * solo cambia el precio al paciente (nada más se toca). Se escribe en bloques por el límite de Firestore. */
+  const importarListaPrecios = async (nuevos: Procedimiento[], cambiosPrecio: { id: string; costoPaciente: number }[]) => {
+    if (!clinicUid || (nuevos.length === 0 && cambiosPrecio.length === 0)) return;
+    const path = `users/${clinicUid}/procedimientos`;
+    const ahoraIso = new Date().toISOString();
+    const operaciones: ((batch: ReturnType<typeof writeBatch>) => void)[] = [
+      ...nuevos.map((data) => (batch: ReturnType<typeof writeBatch>) => batch.set(doc(db, path, data.id), data)),
+      ...cambiosPrecio.map((c) => (batch: ReturnType<typeof writeBatch>) =>
+        batch.update(doc(db, path, c.id), { costoPaciente: c.costoPaciente, actualizadoEl: ahoraIso })
+      ),
+    ];
+    const tamañoLote = 450;
+    for (let i = 0; i < operaciones.length; i += tamañoLote) {
+      const batch = writeBatch(db);
+      operaciones.slice(i, i + tamañoLote).forEach((op) => op(batch));
+      await batch.commit();
+    }
+  };
+
+  const irAExpediente =(patientId: string, tab?: string, citaId?: string) => {
     confirmarSalirSinGuardar(() => {
       setCambiosSinGuardar(null);
       setNavegacionExpediente({ patientId, tab, citaId });
@@ -3273,6 +3295,7 @@ export function PatientDataProvider({
         procedimientos,
         setProcedimientos,
         importarCatalogoProcedimientos,
+        importarListaPrecios,
         historiaClinicaTemplate,
         setHistoriaClinicaTemplate,
         historiaClinicaPorPaciente,

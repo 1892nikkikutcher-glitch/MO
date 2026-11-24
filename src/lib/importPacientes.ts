@@ -74,7 +74,7 @@ function leerFilasDeExcel(buffer: ArrayBuffer): string[][] {
     .filter((fila) => fila.some((v) => v !== ""));
 }
 
-function decodificarBuffer(buffer: ArrayBuffer): string {
+export function decodificarBuffer(buffer: ArrayBuffer): string {
   const bytes = new Uint8Array(buffer);
   if (bytes[0] === 0xef && bytes[1] === 0xbb && bytes[2] === 0xbf) {
     return new TextDecoder("utf-8").decode(bytes.slice(3));
@@ -86,7 +86,7 @@ function decodificarBuffer(buffer: ArrayBuffer): string {
   return utf8;
 }
 
-function detectarDelimitador(primeraLinea: string): string {
+export function detectarDelimitador(primeraLinea: string): string {
   const candidatos = [",", ";", "\t"];
   let mejor = ",";
   let max = 0;
@@ -100,7 +100,7 @@ function detectarDelimitador(primeraLinea: string): string {
   return mejor;
 }
 
-function parseDelimitado(texto: string, delim: string): string[][] {
+export function parseDelimitado(texto: string, delim: string): string[][] {
   const filas: string[][] = [];
   let fila: string[] = [];
   let campo = "";
