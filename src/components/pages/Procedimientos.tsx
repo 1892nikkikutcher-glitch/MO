@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { usePatientData } from "@/context/PatientDataContext";
 import { formatCurrency, unidadCobroLabel, unidadCobroOptions, type UnidadCobro } from "@/lib/patientData";
 import {
@@ -13,6 +13,8 @@ import {
 import ConfirmarEliminar from "@/components/ConfirmarEliminar";
 import ImportarCatalogoDialog from "@/components/procedimientos/ImportarCatalogoDialog";
 import ImportarListaPreciosDialog from "@/components/procedimientos/ImportarListaPreciosDialog";
+import AjustarPreciosDialog from "@/components/procedimientos/AjustarPreciosDialog";
+import { tocaAjusteAnual, type RegistroAjustePrecios } from "@/lib/ajustePreciosInflacion";
 import GuiaConfiguracion from "@/components/procedimientos/GuiaConfiguracion";
 
 const inputClass =
@@ -227,7 +229,20 @@ function ProcedimientoDialog({
 }
 
 export default function Procedimientos() {
-  const { miRol, procedimientos, setProcedimientos } = usePatientData();
+  const { miRol, procedimientos, setProcedimientos, leerUltimoAjustePrecios } = usePatientData();
+  const [mostrarAjuste, setMostrarAjuste] = useState(false);
+  const [ultimoAjuste, setUltimoAjuste] = useState<RegistroAjustePrecios | null>(null);
+  useEffect(() => {
+    if (miRol !== "admin" || mostrarAjuste) return;
+    let vivo = true;
+    void leerUltimoAjustePrecios().then((r) => {
+      if (vivo) setUltimoAjuste(r);
+    });
+    return () => {
+      vivo = false;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [miRol, mostrarAjuste]);
   const [editando, setEditando] = useState<Procedimiento | "nuevo" | null>(null);
   const [procedimientoAEliminar, setProcedimientoAEliminar] = useState<Procedimiento | null>(null);
   const [mostrarImportar, setMostrarImportar] = useState(false);
@@ -282,6 +297,13 @@ export default function Procedimientos() {
         </p>
         <div className="flex shrink-0 flex-wrap justify-end gap-2">
           <button
+            onClick={() => setMostrarAjuste(true)}
+            title="Sube de una vez el precio de todos tus tratamientos con un porcentaje, por ejemplo la inflación anual"
+            className="rounded-lg border border-accent/40 px-4 py-2.5 text-sm font-semibold text-accent transition-colors hover:bg-accent/10"
+          >
+            Ajustar por inflación
+          </button>
+          <button
             onClick={() => setMostrarListaPrecios(true)}
             title="Sube tu lista de precios en Excel o Word y se cargan los tratamientos con su precio"
             className="rounded-lg border border-accent/40 px-4 py-2.5 text-sm font-semibold text-accent transition-colors hover:bg-accent/10"
@@ -297,6 +319,22 @@ export default function Procedimientos() {
           </button>
         </div>
       </div>
+
+      {tocaAjusteAnual(ultimoAjuste, new Date()) && ultimoAjuste && (
+        <div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-warning/30 bg-warning/10 px-4 py-3">
+          <p className="text-sm text-warning">
+            Ya pasó cerca de un año desde que subiste tus precios (
+            {new Date(ultimoAjuste.fecha).toLocaleDateString("es-MX", { month: "long", year: "numeric" })}). Para mantener sanas tus finanzas, conviene
+            ajustarlos a la inflación.
+          </p>
+          <button
+            onClick={() => setMostrarAjuste(true)}
+            className="shrink-0 rounded-lg border border-warning/50 px-3 py-1.5 text-xs font-semibold text-warning hover:bg-warning/10"
+          >
+            Ajustar ahora
+          </button>
+        </div>
+      )}
 
       <div className="rounded-2xl border border-edge/10 bg-surface p-5">
         <h3 className="text-sm font-semibold text-ink">Catálogo recomendado</h3>
@@ -413,6 +451,7 @@ export default function Procedimientos() {
 
       {mostrarImportar && <ImportarCatalogoDialog onClose={() => setMostrarImportar(false)} />}
       {mostrarListaPrecios && <ImportarListaPreciosDialog onClose={() => setMostrarListaPrecios(false)} />}
+      {mostrarAjuste && <AjustarPreciosDialog onClose={() => setMostrarAjuste(false)} />}
     </div>
   );
 }

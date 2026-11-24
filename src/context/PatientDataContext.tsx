@@ -172,6 +172,7 @@ import type { Equipo, RegistroEquipo, IngenieroBiomedico } from "@/lib/mantenimi
 import type { Factura } from "@/lib/facturacion";
 import type { PersonalAsistencia, RegistroAsistencia } from "@/lib/asistencia";
 import type { Procedimiento } from "@/lib/procedimientos";
+import type { RegistroAjustePrecios } from "@/lib/ajustePreciosInflacion";
 import { catalogoRecomendado } from "@/lib/catalogoRecomendado";
 import { crearProcedimientoDesdeTemplate, idDesdeCodigo } from "@/lib/importarCatalogoRecomendado";
 import { catalogoInicial, type MedicamentoCatalogo } from "@/lib/medicamentos";
@@ -930,6 +931,14 @@ type PatientDataContextValue = {
   importarCatalogoProcedimientos: (nuevos: Procedimiento[]) => Promise<void>;
   /** Agrega los tratamientos nuevos de una lista de precios y actualiza el precio al paciente de los que ya existían. */
   importarListaPrecios: (nuevos: Procedimiento[], cambiosPrecio: { id: string; costoPaciente: number }[]) => Promise<void>;
+  /** Guarda de un jalón los precios (y costos) nuevos de varios procedimientos. `registro`: el ajuste que se anota como
+   * el último (undefined = no tocar lo anotado, null = borrarlo, p. ej. al deshacer un primer ajuste). */
+  aplicarAjustePrecios: (
+    cambios: { id: string; campos: Partial<Pick<Procedimiento, "costoPaciente" | "precioPromocional" | "costoOdontologo" | "costoInterno">> }[],
+    registro?: RegistroAjustePrecios | null
+  ) => Promise<void>;
+  /** Último ajuste porcentual de precios que se hizo (o null si nunca). */
+  leerUltimoAjustePrecios: () => Promise<RegistroAjustePrecios | null>;
   historiaClinicaTemplate: HistoriaClinicaTemplate;
   setHistoriaClinicaTemplate: (updater: Updater<HistoriaClinicaTemplate>) => void;
   historiaClinicaPorPaciente: Record<string, RespuestasHistoriaClinica>;
@@ -1628,6 +1637,31 @@ export function PatientDataProvider({
       const batch = writeBatch(db);
       operaciones.slice(i, i + tamañoLote).forEach((op) => op(batch));
       await batch.commit();
+    }
+  };
+
+  const aplicarAjustePrecios: PatientDataContextValue["aplicarAjustePrecios"] = async (cambios, registro) => {
+    if (!clinicUid) return;
+    const path = `users/${clinicUid}/procedimientos`;
+    const ahoraIso = new Date().toISOString();
+    const tamañoLote = 450;
+    for (let i = 0; i < cambios.length; i += tamañoLote) {
+      const batch = writeBatch(db);
+      cambios.slice(i, i + tamañoLote).forEach((c) => batch.update(doc(db, path, c.id), { ...c.campos, actualizadoEl: ahoraIso }));
+      await batch.commit();
+    }
+    const refRegistro = doc(db, `users/${clinicUid}/config/ajustePrecios`);
+    if (registro === null) await deleteDoc(refRegistro);
+    else if (registro) await setDoc(refRegistro, registro);
+  };
+
+  const leerUltimoAjustePrecios = async (): Promise<RegistroAjustePrecios | null> => {
+    if (!clinicUid) return null;
+    try {
+      const snap = await getDoc(doc(db, `users/${clinicUid}/config/ajustePrecios`));
+      return snap.exists() ? (snap.data() as RegistroAjustePrecios) : null;
+    } catch {
+      return null;
     }
   };
 
@@ -3296,6 +3330,8 @@ export function PatientDataProvider({
         setProcedimientos,
         importarCatalogoProcedimientos,
         importarListaPrecios,
+        aplicarAjustePrecios,
+        leerUltimoAjustePrecios,
         historiaClinicaTemplate,
         setHistoriaClinicaTemplate,
         historiaClinicaPorPaciente,
