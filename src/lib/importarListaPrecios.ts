@@ -71,7 +71,7 @@ function resolverEspecialidad(texto: string): string {
   if (!t) return ESPECIALIDAD_POR_DEFECTO;
   const conocida = especialidadesPredefinidas.find((e) => {
     const n = normalizar(e);
-    return n === t || (t.length >= 5 && n.startsWith(t));
+    return n === t || (t.length >= 5 && (n.startsWith(t) || n.endsWith(t)));
   });
   if (conocida) return conocida;
   const limpio = limpiarNombre(texto);
@@ -82,14 +82,16 @@ function resolverEspecialidad(texto: string): string {
 
 type TipoColumna = "nombre" | "precio" | "especialidad" | "duracion" | "ignorar";
 
-const EXCLUIR_PRECIO = /\b(odontologo|doctor|medico|interno|laboratorio|comision|insumos?|material(es)?|promocion(al)?|descuento)\b/;
+const EXCLUIR_PRECIO = /\b(odontologo|doctor|medico|interno|laboratorio|comision|insumos?|material(es)?|promocion(al)?|descuento|produccion|aseguradora|seguro)\b/;
 
 function tipoDeEncabezado(encabezado: string): TipoColumna {
   const h = normalizar(encabezado);
   if (!h) return "ignorar";
+  // «Grupo tratamiento», «Tipo costo tratamiento», «Clasificación»: agrupan, no son ni el nombre ni el precio.
+  if (/\b(grupo|tipo|clasificacion|categoria|area|rubro|familia|departamento|especialidad)\b/.test(h)) return "especialidad";
+  if (/\b(codigo|clave|folio|numero|eventos?)\b/.test(h)) return "ignorar";
   if (/\b(precio|costo|importe|tarifa|monto|cuota|honorarios)\b/.test(h)) return EXCLUIR_PRECIO.test(h) ? "ignorar" : "precio";
   if (/\b(tratamientos?|procedimientos?|conceptos?|servicios?|descripcion|nombre)\b/.test(h)) return "nombre";
-  if (/\b(especialidad|area|categoria|rubro|familia|departamento)\b/.test(h)) return "especialidad";
   if (/\b(duracion|tiempo|minutos)\b/.test(h)) return "duracion";
   return "ignorar";
 }
@@ -139,12 +141,31 @@ export function filasDeMatriz(matriz: string[][], contexto: Contexto = {}): Lect
 
   if (encabezado) {
     const { tipos, fila } = encabezado;
-    idxNombre = tipos.indexOf("nombre");
-    idxPrecio = tipos.indexOf("precio");
-    idxEspecialidad = tipos.indexOf("especialidad");
-    idxDuracion = tipos.indexOf("duracion");
     primeraDeDatos = fila + 1;
-    const otrosPrecios = tipos.map((t, i) => (t === "precio" && i !== idxPrecio ? matriz[fila][i].trim() : "")).filter(Boolean);
+    const datos = matriz.slice(primeraDeDatos);
+    const indicesDe = (tipo: TipoColumna) => tipos.flatMap((t, i) => (t === tipo ? [i] : []));
+    const encabezadoNormalizado = (i: number) => normalizar(matriz[fila][i] ?? "");
+
+    // El nombre: la columna que se llama «Nombre …»; si no hay, la primera de tratamiento/concepto/servicio.
+    const nombres = indicesDe("nombre");
+    idxNombre = nombres.find((i) => /\bnombre\b/.test(encabezadoNormalizado(i))) ?? nombres[0];
+
+    // El precio: si el documento trae varias columnas de dinero, la que de verdad trae precios (los renglones en $0 no
+    // cuentan: «Precio paciente» suele venir vacío mientras el precio real está en «Costo tratamiento»).
+    const conPrecio = (i: number) => datos.filter((f) => (parsePrecio((f[i] ?? "").trim()) ?? 0) > 0).length;
+    const precios = indicesDe("precio").map((i) => ({
+      i,
+      cuenta: conPrecio(i),
+      preferida: /\b(paciente|publico)\b/.test(encabezadoNormalizado(i)) ? 1 : 0,
+    }));
+    precios.sort((a, b) => b.cuenta - a.cuenta || b.preferida - a.preferida || a.i - b.i);
+    idxPrecio = precios[0].i;
+
+    // La especialidad: la columna de agrupación con más variedad (una que dice lo mismo en todos los renglones no sirve).
+    const variedad = (i: number) => new Set(datos.map((f) => normalizar(f[i] ?? "")).filter(Boolean)).size;
+    idxEspecialidad = indicesDe("especialidad").sort((a, b) => variedad(b) - variedad(a) || a - b)[0] ?? -1;
+    idxDuracion = tipos.indexOf("duracion");
+    const otrosPrecios = precios.filter((x) => x.i !== idxPrecio && x.cuenta > 0).map((x) => matriz[fila][x.i].trim());
     if (otrosPrecios.length > 0) {
       avisos.push(`Usé la columna «${matriz[fila][idxPrecio].trim()}» como precio. El documento también trae: ${otrosPrecios.join(", ")}.`);
     }
@@ -187,6 +208,11 @@ export function filasDeMatriz(matriz: string[][], contexto: Contexto = {}): Lect
       especialidad,
       ...(Number.isFinite(duracion) && duracion >= 5 && duracion <= 600 ? { duracionMinutos: Math.round(duracion) } : {}),
     });
+  }
+  // Los encabezados no sirvieron (nada con precio): se intenta adivinar las columnas por su contenido antes de rendirse.
+  if (encabezado && filas.length === 0) {
+    const intento = filasDeMatriz(matriz.slice(primeraDeDatos), contexto);
+    if (intento.filas.length > 0) return intento;
   }
   return { filas, sinPrecio, repetidos, avisos };
 }

@@ -143,6 +143,24 @@ describe("filasDeMatriz", () => {
     expect(r.repetidos).toBe(1);
   });
 
+  it("un reporte con varias columnas de dinero: toma la que sí trae precios y agrupa por el tipo", () => {
+    const r = filasDeMatriz([
+      ["Consultorio Médico Profesional"],
+      [" "],
+      ["Grupo tratamiento", "Tipo costo tratamiento", "Codigo", "Nombre tratamiento", "Costo tratamiento", "Aplica costos aseguradora", "Precio aseguradora", "Precio paciente", "Comision doctor", "Numero de eventos", "Costo produccion", "Clasificacion Tratamiento"],
+      ["Consultorio", "ORTODONCIA", "117", "BRACKET DESPEGADO AUTOLIGADO", "600.0000", "True", "0.0000", "0.0000", "0.0000", "0", "0.0000", ""],
+      ["Consultorio", "ENDODONCIAS", "008", "Acceso endodóntico", "2000.0000", "True", "0.0000", "0.0000", "0.0000", "0", "0.0000", "Curativos"],
+      ["Consultorio", "General", "102", "Aplicacion de Fluór", "290.0000", "True", "0.0000", "0.0000", "0.0000", "0", "0.0000", ""],
+      ["Consultorio", "CONSULTA", "001", "Resina", "0.0000", "True", "0.0000", "0.0000", "0.0000", "0", "0.0000", ""],
+    ]);
+    expect(r.filas.map((f) => [f.nombre, f.precio, f.especialidad])).toEqual([
+      ["Bracket despegado autoligado", 600, "Ortodoncia"],
+      ["Acceso endodóntico", 2000, "Endodoncias"],
+      ["Aplicacion de Fluór", 290, "Odontología General"],
+    ]);
+    expect(r.sinPrecio).toBe(1);
+  });
+
   it("pasa nombres todo en mayúsculas a formato normal", () => {
     const r = filasDeMatriz([["Tratamiento", "Precio"], ["LIMPIEZA DENTAL PROFUNDA", "900"]]);
     expect(r.filas[0].nombre).toBe("Limpieza dental profunda");
