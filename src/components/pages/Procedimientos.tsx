@@ -9,6 +9,10 @@ import {
   esEspecialidadPredefinida,
   esSinClasificar,
   ramasDelCatalogo,
+  normalizarNombreRama,
+  validarNombreRama,
+  renombrarRama,
+  quitarRama,
   formatDuracion,
   esProcedimientoActivo,
   type Procedimiento,
@@ -37,19 +41,22 @@ function procedimientoVacio(): Omit<Procedimiento, "id"> {
 function ProcedimientoDialog({
   inicial,
   especialidadInicial,
+  ramasPropias,
   onClose,
   onGuardar,
 }: {
   inicial: Procedimiento | null;
   /** Para un procedimiento nuevo: la rama desde la que se está agregando. */
   especialidadInicial?: string;
+  /** Ramas que creó la clínica (se ofrecen junto a las base). */
+  ramasPropias: string[];
   onClose: () => void;
   onGuardar: (data: Omit<Procedimiento, "id">) => void;
 }) {
   const [form, setForm] = useState<Omit<Procedimiento, "id">>(
     inicial ?? { ...procedimientoVacio(), ...(especialidadInicial ? { especialidad: especialidadInicial } : {}) }
   );
-  const esConocida = (e: string) => esEspecialidadPredefinida(e) || e === ESPECIALIDAD_SIN_CLASIFICAR;
+  const esConocida = (e: string) => esEspecialidadPredefinida(e) || e === ESPECIALIDAD_SIN_CLASIFICAR || ramasPropias.includes(e);
   const [especialidadPersonalizada, setEspecialidadPersonalizada] = useState(
     inicial && !esConocida(inicial.especialidad) ? inicial.especialidad : ""
   );
@@ -108,6 +115,11 @@ function ProcedimientoDialog({
                 className={inputClass}
               >
                 {especialidadesPredefinidas.map((e) => (
+                  <option key={e} value={e}>
+                    {e}
+                  </option>
+                ))}
+                {ramasPropias.map((e) => (
                   <option key={e} value={e}>
                     {e}
                   </option>
@@ -237,8 +249,28 @@ function ProcedimientoDialog({
 }
 
 export default function Procedimientos() {
-  const { miRol, procedimientos, setProcedimientos, leerUltimoAjustePrecios, leerConfigAjustePrecios, guardarConfigAjustePrecios } = usePatientData();
+  const { miRol, procedimientos, setProcedimientos, leerUltimoAjustePrecios, leerConfigAjustePrecios, guardarConfigAjustePrecios, leerRamasPropias, guardarRamasPropias } =
+    usePatientData();
   const [mostrarAjuste, setMostrarAjuste] = useState(false);
+  // Ramas que la clínica creó (ej. «Prevención») y los formularios para crear, renombrar o quitar una.
+  const [ramasPropias, setRamasPropias] = useState<string[]>([]);
+  const [creandoRama, setCreandoRama] = useState(false);
+  const [nombreRamaNuevo, setNombreRamaNuevo] = useState("");
+  const [renombrandoRama, setRenombrandoRama] = useState(false);
+  const [nombreRenombre, setNombreRenombre] = useState("");
+  const [quitandoRama, setQuitandoRama] = useState(false);
+  const [errorRama, setErrorRama] = useState("");
+  useEffect(() => {
+    if (miRol !== "admin") return;
+    let vivo = true;
+    void leerRamasPropias().then((r) => {
+      if (vivo) setRamasPropias(r);
+    });
+    return () => {
+      vivo = false;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [miRol]);
   const [ramaAbierta, setRamaAbierta] = useState<string | null>(null);
   // Arrastrar un tratamiento a la tarjeta de su rama: cuál se arrastra, sobre qué tarjeta va y el aviso al soltarlo.
   const [arrastrandoId, setArrastrandoId] = useState<string | null>(null);
@@ -316,8 +348,65 @@ export default function Procedimientos() {
   };
 
   const pendienteAjuste = ajustePendiente(configAjuste, ultimoAjuste, new Date());
-  const ramas = ramasDelCatalogo(procedimientos);
+  const ramas = ramasDelCatalogo(procedimientos, ramasPropias);
   const ramaActual = ramas.find((r) => r.nombre === ramaAbierta) ?? null;
+
+  const cerrarFormulariosDeRama = () => {
+    setCreandoRama(false);
+    setRenombrandoRama(false);
+    setQuitandoRama(false);
+    setNombreRamaNuevo("");
+    setErrorRama("");
+  };
+
+  const persistirRamas = async (lista: string[]) => {
+    setRamasPropias(lista);
+    try {
+      await guardarRamasPropias(lista);
+    } catch {
+      setErrorRama("No se pudo guardar la rama. Revisa tu conexión e inténtalo de nuevo.");
+    }
+  };
+
+  const crearRama = async () => {
+    const error = validarNombreRama(nombreRamaNuevo, ramas.map((r) => r.nombre));
+    if (error) return setErrorRama(error);
+    const nombre = normalizarNombreRama(nombreRamaNuevo);
+    await persistirRamas([...ramasPropias, nombre]);
+    cerrarFormulariosDeRama();
+    setRamaAbierta(nombre);
+    setAvisoMovido(`Creaste la rama «${nombre}». Arrastra procedimientos hacia ella o agrega uno nuevo.`);
+  };
+
+  const renombrarRamaActual = async () => {
+    if (!ramaActual) return;
+    const error = validarNombreRama(nombreRenombre, ramas.map((r) => r.nombre), ramaActual.nombre);
+    if (error) return setErrorRama(error);
+    const nombre = normalizarNombreRama(nombreRenombre);
+    if (nombre !== ramaActual.nombre) {
+      const de = ramaActual.nombre;
+      setProcedimientos((prev) => renombrarRama(prev, de, nombre, new Date().toISOString()));
+      await persistirRamas([...ramasPropias.filter((r) => r !== de), nombre]);
+      setRamaAbierta(nombre);
+      setAvisoMovido(`La rama «${de}» ahora se llama «${nombre}».`);
+    }
+    cerrarFormulariosDeRama();
+  };
+
+  const quitarRamaActual = async () => {
+    if (!ramaActual) return;
+    const nombre = ramaActual.nombre;
+    const cuantos = ramaActual.procedimientos.length;
+    setProcedimientos((prev) => quitarRama(prev, nombre, new Date().toISOString()));
+    await persistirRamas(ramasPropias.filter((r) => r !== nombre));
+    cerrarFormulariosDeRama();
+    setRamaAbierta(null);
+    setAvisoMovido(
+      cuantos > 0
+        ? `Quitaste la rama «${nombre}». ${cuantos === 1 ? "Su procedimiento pasó" : `Sus ${cuantos} procedimientos pasaron`} a Sin clasificar.`
+        : `Quitaste la rama «${nombre}».`
+    );
+  };
 
   const ubicarEn = (id: string, especialidad: string) => {
     setProcedimientos((prev) => prev.map((p) => (p.id === id ? { ...p, especialidad, actualizadoEl: new Date().toISOString() } : p)));
@@ -467,7 +556,59 @@ export default function Procedimientos() {
       )}
 
       <div>
-        <h3 className="text-sm font-semibold text-ink">Ramas de la odontología</h3>
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <h3 className="text-sm font-semibold text-ink">Ramas de la odontología</h3>
+          {!creandoRama && (
+            <button
+              onClick={() => {
+                cerrarFormulariosDeRama();
+                setCreandoRama(true);
+              }}
+              className="rounded-lg border border-accent/40 px-3 py-1.5 text-xs font-semibold text-accent transition-colors hover:bg-accent/10"
+            >
+              + Nueva rama
+            </button>
+          )}
+        </div>
+        {creandoRama && (
+          <form
+            onSubmit={(e) => {
+              e.preventDefault();
+              void crearRama();
+            }}
+            className="mt-3 rounded-2xl border border-accent/30 bg-surface p-4"
+          >
+            <label className="mb-1 block text-xs font-medium text-ink/60" htmlFor="nombre-rama-nueva">
+              Nombre de la nueva rama
+            </label>
+            <div className="flex flex-wrap items-start gap-2">
+              <input
+                id="nombre-rama-nueva"
+                autoFocus
+                type="text"
+                value={nombreRamaNuevo}
+                onChange={(e) => {
+                  setNombreRamaNuevo(e.target.value);
+                  setErrorRama("");
+                }}
+                placeholder="Ej. Prevención"
+                maxLength={60}
+                className={`${inputClass} max-w-xs`}
+              />
+              <button type="submit" className="rounded-lg bg-accent px-4 py-2 text-sm font-semibold text-black hover:opacity-90">
+                Crear rama
+              </button>
+              <button type="button" onClick={cerrarFormulariosDeRama} className="rounded-lg border border-edge/15 px-4 py-2 text-sm text-ink/70 hover:bg-surface2">
+                Cancelar
+              </button>
+            </div>
+            {errorRama && (
+              <p role="alert" className="mt-2 text-xs text-danger">
+                {errorRama}
+              </p>
+            )}
+          </form>
+        )}
         <p className="mb-3 mt-1 text-xs text-ink/50">
           Toca una rama para ver sus procedimientos y costos. Para cambiar un procedimiento de rama, arrástralo desde la tabla y suéltalo sobre la tarjeta de su rama.
         </p>
@@ -548,16 +689,102 @@ export default function Procedimientos() {
             <h3 className="text-xs font-semibold uppercase tracking-wide text-accent">
               {ramaActual.nombre} · {ramaActual.procedimientos.length}
             </h3>
-            <button
-              onClick={() => {
-                setEspecialidadNuevo(ramaActual.nombre);
-                setEditando("nuevo");
-              }}
-              className="rounded-lg border border-accent/40 px-3 py-1.5 text-xs font-semibold text-accent transition-colors hover:bg-accent/10"
-            >
-              + Agregar a {ramaActual.nombre}
-            </button>
+            <div className="flex flex-wrap items-center gap-2">
+              {ramaActual.propia && (
+                <>
+                  <button
+                    onClick={() => {
+                      cerrarFormulariosDeRama();
+                      setNombreRenombre(ramaActual.nombre);
+                      setRenombrandoRama(true);
+                    }}
+                    className="rounded-lg border border-edge/15 px-3 py-1.5 text-xs text-ink/70 hover:bg-surface2"
+                  >
+                    Renombrar rama
+                  </button>
+                  <button
+                    onClick={() => {
+                      cerrarFormulariosDeRama();
+                      setQuitandoRama(true);
+                    }}
+                    className="rounded-lg border border-danger/30 px-3 py-1.5 text-xs text-danger hover:bg-danger/10"
+                  >
+                    Eliminar rama
+                  </button>
+                </>
+              )}
+              <button
+                onClick={() => {
+                  setEspecialidadNuevo(ramaActual.nombre);
+                  setEditando("nuevo");
+                }}
+                className="rounded-lg border border-accent/40 px-3 py-1.5 text-xs font-semibold text-accent transition-colors hover:bg-accent/10"
+              >
+                + Agregar a {ramaActual.nombre}
+              </button>
+            </div>
           </div>
+          {ramaActual.propia && renombrandoRama && (
+            <form
+              onSubmit={(e) => {
+                e.preventDefault();
+                void renombrarRamaActual();
+              }}
+              className="mb-3 rounded-2xl border border-accent/30 bg-surface p-4"
+            >
+              <label className="mb-1 block text-xs font-medium text-ink/60" htmlFor="nombre-rama-renombre">
+                Nuevo nombre de la rama (sus procedimientos se pasan con ella)
+              </label>
+              <div className="flex flex-wrap items-start gap-2">
+                <input
+                  id="nombre-rama-renombre"
+                  autoFocus
+                  type="text"
+                  value={nombreRenombre}
+                  onChange={(e) => {
+                    setNombreRenombre(e.target.value);
+                    setErrorRama("");
+                  }}
+                  maxLength={60}
+                  className={`${inputClass} max-w-xs`}
+                />
+                <button type="submit" className="rounded-lg bg-accent px-4 py-2 text-sm font-semibold text-black hover:opacity-90">
+                  Guardar nombre
+                </button>
+                <button type="button" onClick={cerrarFormulariosDeRama} className="rounded-lg border border-edge/15 px-4 py-2 text-sm text-ink/70 hover:bg-surface2">
+                  Cancelar
+                </button>
+              </div>
+              {errorRama && (
+                <p role="alert" className="mt-2 text-xs text-danger">
+                  {errorRama}
+                </p>
+              )}
+            </form>
+          )}
+          {ramaActual.propia && quitandoRama && (
+            <div className="mb-3 rounded-2xl border border-danger/30 bg-surface p-4">
+              <p className="text-sm text-ink">
+                ¿Eliminar la rama «{ramaActual.nombre}»?{" "}
+                {ramaActual.procedimientos.length > 0
+                  ? `Sus ${ramaActual.procedimientos.length} procedimiento(s) no se borran: pasan a «Sin clasificar» para que los ubiques en otra rama.`
+                  : "No tiene procedimientos."}
+              </p>
+              <div className="mt-3 flex flex-wrap gap-2">
+                <button onClick={() => void quitarRamaActual()} className="rounded-lg bg-danger px-4 py-2 text-sm font-semibold text-white hover:opacity-90">
+                  Sí, eliminar rama
+                </button>
+                <button onClick={cerrarFormulariosDeRama} className="rounded-lg border border-edge/15 px-4 py-2 text-sm text-ink/70 hover:bg-surface2">
+                  Cancelar
+                </button>
+              </div>
+              {errorRama && (
+                <p role="alert" className="mt-2 text-xs text-danger">
+                  {errorRama}
+                </p>
+              )}
+            </div>
+          )}
           {ramaActual.sinClasificar && (
             <p className="mb-2 text-xs text-ink/50">
               Aquí llegan los procedimientos que todavía no tienen rama (por ejemplo, los de una lista de precios con grupos propios). Elige en «Ubicar en» a qué rama
@@ -679,6 +906,7 @@ export default function Procedimientos() {
         <ProcedimientoDialog
           inicial={editando === "nuevo" ? null : editando}
           especialidadInicial={editando === "nuevo" ? especialidadNuevo : undefined}
+          ramasPropias={ramas.filter((r) => r.propia).map((r) => r.nombre)}
           onClose={() => setEditando(null)}
           onGuardar={guardarProcedimiento}
         />

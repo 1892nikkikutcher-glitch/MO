@@ -943,6 +943,9 @@ type PatientDataContextValue = {
   leerConfigAjustePrecios: () => Promise<ConfigAjustePrecios>;
   /** Guarda solo los campos que se pasan (el resto queda como estaba). */
   guardarConfigAjustePrecios: (cambios: Partial<ConfigAjustePrecios>) => Promise<void>;
+  /** Ramas del catálogo de procedimientos que creó la clínica (además de las base). */
+  leerRamasPropias: () => Promise<string[]>;
+  guardarRamasPropias: (propias: string[]) => Promise<void>;
   historiaClinicaTemplate: HistoriaClinicaTemplate;
   setHistoriaClinicaTemplate: (updater: Updater<HistoriaClinicaTemplate>) => void;
   historiaClinicaPorPaciente: Record<string, RespuestasHistoriaClinica>;
@@ -1690,6 +1693,23 @@ export function PatientDataProvider({
   const guardarConfigAjustePrecios = async (cambios: Partial<ConfigAjustePrecios>) => {
     if (!clinicUid) return;
     await setDoc(doc(db, `users/${clinicUid}/config/ajustePreciosConfig`), cambios, { merge: true });
+  };
+
+  /** Ramas del catálogo que la clínica creó (por ejemplo «Prevención»); se guardan aparte para que existan aunque estén vacías. */
+  const leerRamasPropias = async (): Promise<string[]> => {
+    if (!clinicUid) return [];
+    try {
+      const snap = await getDoc(doc(db, `users/${clinicUid}/config/ramasCatalogo`));
+      const lista = snap.exists() ? (snap.data() as { propias?: unknown }).propias : [];
+      return Array.isArray(lista) ? lista.filter((x): x is string => typeof x === "string" && x.trim() !== "") : [];
+    } catch {
+      return [];
+    }
+  };
+
+  const guardarRamasPropias = async (propias: string[]) => {
+    if (!clinicUid) return;
+    await setDoc(doc(db, `users/${clinicUid}/config/ramasCatalogo`), { propias });
   };
 
   const irAExpediente =(patientId: string, tab?: string, citaId?: string) => {
@@ -3361,6 +3381,8 @@ export function PatientDataProvider({
         leerUltimoAjustePrecios,
         leerConfigAjustePrecios,
         guardarConfigAjustePrecios,
+        leerRamasPropias,
+        guardarRamasPropias,
         historiaClinicaTemplate,
         setHistoriaClinicaTemplate,
         historiaClinicaPorPaciente,

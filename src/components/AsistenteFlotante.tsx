@@ -51,7 +51,8 @@ export default function AsistenteFlotante({
   // En computadora la barra lateral ocupa una columna junto al borde; el botón se pone justo
   // debajo de ella (centrado en esa columna) para no tapar botones del contenido.
   const posBoton = izquierda ? "lg:left-7 lg:right-auto" : "lg:right-7";
-  const posGlobo = izquierda ? "lg:left-[5.25rem] lg:right-auto" : "lg:right-[5.25rem]";
+  // El globo «¿Dudas?» solo va en celular/tableta: en computadora taparía el contenido junto a la barra, y ahí el
+  // botón ya llama la atención solo (brillo, pulso y la marca roja «!»).
   const posPanel = izquierda ? "lg:left-[6.5rem] lg:right-auto" : "lg:right-[6.5rem]";
   const { ayudaContexto, miUid } = usePatientData();
   const [abierto, setAbierto] = useState(false);
@@ -100,7 +101,7 @@ export default function AsistenteFlotante({
             dejarDeLlamar();
             setAbierto(true);
           }}
-          className={`fixed bottom-[154px] right-[4.5rem] z-40 max-w-[12rem] rounded-xl border border-accent/70 bg-modal-solid px-3 py-2 text-left text-xs font-semibold text-accent shadow-xl motion-safe:animate-bounce print:hidden lg:bottom-5 lg:max-w-none lg:text-sm ${posGlobo}`}
+          className={`fixed bottom-[154px] right-[4.5rem] z-40 max-w-[12rem] rounded-xl border border-accent/70 bg-modal-solid px-3 py-2 text-left text-xs font-semibold text-accent shadow-xl motion-safe:animate-bounce print:hidden lg:hidden`}
         >
           ¿Dudas? Toca aquí y te ayudo
         </button>
