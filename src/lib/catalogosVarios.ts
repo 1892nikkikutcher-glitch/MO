@@ -18,6 +18,28 @@ export function promocionVigente(p: Promocion, hoy: string): boolean {
   return true;
 }
 
+export type EstadoPromocion = { vigente: boolean; etiqueta: string; motivo: string };
+
+function fechaCorta(iso: string): string {
+  const [a, m, d] = iso.split("-").map(Number);
+  const meses = ["ene", "feb", "mar", "abr", "may", "jun", "jul", "ago", "sep", "oct", "nov", "dic"];
+  return `${d} ${meses[m - 1]} ${a}`;
+}
+
+/** Lo mismo que `promocionVigente`, pero diciendo por qué una promoción no lo está. */
+export function estadoPromocion(p: Promocion, hoy: string): EstadoPromocion {
+  if (!p.activa) {
+    return { vigente: false, etiqueta: "Desactivada", motivo: "Está desactivada: abre Editar y marca «Promoción activa»." };
+  }
+  if (p.vigenciaInicio && hoy < p.vigenciaInicio) {
+    return { vigente: false, etiqueta: "Aún no inicia", motivo: `Empieza el ${fechaCorta(p.vigenciaInicio)}.` };
+  }
+  if (p.vigenciaFin && hoy > p.vigenciaFin) {
+    return { vigente: false, etiqueta: "Venció", motivo: `Venció el ${fechaCorta(p.vigenciaFin)}.` };
+  }
+  return { vigente: true, etiqueta: "Vigente", motivo: "" };
+}
+
 export type Aseguradora = {
   id: string;
   nombre: string;

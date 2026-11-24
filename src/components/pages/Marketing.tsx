@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { usePatientData } from "@/context/PatientDataContext";
-import { promocionVigente, type Promocion } from "@/lib/catalogosVarios";
+import { estadoPromocion, type Promocion } from "@/lib/catalogosVarios";
 import { calcularEdadDetallada } from "@/lib/patientData";
 import { capitalizarNombre } from "@/lib/textoNombre";
 import ConfirmarEliminar from "@/components/ConfirmarEliminar";
@@ -199,7 +199,8 @@ export default function Marketing() {
         ) : (
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
             {promociones.map((p) => {
-              const vigente = promocionVigente(p, hoyIso);
+              const estado = estadoPromocion(p, hoyIso);
+              const vigente = estado.vigente;
               return (
                 <div key={p.id} className="rounded-2xl border border-edge/10 bg-surface p-5">
                   <div className="flex items-center justify-between gap-2">
@@ -209,9 +210,10 @@ export default function Marketing() {
                         vigente ? "bg-success/10 text-success" : "bg-ink/10 text-ink/40"
                       }`}
                     >
-                      {vigente ? "Vigente" : "No vigente"}
+                      {estado.etiqueta}
                     </span>
                   </div>
+                  {!vigente && <p className="mt-1 text-[11px] text-warning">{estado.motivo}</p>}
                   {p.descuento && <p className="mt-1 text-lg font-bold text-accent">{p.descuento}</p>}
                   {p.descripcion && <p className="mt-1 text-xs text-ink/50">{p.descripcion}</p>}
                   {(p.vigenciaInicio || p.vigenciaFin) && (
