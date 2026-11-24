@@ -18,6 +18,7 @@ import RegistrarDevolucionDialog from "@/components/RegistrarDevolucionDialog";
 import { calcularDisponibleDevolucion, resumenDesdeDevoluciones } from "@/lib/devolucionesPago";
 import { fechaPagoAIso } from "@/lib/metas";
 import { medicoPredeterminadoParaPago } from "@/lib/medicoDelPago";
+import { formaPagoHabitual } from "@/lib/formaPagoHabitual";
 import { FORMA_PAGO_CASHBACK, baseCashbackDePago, calcularCashback, esFormaPagoCashback, montoMaximoCanje, otorgarCashbackAPago, puedeOtorgarCashback } from "@/lib/cashback";
 import { avisoCashbackEnPago } from "@/lib/cashbackTextos";
 import { toISODate } from "@/lib/agendaHelpers";
@@ -143,6 +144,7 @@ export function EditarPagoDialog({
 }) {
   const [lineas, setLineas] = useState<LineaPago[]>(() => pago.lineas.map((l) => ({ ...l })));
   const [formaPago, setFormaPago] = useState(pago.formaPago);
+  const [claveEdit, setClaveEdit] = useState(pago.clavePago ?? "");
   const { recursos: recursosEdicion } = usePatientData();
   const [medicoEdit, setMedicoEdit] = useState(pago.medico);
   const medicosParaEditar = Array.from(new Set([pago.medico, ...recursosEdicion.filter((r) => r.tipo === "medico").map((r) => r.nombre)])).filter(Boolean);
@@ -203,7 +205,7 @@ export function EditarPagoDialog({
           corte y a los reportes del día que elijas.
         </p>
         <div className="mb-4">
-          <label className="mb-1 block text-xs font-medium text-ink/60">Médico al que se atribuye</label>
+          <label className="mb-1 block text-xs font-medium text-ink/60">Médico tratante</label>
           <select
             value={medicoEdit}
             onChange={(e) => setMedicoEdit(e.target.value)}
@@ -240,6 +242,19 @@ export function EditarPagoDialog({
               </option>
             ))}
           </select>
+        </div>
+        <div className="mb-4">
+          <label className="mb-1 block text-xs font-medium text-ink/60">
+            Clave de pago <span className="font-normal text-ink/40">(opcional)</span>
+          </label>
+          <input
+            type="text"
+            maxLength={60}
+            value={claveEdit}
+            onChange={(e) => setClaveEdit(e.target.value)}
+            placeholder="Folio o referencia"
+            className="w-full rounded-lg border border-edge/10 bg-field px-3 py-2 text-sm text-ink outline-none focus:border-accent/60"
+          />
         </div>
         <div className="space-y-2">
           {lineas.map((l) => {
@@ -315,7 +330,8 @@ export function EditarPagoDialog({
               // Si no tocó la fecha se conserva el texto original tal cual; si la cambió, se guarda como DD/MM/AAAA.
               const fecha =
                 fechaIso && fechaIso !== fechaOriginalIso ? `${fechaIso.slice(8, 10)}/${fechaIso.slice(5, 7)}/${fechaIso.slice(0, 4)}` : pago.fecha;
-              onSave({ ...pago, lineas, total, formaPago, fecha, medico: medicoEdit });
+              const { clavePago: _anterior, ...sinClave } = pago;
+              onSave({ ...sinClave, lineas, total, formaPago, fecha, medico: medicoEdit, ...(claveEdit.trim() ? { clavePago: claveEdit.trim() } : {}) });
             }}
             disabled={!puedeGuardar || !fechaIso}
             className="flex-1 rounded-lg border border-accent/60 bg-accent/15 py-2.5 text-sm font-semibold text-accent transition-opacity hover:bg-accent/25 disabled:cursor-not-allowed disabled:opacity-40"
@@ -362,7 +378,7 @@ export function AgregarPagoDialog({
   // de la clínica (Agenda → Recursos), nunca de una lista genérica — así
   // "Médico" en el recibo es el mismo nombre que alimenta el desglose de
   // ingresos por médico, en vez de un valor que nadie más lee.
-  const { recursos, saldoCashbackDe, cashbackConfig, patients, citas, presupuestosPorPaciente, setPresupuestosPaciente, userEmail } = usePatientData();
+  const { recursos, saldoCashbackDe, cashbackConfig, patients, citas, presupuestosPorPaciente, pagosPorPaciente, setPresupuestosPaciente, userEmail } = usePatientData();
   const medicosDisponibles = recursos.filter((r) => r.tipo === "medico").map((r) => r.nombre);
   const saldoCashbackPaciente = saldoCashbackDe(patientId);
   const cashbackDisponible = saldoCashbackPaciente.disponible;
@@ -387,7 +403,17 @@ export function AgregarPagoDialog({
       hoyISO: hoyIsoPago,
     }) || (medicosDisponibles.length === 1 ? medicosDisponibles[0] : "");
   const [medico, setMedico] = useState(medicoSugerido);
-  const [formaPago, setFormaPago] = useState(formaPagoInicial === FORMA_PAGO_CASHBACK && cashbackDisponible > 0 ? FORMA_PAGO_CASHBACK : formasDePago[0]);
+  // La forma de pago que este paciente normalmente usa (la que más veces ha usado). Sin historial no se adivina:
+  // quien cobra la elige.
+  const formaHabitual = formaPagoHabitual(pagosPorPaciente[patientId] ?? [], formasDePago);
+  const [formaPago, setFormaPago] = useState(
+    formaPagoInicial === FORMA_PAGO_CASHBACK && cashbackDisponible > 0 ? FORMA_PAGO_CASHBACK : formaHabitual ?? ""
+  );
+  const [clavePago, setClavePago] = useState("");
+  // Autocompletado de "Tratamientos": se escribe y se ofrecen los de la lista; lo que no esté se agrega como servicio.
+  const [consulta, setConsulta] = useState("");
+  const [listaAbierta, setListaAbierta] = useState(false);
+  const [opcionActiva, setOpcionActiva] = useState(0);
   const [seleccionados, setSeleccionados] = useState<string[]>([]);
   const [montos, setMontos] = useState<Record<string, number>>({});
   /** En lo aceptado que aún no se realiza: encendido = se hizo hoy (se marca terminado y genera su cargo); apagado = anticipo. */
@@ -401,9 +427,6 @@ export function AgregarPagoDialog({
       ? [{ id: `sug-${servicioSugerido.origenId}`, tipo: "servicio", label: servicioSugerido.concepto, monto: servicioSugerido.monto, origenId: servicioSugerido.origenId }]
       : []
   );
-  const [extraTipo, setExtraTipo] = useState<"servicio" | "anticipo">("servicio");
-  const [extraConcepto, setExtraConcepto] = useState("");
-  const [extraMonto, setExtraMonto] = useState("");
   const [facturar, setFacturar] = useState(false);
   // Guardar dos veces el mismo cobro (doble clic, reintento) nunca debe duplicar el pago ni el servicio.
   const guardandoRef = useRef(false);
@@ -420,23 +443,48 @@ export function AgregarPagoDialog({
     (sum, id) => sum + (montos[id] ?? 0),
     0
   );
-  const extraMontoNumerico = Number(extraMonto);
-  const puedeAgregarExtra = extraMontoNumerico > 0;
-  const agregarExtra = () => {
-    if (!puedeAgregarExtra) return;
+  /** Un servicio que no estaba presupuestado, o un anticipo: se agrega con el texto escrito y se le captura el monto. */
+  const agregarExtra = (tipo: "servicio" | "anticipo") => {
     setExtras((prev) => [
       ...prev,
       {
-        id: `${Date.now()}`,
-        tipo: extraTipo,
-        label: extraConcepto.trim() || (extraTipo === "servicio" ? "Servicio realizado" : "Anticipo"),
-        monto: extraMontoNumerico,
+        id: `${Date.now()}-${prev.length}`,
+        tipo,
+        label: consulta.trim() || (tipo === "servicio" ? "Servicio realizado" : "Anticipo"),
+        monto: 0,
       },
     ]);
-    setExtraConcepto("");
-    setExtraMonto("");
+    setConsulta("");
+    setListaAbierta(false);
   };
+  const cambiarMontoExtra = (id: string, monto: number) =>
+    setExtras((prev) => prev.map((e) => (e.id === id ? { ...e, monto: Math.max(0, monto) } : e)));
   const totalExtras = extras.reduce((sum, e) => sum + e.monto, 0);
+
+  // Opciones del autocompletado: los tratamientos de la lista que coinciden con lo escrito (sin acentos ni mayúsculas)
+  // y, aparte, agregar lo escrito como servicio no presupuestado o dejar el pago como anticipo.
+  const sinAcentos = (s: string) => s.normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase();
+  const textoBuscado = sinAcentos(consulta.trim());
+  const sugerencias = tratamientosPendientes.filter(
+    (t) => !seleccionados.includes(t.id) && (textoBuscado === "" || sinAcentos(`${t.label} ${t.folio}`).includes(textoBuscado))
+  );
+  type OpcionLista =
+    | { clave: string; tipo: "tratamiento"; renglon: RenglonCobrable }
+    | { clave: string; tipo: "servicio" | "anticipo" };
+  const opcionesLista: OpcionLista[] = [
+    ...sugerencias.map((renglon): OpcionLista => ({ clave: renglon.id, tipo: "tratamiento", renglon })),
+    ...(consulta.trim() ? [{ clave: "__servicio__", tipo: "servicio" } as OpcionLista] : []),
+    { clave: "__anticipo__", tipo: "anticipo" },
+  ];
+  const elegirOpcion = (o: OpcionLista) => {
+    if (o.tipo === "tratamiento") {
+      toggleTratamiento(o.renglon);
+      setConsulta("");
+      setOpcionActiva(0);
+    } else {
+      agregarExtra(o.tipo);
+    }
+  };
   const totalAPagar = totalTratamientosSeleccionados + totalExtras;
 
   const pagaConCashback = esFormaPagoCashback(formaPago);
@@ -447,9 +495,10 @@ export function AgregarPagoDialog({
   const excedeCashback = pagaConCashback && totalAPagar > maxCashbackAhora + 0.001;
   useEffect(() => {
     // Al marcar promoción o cortesía ya no se puede pagar con cashback.
-    if (sinCashback && esFormaPagoCashback(formaPago)) setFormaPago(formasDePago[0]);
-  }, [sinCashback, formaPago]);
-  const puedeGuardar = totalAPagar > 0 && medico !== "" && !excedeCashback;
+    if (sinCashback && esFormaPagoCashback(formaPago)) setFormaPago(formaHabitual ?? "");
+  }, [sinCashback, formaPago, formaHabitual]);
+  // Un servicio o anticipo agregado sin monto no se puede guardar: se le captura primero.
+  const puedeGuardar = totalAPagar > 0 && medico !== "" && formaPago !== "" && extras.every((e) => e.monto > 0) && !excedeCashback;
 
   const handleGuardar = () => {
     if (!puedeGuardar || guardandoRef.current) return;
@@ -514,6 +563,7 @@ export function AgregarPagoDialog({
       facturar,
       firma: null,
       ...(sinCashback && !pagaConCashback ? { sinCashback: true } : {}),
+      ...(clavePago.trim() ? { clavePago: clavePago.trim() } : {}),
     };
 
     onSave(pago);
@@ -563,79 +613,92 @@ export function AgregarPagoDialog({
     );
   }
 
+  const hayPropuestas = tratamientosPendientes.some((t) => t.tipo === "propuesta");
+  const renglonesElegidos = seleccionados
+    .map((id) => tratamientosPendientes.find((t) => t.id === id))
+    .filter((t): t is RenglonCobrable => Boolean(t));
+  // Qué falta para poder guardar (solo se avisa cuando ya hay algo que cobrar, para no llenar de avisos la ventana vacía).
+  const faltantes: string[] = [];
+  if (totalAPagar > 0 || extras.length > 0) {
+    if (medico === "") faltantes.push("el médico tratante");
+    if (formaPago === "") faltantes.push("la forma de pago");
+    if (extras.some((e) => e.monto <= 0)) faltantes.push("el monto del servicio o anticipo");
+  }
+  const inputMontoClass =
+    "w-24 rounded-md border border-edge/10 bg-field px-1.5 py-1 text-right text-sm text-ink outline-none focus:border-accent/60";
+
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4">
-      <div className="max-h-[90vh] w-full max-w-lg overflow-y-auto rounded-2xl border border-edge/10 bg-modal p-6">
-        <div className="mb-4 flex items-center justify-between">
-          <h2 className="text-lg font-semibold text-ink">Agregar Pago</h2>
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-3">
+      <div className="max-h-[96vh] w-full max-w-lg overflow-y-auto rounded-2xl border border-edge/10 bg-modal p-5">
+        <div className="mb-3 flex items-start justify-between gap-3">
+          <div className="min-w-0">
+            <h2 className="text-lg font-semibold leading-tight text-ink">Agregar Pago</h2>
+            <p className="truncate text-sm text-ink/60" title={patientName}>
+              {patientName}
+            </p>
+          </div>
           <button
             onClick={onClose}
-            className="flex h-7 w-7 items-center justify-center rounded-full text-ink/50 hover:bg-surface hover:text-ink"
+            aria-label="Cerrar"
+            className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-ink/50 hover:bg-surface hover:text-ink"
           >
             ✕
           </button>
         </div>
 
-        <div className="space-y-4">
-          <div className="rounded-lg border border-accent/30 bg-accent/10 px-3 py-2">
-            <div className="text-[11px] uppercase tracking-wide text-ink/50">
-              Saldo por cobrar del paciente
-            </div>
-            <div className="text-xl font-bold text-accent">
-              {formatCurrency(saldoPendienteTotal)}
+        <div className="space-y-3">
+          <div className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-0.5 rounded-lg border border-accent/30 bg-accent/10 px-3 py-2">
+            <div className="flex items-baseline gap-2">
+              <span className="text-[11px] uppercase tracking-wide text-ink/50">Saldo por cobrar</span>
+              <span className="text-lg font-bold text-accent">{formatCurrency(saldoPendienteTotal)}</span>
             </div>
             {saldoAFavor > 0 && (
-              <div className="mt-0.5 text-xs text-ink/60">
-                Además tiene <span className="font-semibold text-success">{formatCurrency(saldoAFavor)}</span> a favor (anticipos o pagos sin asignar).
-              </div>
+              <span className="text-xs text-ink/60" title="Anticipos o pagos sin asignar">
+                A favor: <span className="font-semibold text-success">{formatCurrency(saldoAFavor)}</span>
+              </span>
             )}
-            {tratamientosPendientes.some((t) => t.tipo === "propuesta") && (
-              <div className="mt-0.5 text-xs text-ink/60">
-                Tiene presupuestos sin aceptar (no cuentan como saldo). Si viene a pagarlos, márcalos abajo: al cobrarlos se registra su aceptación.
-              </div>
+            {hayPropuestas && (
+              <p className="basis-full text-[11px] text-ink/60">
+                Hay presupuestos sin aceptar (no cuentan como saldo). Al cobrarlos se registra su aceptación.
+              </p>
             )}
           </div>
 
           {avisoCashback && (
-            <div className="rounded-lg border border-success/30 bg-success/10 px-3 py-2 text-xs">
-              <p className="font-semibold text-success">💰 {avisoCashback.titulo}</p>
+            <div className="rounded-lg border border-success/30 bg-success/10 px-3 py-1.5 text-xs">
+              <div className="flex items-center justify-between gap-3">
+                <p className="font-semibold text-success">💰 {avisoCashback.titulo}</p>
+                {avisoCashback.puedeUsar && !sinCashback && (
+                  <button
+                    type="button"
+                    onClick={() => setFormaPago(pagaConCashback ? formaHabitual ?? "" : FORMA_PAGO_CASHBACK)}
+                    className="shrink-0 rounded-lg border border-success/50 px-2.5 py-1 font-semibold text-success transition-colors hover:bg-success/10"
+                  >
+                    {pagaConCashback ? "Quitar Cashback" : "Usar Cashback"}
+                  </button>
+                )}
+              </div>
               {avisoCashback.detalle.map((linea) => (
                 <p key={linea} className="mt-0.5 text-ink/60">
                   {linea}
                 </p>
               ))}
               {avisoCashback.puedeUsar && sinCashback && (
-                <p className="mt-1 text-ink/60">No se puede usar en una promoción, cortesía o tarifa especial.</p>
+                <p className="mt-0.5 text-ink/60">No se puede usar en una promoción, cortesía o tarifa especial.</p>
               )}
-              {avisoCashback.puedeUsar && !sinCashback && (
-                <>
-                  {seleccionados.length > 0 && (
-                    <p className="mt-0.5 text-ink/60">
-                      Con lo que vas a cobrar puede cubrir hasta {formatCurrency(maxCashbackAhora)} ahora.
-                    </p>
-                  )}
-                  <button
-                    type="button"
-                    onClick={() => setFormaPago(pagaConCashback ? formasDePago[0] : FORMA_PAGO_CASHBACK)}
-                    className="mt-2 rounded-lg border border-success/50 px-3 py-1.5 font-semibold text-success transition-colors hover:bg-success/10"
-                  >
-                    {pagaConCashback ? "Quitar Cashback" : "Usar Cashback"}
-                  </button>
-                </>
+              {avisoCashback.puedeUsar && !sinCashback && seleccionados.length > 0 && (
+                <p className="mt-0.5 text-ink/60">Con lo que vas a cobrar puede cubrir hasta {formatCurrency(maxCashbackAhora)} ahora.</p>
               )}
             </div>
           )}
 
-          <div>
-            <label className="mb-1 block text-xs font-medium text-ink/60">Nombre del paciente</label>
-            <input type="text" readOnly value={patientName} className={`${inputClass} cursor-not-allowed text-ink/60`} />
-          </div>
-
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-2 gap-3">
             <div>
-              <label className="mb-1 block text-xs font-medium text-ink/60">Médico al que se atribuye</label>
+              <label htmlFor="pago-medico" className="mb-1 block text-xs font-medium text-ink/60">
+                Médico tratante
+              </label>
               {medicosDisponibles.length > 0 ? (
-                <select value={medico} onChange={(e) => setMedico(e.target.value)} className={inputClass}>
+                <select id="pago-medico" value={medico} onChange={(e) => setMedico(e.target.value)} className={inputClass}>
                   {!medico && (
                     <option value="" disabled>
                       Elige quién atendió
@@ -654,212 +717,262 @@ export function AgregarPagoDialog({
               )}
             </div>
             <div>
-              <label className="mb-1 block text-xs font-medium text-ink/60">Forma de pago</label>
-              <select value={formaPago} onChange={(e) => setFormaPago(e.target.value)} className={inputClass}>
+              <label htmlFor="pago-forma" className="mb-1 block text-xs font-medium text-ink/60">
+                Forma de pago
+                {formaHabitual && formaPago === formaHabitual && <span className="ml-1 font-normal text-ink/40">· la habitual</span>}
+              </label>
+              <select id="pago-forma" value={formaPago} onChange={(e) => setFormaPago(e.target.value)} className={inputClass}>
+                {formaPago === "" && (
+                  <option value="" disabled>
+                    Elige una…
+                  </option>
+                )}
                 {formasDisponibles.map((f) => (
                   <option key={f} value={f}>
                     {f === FORMA_PAGO_CASHBACK ? `Cashback (disponible ${formatCurrency(cashbackDisponible)})` : f}
                   </option>
                 ))}
               </select>
-              {excedeCashback && (
-                <p className="mt-1 text-[11px] text-danger">
-                  Con Cashback solo puedes cubrir {formatCurrency(maxCashbackAhora)} (lo menor entre tu saldo de {formatCurrency(cashbackDisponible)}, {cashbackConfig.porcentajeMaxCanje}% de la atención y el tope por visita). Baja el
-                  monto y cobra el resto en otro pago.
-                </p>
-              )}
-              {pagaConCashback && valorAtencion === 0 && (
-                <p className="mt-1 text-[11px] text-ink/50">El Cashback se aplica a un tratamiento o a un servicio realizado: márcalo o agrégalo abajo.</p>
-              )}
-              {pagaConCashback && valorAtencion > 0 && !excedeCashback && (
-                <p className="mt-1 text-[11px] text-ink/50">Puedes cubrir hasta {formatCurrency(maxCashbackAhora)} con Cashback en esta atención; el resto cóbralo en otro pago.</p>
-              )}
-              {cashbackConfig.activo && !pagaConCashback && (
-                <label className="mt-2 flex items-center gap-2 text-xs text-ink/70">
-                  <input type="checkbox" checked={sinCashback} onChange={(e) => setSinCashback(e.target.checked)} className="h-4 w-4 rounded border-edge/30" />
-                  Promoción, cortesía o tarifa especial (no genera ni usa Cashback)
-                </label>
-              )}
             </div>
           </div>
+          {excedeCashback && (
+            <p className="text-[11px] text-danger">
+              Con Cashback solo puedes cubrir {formatCurrency(maxCashbackAhora)} (lo menor entre tu saldo de {formatCurrency(cashbackDisponible)}, {cashbackConfig.porcentajeMaxCanje}% de la atención y el tope por visita). Baja el
+              monto y cobra el resto en otro pago.
+            </p>
+          )}
+          {pagaConCashback && valorAtencion === 0 && (
+            <p className="text-[11px] text-ink/50">El Cashback se aplica a un tratamiento o a un servicio realizado: agrégalo abajo.</p>
+          )}
+          {pagaConCashback && valorAtencion > 0 && !excedeCashback && (
+            <p className="text-[11px] text-ink/50">Puedes cubrir hasta {formatCurrency(maxCashbackAhora)} con Cashback en esta atención; el resto cóbralo en otro pago.</p>
+          )}
 
           <div>
-            <div className="mb-1 flex items-center justify-between">
-              <label className="block text-xs font-medium text-ink/60">¿Qué se está pagando?</label>
-            </div>
-
-            {tratamientosPendientes.length === 0 && extras.length === 0 ? (
-              <p className="rounded-lg border border-dashed border-edge/15 p-4 text-center text-xs text-ink/30">
-                Este paciente no tiene presupuestos ni nada por cobrar. Si se le hizo un servicio, regístralo abajo.
-              </p>
-            ) : (
-              <div className="max-h-56 space-y-1.5 overflow-y-auto rounded-lg border border-edge/10 p-2">
-                {tratamientosPendientes.map((t) => {
-                  const isSelected = seleccionados.includes(t.id);
-                  return (
-                    <div key={t.id} className="rounded-md px-2 py-1.5 hover:bg-surface">
-                      <label className="flex cursor-pointer items-center justify-between gap-3 text-sm">
-                        <span className="flex flex-1 items-center gap-2">
-                          <input
-                            type="checkbox"
-                            checked={isSelected}
-                            onChange={() => toggleTratamiento(t)}
-                            className="h-4 w-4 shrink-0 accent-accent"
-                          />
-                          <span className="text-ink/80">
-                            <span className="mr-1 text-ink/40">#{t.folio}</span>
-                            {t.label}
-                            {t.tipo === "anticipo" && (
-                              <span className="ml-2 rounded-full bg-accent/10 px-1.5 py-0.5 text-[10px] font-semibold text-accent">
-                                Aceptado, por realizar
-                              </span>
-                            )}
-                            {t.tipo === "propuesta" && (
-                              <span className="ml-2 rounded-full bg-warning/10 px-1.5 py-0.5 text-[10px] font-semibold text-warning">
-                                Presupuestado, sin aceptar
-                              </span>
-                            )}
-                          </span>
-                        </span>
-                        <span className="shrink-0 text-xs text-ink/40">
-                          {t.tipo === "cargo" ? "Por cobrar" : t.tipo === "anticipo" ? "Autorizado" : "Presupuestado"}: {formatCurrency(t.pendiente)}
-                        </span>
-                      </label>
-                      {isSelected && t.tipo === "propuesta" && (
-                        <p className="mt-1 pl-6 text-[11px] text-ink/50">Al cobrarlo se registra que el paciente aceptó este tratamiento.</p>
-                      )}
-                      {isSelected && (
-                        <div className="mt-1.5 flex flex-wrap items-center justify-end gap-x-4 gap-y-1 pl-6">
-                          {t.tipo !== "cargo" && (
-                            <label className="flex items-center gap-1.5 text-xs text-ink/60">
-                              <input
-                                type="checkbox"
-                                checked={realizadoHoy[t.id] ?? true}
-                                onChange={(e) => setRealizadoHoy((prev) => ({ ...prev, [t.id]: e.target.checked }))}
-                                className="h-3.5 w-3.5 accent-accent"
-                              />
-                              Se realizó hoy
-                              <span className="text-ink/40">{(realizadoHoy[t.id] ?? true) ? "" : "(queda como anticipo)"}</span>
-                            </label>
-                          )}
-                          <span className="flex items-center gap-2">
-                            <span className="text-xs text-ink/40">Abono / pago:</span>
-                            <span className="flex items-center gap-1 text-ink/60">
-                              $
-                              <input
-                                type="number"
-                                min={0}
-                                max={t.pendiente}
-                                value={montos[t.id] ?? t.pendiente}
-                                onChange={(e) =>
-                                  setMontos((prev) => ({ ...prev, [t.id]: Math.min(Math.max(Number(e.target.value) || 0, 0), t.pendiente) }))
-                                }
-                                className="w-24 rounded-md border border-edge/10 bg-field px-1.5 py-1 text-right text-sm text-ink outline-none focus:border-accent/60"
-                              />
-                            </span>
-                          </span>
-                        </div>
-                      )}
-                    </div>
-                  );
-                })}
-
-                {extras.map((e) => (
-                  <div
-                    key={e.id}
-                    className="flex items-center justify-between gap-3 rounded-md bg-success/5 px-2 py-1.5 text-sm"
-                  >
-                    <span className="flex items-center gap-2 text-ink/80">
-                      <span className="rounded bg-success/15 px-1.5 py-0.5 text-[10px] font-semibold uppercase text-success">
-                        {e.tipo === "servicio" ? "Servicio" : "Anticipo"}
-                      </span>
-                      {e.label}
-                    </span>
-                    <span className="flex shrink-0 items-center gap-2 text-ink/60">
-                      {formatCurrency(e.monto)}
+            <label htmlFor="pago-tratamientos" className="mb-1 block text-xs font-medium text-ink/60">
+              Tratamientos
+            </label>
+            <div className="relative">
+              <input
+                id="pago-tratamientos"
+                type="text"
+                autoFocus
+                autoComplete="off"
+                role="combobox"
+                aria-expanded={listaAbierta}
+                aria-controls="pago-opciones"
+                aria-autocomplete="list"
+                value={consulta}
+                onChange={(e) => {
+                  setConsulta(e.target.value);
+                  setListaAbierta(true);
+                  setOpcionActiva(0);
+                }}
+                onFocus={() => setListaAbierta(true)}
+                onBlur={() => setListaAbierta(false)}
+                onKeyDown={(e) => {
+                  if (e.key === "ArrowDown") {
+                    e.preventDefault();
+                    setListaAbierta(true);
+                    setOpcionActiva((i) => Math.min(i + 1, opcionesLista.length - 1));
+                  } else if (e.key === "ArrowUp") {
+                    e.preventDefault();
+                    setOpcionActiva((i) => Math.max(i - 1, 0));
+                  } else if (e.key === "Enter") {
+                    e.preventDefault();
+                    const o = opcionesLista[Math.min(opcionActiva, opcionesLista.length - 1)];
+                    if (listaAbierta && o) elegirOpcion(o);
+                  } else if (e.key === "Escape" && listaAbierta) {
+                    e.stopPropagation();
+                    setListaAbierta(false);
+                  }
+                }}
+                placeholder={tratamientosPendientes.length > 0 ? "Escribe para buscar el tratamiento…" : "Escribe el servicio que se cobra…"}
+                className={inputClass}
+              />
+              {listaAbierta && (
+                <ul
+                  id="pago-opciones"
+                  role="listbox"
+                  onMouseDown={(e) => e.preventDefault()}
+                  className="absolute left-0 right-0 top-full z-20 mt-1 max-h-40 overflow-y-auto rounded-lg border border-edge/15 bg-modal py-1 shadow-card"
+                >
+                  {opcionesLista.map((o, i) => (
+                    <li key={o.clave} role="option" aria-selected={i === opcionActiva}>
                       <button
-                        onClick={() => setExtras((prev) => prev.filter((x) => x.id !== e.id))}
-                        className="text-ink/30 hover:text-danger"
+                        type="button"
+                        onClick={() => elegirOpcion(o)}
+                        onMouseEnter={() => setOpcionActiva(i)}
+                        className={`flex w-full items-center justify-between gap-3 px-3 py-1.5 text-left text-sm ${
+                          i === opcionActiva ? "bg-surface" : ""
+                        }`}
+                      >
+                        {o.tipo === "tratamiento" ? (
+                          <>
+                            <span className="min-w-0 flex-1 truncate text-ink/80">
+                              <span className="mr-1 text-ink/40">#{o.renglon.folio}</span>
+                              {o.renglon.label}
+                              {o.renglon.tipo === "propuesta" && <span className="ml-2 text-[10px] font-semibold text-warning">sin aceptar</span>}
+                              {o.renglon.tipo === "anticipo" && <span className="ml-2 text-[10px] font-semibold text-accent">por realizar</span>}
+                            </span>
+                            <span className="shrink-0 text-xs text-ink/50">{formatCurrency(o.renglon.pendiente)}</span>
+                          </>
+                        ) : o.tipo === "servicio" ? (
+                          <span className="min-w-0 truncate text-accent">+ Servicio no presupuestado: «{consulta.trim()}»</span>
+                        ) : (
+                          <span className="min-w-0 truncate text-ink/70">
+                            + Anticipo{consulta.trim() ? ` «${consulta.trim()}»` : " o pago sin asignar"}{" "}
+                            <span className="text-ink/40">(queda a favor del paciente)</span>
+                          </span>
+                        )}
+                      </button>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </div>
+            {tratamientosPendientes.length === 0 && extras.length === 0 && (
+              <p className="mt-1 text-[11px] text-ink/50">Este paciente no tiene presupuestos por cobrar. Si se le hizo un servicio, escríbelo y agrégalo.</p>
+            )}
+
+            {(renglonesElegidos.length > 0 || extras.length > 0) && (
+              <div className="mt-2 max-h-40 space-y-1.5 overflow-y-auto">
+                {renglonesElegidos.map((t) => (
+                  <div key={t.id} className="rounded-lg border border-edge/10 bg-inset px-2.5 py-1.5">
+                    <div className="flex items-center gap-2">
+                      <span className="min-w-0 flex-1 truncate text-sm text-ink/80" title={t.label}>
+                        <span className="mr-1 text-ink/40">#{t.folio}</span>
+                        {t.label}
+                      </span>
+                      <span className="shrink-0 text-[11px] text-ink/40">de {formatCurrency(t.pendiente)}</span>
+                      <span className="flex shrink-0 items-center gap-1 text-ink/60">
+                        $
+                        <input
+                          type="number"
+                          min={0}
+                          max={t.pendiente}
+                          value={montos[t.id] ?? t.pendiente}
+                          aria-label={`Monto a pagar de ${t.label}`}
+                          onChange={(e) =>
+                            setMontos((prev) => ({ ...prev, [t.id]: Math.min(Math.max(Number(e.target.value) || 0, 0), t.pendiente) }))
+                          }
+                          className={inputMontoClass}
+                        />
+                      </span>
+                      <button
+                        type="button"
+                        onClick={() => toggleTratamiento(t)}
+                        className="shrink-0 text-ink/30 hover:text-danger"
                         title="Quitar"
+                        aria-label={`Quitar ${t.label}`}
                       >
                         ✕
                       </button>
+                    </div>
+                    {t.tipo !== "cargo" && (
+                      <div className="mt-1 flex flex-wrap items-center justify-between gap-x-3 gap-y-0.5 text-[11px] text-ink/50">
+                        <span>{t.tipo === "propuesta" ? "Sin aceptar: al cobrarlo se registra su aceptación." : "Aceptado, por realizar."}</span>
+                        <label className="flex items-center gap-1.5">
+                          <input
+                            type="checkbox"
+                            checked={realizadoHoy[t.id] ?? true}
+                            onChange={(e) => setRealizadoHoy((prev) => ({ ...prev, [t.id]: e.target.checked }))}
+                            className="h-3.5 w-3.5 accent-accent"
+                          />
+                          Se realizó hoy{(realizadoHoy[t.id] ?? true) ? "" : " (queda como anticipo)"}
+                        </label>
+                      </div>
+                    )}
+                  </div>
+                ))}
+
+                {extras.map((e) => (
+                  <div key={e.id} className="flex items-center gap-2 rounded-lg border border-success/20 bg-success/5 px-2.5 py-1.5 text-sm">
+                    <span className="shrink-0 rounded bg-success/15 px-1.5 py-0.5 text-[10px] font-semibold uppercase text-success">
+                      {e.tipo === "servicio" ? "Servicio" : "Anticipo"}
                     </span>
+                    <span className="min-w-0 flex-1 truncate text-ink/80" title={e.label}>
+                      {e.label}
+                    </span>
+                    <span className="flex shrink-0 items-center gap-1 text-ink/60">
+                      $
+                      <input
+                        type="number"
+                        min={0}
+                        autoFocus={e.monto === 0}
+                        value={e.monto === 0 ? "" : e.monto}
+                        placeholder="Monto"
+                        aria-label={`Monto de ${e.label}`}
+                        onChange={(ev) => cambiarMontoExtra(e.id, Number(ev.target.value) || 0)}
+                        className={inputMontoClass}
+                      />
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => setExtras((prev) => prev.filter((x) => x.id !== e.id))}
+                      className="shrink-0 text-ink/30 hover:text-danger"
+                      title="Quitar"
+                      aria-label={`Quitar ${e.label}`}
+                    >
+                      ✕
+                    </button>
                   </div>
                 ))}
               </div>
             )}
+          </div>
 
-            <div className="mt-2 rounded-lg border border-dashed border-accent/30 p-2.5">
-              <select
-                value={extraTipo}
-                onChange={(e) => setExtraTipo(e.target.value as "servicio" | "anticipo")}
-                aria-label="Tipo de cobro adicional"
-                className={`${inputClass} mb-1.5`}
-              >
-                <option value="servicio">Servicio realizado que no estaba presupuestado</option>
-                <option value="anticipo">Anticipo o pago sin asignar (queda a favor del paciente)</option>
-              </select>
-              <p className="mb-1.5 text-[11px] text-ink/50">
-                {extraTipo === "servicio"
-                  ? "Se registra el servicio y su cargo, y este pago lo cubre. Ej. consulta de valoración, medicamento."
-                  : "El dinero queda como saldo a favor; después se asigna a un tratamiento desde Pagos (✎ Editar)."}
-              </p>
-              <div className="space-y-2">
-                <input
-                  type="text"
-                  value={extraConcepto}
-                  onChange={(e) => setExtraConcepto(e.target.value)}
-                  placeholder="Concepto (opcional)"
-                  aria-label="Concepto del cobro adicional"
-                  className={inputClass}
-                />
-                <div className="flex gap-2">
-                  <div className="relative min-w-0 flex-1">
-                    <span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-sm text-ink/40">$</span>
-                    <input
-                      type="number"
-                      min={0}
-                      value={extraMonto}
-                      onChange={(e) => setExtraMonto(e.target.value)}
-                      onKeyDown={(e) => {
-                        if (e.key === "Enter") agregarExtra();
-                      }}
-                      placeholder="Monto"
-                      aria-label="Monto del cobro adicional"
-                      className={`${inputClass} pl-7`}
-                    />
-                  </div>
-                  <button
-                    type="button"
-                    onClick={agregarExtra}
-                    disabled={!puedeAgregarExtra}
-                    className="shrink-0 rounded-lg border border-accent/60 bg-accent/15 px-4 text-sm font-semibold text-accent transition-opacity hover:bg-accent/25 disabled:cursor-not-allowed disabled:opacity-40"
-                  >
-                    Agregar
-                  </button>
-                </div>
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label htmlFor="pago-clave" className="mb-1 block text-xs font-medium text-ink/60">
+                Clave de pago <span className="font-normal text-ink/40">(opcional)</span>
+              </label>
+              <input
+                id="pago-clave"
+                type="text"
+                maxLength={60}
+                autoComplete="off"
+                value={clavePago}
+                onChange={(e) => setClavePago(e.target.value)}
+                placeholder="Folio o referencia"
+                className={inputClass}
+              />
+            </div>
+            <div>
+              <div className="mb-1 text-xs font-medium text-ink/60">Total a pagar</div>
+              <div className="flex min-h-[38px] items-center rounded-lg border border-edge/10 bg-inset px-3 text-lg font-bold text-success">
+                {formatCurrency(totalAPagar)}
               </div>
             </div>
           </div>
 
-          <div className="rounded-lg border border-edge/10 bg-inset px-3 py-2">
-            <div className="text-[11px] uppercase tracking-wide text-ink/40">Total a pagar</div>
-            <div className="text-xl font-bold text-success">{formatCurrency(totalAPagar)}</div>
+          <div className="flex flex-wrap items-center gap-x-5 gap-y-1.5 text-sm text-ink/70">
+            <label className="flex items-center gap-2">
+              <input
+                type="checkbox"
+                checked={facturar}
+                onChange={(e) => setFacturar(e.target.checked)}
+                className="h-4 w-4 accent-accent"
+              />
+              Activo para facturar
+            </label>
+            {cashbackConfig.activo && !pagaConCashback && (
+              <label className="flex items-center gap-2">
+                <input
+                  type="checkbox"
+                  checked={sinCashback}
+                  onChange={(e) => setSinCashback(e.target.checked)}
+                  className="h-4 w-4 accent-accent"
+                />
+                Promoción o cortesía (sin Cashback)
+              </label>
+            )}
           </div>
-
-          <label className="flex items-center gap-2 text-sm text-ink/70">
-            <input
-              type="checkbox"
-              checked={facturar}
-              onChange={(e) => setFacturar(e.target.checked)}
-              className="h-4 w-4 accent-accent"
-            />
-            Activo para facturar
-          </label>
         </div>
 
-        <div className="mt-6 flex gap-3">
+        {faltantes.length > 0 && <p className="mt-3 text-[11px] text-warning">Para guardar falta: {faltantes.join(", ")}.</p>}
+
+        <div className="mt-4 flex gap-3">
           <button
             onClick={onClose}
             className="flex-1 rounded-lg border border-edge/15 py-2.5 text-sm font-semibold text-ink/80 transition-colors hover:bg-surface"
@@ -874,7 +987,6 @@ export function AgregarPagoDialog({
             Guardar
           </button>
         </div>
-
       </div>
     </div>
   );
@@ -1127,7 +1239,10 @@ export default function Pagos({
                   <td className="px-6 py-3 text-ink/70">
                     {pago.lineas.length > 0 ? pago.lineas.map((l) => l.label).join(", ") : "—"}
                   </td>
-                  <td className="px-6 py-3 text-ink/70">{pago.formaPago}</td>
+                  <td className="px-6 py-3 text-ink/70">
+                    {pago.formaPago}
+                    {pago.clavePago && <span className="block text-[11px] text-ink/40">Clave: {pago.clavePago}</span>}
+                  </td>
                   <td className="px-6 py-3 text-ink/70">{pago.medico}</td>
                   <td className="px-6 py-3">
                     <span

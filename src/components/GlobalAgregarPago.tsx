@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { usePatientData } from "@/context/PatientDataContext";
 import { coincidePaciente, formatNombreConEdad } from "@/lib/patientData";
 import { calcularCuenta, renglonesCobrables } from "@/lib/cuentaPaciente";
@@ -20,9 +20,25 @@ export default function GlobalAgregarPago({
   /** Servicio que conviene cobrar (por ejemplo, el de la cita desde la que se abre): se ofrece ya capturado. */
   servicioSugerido?: { origenId: string; concepto: string; monto: number };
 }) {
-  const { patients, presupuestosPorPaciente, pagosPorPaciente, devolucionesPorPaciente, setPagosPaciente, addPatient, userEmail, setPagosRealizados } =
-    usePatientData();
+  const {
+    patients,
+    presupuestosPorPaciente,
+    pagosPorPaciente,
+    devolucionesPorPaciente,
+    setPagosPaciente,
+    addPatient,
+    userEmail,
+    setPagosRealizados,
+    cargarDatosPaciente,
+  } = usePatientData();
   const [patientId, setPatientId] = useState(initialPatientId ?? "");
+
+  // La cuenta del paciente (presupuestos, pagos, devoluciones) se carga bajo demanda al abrir su expediente. Si el
+  // paciente se elige aquí mismo, hay que pedirla: sin ella el saldo saldría en $0 y no habría nada que cobrar.
+  useEffect(() => {
+    if (patientId) cargarDatosPaciente(patientId);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [patientId]);
   const [busqueda, setBusqueda] = useState("");
   const [mostrarNuevoPaciente, setMostrarNuevoPaciente] = useState(false);
   const [nombreNuevo, setNombreNuevo] = useState("");
@@ -188,6 +204,26 @@ export default function GlobalAgregarPago({
   }
 
   const patient = patients.find((p) => p.id === patientId)!;
+  const cuentaCargada =
+    presupuestosPorPaciente[patientId] !== undefined &&
+    pagosPorPaciente[patientId] !== undefined &&
+    devolucionesPorPaciente[patientId] !== undefined;
+  if (!cuentaCargada) {
+    return (
+      <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4">
+        <div className="w-full max-w-sm rounded-2xl border border-edge/10 bg-modal p-6 text-center">
+          <p className="text-sm font-semibold text-ink">Cargando la cuenta de {patient.name}…</p>
+          <p className="mt-1 text-xs text-ink/50">Se están consultando sus presupuestos y pagos para mostrar lo que hay por cobrar.</p>
+          <button
+            onClick={onClose}
+            className="mt-4 w-full rounded-lg border border-edge/15 py-2 text-sm font-semibold text-ink/80 transition-colors hover:bg-surface"
+          >
+            Cancelar
+          </button>
+        </div>
+      </div>
+    );
+  }
   const presupuestos = presupuestosPorPaciente[patientId] ?? [];
   const pagos = pagosPorPaciente[patientId] ?? [];
   const devoluciones = devolucionesPorPaciente[patientId] ?? [];

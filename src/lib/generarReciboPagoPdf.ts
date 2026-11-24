@@ -91,6 +91,7 @@ export async function generarReciboPagoPdf(datos: DatosReciboPagoPdf): Promise<B
   datoFila("Fecha:", pago.fecha);
   datoFila("Médico:", pago.medico);
   datoFila("Forma de pago:", pago.formaPago);
+  if (pago.clavePago) datoFila("Clave de pago:", pago.clavePago);
 
   y += 4;
   const xMonto = xDerecha;

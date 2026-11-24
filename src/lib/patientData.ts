@@ -344,6 +344,8 @@ export type Pago = {
   firma: string | null;
   /** Promoción, cortesía, tarifa especial…: este pago no genera cashback. */
   sinCashback?: boolean;
+  /** Folio, referencia o autorización con la que se puede ubicar el pago (transferencia, terminal, cheque…). Opcional. */
+  clavePago?: string;
 };
 
 export type MedicamentoRecetado = {
