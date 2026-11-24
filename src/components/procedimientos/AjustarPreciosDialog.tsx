@@ -18,7 +18,7 @@ const inputClass = "w-full rounded-lg border border-edge/10 bg-field px-3 py-2 t
 type Paso = "configurar" | "guardando" | "resultado";
 
 export default function AjustarPreciosDialog({ onClose }: { onClose: () => void }) {
-  const { procedimientos, aplicarAjustePrecios, leerUltimoAjustePrecios } = usePatientData();
+  const { procedimientos, aplicarAjustePrecios, leerUltimoAjustePrecios, leerPorcentajeAnualPrecios, guardarPorcentajeAnualPrecios } = usePatientData();
   const [paso, setPaso] = useState<Paso>("configurar");
   const [porcentajeTexto, setPorcentajeTexto] = useState("");
   const [paso$, setPaso$] = useState(10);
@@ -28,11 +28,20 @@ export default function AjustarPreciosDialog({ onClose }: { onClose: () => void 
   const [ultimo, setUltimo] = useState<RegistroAjustePrecios | null>(null);
   const [aplicado, setAplicado] = useState<{ cambios: CambioPrecio[]; porcentaje: number; registroPrevio: RegistroAjustePrecios | null } | null>(null);
   const [deshecho, setDeshecho] = useState(false);
+  const [anualGuardado, setAnualGuardado] = useState<number | null>(null);
+  const [recordarAnual, setRecordarAnual] = useState(false);
+  const [aviso, setAviso] = useState("");
 
   useEffect(() => {
     let vivo = true;
     void leerUltimoAjustePrecios().then((r) => {
       if (vivo) setUltimo(r);
+    });
+    void leerPorcentajeAnualPrecios().then((r) => {
+      if (!vivo) return;
+      setAnualGuardado(r);
+      // Su aumento anual ya viene escrito: solo revisa la vista previa y aplica.
+      if (r !== null) setPorcentajeTexto((prev) => (prev === "" ? String(r) : prev));
     });
     return () => {
       vivo = false;
@@ -53,8 +62,24 @@ export default function AjustarPreciosDialog({ onClose }: { onClose: () => void 
   const conPrecio = procedimientos.filter((p) => p.costoPaciente > 0 && (!especialidad || p.especialidad === especialidad)).length;
   const sinPrecio = procedimientos.filter((p) => !(p.costoPaciente > 0) && (!especialidad || p.especialidad === especialidad)).length;
 
+  const distintoDelAnual = valido && anualGuardado !== porcentaje;
+
+  const guardarSoloAnual = async () => {
+    setError("");
+    setAviso("");
+    try {
+      await guardarPorcentajeAnualPrecios(porcentaje);
+      setAnualGuardado(porcentaje);
+      setRecordarAnual(false);
+      setAviso(`Listo: tu aumento anual quedó en ${porcentaje}%. Te lo propondré cada vez que toque ajustar.`);
+    } catch {
+      setError("No se pudo guardar tu aumento anual. Revisa tu conexión e inténtalo de nuevo.");
+    }
+  };
+
   const aplicar = async () => {
     setError("");
+    setAviso("");
     setPaso("guardando");
     const registro: RegistroAjustePrecios = { fecha: new Date().toISOString(), porcentaje, cantidad: cambios.length };
     try {
@@ -62,6 +87,14 @@ export default function AjustarPreciosDialog({ onClose }: { onClose: () => void 
         cambios.map((c) => ({ id: c.id, campos: c.campos })),
         registro
       );
+      if (recordarAnual && distintoDelAnual) {
+        try {
+          await guardarPorcentajeAnualPrecios(porcentaje);
+          setAnualGuardado(porcentaje);
+        } catch {
+          /* los precios ya se guardaron; el porcentaje anual se puede fijar después */
+        }
+      }
       setAplicado({ cambios, porcentaje, registroPrevio: ultimo });
       setUltimo(registro);
       setPaso("resultado");
@@ -152,6 +185,7 @@ export default function AjustarPreciosDialog({ onClose }: { onClose: () => void 
               </p>
             )}
             {error && <p className="rounded-lg border border-danger/30 bg-danger/10 px-3 py-2 text-xs text-danger">{error}</p>}
+            {aviso && <p className="rounded-lg border border-success/30 bg-success/10 px-3 py-2 text-xs text-success">{aviso}</p>}
 
             <div className="grid gap-3 sm:grid-cols-3">
               <div>
@@ -164,7 +198,10 @@ export default function AjustarPreciosDialog({ onClose }: { onClose: () => void 
                     type="text"
                     inputMode="decimal"
                     value={porcentajeTexto}
-                    onChange={(e) => setPorcentajeTexto(e.target.value.replace(/[^0-9.,]/g, ""))}
+                    onChange={(e) => {
+                      setPorcentajeTexto(e.target.value.replace(/[^0-9.,]/g, ""));
+                      setAviso("");
+                    }}
                     placeholder="Ej. 4.5"
                     className={`${inputClass} pr-8`}
                     autoFocus
@@ -197,6 +234,24 @@ export default function AjustarPreciosDialog({ onClose }: { onClose: () => void 
                   ))}
                 </select>
               </div>
+            </div>
+
+            <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-ink/60">
+              <span>
+                Mi aumento anual:{" "}
+                <strong className="text-ink">{anualGuardado !== null ? `${anualGuardado}%` : "aún no lo defines"}</strong>
+              </span>
+              {distintoDelAnual && (
+                <>
+                  <label className="flex cursor-pointer items-center gap-1.5">
+                    <input type="checkbox" checked={recordarAnual} onChange={(e) => setRecordarAnual(e.target.checked)} className="accent-[color:var(--accent)]" />
+                    Dejar {porcentaje}% como mi aumento anual al aplicar
+                  </label>
+                  <button onClick={guardarSoloAnual} className="font-semibold text-accent hover:underline">
+                    Solo guardarlo, sin aplicar
+                  </button>
+                </>
+              )}
             </div>
 
             <label className="flex cursor-pointer items-start gap-2 text-xs text-ink/70">

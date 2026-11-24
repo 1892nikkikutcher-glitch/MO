@@ -939,6 +939,9 @@ type PatientDataContextValue = {
   ) => Promise<void>;
   /** Último ajuste porcentual de precios que se hizo (o null si nunca). */
   leerUltimoAjustePrecios: () => Promise<RegistroAjustePrecios | null>;
+  /** El aumento anual que el dueño decidió (porcentaje), o null si aún no lo fija. */
+  leerPorcentajeAnualPrecios: () => Promise<number | null>;
+  guardarPorcentajeAnualPrecios: (porcentaje: number) => Promise<void>;
   historiaClinicaTemplate: HistoriaClinicaTemplate;
   setHistoriaClinicaTemplate: (updater: Updater<HistoriaClinicaTemplate>) => void;
   historiaClinicaPorPaciente: Record<string, RespuestasHistoriaClinica>;
@@ -1663,6 +1666,22 @@ export function PatientDataProvider({
     } catch {
       return null;
     }
+  };
+
+  const leerPorcentajeAnualPrecios = async (): Promise<number | null> => {
+    if (!clinicUid) return null;
+    try {
+      const snap = await getDoc(doc(db, `users/${clinicUid}/config/ajustePreciosConfig`));
+      const valor = snap.exists() ? Number((snap.data() as { porcentajeAnual?: number }).porcentajeAnual) : NaN;
+      return Number.isFinite(valor) && valor > 0 ? valor : null;
+    } catch {
+      return null;
+    }
+  };
+
+  const guardarPorcentajeAnualPrecios = async (porcentaje: number) => {
+    if (!clinicUid) return;
+    await setDoc(doc(db, `users/${clinicUid}/config/ajustePreciosConfig`), { porcentajeAnual: porcentaje });
   };
 
   const irAExpediente =(patientId: string, tab?: string, citaId?: string) => {
@@ -3332,6 +3351,8 @@ export function PatientDataProvider({
         importarListaPrecios,
         aplicarAjustePrecios,
         leerUltimoAjustePrecios,
+        leerPorcentajeAnualPrecios,
+        guardarPorcentajeAnualPrecios,
         historiaClinicaTemplate,
         setHistoriaClinicaTemplate,
         historiaClinicaPorPaciente,

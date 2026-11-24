@@ -229,14 +229,18 @@ function ProcedimientoDialog({
 }
 
 export default function Procedimientos() {
-  const { miRol, procedimientos, setProcedimientos, leerUltimoAjustePrecios } = usePatientData();
+  const { miRol, procedimientos, setProcedimientos, leerUltimoAjustePrecios, leerPorcentajeAnualPrecios } = usePatientData();
   const [mostrarAjuste, setMostrarAjuste] = useState(false);
   const [ultimoAjuste, setUltimoAjuste] = useState<RegistroAjustePrecios | null>(null);
+  const [porcentajeAnual, setPorcentajeAnual] = useState<number | null>(null);
   useEffect(() => {
     if (miRol !== "admin" || mostrarAjuste) return;
     let vivo = true;
     void leerUltimoAjustePrecios().then((r) => {
       if (vivo) setUltimoAjuste(r);
+    });
+    void leerPorcentajeAnualPrecios().then((r) => {
+      if (vivo) setPorcentajeAnual(r);
     });
     return () => {
       vivo = false;
@@ -325,7 +329,7 @@ export default function Procedimientos() {
           <p className="text-sm text-warning">
             Ya pasó cerca de un año desde que subiste tus precios (
             {new Date(ultimoAjuste.fecha).toLocaleDateString("es-MX", { month: "long", year: "numeric" })}). Para mantener sanas tus finanzas, conviene
-            ajustarlos a la inflación.
+            ajustarlos{porcentajeAnual !== null ? ` (tu aumento anual es de ${porcentajeAnual}%)` : " a la inflación"}.
           </p>
           <button
             onClick={() => setMostrarAjuste(true)}
