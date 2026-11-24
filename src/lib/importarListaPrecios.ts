@@ -7,7 +7,7 @@
 import * as XLSX from "xlsx";
 import { unzipSync } from "fflate";
 import { decodificarBuffer, detectarDelimitador, parseDelimitado } from "./importPacientes";
-import { especialidadesPredefinidas, type Procedimiento } from "./procedimientos";
+import { ESPECIALIDAD_SIN_CLASIFICAR, esEspecialidadPredefinida, especialidadesPredefinidas, type Procedimiento } from "./procedimientos";
 import { similitudNombres } from "./importarCatalogoRecomendado";
 
 export type FilaPrecio = {
@@ -69,9 +69,11 @@ function limpiarNombre(texto: string): string {
 function resolverEspecialidad(texto: string): string {
   const t = normalizar(texto);
   if (!t) return ESPECIALIDAD_POR_DEFECTO;
+  // «Endodoncias» (plural) también es la especialidad «Endodoncia».
+  const singular = t.length > 5 ? t.replace(/s$/, "") : t;
   const conocida = especialidadesPredefinidas.find((e) => {
     const n = normalizar(e);
-    return n === t || (t.length >= 5 && (n.startsWith(t) || n.endsWith(t)));
+    return n === t || n === singular || (t.length >= 5 && (n.startsWith(t) || n.endsWith(t)));
   });
   if (conocida) return conocida;
   const limpio = limpiarNombre(texto);
@@ -385,7 +387,10 @@ export function procedimientoDesdeFila(fila: FilaPrecio, id: string, ahoraIso: s
   return {
     id,
     nombre: fila.nombre,
-    especialidad: fila.especialidad,
+    // Un grupo del archivo que no es una especialidad («Promociones del mes», «Consulta») no se inventa como rama: queda
+    // en «Sin clasificar» para que el dueño lo ubique, y el grupo original se guarda en las notas.
+    especialidad: esEspecialidadPredefinida(fila.especialidad) ? fila.especialidad : ESPECIALIDAD_SIN_CLASIFICAR,
+    ...(esEspecialidadPredefinida(fila.especialidad) ? {} : { notasInternas: `Grupo en la lista de precios: ${fila.especialidad}` }),
     costoPaciente: fila.precio,
     costoOdontologo: 0,
     costoSinConfigurar: true,

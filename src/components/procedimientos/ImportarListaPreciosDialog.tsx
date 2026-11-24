@@ -3,6 +3,7 @@
 import { useRef, useState } from "react";
 import { usePatientData } from "@/context/PatientDataContext";
 import { formatCurrency } from "@/lib/patientData";
+import { esEspecialidadPredefinida } from "@/lib/procedimientos";
 import {
   clasificarListaPrecios,
   leerListaPrecios,
@@ -128,7 +129,8 @@ export default function ImportarListaPreciosDialog({ onClose }: { onClose: () =>
             </div>
             <p className="text-xs text-ink/50">
               Los tratamientos nuevos quedaron con el costo al odontólogo sin configurar y con la duración que traía tu archivo (30 minutos si no
-              la traía): ajústalos desde la lista cuando quieras. Los presupuestos que ya hiciste conservan el precio con el que se hicieron.
+              la traía): ajústalos desde la lista cuando quieras. Los que venían en un grupo que no es una especialidad (por ejemplo «Promociones del mes») quedaron en la
+              tarjeta «Sin clasificar», para que los ubiques en su rama. Los presupuestos que ya hiciste conservan el precio con el que se hicieron.
             </p>
             <button
               onClick={onClose}
@@ -177,7 +179,7 @@ export default function ImportarListaPreciosDialog({ onClose }: { onClose: () =>
                         <span className={`rounded-full px-2 py-0.5 text-[10px] font-semibold ${badge.clase}`}>{badge.texto}</span>
                       </div>
                       <p className="mt-0.5 text-xs text-ink/50">
-                        {it.fila.especialidad}
+                        {esEspecialidadPredefinida(it.fila.especialidad) ? it.fila.especialidad : `Sin clasificar (grupo: ${it.fila.especialidad})`}
                         {it.fila.duracionMinutos ? ` · ${it.fila.duracionMinutos} min` : ""}
                       </p>
                       {it.clasificacion === "posible_duplicado" && it.existente && (

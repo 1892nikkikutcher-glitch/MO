@@ -81,3 +81,54 @@ export function formatDuracion(minutos: number): string {
   const resto = minutos % 60;
   return resto === 0 ? `${horas} h` : `${horas} h ${resto} min`;
 }
+
+/** Dónde caen los procedimientos que todavía no se ubican en su rama (por ejemplo, los de una lista de precios con grupos
+ * que no son una especialidad): el dueño los acomoda después. */
+export const ESPECIALIDAD_SIN_CLASIFICAR = "Sin clasificar";
+
+export function esSinClasificar(p: Pick<Procedimiento, "especialidad">): boolean {
+  const e = (p.especialidad ?? "").trim().toLowerCase();
+  return e === "" || e === ESPECIALIDAD_SIN_CLASIFICAR.toLowerCase();
+}
+
+export function esEspecialidadPredefinida(especialidad: string): boolean {
+  return (especialidadesPredefinidas as readonly string[]).includes(especialidad);
+}
+
+export type RamaCatalogo = {
+  /** Nombre de la rama (la especialidad, o «Sin clasificar»). */
+  nombre: string;
+  sinClasificar: boolean;
+  procedimientos: Procedimiento[];
+  /** Precios al paciente de los que ya tienen precio (para mostrar «desde / hasta»). */
+  desde: number | null;
+  hasta: number | null;
+};
+
+/** Las ramas de la odontología con sus procedimientos: primero las predefinidas (aunque estén vacías, para que se vea
+ * la estructura), luego las que la clínica creó, y «Sin clasificar» al frente si tiene algo por ubicar o al final si no. */
+export function ramasDelCatalogo(procedimientos: Procedimiento[]): RamaCatalogo[] {
+  const porNombre = new Map<string, Procedimiento[]>();
+  const sin: Procedimiento[] = [];
+  for (const p of procedimientos) {
+    if (esSinClasificar(p)) sin.push(p);
+    else porNombre.set(p.especialidad, [...(porNombre.get(p.especialidad) ?? []), p]);
+  }
+  const rama = (nombre: string, lista: Procedimiento[], sinClasificar: boolean): RamaCatalogo => {
+    const precios = lista.map((p) => p.costoPaciente).filter((c) => c > 0);
+    return {
+      nombre,
+      sinClasificar,
+      procedimientos: [...lista].sort((a, b) => a.nombre.localeCompare(b.nombre)),
+      desde: precios.length ? Math.min(...precios) : null,
+      hasta: precios.length ? Math.max(...precios) : null,
+    };
+  };
+  const predefinidas = especialidadesPredefinidas.map((e) => rama(e, porNombre.get(e) ?? [], false));
+  const propias = [...porNombre.keys()]
+    .filter((e) => !esEspecialidadPredefinida(e))
+    .sort((a, b) => a.localeCompare(b))
+    .map((e) => rama(e, porNombre.get(e) ?? [], false));
+  const ramaSin = rama(ESPECIALIDAD_SIN_CLASIFICAR, sin, true);
+  return sin.length > 0 ? [ramaSin, ...predefinidas, ...propias] : [...predefinidas, ...propias, ramaSin];
+}

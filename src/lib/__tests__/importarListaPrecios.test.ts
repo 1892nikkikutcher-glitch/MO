@@ -155,7 +155,7 @@ describe("filasDeMatriz", () => {
     ]);
     expect(r.filas.map((f) => [f.nombre, f.precio, f.especialidad])).toEqual([
       ["Bracket despegado autoligado", 600, "Ortodoncia"],
-      ["Acceso endodóntico", 2000, "Endodoncias"],
+      ["Acceso endodóntico", 2000, "Endodoncia"],
       ["Aplicacion de Fluór", 290, "Odontología General"],
     ]);
     expect(r.sinPrecio).toBe(1);
@@ -238,6 +238,16 @@ describe("clasificarListaPrecios", () => {
 });
 
 describe("procedimientoDesdeFila", () => {
+  it("un grupo del archivo que no es una especialidad queda en «Sin clasificar» y se conserva en las notas", () => {
+    const p = procedimientoDesdeFila({ nombre: "Aplicación de flúor abril", precio: 149, especialidad: "Promociones del mes" }, "p1", "2026-11-24T10:00:00.000Z");
+    expect(p).toMatchObject({ especialidad: "Sin clasificar", notasInternas: "Grupo en la lista de precios: Promociones del mes" });
+  });
+
+  it("reconoce el plural de una especialidad", () => {
+    const r = filasDeMatriz([["Tratamiento", "Precio", "Tipo"], ["Acceso", "2000", "ENDODONCIAS"], ["Brackets", "600", "ORTODONCIA"]]);
+    expect(r.filas.map((f) => f.especialidad)).toEqual(["Endodoncia", "Ortodoncia"]);
+  });
+
   it("crea el tratamiento con su precio y el costo al odontólogo sin configurar", () => {
     const nuevo = procedimientoDesdeFila({ nombre: "Blanqueamiento", precio: 3500, especialidad: "Estética Dental" }, "proc1", "2026-11-24T10:00:00.000Z");
     expect(nuevo).toMatchObject({

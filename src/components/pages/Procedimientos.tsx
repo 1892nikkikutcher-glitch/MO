@@ -1,11 +1,14 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { usePatientData } from "@/context/PatientDataContext";
 import { formatCurrency, unidadCobroLabel, unidadCobroOptions, type UnidadCobro } from "@/lib/patientData";
 import {
   especialidadesPredefinidas,
-  agruparPorEspecialidad,
+  ESPECIALIDAD_SIN_CLASIFICAR,
+  esEspecialidadPredefinida,
+  esSinClasificar,
+  ramasDelCatalogo,
   formatDuracion,
   esProcedimientoActivo,
   type Procedimiento,
@@ -33,20 +36,24 @@ function procedimientoVacio(): Omit<Procedimiento, "id"> {
 
 function ProcedimientoDialog({
   inicial,
+  especialidadInicial,
   onClose,
   onGuardar,
 }: {
   inicial: Procedimiento | null;
+  /** Para un procedimiento nuevo: la rama desde la que se está agregando. */
+  especialidadInicial?: string;
   onClose: () => void;
   onGuardar: (data: Omit<Procedimiento, "id">) => void;
 }) {
-  const [form, setForm] = useState<Omit<Procedimiento, "id">>(inicial ?? procedimientoVacio());
-  const [especialidadPersonalizada, setEspecialidadPersonalizada] = useState(
-    inicial && !(especialidadesPredefinidas as readonly string[]).includes(inicial.especialidad)
-      ? inicial.especialidad
-      : ""
+  const [form, setForm] = useState<Omit<Procedimiento, "id">>(
+    inicial ?? { ...procedimientoVacio(), ...(especialidadInicial ? { especialidad: especialidadInicial } : {}) }
   );
-  const usaOtra = !(especialidadesPredefinidas as readonly string[]).includes(form.especialidad);
+  const esConocida = (e: string) => esEspecialidadPredefinida(e) || e === ESPECIALIDAD_SIN_CLASIFICAR;
+  const [especialidadPersonalizada, setEspecialidadPersonalizada] = useState(
+    inicial && !esConocida(inicial.especialidad) ? inicial.especialidad : ""
+  );
+  const usaOtra = !esConocida(form.especialidad);
 
   const puedeGuardar =
     form.nombre.trim().length > 0 && (!usaOtra || especialidadPersonalizada.trim().length > 0);
@@ -105,6 +112,7 @@ function ProcedimientoDialog({
                     {e}
                   </option>
                 ))}
+                <option value={ESPECIALIDAD_SIN_CLASIFICAR}>Sin clasificar (ubicar después)</option>
                 <option value="__otra__">Otra especialidad...</option>
               </select>
             </div>
@@ -231,6 +239,12 @@ function ProcedimientoDialog({
 export default function Procedimientos() {
   const { miRol, procedimientos, setProcedimientos, leerUltimoAjustePrecios, leerConfigAjustePrecios, guardarConfigAjustePrecios } = usePatientData();
   const [mostrarAjuste, setMostrarAjuste] = useState(false);
+  const [ramaAbierta, setRamaAbierta] = useState<string | null>(null);
+  const [especialidadNuevo, setEspecialidadNuevo] = useState<string | undefined>(undefined);
+  const panelRama = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (ramaAbierta) panelRama.current?.scrollIntoView({ behavior: "smooth", block: "nearest" });
+  }, [ramaAbierta]);
   const [ultimoAjuste, setUltimoAjuste] = useState<RegistroAjustePrecios | null>(null);
   const [configAjuste, setConfigAjuste] = useState<ConfigAjustePrecios>({});
   const [ajusteEnAprobacion, setAjusteEnAprobacion] = useState(false);
@@ -292,7 +306,12 @@ export default function Procedimientos() {
   };
 
   const pendienteAjuste = ajustePendiente(configAjuste, ultimoAjuste, new Date());
-  const grupos = agruparPorEspecialidad(procedimientos);
+  const ramas = ramasDelCatalogo(procedimientos);
+  const ramaActual = ramas.find((r) => r.nombre === ramaAbierta) ?? null;
+
+  const ubicarEn = (id: string, especialidad: string) => {
+    setProcedimientos((prev) => prev.map((p) => (p.id === id ? { ...p, especialidad, actualizadoEl: new Date().toISOString() } : p)));
+  };
 
   return (
     <div className="space-y-6">
@@ -320,7 +339,10 @@ export default function Procedimientos() {
             Agregar documento
           </button>
           <button
-            onClick={() => setEditando("nuevo")}
+            onClick={() => {
+              setEspecialidadNuevo(undefined);
+              setEditando("nuevo");
+            }}
             className="rounded-lg border border-accent/50 bg-accent/10 px-4 py-2.5 text-sm font-semibold text-accent transition-colors hover:bg-accent/20"
             style={{ boxShadow: "0 0 12px -2px rgb(var(--accent-rgb) / 0.5)" }}
           >
@@ -392,19 +414,81 @@ export default function Procedimientos() {
         </button>
       </div>
 
-      {grupos.length === 0 ? (
+      {procedimientos.length === 0 && (
         <div className="rounded-2xl border border-dashed border-edge/15 bg-surface p-10 text-center text-sm text-ink/40">
           Aún no agregas procedimientos.
         </div>
-      ) : (
-        <div className="space-y-6">
-          {grupos.map((grupo) => (
-            <div key={grupo.especialidad}>
-              <h3 className="mb-2 text-xs font-semibold uppercase tracking-wide text-accent">
-                {grupo.especialidad}
-              </h3>
-              <div className="overflow-x-auto rounded-2xl border border-edge/10 bg-surface">
-                <div className="min-w-[880px]">
+      )}
+
+      <div>
+        <h3 className="text-sm font-semibold text-ink">Ramas de la odontología</h3>
+        <p className="mb-3 mt-1 text-xs text-ink/50">Toca una rama para ver sus procedimientos y costos.</p>
+        <div className="grid grid-cols-2 gap-3 md:grid-cols-3 xl:grid-cols-4">
+          {ramas.map((r) => {
+            const abierta = ramaAbierta === r.nombre;
+            const vacia = r.procedimientos.length === 0;
+            const porUbicar = r.sinClasificar && !vacia;
+            return (
+              <button
+                key={r.nombre}
+                type="button"
+                aria-expanded={abierta}
+                onClick={() => setRamaAbierta(abierta ? null : r.nombre)}
+                className={`rounded-2xl border border-l-4 p-4 text-left transition-colors hover:bg-surface2 ${
+                  abierta ? "border-accent/60 bg-surface2" : "border-edge/10 bg-surface"
+                } border-l-accent ${vacia ? "opacity-60" : ""}`}
+              >
+                <div className="flex items-start justify-between gap-2">
+                  <span className="text-2xl font-bold leading-none text-ink">{r.procedimientos.length}</span>
+                  <span className="text-xs text-ink/40" aria-hidden="true">
+                    {abierta ? "▴" : "▾"}
+                  </span>
+                </div>
+                <p className="mt-2 text-xs font-semibold uppercase tracking-wide text-ink/70">{r.nombre}</p>
+                {porUbicar ? (
+                  <span className="mt-1 inline-block rounded-full bg-accent/15 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-accent">
+                    Por ubicar
+                  </span>
+                ) : (
+                  <p className="mt-1 text-[11px] text-ink/40">
+                    {r.desde === null ? (vacia ? "Sin procedimientos" : "Sin precio aún") : r.desde === r.hasta ? formatCurrency(r.desde) : `${formatCurrency(r.desde)} a ${formatCurrency(r.hasta ?? r.desde)}`}
+                  </p>
+                )}
+              </button>
+            );
+          })}
+        </div>
+      </div>
+
+      {ramaActual && (
+        <div ref={panelRama} className="scroll-mt-4">
+          <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
+            <h3 className="text-xs font-semibold uppercase tracking-wide text-accent">
+              {ramaActual.nombre} · {ramaActual.procedimientos.length}
+            </h3>
+            <button
+              onClick={() => {
+                setEspecialidadNuevo(ramaActual.nombre);
+                setEditando("nuevo");
+              }}
+              className="rounded-lg border border-accent/40 px-3 py-1.5 text-xs font-semibold text-accent transition-colors hover:bg-accent/10"
+            >
+              + Agregar a {ramaActual.nombre}
+            </button>
+          </div>
+          {ramaActual.sinClasificar && (
+            <p className="mb-2 text-xs text-ink/50">
+              Aquí llegan los procedimientos que todavía no tienen rama (por ejemplo, los de una lista de precios con grupos propios). Elige en «Ubicar en» a qué rama
+              pertenece cada uno y se pasa solo a su tarjeta.
+            </p>
+          )}
+          {ramaActual.procedimientos.length === 0 ? (
+            <div className="rounded-2xl border border-dashed border-edge/15 bg-surface p-8 text-center text-sm text-ink/40">
+              {ramaActual.sinClasificar ? "No hay nada por ubicar. Lo nuevo que no tenga rama llegará aquí." : "Esta rama todavía no tiene procedimientos."}
+            </div>
+          ) : (
+            <div className="overflow-x-auto rounded-2xl border border-edge/10 bg-surface">
+              <div className="min-w-[880px]">
                 <div className="grid grid-cols-[minmax(0,1fr)_120px_130px_100px_230px] gap-3 border-b border-edge/10 px-4 py-3 text-xs font-semibold uppercase tracking-wide text-ink/40">
                   <span>Procedimiento</span>
                   <span>Costo paciente</span>
@@ -413,7 +497,7 @@ export default function Procedimientos() {
                   <span className="text-right">Acción</span>
                 </div>
                 <div className="divide-y divide-edge/5">
-                  {grupo.procedimientos.map((p) => {
+                  {ramaActual.procedimientos.map((p) => {
                     const activo = esProcedimientoActivo(p);
                     const tieneGuia = Boolean(p.origenPlantillaId);
                     return (
@@ -433,6 +517,27 @@ export default function Procedimientos() {
                               >
                                 {guiaAbiertaId === p.id ? "Ocultar guía ▴" : "Guía ▾"}
                               </button>
+                            )}
+                            {esSinClasificar(p) && (
+                              <label className="flex basis-full items-center gap-2 text-xs font-normal text-ink/60">
+                                Ubicar en:
+                                <select
+                                  value=""
+                                  onChange={(e) => e.target.value && ubicarEn(p.id, e.target.value)}
+                                  aria-label={`Ubicar «${p.nombre}» en una rama`}
+                                  className="rounded-md border border-edge/10 bg-field px-2 py-1 text-xs text-ink outline-none focus:border-accent/60"
+                                >
+                                  <option value="">Elige la rama…</option>
+                                  {especialidadesPredefinidas.map((e) => (
+                                    <option key={e} value={e}>
+                                      {e}
+                                    </option>
+                                  ))}
+                                </select>
+                                {p.notasInternas?.startsWith("Grupo en la lista de precios:") && (
+                                  <span className="text-ink/40">({p.notasInternas.replace("Grupo en la lista de precios:", "venía en").trim()})</span>
+                                )}
+                              </label>
                             )}
                           </span>
                           <span className="text-sm text-ink/70">{formatCurrency(p.costoPaciente)}</span>
@@ -464,16 +569,16 @@ export default function Procedimientos() {
                     );
                   })}
                 </div>
-                </div>
               </div>
             </div>
-          ))}
+          )}
         </div>
       )}
 
       {editando && (
         <ProcedimientoDialog
           inicial={editando === "nuevo" ? null : editando}
+          especialidadInicial={editando === "nuevo" ? especialidadNuevo : undefined}
           onClose={() => setEditando(null)}
           onGuardar={guardarProcedimiento}
         />
