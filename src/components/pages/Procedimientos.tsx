@@ -240,6 +240,15 @@ export default function Procedimientos() {
   const { miRol, procedimientos, setProcedimientos, leerUltimoAjustePrecios, leerConfigAjustePrecios, guardarConfigAjustePrecios } = usePatientData();
   const [mostrarAjuste, setMostrarAjuste] = useState(false);
   const [ramaAbierta, setRamaAbierta] = useState<string | null>(null);
+  // Arrastrar un tratamiento a la tarjeta de su rama: cuál se arrastra, sobre qué tarjeta va y el aviso al soltarlo.
+  const [arrastrandoId, setArrastrandoId] = useState<string | null>(null);
+  const [sobreRama, setSobreRama] = useState<string | null>(null);
+  const [avisoMovido, setAvisoMovido] = useState("");
+  useEffect(() => {
+    if (!avisoMovido) return;
+    const t = setTimeout(() => setAvisoMovido(""), 4000);
+    return () => clearTimeout(t);
+  }, [avisoMovido]);
   const [especialidadNuevo, setEspecialidadNuevo] = useState<string | undefined>(undefined);
   const panelRama = useRef<HTMLDivElement>(null);
   useEffect(() => {
@@ -311,6 +320,19 @@ export default function Procedimientos() {
 
   const ubicarEn = (id: string, especialidad: string) => {
     setProcedimientos((prev) => prev.map((p) => (p.id === id ? { ...p, especialidad, actualizadoEl: new Date().toISOString() } : p)));
+  };
+
+  /** Suelta el tratamiento arrastrado sobre la tarjeta de una rama (la misma rama en la que ya está no cambia nada). */
+  const soltarEnRama = (rama: string) => {
+    const id = arrastrandoId;
+    setArrastrandoId(null);
+    setSobreRama(null);
+    const p = procedimientos.find((x) => x.id === id);
+    if (!p) return;
+    const actual = esSinClasificar(p) ? ESPECIALIDAD_SIN_CLASIFICAR : p.especialidad;
+    if (actual === rama) return;
+    ubicarEn(p.id, rama);
+    setAvisoMovido(`«${p.nombre}» pasó a ${rama}.`);
   };
 
   return (
@@ -422,7 +444,14 @@ export default function Procedimientos() {
 
       <div>
         <h3 className="text-sm font-semibold text-ink">Ramas de la odontología</h3>
-        <p className="mb-3 mt-1 text-xs text-ink/50">Toca una rama para ver sus procedimientos y costos.</p>
+        <p className="mb-3 mt-1 text-xs text-ink/50">
+          Toca una rama para ver sus procedimientos y costos. Para cambiar un procedimiento de rama, arrástralo desde la tabla y suéltalo sobre la tarjeta de su rama.
+        </p>
+        {avisoMovido && (
+          <p role="status" className="mb-3 rounded-lg border border-success/30 bg-success/10 px-3 py-2 text-xs text-success [[data-theme=light]_&]:text-[#047857]">
+            {avisoMovido}
+          </p>
+        )}
         <div className="grid grid-cols-2 gap-3 md:grid-cols-3 xl:grid-cols-4">
           {ramas.map((r) => {
             const abierta = ramaAbierta === r.nombre;
@@ -434,9 +463,20 @@ export default function Procedimientos() {
                 type="button"
                 aria-expanded={abierta}
                 onClick={() => setRamaAbierta(abierta ? null : r.nombre)}
+                onDragOver={(e) => {
+                  if (!arrastrandoId) return;
+                  e.preventDefault();
+                  e.dataTransfer.dropEffect = "move";
+                  if (sobreRama !== r.nombre) setSobreRama(r.nombre);
+                }}
+                onDragLeave={() => setSobreRama((prev) => (prev === r.nombre ? null : prev))}
+                onDrop={(e) => {
+                  e.preventDefault();
+                  soltarEnRama(r.nombre);
+                }}
                 className={`rounded-2xl border border-l-4 p-4 text-left transition-colors hover:bg-surface2 ${
-                  abierta ? "border-accent/60 bg-surface2" : "border-edge/10 bg-surface"
-                } border-l-accent ${vacia ? "opacity-60" : ""}`}
+                  sobreRama === r.nombre ? "border-accent bg-accent/15 ring-2 ring-accent/60" : abierta ? "border-accent/60 bg-surface2" : "border-edge/10 bg-surface"
+                } border-l-accent ${vacia && !arrastrandoId ? "opacity-60" : ""}`}
               >
                 <div className="flex items-start justify-between gap-2">
                   <span className="text-2xl font-bold leading-none text-ink">{r.procedimientos.length}</span>
@@ -501,7 +541,21 @@ export default function Procedimientos() {
                     const activo = esProcedimientoActivo(p);
                     const tieneGuia = Boolean(p.origenPlantillaId);
                     return (
-                      <div key={p.id} className={`px-4 py-3 ${activo ? "" : "opacity-50"}`}>
+                      <div
+                        key={p.id}
+                        draggable
+                        onDragStart={(e) => {
+                          e.dataTransfer.setData("text/plain", p.id);
+                          e.dataTransfer.effectAllowed = "move";
+                          setArrastrandoId(p.id);
+                        }}
+                        onDragEnd={() => {
+                          setArrastrandoId(null);
+                          setSobreRama(null);
+                        }}
+                        title="Arrástralo a la tarjeta de su rama para cambiarlo de lugar"
+                        className={`cursor-grab px-4 py-3 active:cursor-grabbing ${activo ? "" : "opacity-50"} ${arrastrandoId === p.id ? "opacity-40" : ""}`}
+                      >
                         <div className="grid grid-cols-[minmax(0,1fr)_120px_130px_100px_230px] items-center gap-3">
                           <span className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1 text-sm font-medium text-ink">
                             {p.nombre}
