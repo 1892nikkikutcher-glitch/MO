@@ -207,13 +207,15 @@ export default function Marketing() {
                     <p className="text-sm font-semibold text-ink">{p.nombre}</p>
                     <span
                       className={`shrink-0 rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide ${
-                        vigente ? "bg-success/10 text-success" : "bg-ink/10 text-ink/40"
+                        vigente
+                          ? "bg-success/10 text-success [[data-theme=light]_&]:bg-[#047857]/15 [[data-theme=light]_&]:text-[#047857]"
+                          : "bg-danger/15 text-danger"
                       }`}
                     >
                       {estado.etiqueta}
                     </span>
                   </div>
-                  {!vigente && <p className="mt-1 text-[11px] text-warning">{estado.motivo}</p>}
+                  {!vigente && <p className="mt-1 text-[11px] text-danger">{estado.motivo}</p>}
                   {p.descuento && <p className="mt-1 text-lg font-bold text-accent">{p.descuento}</p>}
                   {p.descripcion && <p className="mt-1 text-xs text-ink/50">{p.descripcion}</p>}
                   {(p.vigenciaInicio || p.vigenciaFin) && (
