@@ -7,7 +7,13 @@
 import * as XLSX from "xlsx";
 import { unzipSync } from "fflate";
 import { decodificarBuffer, detectarDelimitador, parseDelimitado } from "./importPacientes";
-import { ESPECIALIDAD_SIN_CLASIFICAR, esEspecialidadPredefinida, especialidadesPredefinidas, type Procedimiento } from "./procedimientos";
+import {
+  ESPECIALIDAD_SIN_CLASIFICAR,
+  ESPECIALIDADES_RENOMBRADAS,
+  esEspecialidadPredefinida,
+  especialidadesPredefinidas,
+  type Procedimiento,
+} from "./procedimientos";
 import { similitudNombres } from "./importarCatalogoRecomendado";
 
 export type FilaPrecio = {
@@ -71,6 +77,9 @@ function resolverEspecialidad(texto: string): string {
   if (!t) return ESPECIALIDAD_POR_DEFECTO;
   // «Endodoncias» (plural) también es la especialidad «Endodoncia».
   const singular = t.length > 5 ? t.replace(/s$/, "") : t;
+  // Un nombre anterior de una rama base («Cirugía Oral y Maxilofacial») es la rama de hoy («Cirugía Bucal»).
+  const renombrada = Object.entries(ESPECIALIDADES_RENOMBRADAS).find(([antes]) => normalizar(antes) === t || normalizar(antes) === singular);
+  if (renombrada) return renombrada[1];
   const conocida = especialidadesPredefinidas.find((e) => {
     const n = normalizar(e);
     return n === t || n === singular || (t.length >= 5 && (n.startsWith(t) || n.endsWith(t)));

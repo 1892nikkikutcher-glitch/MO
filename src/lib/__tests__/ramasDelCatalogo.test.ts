@@ -12,9 +12,9 @@ const proc = (id: string, especialidad: string, costoPaciente = 100): Procedimie
 
 describe("ramasDelCatalogo", () => {
   it("muestra todas las ramas predefinidas aunque estén vacías, con «Sin clasificar» al final si no hay nada por ubicar", () => {
-    const r = ramasDelCatalogo([proc("a", "Ortodoncia", 500)]);
+    const r = ramasDelCatalogo([proc("a", "Ortodoncia y Ortopedia", 500)]);
     expect(r.map((x) => x.nombre)).toEqual([...especialidadesPredefinidas, ESPECIALIDAD_SIN_CLASIFICAR]);
-    expect(r.find((x) => x.nombre === "Ortodoncia")?.procedimientos).toHaveLength(1);
+    expect(r.find((x) => x.nombre === "Ortodoncia y Ortopedia")?.procedimientos).toHaveLength(1);
     expect(r[r.length - 1]).toMatchObject({ sinClasificar: true, procedimientos: [], desde: null });
   });
 
@@ -32,8 +32,8 @@ describe("ramasDelCatalogo", () => {
   });
 
   it("calcula desde / hasta con lo que ya tiene precio", () => {
-    const r = ramasDelCatalogo([proc("a", "Ortodoncia", 0), proc("b", "Ortodoncia", 600), proc("c", "Ortodoncia", 18000)]);
-    expect(r.find((x) => x.nombre === "Ortodoncia")).toMatchObject({ desde: 600, hasta: 18000 });
+    const r = ramasDelCatalogo([proc("a", "Ortodoncia y Ortopedia", 0), proc("b", "Ortodoncia y Ortopedia", 600), proc("c", "Ortodoncia y Ortopedia", 18000)]);
+    expect(r.find((x) => x.nombre === "Ortodoncia y Ortopedia")).toMatchObject({ desde: 600, hasta: 18000 });
   });
 
   it("esSinClasificar reconoce mayúsculas y vacío", () => {

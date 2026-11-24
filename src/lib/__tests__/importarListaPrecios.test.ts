@@ -91,8 +91,8 @@ describe("filasDeMatriz", () => {
       ["Endodoncia molar", "4500"],
     ]);
     expect(r.filas.map((f) => [f.nombre, f.especialidad])).toEqual([
-      ["Brackets metálicos", "Ortodoncia"],
-      ["Retenedor", "Ortodoncia"],
+      ["Brackets metálicos", "Ortodoncia y Ortopedia"],
+      ["Retenedor", "Ortodoncia y Ortopedia"],
       ["Endodoncia molar", "Endodoncia"],
     ]);
   });
@@ -154,7 +154,7 @@ describe("filasDeMatriz", () => {
       ["Consultorio", "CONSULTA", "001", "Resina", "0.0000", "True", "0.0000", "0.0000", "0.0000", "0", "0.0000", ""],
     ]);
     expect(r.filas.map((f) => [f.nombre, f.precio, f.especialidad])).toEqual([
-      ["Bracket despegado autoligado", 600, "Ortodoncia"],
+      ["Bracket despegado autoligado", 600, "Ortodoncia y Ortopedia"],
       ["Acceso endodóntico", 2000, "Endodoncia"],
       ["Aplicacion de Fluór", 290, "Odontología General"],
     ]);
@@ -184,7 +184,7 @@ describe("leerListaPrecios", () => {
       "lista.xlsx"
     );
     expect(r.filas.map((f) => [f.nombre, f.especialidad])).toEqual([
-      ["Brackets", "Ortodoncia"],
+      ["Brackets", "Ortodoncia y Ortopedia"],
       ["Limpieza", "Odontología General"],
     ]);
   });
@@ -245,7 +245,7 @@ describe("procedimientoDesdeFila", () => {
 
   it("reconoce el plural de una especialidad", () => {
     const r = filasDeMatriz([["Tratamiento", "Precio", "Tipo"], ["Acceso", "2000", "ENDODONCIAS"], ["Brackets", "600", "ORTODONCIA"]]);
-    expect(r.filas.map((f) => f.especialidad)).toEqual(["Endodoncia", "Ortodoncia"]);
+    expect(r.filas.map((f) => f.especialidad)).toEqual(["Endodoncia", "Ortodoncia y Ortopedia"]);
   });
 
   it("crea el tratamiento con su precio y el costo al odontólogo sin configurar", () => {

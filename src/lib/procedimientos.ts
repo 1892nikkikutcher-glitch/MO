@@ -7,16 +7,28 @@ import type { UnidadCobro } from "./patientData";
 
 export const especialidadesPredefinidas = [
   "Odontología General",
-  "Ortodoncia",
+  "O. Preventiva",
+  "Operatoria Dental",
+  "Ortodoncia y Ortopedia",
   "Endodoncia",
   "Periodoncia",
-  "Cirugía Oral y Maxilofacial",
+  "Cirugía Bucal",
   "Odontopediatría",
   "Prótesis",
   "Estética Dental",
   "Implantología",
-  "Radiología",
 ] as const;
+
+/** Ramas base que cambiaron de nombre: lo que se guardó con el nombre de antes se lee (y se migra) con el de ahora. */
+export const ESPECIALIDADES_RENOMBRADAS: Record<string, string> = {
+  Ortodoncia: "Ortodoncia y Ortopedia",
+  "Cirugía Oral y Maxilofacial": "Cirugía Bucal",
+};
+
+/** El nombre actual de una especialidad (el mismo si nunca se renombró). */
+export function especialidadVigente(especialidad: string): string {
+  return ESPECIALIDADES_RENOMBRADAS[(especialidad ?? "").trim()] ?? especialidad;
+}
 
 export type VisibilidadProcedimiento = "interna" | "publica";
 
@@ -63,9 +75,10 @@ export function agruparPorEspecialidad(
 ): { especialidad: string; procedimientos: Procedimiento[] }[] {
   const grupos = new Map<string, Procedimiento[]>();
   procedimientos.forEach((p) => {
-    const lista = grupos.get(p.especialidad) ?? [];
+    const nombre = especialidadVigente(p.especialidad);
+    const lista = grupos.get(nombre) ?? [];
     lista.push(p);
-    grupos.set(p.especialidad, lista);
+    grupos.set(nombre, lista);
   });
   return Array.from(grupos.entries())
     .map(([especialidad, lista]) => ({
@@ -113,12 +126,23 @@ const claveRama = (nombre: string) =>
 /** null si el nombre sirve para una rama; si no, el motivo en palabras de quien lo escribe. `existentes` son los
  * nombres de todas las ramas; `actual` es la rama que se está renombrando (puede conservar su propio nombre). */
 export function validarNombreRama(nombre: string, existentes: string[], actual?: string): string | null {
-  const limpio = normalizarNombreRama(nombre);
+  // Un nombre anterior de una rama base («Ortodoncia») cuenta como esa rama («Ortodoncia y Ortopedia»).
+  const limpio = especialidadVigente(normalizarNombreRama(nombre));
   if (!limpio) return "Escribe el nombre de la rama.";
   if (limpio.length > 60) return "El nombre es muy largo (máximo 60 letras).";
   if (claveRama(limpio) === claveRama(ESPECIALIDAD_SIN_CLASIFICAR)) return "«Sin clasificar» ya existe y no se puede repetir.";
   const choca = existentes.some((e) => claveRama(e) === claveRama(limpio) && !(actual && claveRama(actual) === claveRama(e)));
   return choca ? "Ya existe una rama con ese nombre." : null;
+}
+
+/** Guarda con el nombre actual lo que quedó con el nombre anterior de una rama base. Devuelve la MISMA lista si no hay nada
+ * que cambiar (así quien la llama sabe que no hace falta guardar). */
+export function migrarEspecialidadesRenombradas(procedimientos: Procedimiento[], ahora: string): Procedimiento[] {
+  if (!procedimientos.some((p) => especialidadVigente(p.especialidad) !== p.especialidad)) return procedimientos;
+  return procedimientos.map((p) => {
+    const vigente = especialidadVigente(p.especialidad);
+    return vigente === p.especialidad ? p : { ...p, especialidad: vigente, actualizadoEl: ahora };
+  });
 }
 
 /** Pasa a otro nombre de rama todos los procedimientos de `de`. */
@@ -149,12 +173,16 @@ export function ramasDelCatalogo(procedimientos: Procedimiento[], ramasPropias: 
   const porNombre = new Map<string, Procedimiento[]>();
   const sin: Procedimiento[] = [];
   for (const p of procedimientos) {
-    if (esSinClasificar(p)) sin.push(p);
-    else porNombre.set(p.especialidad, [...(porNombre.get(p.especialidad) ?? []), p]);
+    if (esSinClasificar(p)) {
+      sin.push(p);
+    } else {
+      const nombre = especialidadVigente(p.especialidad);
+      porNombre.set(nombre, [...(porNombre.get(nombre) ?? []), p]);
+    }
   }
   // Las ramas que la clínica creó aparecen aunque todavía no tengan procedimientos.
   for (const nombre of ramasPropias) {
-    const limpio = normalizarNombreRama(nombre);
+    const limpio = especialidadVigente(normalizarNombreRama(nombre));
     if (limpio && !esEspecialidadPredefinida(limpio) && claveRama(limpio) !== claveRama(ESPECIALIDAD_SIN_CLASIFICAR) && !porNombre.has(limpio)) {
       porNombre.set(limpio, []);
     }

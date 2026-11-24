@@ -13,6 +13,8 @@ import {
   validarNombreRama,
   renombrarRama,
   quitarRama,
+  especialidadVigente,
+  migrarEspecialidadesRenombradas,
   formatDuracion,
   esProcedimientoActivo,
   type Procedimiento,
@@ -254,6 +256,14 @@ export default function Procedimientos() {
   const [mostrarAjuste, setMostrarAjuste] = useState(false);
   // Ramas que la clínica creó (ej. «Prevención») y los formularios para crear, renombrar o quitar una.
   const [ramasPropias, setRamasPropias] = useState<string[]>([]);
+  // Ramas base que cambiaron de nombre (Ortodoncia → Ortodoncia y Ortopedia…): lo guardado con el nombre anterior se pasa al actual.
+  useEffect(() => {
+    if (miRol !== "admin") return;
+    if (procedimientos.some((p) => especialidadVigente(p.especialidad) !== p.especialidad)) {
+      setProcedimientos((prev) => migrarEspecialidadesRenombradas(prev, new Date().toISOString()));
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [miRol, procedimientos]);
   const [creandoRama, setCreandoRama] = useState(false);
   const [nombreRamaNuevo, setNombreRamaNuevo] = useState("");
   const [renombrandoRama, setRenombrandoRama] = useState(false);
@@ -416,7 +426,7 @@ export default function Procedimientos() {
   const moverARama = (id: string | null, rama: string) => {
     const p = procedimientos.find((x) => x.id === id);
     if (!p) return;
-    const actual = esSinClasificar(p) ? ESPECIALIDAD_SIN_CLASIFICAR : p.especialidad;
+    const actual = esSinClasificar(p) ? ESPECIALIDAD_SIN_CLASIFICAR : especialidadVigente(p.especialidad);
     if (actual === rama) return;
     ubicarEn(p.id, rama);
     setAvisoMovido(`«${p.nombre}» pasó a ${rama}.`);

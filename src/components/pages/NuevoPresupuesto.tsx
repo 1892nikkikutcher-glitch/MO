@@ -8,6 +8,8 @@ import { sonEquivalentes } from "@/lib/deepEqual";
 import {
   agruparPorEspecialidad,
   especialidadesPredefinidas,
+  especialidadVigente,
+  esEspecialidadPredefinida,
   esProcedimientoActivo,
   type Procedimiento,
 } from "@/lib/procedimientos";
@@ -122,7 +124,7 @@ export default function NuevoPresupuesto({
   );
   const [tipoDePrecio, setTipoDePrecio] = useState(initialBudget?.tipoDePrecio ?? tiposDePrecios[0]);
   const [especialidad, setEspecialidad] = useState(
-    initialBudget?.especialidad ?? especialidadesPredefinidas[0]
+    especialidadVigente(initialBudget?.especialidad ?? especialidadesPredefinidas[0])
   );
   const diagnostico = initialBudget?.diagnostico ?? "";
   const [vigenciaDias, setVigenciaDias] = useState(initialBudget?.vigenciaDias ?? VIGENCIA_DIAS_DEFECTO);
@@ -596,7 +598,8 @@ export default function NuevoPresupuesto({
                 onChange={(e) => setEspecialidad(e.target.value)}
                 className="w-full rounded-lg border border-edge/10 bg-field px-3 py-2 text-sm text-ink outline-none focus:border-accent/60"
               >
-                {especialidadesPredefinidas.map((e) => (
+                {/* Un presupuesto viejo puede traer una rama que ya no es base (ej. Radiología): se conserva para no perderla. */}
+                {(esEspecialidadPredefinida(especialidad) || !especialidad ? [...especialidadesPredefinidas] : [...especialidadesPredefinidas, especialidad]).map((e) => (
                   <option key={e} value={e}>
                     {e}
                   </option>
