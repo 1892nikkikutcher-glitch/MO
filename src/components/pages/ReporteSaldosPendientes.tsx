@@ -67,14 +67,22 @@ export default function ReporteSaldosPendientes() {
   const quitarNoAtendidas = async () => {
     if (!resultado || resultado.noAtendidas.length === 0) return;
     const n = resultado.noAtendidas.length;
-    if (!window.confirm(`Se quitarán ${n} presupuestos de citas que nunca se atendieron y que nadie ha pagado. Quedan guardados en la Papelera. ¿Continuar?`)) return;
+    const pregunta =
+      n === 1
+        ? "Se quitará 1 presupuesto de una cita que nunca se atendió y que nadie ha pagado. Queda guardado en la Papelera. ¿Continuar?"
+        : `Se quitarán ${n} presupuestos de citas que nunca se atendieron y que nadie ha pagado. Quedan guardados en la Papelera. ¿Continuar?`;
+    if (!window.confirm(pregunta)) return;
     setLimpiando(true);
     setMensajeLimpieza("");
     try {
       const quitados = await quitarPresupuestosDeCitasNoAtendidas(resultado.noAtendidas);
-      setMensajeLimpieza(`Listo: se quitaron ${quitados} presupuestos. Recalculando saldos…`);
+      setMensajeLimpieza(`Listo: se ${quitados === 1 ? "quitó 1 presupuesto" : `quitaron ${quitados} presupuestos`}. Recalculando saldos…`);
       await recalcular();
-      setMensajeLimpieza(`Listo: se quitaron ${quitados} presupuestos (están en Administración → Papelera).`);
+      setMensajeLimpieza(
+        quitados === 1
+          ? "Listo: se quitó 1 presupuesto (está en Administración → Papelera)."
+          : `Listo: se quitaron ${quitados} presupuestos (están en Administración → Papelera).`
+      );
     } catch (err) {
       console.error("No se pudieron quitar los presupuestos", err);
       setMensajeLimpieza("No se pudo completar. Intenta de nuevo.");
@@ -88,9 +96,13 @@ export default function ReporteSaldosPendientes() {
     if (aplicables.length === 0) return;
     const pasan = aplicables.filter((c) => c.accion === "pasar_pagos").length;
     const texto =
-      `Se corregirán ${aplicables.length} presupuestos de control` +
-      (pasan > 0 ? ` (${pasan} con pagos que pasan al presupuesto principal de ortodoncia)` : "") +
-      ". Los quitados quedan en la Papelera y el dinero cobrado no cambia. ¿Continuar?";
+      (aplicables.length === 1 ? "Se corregirá 1 presupuesto de control" : `Se corregirán ${aplicables.length} presupuestos de control`) +
+      (pasan > 0
+        ? pasan === 1
+          ? " (1 con un pago que pasa al presupuesto principal de ortodoncia)"
+          : ` (${pasan} con pagos que pasan al presupuesto principal de ortodoncia)`
+        : "") +
+      ". Lo que se quite queda en la Papelera y el dinero cobrado no cambia. ¿Continuar?";
     if (!window.confirm(texto)) return;
     setCorrigiendoControles(true);
     const nuevos: Record<string, { ok: boolean; texto: string }> = {};
@@ -227,8 +239,11 @@ export default function ReporteSaldosPendientes() {
           {resultado.noAtendidas.length > 0 && (
             <div className="rounded-xl border border-danger/30 bg-danger/5 p-3">
               <p className="text-sm font-semibold text-danger">
-                {resultado.noAtendidas.length} presupuestos son de citas que nunca se atendieron (
-                {formatCurrency(resultado.noAtendidas.reduce((sum, x) => sum + x.total, 0))}) y nadie los ha pagado
+                {resultado.noAtendidas.length === 1
+                  ? "1 presupuesto es de una cita que nunca se atendió ("
+                  : `${resultado.noAtendidas.length} presupuestos son de citas que nunca se atendieron (`}
+                {formatCurrency(resultado.noAtendidas.reduce((sum, x) => sum + x.total, 0))}){" "}
+                {resultado.noAtendidas.length === 1 ? "y nadie lo ha pagado" : "y nadie los ha pagado"}
               </p>
               <p className="mt-1 text-xs text-ink/60">
                 Cada cita con costo crea su presupuesto; si la cita se canceló, se reagendó o el paciente no llegó,
@@ -252,7 +267,7 @@ export default function ReporteSaldosPendientes() {
                 disabled={limpiando}
                 className="mt-3 rounded-lg border border-danger/50 bg-danger/10 px-4 py-2 text-xs font-semibold text-danger hover:bg-danger/20 disabled:opacity-50"
               >
-                {limpiando ? "Quitando…" : `Quitar estos ${resultado.noAtendidas.length} presupuestos`}
+                {limpiando ? "Quitando…" : resultado.noAtendidas.length === 1 ? "Quitar este presupuesto" : `Quitar estos ${resultado.noAtendidas.length} presupuestos`}
               </button>
             </div>
           )}
@@ -261,7 +276,9 @@ export default function ReporteSaldosPendientes() {
           {resultado.controles.length > 0 && (
             <div className="rounded-xl border border-warning/30 bg-warning/5 p-3">
               <p className="text-sm font-semibold text-warning">
-                {resultado.controles.length} presupuestos son controles o mensualidades que se crearon solos
+                {resultado.controles.length === 1
+                  ? "1 presupuesto es un control o una mensualidad que se creó solo"
+                  : `${resultado.controles.length} presupuestos son controles o mensualidades que se crearon solos`}
               </p>
               <p className="mt-1 text-xs text-ink/60">
                 Un control o una mensualidad es una visita de un tratamiento que ya tiene su presupuesto, no un
@@ -340,7 +357,9 @@ export default function ReporteSaldosPendientes() {
           {resultado.duplicados.length > 0 && (
             <div className="rounded-xl border border-warning/30 bg-warning/5 p-3">
               <p className="text-sm font-semibold text-warning">
-                {resultado.duplicados.length} pacientes tienen el mismo trabajo dos veces: una vez pagado y otra como deuda
+                {resultado.duplicados.length === 1
+                  ? "1 paciente tiene el mismo trabajo dos veces: una vez pagado y otra como deuda"
+                  : `${resultado.duplicados.length} pacientes tienen el mismo trabajo dos veces: una vez pagado y otra como deuda`}
               </p>
               <p className="mt-1 text-xs text-ink/60">
                 Pasa cuando el pago se registra como «extra» en lugar de ligarlo al presupuesto de la cita. «Unir» pasa el
