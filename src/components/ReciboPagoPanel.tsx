@@ -273,6 +273,12 @@ export default function ReciboPagoPanel({
               <span>Saldo por cobrar</span>
               <span className={resumenCuenta.saldo > 0 ? "text-danger" : "text-success"}>{formatCurrency(resumenCuenta.saldo)}</span>
             </div>
+            {(resumenCuenta.aFavor ?? 0) > 0 && (
+              <div className="flex justify-between font-semibold">
+                <span>Saldo a favor (por aplicar a tus tratamientos)</span>
+                <span className="text-success">{formatCurrency(resumenCuenta.aFavor ?? 0)}</span>
+              </div>
+            )}
             {resumenCuenta.proximaCita && (
               <div className="flex justify-between pt-1">
                 <span>Próxima cita · {resumenCuenta.proximaCita.fecha.split("-").reverse().join("/")}</span>

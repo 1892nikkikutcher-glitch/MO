@@ -166,6 +166,7 @@ export async function generarReciboPagoPdf(datos: DatosReciboPagoPdf): Promise<B
     filaCuenta("Cargos por tratamientos realizados", resumen.totalPresupuestado);
     filaCuenta("Pagado a la fecha (incluye este pago)", resumen.totalPagado);
     filaCuenta("Saldo por cobrar", resumen.saldo, true);
+    if ((resumen.aFavor ?? 0) > 0) filaCuenta("Saldo a favor (por aplicar a tus tratamientos)", resumen.aFavor ?? 0, true);
     if (resumen.proximaCita) {
       const { fecha, horaInicio, tratamientos, costo } = resumen.proximaCita;
       y += 1.5;

@@ -11,6 +11,8 @@ export type ResumenCuentaRecibo = {
   totalPresupuestado: number;
   totalPagado: number;
   saldo: number;
+  /** Dinero del paciente que aún no se aplica a ningún cargo (por ejemplo, un anticipo). Ausente en recibos viejos. */
+  aFavor?: number;
   proximaCita: { fecha: string; horaInicio: string; tratamientos: string[]; costo: number | null } | null;
 };
 
@@ -53,6 +55,7 @@ export function resumenCuentaRecibo(datos: {
     totalPresupuestado,
     totalPagado,
     saldo: Math.max(0, saldo),
+    aFavor: redondearDinero(Math.max(0, resumen.aFavor)),
     proximaCita: cita
       ? { fecha: cita.fecha, horaInicio: cita.horaInicio, tratamientos: cita.tratamientos ?? [], costo: montoDeCostoCita(cita.costo) }
       : null,

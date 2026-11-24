@@ -51,6 +51,12 @@ describe("resumenCuentaRecibo", () => {
     expect(r).toMatchObject({ totalPagado: 1000, saldo: 4000 });
   });
 
+  it("trae el saldo a favor cuando el paciente pagó de más (por ejemplo, un anticipo) y 0 si no", () => {
+    const sobrepago = pagoCon("p1", 6000);
+    expect(resumenCuentaRecibo({ ...base, pagos: [sobrepago], pago: sobrepago })).toMatchObject({ saldo: 0, aFavor: 1000 });
+    expect(resumenCuentaRecibo({ ...base, pagos: [pagoCon("p1", 700)], pago: pagoCon("p1", 700) })).toMatchObject({ aFavor: 0 });
+  });
+
   it("sin presupuestos no hay estado de cuenta", () => {
     expect(resumenCuentaRecibo({ ...base, presupuestos: [], pagos: [], pago: pagoCon("p1", 1) })).toBeNull();
   });

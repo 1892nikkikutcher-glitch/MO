@@ -25,6 +25,7 @@ export const reciboCompartidoSchema = z
         totalPresupuestado: z.number().finite().min(0).max(100_000_000),
         totalPagado: z.number().finite().min(-100_000_000).max(100_000_000),
         saldo: z.number().finite().min(0).max(100_000_000),
+        aFavor: z.number().finite().min(0).max(100_000_000).optional(),
         proximaCita: z
           .object({
             fecha: texto(20),
