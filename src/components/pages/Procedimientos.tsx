@@ -242,6 +242,7 @@ export default function Procedimientos() {
   const [ramaAbierta, setRamaAbierta] = useState<string | null>(null);
   // Arrastrar un tratamiento a la tarjeta de su rama: cuál se arrastra, sobre qué tarjeta va y el aviso al soltarlo.
   const [arrastrandoId, setArrastrandoId] = useState<string | null>(null);
+  const idArrastrado = useRef<string | null>(null); // la lógica del arrastre lee esto; el estado solo pinta
   const [sobreRama, setSobreRama] = useState<string | null>(null);
   const [avisoMovido, setAvisoMovido] = useState("");
   useEffect(() => {
@@ -322,11 +323,8 @@ export default function Procedimientos() {
     setProcedimientos((prev) => prev.map((p) => (p.id === id ? { ...p, especialidad, actualizadoEl: new Date().toISOString() } : p)));
   };
 
-  /** Suelta el tratamiento arrastrado sobre la tarjeta de una rama (la misma rama en la que ya está no cambia nada). */
-  const soltarEnRama = (rama: string) => {
-    const id = arrastrandoId;
-    setArrastrandoId(null);
-    setSobreRama(null);
+  /** Pasa un tratamiento a otra rama (la misma en la que ya está no cambia nada) y avisa. */
+  const moverARama = (id: string | null, rama: string) => {
     const p = procedimientos.find((x) => x.id === id);
     if (!p) return;
     const actual = esSinClasificar(p) ? ESPECIALIDAD_SIN_CLASIFICAR : p.especialidad;
@@ -334,6 +332,32 @@ export default function Procedimientos() {
     ubicarEn(p.id, rama);
     setAvisoMovido(`«${p.nombre}» pasó a ${rama}.`);
   };
+
+  const terminarArrastre = () => {
+    idArrastrado.current = null;
+    setArrastrandoId(null);
+    setSobreRama(null);
+  };
+
+  /** Controladores para que algo sea destino de un tratamiento arrastrado (tarjetas y franja flotante). */
+  const destinoRama = (rama: string) => ({
+    onDragEnter: (e: React.DragEvent) => {
+      if (!idArrastrado.current) return;
+      e.preventDefault();
+    },
+    onDragOver: (e: React.DragEvent) => {
+      if (!idArrastrado.current) return;
+      e.preventDefault();
+      e.dataTransfer.dropEffect = "move";
+      setSobreRama((prev) => (prev === rama ? prev : rama));
+    },
+    onDragLeave: () => setSobreRama((prev) => (prev === rama ? null : prev)),
+    onDrop: (e: React.DragEvent) => {
+      e.preventDefault();
+      moverARama(idArrastrado.current ?? e.dataTransfer.getData("text/plain"), rama);
+      terminarArrastre();
+    },
+  });
 
   return (
     <div className="space-y-6">
@@ -458,23 +482,21 @@ export default function Procedimientos() {
             const vacia = r.procedimientos.length === 0;
             const porUbicar = r.sinClasificar && !vacia;
             return (
-              <button
+              // div con rol de botón (no <button>): Firefox no entrega los eventos de soltar sobre un <button>.
+              <div
                 key={r.nombre}
-                type="button"
+                role="button"
+                tabIndex={0}
                 aria-expanded={abierta}
                 onClick={() => setRamaAbierta(abierta ? null : r.nombre)}
-                onDragOver={(e) => {
-                  if (!arrastrandoId) return;
-                  e.preventDefault();
-                  e.dataTransfer.dropEffect = "move";
-                  if (sobreRama !== r.nombre) setSobreRama(r.nombre);
+                onKeyDown={(e) => {
+                  if (e.key === "Enter" || e.key === " ") {
+                    e.preventDefault();
+                    setRamaAbierta(abierta ? null : r.nombre);
+                  }
                 }}
-                onDragLeave={() => setSobreRama((prev) => (prev === r.nombre ? null : prev))}
-                onDrop={(e) => {
-                  e.preventDefault();
-                  soltarEnRama(r.nombre);
-                }}
-                className={`rounded-2xl border border-l-4 p-4 text-left transition-colors hover:bg-surface2 ${
+                {...destinoRama(r.nombre)}
+                className={`cursor-pointer rounded-2xl border border-l-4 p-4 text-left transition-colors hover:bg-surface2 ${
                   sobreRama === r.nombre ? "border-accent bg-accent/15 ring-2 ring-accent/60" : abierta ? "border-accent/60 bg-surface2" : "border-edge/10 bg-surface"
                 } border-l-accent ${vacia && !arrastrandoId ? "opacity-60" : ""}`}
               >
@@ -494,11 +516,31 @@ export default function Procedimientos() {
                     {r.desde === null ? (vacia ? "Sin procedimientos" : "Sin precio aún") : r.desde === r.hasta ? formatCurrency(r.desde) : `${formatCurrency(r.desde)} a ${formatCurrency(r.hasta ?? r.desde)}`}
                   </p>
                 )}
-              </button>
+              </div>
             );
           })}
         </div>
       </div>
+
+      {/* Mientras se arrastra, una franja siempre visible con todas las ramas: así no hay que acercar la fila a las tarjetas de arriba. */}
+      {arrastrandoId && (
+        <div className="fixed inset-x-3 top-3 z-50 rounded-2xl border border-accent/50 bg-modal-solid p-3 shadow-2xl lg:inset-x-24">
+          <p className="mb-2 text-xs font-semibold text-accent">Suéltalo sobre la rama a la que pertenece:</p>
+          <div className="flex flex-wrap gap-2">
+            {ramas.map((r) => (
+              <div
+                key={r.nombre}
+                {...destinoRama(r.nombre)}
+                className={`rounded-lg border px-3 py-2 text-xs font-semibold uppercase tracking-wide transition-colors ${
+                  sobreRama === r.nombre ? "border-accent bg-accent/25 text-accent ring-2 ring-accent/60" : "border-edge/15 bg-surface text-ink/70"
+                }`}
+              >
+                {r.nombre}
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
 
       {ramaActual && (
         <div ref={panelRama} className="scroll-mt-4">
@@ -547,12 +589,13 @@ export default function Procedimientos() {
                         onDragStart={(e) => {
                           e.dataTransfer.setData("text/plain", p.id);
                           e.dataTransfer.effectAllowed = "move";
-                          setArrastrandoId(p.id);
+                          idArrastrado.current = p.id;
+                          // Se pinta en el siguiente ciclo: cambiar la pantalla dentro del dragstart puede cancelar el arrastre.
+                          setTimeout(() => {
+                            if (idArrastrado.current === p.id) setArrastrandoId(p.id);
+                          }, 0);
                         }}
-                        onDragEnd={() => {
-                          setArrastrandoId(null);
-                          setSobreRama(null);
-                        }}
+                        onDragEnd={terminarArrastre}
                         title="Arrástralo a la tarjeta de su rama para cambiarlo de lugar"
                         className={`cursor-grab px-4 py-3 active:cursor-grabbing ${activo ? "" : "opacity-50"} ${arrastrandoId === p.id ? "opacity-40" : ""}`}
                       >
@@ -572,27 +615,30 @@ export default function Procedimientos() {
                                 {guiaAbiertaId === p.id ? "Ocultar guía ▴" : "Guía ▾"}
                               </button>
                             )}
-                            {esSinClasificar(p) && (
-                              <label className="flex basis-full items-center gap-2 text-xs font-normal text-ink/60">
-                                Ubicar en:
-                                <select
-                                  value=""
-                                  onChange={(e) => e.target.value && ubicarEn(p.id, e.target.value)}
-                                  aria-label={`Ubicar «${p.nombre}» en una rama`}
-                                  className="rounded-md border border-edge/10 bg-field px-2 py-1 text-xs text-ink outline-none focus:border-accent/60"
-                                >
-                                  <option value="">Elige la rama…</option>
-                                  {especialidadesPredefinidas.map((e) => (
-                                    <option key={e} value={e}>
-                                      {e}
+                            {/* Alternativa al arrastre (celular, tableta o teclado): el mismo cambio de rama con un selector. */}
+                            <label className="flex basis-full items-center gap-2 text-xs font-normal text-ink/60">
+                              {esSinClasificar(p) ? "Ubicar en:" : "Mover a:"}
+                              <select
+                                value=""
+                                onChange={(e) => e.target.value && moverARama(p.id, e.target.value)}
+                                aria-label={`${esSinClasificar(p) ? "Ubicar" : "Mover"} «${p.nombre}» en una rama`}
+                                onDragStart={(e) => e.preventDefault()}
+                                className="rounded-md border border-edge/10 bg-field px-2 py-1 text-xs text-ink outline-none focus:border-accent/60"
+                              >
+                                <option value="">Elige la rama…</option>
+                                {ramas
+                                  .filter((r) => r.nombre !== ramaActual.nombre)
+                                  .map((r) => (
+                                    <option key={r.nombre} value={r.nombre}>
+                                      {r.nombre}
                                     </option>
                                   ))}
-                                </select>
-                                {p.notasInternas?.startsWith("Grupo en la lista de precios:") && (
-                                  <span className="text-ink/40">({p.notasInternas.replace("Grupo en la lista de precios:", "venía en").trim()})</span>
-                                )}
-                              </label>
-                            )}
+                              </select>
+                              {esSinClasificar(p) && p.notasInternas?.startsWith("Grupo en la lista de precios:") && (
+                                <span className="text-ink/40">({p.notasInternas.replace("Grupo en la lista de precios:", "venía en").trim()})</span>
+                              )}
+                            </label>
+
                           </span>
                           <span className="text-sm text-ink/70">{formatCurrency(p.costoPaciente)}</span>
                           <span className="text-sm text-ink/70">{p.costoSinConfigurar ? <span className="text-warning">Sin configurar</span> : formatCurrency(p.costoOdontologo)}</span>
