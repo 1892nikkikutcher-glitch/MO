@@ -18,6 +18,7 @@ import { incidentesPendientesDeSeguimiento, VENTANA_INCIDENTES_DIAS } from "@/li
 import { DIAS_AVISO_MANTENIMIENTO, resumenMantenimiento } from "@/lib/mantenimientoEquipos";
 import { pagosPendientesDeFacturar, totalDePagos } from "@/lib/facturacion";
 import { primerosPendientes } from "@/lib/primerosPendientes";
+import { ajustePendiente, type ConfigAjustePrecios } from "@/lib/ajustePreciosInflacion";
 import { EVENTO_INICIAR_GUIA } from "@/components/GuiaPrimerPaciente";
 import LaboratoriosPendientesPanel from "./LaboratoriosPendientesPanel";
 
@@ -94,7 +95,20 @@ export default function AttentionAlerts({ rango }: { rango: RangoPeriodo }) {
     clinicInfo,
     pendingInvite,
     abrirNuevaCitaDesdeInicio,
+    leerConfigAjustePrecios,
   } = usePatientData();
+  const [configAjustePrecios, setConfigAjustePrecios] = useState<ConfigAjustePrecios>({});
+  useEffect(() => {
+    if (miRol !== "admin") return;
+    let vivo = true;
+    void leerConfigAjustePrecios().then((c) => {
+      if (vivo) setConfigAjustePrecios(c);
+    });
+    return () => {
+      vivo = false;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [miRol]);
   const [mostrarLaboratorios, setMostrarLaboratorios] = useState(false);
   const [datosListos, setDatosListos] = useState(false);
   useEffect(() => {
@@ -295,6 +309,21 @@ export default function AttentionAlerts({ rango }: { rango: RangoPeriodo }) {
       prioridad: "media",
       categoria: "conecta",
       onClick: () => irAPagina("mo-conecta"),
+    });
+  }
+
+  // El ajuste anual de precios nunca se aplica solo: al llegar la fecha que el dueño programó, se le pide su permiso.
+  const ajusteDePrecios = miRol === "admin" ? ajustePendiente(configAjustePrecios, null, hoy) : null;
+  if (ajusteDePrecios?.tipo === "aprobacion") {
+    alertas.push({
+      key: "ajuste-precios-anual",
+      emoji: "💲",
+      texto: `Es momento de tu ajuste anual de precios${
+        ajusteDePrecios.porcentaje !== null ? ` (${ajusteDePrecios.porcentaje}%)` : ""
+      } — revisa cómo quedarían y apruébalo`,
+      prioridad: "media",
+      categoria: "financiero",
+      onClick: () => irAPagina("administracion-procedimientos"),
     });
   }
 

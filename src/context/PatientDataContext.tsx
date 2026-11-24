@@ -172,7 +172,7 @@ import type { Equipo, RegistroEquipo, IngenieroBiomedico } from "@/lib/mantenimi
 import type { Factura } from "@/lib/facturacion";
 import type { PersonalAsistencia, RegistroAsistencia } from "@/lib/asistencia";
 import type { Procedimiento } from "@/lib/procedimientos";
-import type { RegistroAjustePrecios } from "@/lib/ajustePreciosInflacion";
+import type { ConfigAjustePrecios, RegistroAjustePrecios } from "@/lib/ajustePreciosInflacion";
 import { catalogoRecomendado } from "@/lib/catalogoRecomendado";
 import { crearProcedimientoDesdeTemplate, idDesdeCodigo } from "@/lib/importarCatalogoRecomendado";
 import { catalogoInicial, type MedicamentoCatalogo } from "@/lib/medicamentos";
@@ -939,9 +939,10 @@ type PatientDataContextValue = {
   ) => Promise<void>;
   /** Último ajuste porcentual de precios que se hizo (o null si nunca). */
   leerUltimoAjustePrecios: () => Promise<RegistroAjustePrecios | null>;
-  /** El aumento anual que el dueño decidió (porcentaje), o null si aún no lo fija. */
-  leerPorcentajeAnualPrecios: () => Promise<number | null>;
-  guardarPorcentajeAnualPrecios: (porcentaje: number) => Promise<void>;
+  /** Lo que el dueño decidió sobre su aumento anual (porcentaje, aviso anual, fecha). */
+  leerConfigAjustePrecios: () => Promise<ConfigAjustePrecios>;
+  /** Guarda solo los campos que se pasan (el resto queda como estaba). */
+  guardarConfigAjustePrecios: (cambios: Partial<ConfigAjustePrecios>) => Promise<void>;
   historiaClinicaTemplate: HistoriaClinicaTemplate;
   setHistoriaClinicaTemplate: (updater: Updater<HistoriaClinicaTemplate>) => void;
   historiaClinicaPorPaciente: Record<string, RespuestasHistoriaClinica>;
@@ -1668,20 +1669,27 @@ export function PatientDataProvider({
     }
   };
 
-  const leerPorcentajeAnualPrecios = async (): Promise<number | null> => {
-    if (!clinicUid) return null;
+  const leerConfigAjustePrecios = async (): Promise<ConfigAjustePrecios> => {
+    if (!clinicUid) return {};
     try {
       const snap = await getDoc(doc(db, `users/${clinicUid}/config/ajustePreciosConfig`));
-      const valor = snap.exists() ? Number((snap.data() as { porcentajeAnual?: number }).porcentajeAnual) : NaN;
-      return Number.isFinite(valor) && valor > 0 ? valor : null;
+      if (!snap.exists()) return {};
+      const d = snap.data() as ConfigAjustePrecios;
+      const pct = Number(d.porcentajeAnual);
+      return {
+        ...(Number.isFinite(pct) && pct > 0 ? { porcentajeAnual: pct } : {}),
+        ...(d.automatico ? { automatico: true } : {}),
+        ...(d.proximoAjuste ? { proximoAjuste: d.proximoAjuste } : {}),
+        ...(d.posponerHasta ? { posponerHasta: d.posponerHasta } : {}),
+      };
     } catch {
-      return null;
+      return {};
     }
   };
 
-  const guardarPorcentajeAnualPrecios = async (porcentaje: number) => {
+  const guardarConfigAjustePrecios = async (cambios: Partial<ConfigAjustePrecios>) => {
     if (!clinicUid) return;
-    await setDoc(doc(db, `users/${clinicUid}/config/ajustePreciosConfig`), { porcentajeAnual: porcentaje });
+    await setDoc(doc(db, `users/${clinicUid}/config/ajustePreciosConfig`), cambios, { merge: true });
   };
 
   const irAExpediente =(patientId: string, tab?: string, citaId?: string) => {
@@ -3351,8 +3359,8 @@ export function PatientDataProvider({
         importarListaPrecios,
         aplicarAjustePrecios,
         leerUltimoAjustePrecios,
-        leerPorcentajeAnualPrecios,
-        guardarPorcentajeAnualPrecios,
+        leerConfigAjustePrecios,
+        guardarConfigAjustePrecios,
         historiaClinicaTemplate,
         setHistoriaClinicaTemplate,
         historiaClinicaPorPaciente,

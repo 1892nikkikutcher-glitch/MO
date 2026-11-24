@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { aplicarPorcentaje, calcularAjustePrecios, mesesDesdeAjuste, redondearPrecio, tocaAjusteAnual } from "../ajustePreciosInflacion";
+import { ajustePendiente, aplicarPorcentaje, calcularAjustePrecios, mesesDesdeAjuste, proximoPrimeroDeEnero, redondearPrecio, siguienteAjuste, tocaAjusteAnual } from "../ajustePreciosInflacion";
 import type { Procedimiento } from "../procedimientos";
 
 const proc = (id: string, costoPaciente: number, extra: Partial<Procedimiento> = {}): Procedimiento => ({
@@ -78,5 +78,31 @@ describe("recordatorio anual", () => {
     expect(tocaAjusteAnual(registro, new Date("2026-11-24T12:00:00Z"))).toBe(true);
     expect(tocaAjusteAnual(registro, new Date("2026-06-01T12:00:00Z"))).toBe(false);
     expect(tocaAjusteAnual(null, new Date("2026-11-24T12:00:00Z"))).toBe(false);
+  });
+});
+
+describe("ajuste anual con aprobación", () => {
+  const hoy = new Date(2027, 0, 5);
+  it("el primer aviso propuesto es el siguiente 1 de enero", () => {
+    expect(proximoPrimeroDeEnero(new Date(2026, 10, 24))).toBe("2027-01-01");
+  });
+  it("al aprobar, la siguiente fecha es un año después de la programada y siempre queda en el futuro", () => {
+    expect(siguienteAjuste("2027-01-01", hoy)).toBe("2028-01-01");
+    expect(siguienteAjuste("2027-01-01", new Date(2027, 11, 20))).toBe("2028-01-01");
+    expect(siguienteAjuste("2024-03-10", hoy)).toBe("2027-03-10");
+    expect(siguienteAjuste("2028-02-29", new Date(2028, 2, 5))).toBe("2029-02-28");
+  });
+  it("pide permiso solo cuando llega la fecha, y no si lo pospuso", () => {
+    const cfg = { automatico: true, porcentajeAnual: 4.5, proximoAjuste: "2027-01-01" };
+    expect(ajustePendiente(cfg, null, new Date(2026, 11, 31))).toBeNull();
+    expect(ajustePendiente(cfg, null, hoy)).toEqual({ tipo: "aprobacion", programada: "2027-01-01", porcentaje: 4.5 });
+    expect(ajustePendiente({ ...cfg, posponerHasta: "2027-01-12" }, null, hoy)).toBeNull();
+    expect(ajustePendiente({ ...cfg, posponerHasta: "2027-01-12" }, null, new Date(2027, 0, 12))).not.toBeNull();
+  });
+  it("sin ajuste automático, queda el recordatorio de los 11 meses", () => {
+    const registro = { fecha: "2025-12-10T12:00:00.000Z", porcentaje: 4, cantidad: 3 };
+    expect(ajustePendiente({}, registro, new Date("2026-11-24T12:00:00Z"))).toEqual({ tipo: "recordatorio" });
+    expect(ajustePendiente({ automatico: true, proximoAjuste: "2027-06-01" }, registro, new Date("2026-11-24T12:00:00Z"))).toBeNull();
+    expect(ajustePendiente(null, null, hoy)).toBeNull();
   });
 });

@@ -14,7 +14,7 @@ import ConfirmarEliminar from "@/components/ConfirmarEliminar";
 import ImportarCatalogoDialog from "@/components/procedimientos/ImportarCatalogoDialog";
 import ImportarListaPreciosDialog from "@/components/procedimientos/ImportarListaPreciosDialog";
 import AjustarPreciosDialog from "@/components/procedimientos/AjustarPreciosDialog";
-import { tocaAjusteAnual, type RegistroAjustePrecios } from "@/lib/ajustePreciosInflacion";
+import { ajustePendiente, sumarDias, type ConfigAjustePrecios, type RegistroAjustePrecios } from "@/lib/ajustePreciosInflacion";
 import GuiaConfiguracion from "@/components/procedimientos/GuiaConfiguracion";
 
 const inputClass =
@@ -229,18 +229,19 @@ function ProcedimientoDialog({
 }
 
 export default function Procedimientos() {
-  const { miRol, procedimientos, setProcedimientos, leerUltimoAjustePrecios, leerPorcentajeAnualPrecios } = usePatientData();
+  const { miRol, procedimientos, setProcedimientos, leerUltimoAjustePrecios, leerConfigAjustePrecios, guardarConfigAjustePrecios } = usePatientData();
   const [mostrarAjuste, setMostrarAjuste] = useState(false);
   const [ultimoAjuste, setUltimoAjuste] = useState<RegistroAjustePrecios | null>(null);
-  const [porcentajeAnual, setPorcentajeAnual] = useState<number | null>(null);
+  const [configAjuste, setConfigAjuste] = useState<ConfigAjustePrecios>({});
+  const [ajusteEnAprobacion, setAjusteEnAprobacion] = useState(false);
   useEffect(() => {
     if (miRol !== "admin" || mostrarAjuste) return;
     let vivo = true;
     void leerUltimoAjustePrecios().then((r) => {
       if (vivo) setUltimoAjuste(r);
     });
-    void leerPorcentajeAnualPrecios().then((r) => {
-      if (vivo) setPorcentajeAnual(r);
+    void leerConfigAjustePrecios().then((r) => {
+      if (vivo) setConfigAjuste(r);
     });
     return () => {
       vivo = false;
@@ -290,6 +291,7 @@ export default function Procedimientos() {
     );
   };
 
+  const pendienteAjuste = ajustePendiente(configAjuste, ultimoAjuste, new Date());
   const grupos = agruparPorEspecialidad(procedimientos);
 
   return (
@@ -301,7 +303,10 @@ export default function Procedimientos() {
         </p>
         <div className="flex shrink-0 flex-wrap justify-end gap-2">
           <button
-            onClick={() => setMostrarAjuste(true)}
+            onClick={() => {
+              setAjusteEnAprobacion(false);
+              setMostrarAjuste(true);
+            }}
             title="Sube de una vez el precio de todos tus tratamientos con un porcentaje, por ejemplo la inflación anual"
             className="rounded-lg border border-accent/40 px-4 py-2.5 text-sm font-semibold text-accent transition-colors hover:bg-accent/10"
           >
@@ -324,15 +329,48 @@ export default function Procedimientos() {
         </div>
       </div>
 
-      {tocaAjusteAnual(ultimoAjuste, new Date()) && ultimoAjuste && (
+      {pendienteAjuste?.tipo === "aprobacion" && (
+        <div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-warning/30 bg-warning/10 px-4 py-3">
+          <p className="text-sm text-warning">
+            <strong>Es momento de tu ajuste anual de precios.</strong>{" "}
+            {pendienteAjuste.porcentaje !== null ? `Tu aumento anual es de ${pendienteAjuste.porcentaje}%. ` : ""}
+            Revisa cómo quedarían y dame tu permiso: no se cambia nada hasta que lo apruebes.
+          </p>
+          <div className="flex shrink-0 gap-2">
+            <button
+              onClick={() => {
+                setAjusteEnAprobacion(true);
+                setMostrarAjuste(true);
+              }}
+              className="rounded-lg border border-warning/50 bg-warning/10 px-3 py-1.5 text-xs font-semibold text-warning hover:bg-warning/20"
+            >
+              Revisar y aprobar
+            </button>
+            <button
+              onClick={async () => {
+                const posponerHasta = sumarDias(new Date(), 7);
+                await guardarConfigAjustePrecios({ posponerHasta });
+                setConfigAjuste((prev) => ({ ...prev, posponerHasta }));
+              }}
+              className="rounded-lg border border-warning/30 px-3 py-1.5 text-xs font-semibold text-warning/80 hover:bg-warning/10"
+            >
+              Recordármelo en 7 días
+            </button>
+          </div>
+        </div>
+      )}
+      {pendienteAjuste?.tipo === "recordatorio" && ultimoAjuste && (
         <div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-warning/30 bg-warning/10 px-4 py-3">
           <p className="text-sm text-warning">
             Ya pasó cerca de un año desde que subiste tus precios (
             {new Date(ultimoAjuste.fecha).toLocaleDateString("es-MX", { month: "long", year: "numeric" })}). Para mantener sanas tus finanzas, conviene
-            ajustarlos{porcentajeAnual !== null ? ` (tu aumento anual es de ${porcentajeAnual}%)` : " a la inflación"}.
+            ajustarlos{configAjuste.porcentajeAnual !== undefined ? ` (tu aumento anual es de ${configAjuste.porcentajeAnual}%)` : " a la inflación"}.
           </p>
           <button
-            onClick={() => setMostrarAjuste(true)}
+            onClick={() => {
+              setAjusteEnAprobacion(false);
+              setMostrarAjuste(true);
+            }}
             className="shrink-0 rounded-lg border border-warning/50 px-3 py-1.5 text-xs font-semibold text-warning hover:bg-warning/10"
           >
             Ajustar ahora
@@ -455,7 +493,7 @@ export default function Procedimientos() {
 
       {mostrarImportar && <ImportarCatalogoDialog onClose={() => setMostrarImportar(false)} />}
       {mostrarListaPrecios && <ImportarListaPreciosDialog onClose={() => setMostrarListaPrecios(false)} />}
-      {mostrarAjuste && <AjustarPreciosDialog onClose={() => setMostrarAjuste(false)} />}
+      {mostrarAjuste && <AjustarPreciosDialog modoAprobacion={ajusteEnAprobacion} onClose={() => setMostrarAjuste(false)} />}
     </div>
   );
 }
