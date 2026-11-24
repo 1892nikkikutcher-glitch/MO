@@ -5,6 +5,7 @@ import { usePatientData } from "@/context/PatientDataContext";
 import { obtenerAyuda } from "@/lib/ayudaPaginas";
 import { EVENTO_ABRIR_TUTORIAL } from "./TutorialInicio";
 import { EVENTO_INICIAR_GUIA } from "./GuiaPrimerPaciente";
+import type { LadoNavegacion } from "@/lib/ladoNavegacion";
 import {
   claveSesionAsistente,
   claveVisitasAsistente,
@@ -14,7 +15,7 @@ import {
 
 function IconoAsistente() {
   return (
-    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" className="lg:h-8 lg:w-8">
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" className="lg:h-6 lg:w-6">
       <path
         d="M12 18h.01M9.5 9a2.5 2.5 0 0 1 5 0c0 1.5-1 2-2 2.7-.6.4-1 .8-1 1.8M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z"
         stroke="currentColor"
@@ -38,11 +39,20 @@ export default function AsistenteFlotante({
   activePage,
   activeLabel,
   oculto,
+  lado = "derecha",
 }: {
   activePage: string;
   activeLabel: string;
   oculto: boolean;
+  /** Lado de la pantalla donde está la barra lateral (en computadora el botón va debajo de ella). */
+  lado?: LadoNavegacion;
 }) {
+  const izquierda = lado === "izquierda";
+  // En computadora la barra lateral ocupa una columna junto al borde; el botón se pone justo
+  // debajo de ella (centrado en esa columna) para no tapar botones del contenido.
+  const posBoton = izquierda ? "lg:left-7 lg:right-auto" : "lg:right-7";
+  const posGlobo = izquierda ? "lg:left-[5.25rem] lg:right-auto" : "lg:right-[5.25rem]";
+  const posPanel = izquierda ? "lg:left-[6.5rem] lg:right-auto" : "lg:right-[6.5rem]";
   const { ayudaContexto, miUid } = usePatientData();
   const [abierto, setAbierto] = useState(false);
   const [llamando, setLlamando] = useState(false);
@@ -90,7 +100,7 @@ export default function AsistenteFlotante({
             dejarDeLlamar();
             setAbierto(true);
           }}
-          className="fixed bottom-[154px] right-[4.5rem] z-40 max-w-[12rem] rounded-xl border border-accent/70 bg-modal-solid px-3 py-2 text-left text-xs font-semibold text-accent shadow-xl motion-safe:animate-bounce print:hidden lg:bottom-11 lg:right-[7.5rem] lg:max-w-none lg:text-sm"
+          className={`fixed bottom-[154px] right-[4.5rem] z-40 max-w-[12rem] rounded-xl border border-accent/70 bg-modal-solid px-3 py-2 text-left text-xs font-semibold text-accent shadow-xl motion-safe:animate-bounce print:hidden lg:bottom-5 lg:max-w-none lg:text-sm ${posGlobo}`}
         >
           ¿Dudas? Toca aquí y te ayudo
         </button>
@@ -106,7 +116,7 @@ export default function AsistenteFlotante({
             ? "0 0 26px 2px rgb(var(--accent-rgb) / 0.95)"
             : "0 0 18px -2px rgb(var(--accent-rgb) / 0.7)",
         }}
-        className={`fixed bottom-[150px] right-6 z-40 flex h-10 w-10 items-center justify-center rounded-full border text-accent backdrop-blur transition-transform hover:scale-105 print:hidden lg:bottom-6 lg:h-20 lg:w-20 ${
+        className={`fixed bottom-[150px] right-6 z-40 flex h-10 w-10 items-center justify-center rounded-full border text-accent backdrop-blur transition-transform hover:scale-105 print:hidden lg:bottom-4 lg:h-12 lg:w-12 ${posBoton} ${
           llamando ? "border-accent bg-accent/45" : "border-accent/50 bg-accent/20"
         }`}
       >
@@ -136,7 +146,7 @@ export default function AsistenteFlotante({
             className="fixed inset-0 z-40 print:hidden"
             aria-hidden
           />
-          <div className="fixed bottom-[200px] right-6 z-50 max-h-[70vh] w-[calc(100vw-3rem)] max-w-sm overflow-y-auto rounded-2xl border border-edge/10 bg-modal-solid p-5 shadow-2xl print:hidden lg:bottom-[158px]">
+          <div className={`fixed bottom-[200px] right-6 z-50 max-h-[70vh] w-[calc(100vw-3rem)] max-w-sm overflow-y-auto rounded-2xl border border-edge/10 bg-modal-solid p-5 shadow-2xl print:hidden lg:bottom-4 ${posPanel}`}>
             <div className="mb-3 flex items-start justify-between gap-3">
               <div>
                 <p className="text-[11px] font-semibold uppercase tracking-wide text-accent">

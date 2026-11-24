@@ -1100,7 +1100,7 @@ function DashboardBody({
         />
       )}
 
-      <AsistenteFlotante activePage={activePage} activeLabel={activeLabel} oculto={fanAbierto} />
+      <AsistenteFlotante activePage={activePage} activeLabel={activeLabel} oculto={fanAbierto} lado={ladoNav} />
     </div>
     </PrivacidadProvider>
   );

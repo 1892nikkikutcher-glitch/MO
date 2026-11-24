@@ -15,6 +15,7 @@ import { moduloVisibleParaRol } from "@/lib/permisosRol";
 import type { RolClinica } from "@/lib/patientData";
 import type { LadoNavegacion } from "@/lib/ladoNavegacion";
 import { MO_ES_GRATIS } from "@/lib/planesConfig";
+import { trazoSubmodulo } from "@/lib/iconosSubmodulos";
 
 export const navItems = [
   {
@@ -796,10 +797,26 @@ export default function BottomNav({
                     onNavigate(child.id);
                     setAbierto(null);
                   }}
-                  className={`block w-full rounded-lg px-3 py-2.5 text-left text-sm font-medium transition-colors ${
+                  className={`flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-left text-sm font-medium transition-colors ${
                     active === child.id ? "bg-accent/10 text-accent" : "text-ink/70 hover:bg-surface"
                   }`}
                 >
+                  <svg
+                    width="20"
+                    height="20"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    aria-hidden="true"
+                    className={`shrink-0 ${active === child.id ? "text-accent" : "text-accent/70"}`}
+                  >
+                    <path
+                      d={trazoSubmodulo(child.id)}
+                      stroke="currentColor"
+                      strokeWidth="1.8"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                    />
+                  </svg>
                   {child.label}
                 </button>
               ))}
