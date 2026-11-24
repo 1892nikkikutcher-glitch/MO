@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   aceptarPropuesta,
+  aceptarRenglones,
   calcularCuenta,
   cantidadDeCobro,
   conServicios,
@@ -347,5 +348,58 @@ describe("ejemplo completo para el personal", () => {
       porCobrar: 300,
       aFavor: 0,
     });
+  });
+});
+
+describe("cobrar lo presupuestado que aún no se acepta (ventana de cobro)", () => {
+  const antiguo = (id: string, items: LineItem[]): SavedBudget => {
+    const { origen: _o, ...resto } = propuesta(id, items);
+    void _o;
+    return resto as SavedBudget;
+  };
+
+  it("sin la opción, una propuesta no se ofrece; con ella aparece como 'propuesta' por su precio", () => {
+    const ps = [antiguo("v1", [item("a", 900)])];
+    expect(renglonesCobrables(ps, [])).toEqual([]);
+    expect(renglonesCobrables(ps, [], [], { incluirPropuestas: true })).toEqual([
+      { id: "a", presupuestoId: "v1", folio: "V1", label: "Procedimiento a", price: 900, pendiente: 900, tipo: "propuesta" },
+    ]);
+  });
+
+  it("rechazados, no elegidos y expirados no se ofrecen", () => {
+    const ps = [
+      propuesta("r", [item("r1", 100)], { estado: "rechazado" }),
+      propuesta("n", [item("n1", 100)], { estado: "no_elegida" }),
+      propuesta("e", [item("e1", 100)], { estado: "expirado" }),
+    ];
+    expect(renglonesCobrables(ps, [], [], { incluirPropuestas: true })).toEqual([]);
+  });
+
+  it("cobrar un presupuesto antiguo registra su aceptación y, si se realizó hoy, queda como cargo", () => {
+    let ps = [antiguo("v1", [item("a", 900)])];
+    ps = aceptarRenglones(ps, ["a"], { fechaISO: "2026-11-23" });
+    expect(ps[0].estado).toBe("aceptado");
+    expect(ps[0].aceptacion).toMatchObject({ itemIds: ["a"], modalidad: "al_realizar", fecha: "2026-11-23" });
+    ps = marcarAvance(ps, ["a"], "terminado", "2026-11-23");
+    expect(resumen(ps, [pago("pg1", [{ tratamientoId: "a", monto: 400 }])])).toMatchObject({ cargos: 900, pagadoACargos: 400, porCobrar: 500, aFavor: 0 });
+  });
+
+  it("si no se realizó hoy, lo cobrado queda como anticipo del tratamiento aceptado", () => {
+    const ps = aceptarRenglones([antiguo("v1", [item("a", 900)])], ["a"], { fechaISO: "2026-11-23" });
+    expect(resumen(ps, [pago("pg1", [{ tratamientoId: "a", monto: 400 }])])).toMatchObject({ cargos: 0, porCobrar: 0, aFavor: 400 });
+  });
+
+  it("aceptar otro renglón del mismo presupuesto suma al anterior, no lo reemplaza", () => {
+    let ps = aceptarRenglones([propuesta("p1", [item("a", 100), item("b", 200), item("c", 300)])], ["a"], { fechaISO: "2026-11-23" });
+    ps = aceptarRenglones(ps, ["b"], { fechaISO: "2026-11-24" });
+    expect(ps[0].aceptacion).toMatchObject({ itemIds: ["a", "b"], fecha: "2026-11-23" });
+    expect(resumen(ps)).toMatchObject({ aceptadoPendienteDeCobro: 300, propuesto: 300 });
+  });
+
+  it("aceptar una alternativa deja la otra como no elegida", () => {
+    const A = propuesta("A", [item("a", 3000)], { grupoAlternativas: "g1" });
+    const B = propuesta("B", [item("b", 5000)], { grupoAlternativas: "g1" });
+    const ps = aceptarRenglones([A, B], ["a"], { fechaISO: "2026-11-23" });
+    expect(ps.find((p) => p.id === "B")?.estado).toBe("no_elegida");
   });
 });

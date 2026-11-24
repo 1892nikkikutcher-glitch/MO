@@ -230,14 +230,21 @@ export type RenglonCobrable = {
   price: number;
   /** Lo que aún se puede pagar a este renglón. */
   pendiente: number;
-  /** "cargo": ya se realizó (o se cobra desde que se aceptó) y se debe. "anticipo": aceptado y aún no realizado. */
-  tipo: "cargo" | "anticipo";
+  /** "cargo": ya se realizó (o se cobra desde que se aceptó) y se debe. "anticipo": aceptado y aún no realizado.
+   * "propuesta": presupuestado y todavía sin aceptar (solo se ofrece al cobrar: cobrarlo registra su aceptación). */
+  tipo: "cargo" | "anticipo" | "propuesta";
 };
 
 /** Qué se puede cobrar a un paciente: primero lo que ya se debe; después lo aceptado todavía sin realizar,
- * que se puede dejar como anticipo (o marcar como realizado al cobrarlo). Lo que solo está propuesto,
- * rechazado o no elegido no se cobra. */
-export function renglonesCobrables(presupuestos: SavedBudget[], pagos: Pago[], devoluciones: DevolucionPago[] = []): RenglonCobrable[] {
+ * que se puede dejar como anticipo (o marcar como realizado al cobrarlo). Lo que está rechazado o no elegido
+ * no se cobra. Lo que solo está propuesto tampoco es deuda, pero en la ventana de cobro se puede ofrecer
+ * (`incluirPropuestas`): el paciente llegó a pagarlo, así que cobrarlo es aceptarlo. */
+export function renglonesCobrables(
+  presupuestos: SavedBudget[],
+  pagos: Pago[],
+  devoluciones: DevolucionPago[] = [],
+  opciones: { incluirPropuestas?: boolean } = {}
+): RenglonCobrable[] {
   const salida: RenglonCobrable[] = [];
   calcularRenglones(presupuestos, pagos, devoluciones).forEach((r) => {
     if (montoMayorQue(r.porCobrar, 0)) {
@@ -249,9 +256,37 @@ export function renglonesCobrables(presupuestos: SavedBudget[], pagos: Pago[], d
       if (montoMayorQue(resta, 0)) {
         salida.push({ id: r.item.id, presupuestoId: r.presupuestoId, folio: r.folio, label: r.label, price: r.price, pendiente: resta, tipo: "anticipo" });
       }
+      return;
+    }
+    if (opciones.incluirPropuestas && r.propuesto > 0) {
+      salida.push({ id: r.item.id, presupuestoId: r.presupuestoId, folio: r.folio, label: r.label, price: r.price, pendiente: r.price, tipo: "propuesta" });
     }
   });
   return salida;
+}
+
+/** Registra como aceptados estos renglones (los que el paciente viene a pagar sin haber aceptado antes). Se suman
+ * a lo que ya estuviera aceptado en su presupuesto, no lo reemplazan; el cobro se hace al realizarlos. */
+export function aceptarRenglones(
+  presupuestos: SavedBudget[],
+  itemIds: string[],
+  opciones: { fechaISO: string; porEmail?: string; ahoraISO?: string }
+): SavedBudget[] {
+  const ids = new Set(itemIds);
+  let resultado = presupuestos;
+  presupuestos.forEach((p) => {
+    const nuevos = p.items.filter((i) => ids.has(i.id)).map((i) => i.id);
+    if (nuevos.length === 0) return;
+    const previos = p.aceptacion?.itemIds ?? [];
+    resultado = aceptarPropuesta(resultado, p.id, {
+      itemIds: [...new Set([...previos, ...nuevos])],
+      modalidad: p.aceptacion?.modalidad ?? "al_realizar",
+      fechaISO: p.aceptacion?.fecha ?? opciones.fechaISO,
+      porEmail: opciones.porEmail,
+      ahoraISO: opciones.ahoraISO,
+    });
+  });
+  return resultado;
 }
 
 // ---------- Cambios que se aplican a los presupuestos (puros: devuelven una copia) ----------

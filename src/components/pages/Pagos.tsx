@@ -22,6 +22,7 @@ import { FORMA_PAGO_CASHBACK, baseCashbackDePago, calcularCashback, esFormaPagoC
 import { avisoCashbackEnPago } from "@/lib/cashbackTextos";
 import { toISODate } from "@/lib/agendaHelpers";
 import {
+  aceptarRenglones,
   calcularCuenta,
   conServicios,
   crearServicioRealizado,
@@ -488,10 +489,19 @@ export function AgregarPagoDialog({
       return { id: `${pagoId}-x${i}`, tratamientoId: servicio.items[0].id, folio: servicio.folio, label: e.label, monto: e.monto };
     });
 
+    // Lo presupuestado que el paciente viene a pagar sin haberlo aceptado antes: cobrarlo registra su aceptación.
+    const aceptadosAlCobrar = seleccion.filter((t) => t.tipo === "propuesta").map((t) => t.id);
     // Lo aceptado que se realizó hoy queda terminado: es lo que lo convierte en cargo cuando se cobra al realizar.
-    const terminadosHoy = seleccion.filter((t) => t.tipo === "anticipo" && (realizadoHoy[t.id] ?? true)).map((t) => t.id);
-    if (serviciosNuevos.length > 0 || terminadosHoy.length > 0) {
-      setPresupuestosPaciente(patientId, (prev) => marcarAvance(conServicios(prev, serviciosNuevos), terminadosHoy, "terminado", fechaISO));
+    const terminadosHoy = seleccion.filter((t) => t.tipo !== "cargo" && (realizadoHoy[t.id] ?? true)).map((t) => t.id);
+    if (serviciosNuevos.length > 0 || terminadosHoy.length > 0 || aceptadosAlCobrar.length > 0) {
+      setPresupuestosPaciente(patientId, (prev) =>
+        marcarAvance(
+          aceptarRenglones(conServicios(prev, serviciosNuevos), aceptadosAlCobrar, { fechaISO, porEmail: userEmail, ahoraISO: ahora.toISOString() }),
+          terminadosHoy,
+          "terminado",
+          fechaISO
+        )
+      );
     }
 
     const pago: Pago = {
@@ -577,6 +587,11 @@ export function AgregarPagoDialog({
             {saldoAFavor > 0 && (
               <div className="mt-0.5 text-xs text-ink/60">
                 Además tiene <span className="font-semibold text-success">{formatCurrency(saldoAFavor)}</span> a favor (anticipos o pagos sin asignar).
+              </div>
+            )}
+            {tratamientosPendientes.some((t) => t.tipo === "propuesta") && (
+              <div className="mt-0.5 text-xs text-ink/60">
+                Tiene presupuestos sin aceptar (no cuentan como saldo). Si viene a pagarlos, márcalos abajo: al cobrarlos se registra su aceptación.
               </div>
             )}
           </div>
@@ -675,7 +690,7 @@ export function AgregarPagoDialog({
 
             {tratamientosPendientes.length === 0 && extras.length === 0 ? (
               <p className="rounded-lg border border-dashed border-edge/15 p-4 text-center text-xs text-ink/30">
-                Este paciente no tiene nada por cobrar ni tratamiento aceptado. Si se le hizo un servicio, regístralo abajo.
+                Este paciente no tiene presupuestos ni nada por cobrar. Si se le hizo un servicio, regístralo abajo.
               </p>
             ) : (
               <div className="max-h-56 space-y-1.5 overflow-y-auto rounded-lg border border-edge/10 p-2">
@@ -699,15 +714,23 @@ export function AgregarPagoDialog({
                                 Aceptado, por realizar
                               </span>
                             )}
+                            {t.tipo === "propuesta" && (
+                              <span className="ml-2 rounded-full bg-warning/10 px-1.5 py-0.5 text-[10px] font-semibold text-warning">
+                                Presupuestado, sin aceptar
+                              </span>
+                            )}
                           </span>
                         </span>
                         <span className="shrink-0 text-xs text-ink/40">
-                          {t.tipo === "cargo" ? "Por cobrar" : "Autorizado"}: {formatCurrency(t.pendiente)}
+                          {t.tipo === "cargo" ? "Por cobrar" : t.tipo === "anticipo" ? "Autorizado" : "Presupuestado"}: {formatCurrency(t.pendiente)}
                         </span>
                       </label>
+                      {isSelected && t.tipo === "propuesta" && (
+                        <p className="mt-1 pl-6 text-[11px] text-ink/50">Al cobrarlo se registra que el paciente aceptó este tratamiento.</p>
+                      )}
                       {isSelected && (
                         <div className="mt-1.5 flex flex-wrap items-center justify-end gap-x-4 gap-y-1 pl-6">
-                          {t.tipo === "anticipo" && (
+                          {t.tipo !== "cargo" && (
                             <label className="flex items-center gap-1.5 text-xs text-ink/60">
                               <input
                                 type="checkbox"
@@ -953,7 +976,7 @@ export default function Pagos({
 
   // Tres cosas distintas que antes se mezclaban en un solo "presupuestado": lo que el paciente solo está considerando,
   // lo que autorizó y todavía no se cobra, y lo que ya se le debe cobrar (cargos menos pagos). Ver cuentaPaciente.ts.
-  const tratamientosPendientes = renglonesCobrables(presupuestos, pagos, devoluciones);
+  const tratamientosPendientes = renglonesCobrables(presupuestos, pagos, devoluciones, { incluirPropuestas: true });
   const { resumen } = calcularCuenta(presupuestos, pagos, devoluciones);
   /** Dinero cobrado en líneas sin tratamiento que NO se dejaron a propósito como anticipo: entra a caja pero no
    * baja ningún saldo (ver calcularSaldoPendiente). */

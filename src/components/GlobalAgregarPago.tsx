@@ -191,7 +191,7 @@ export default function GlobalAgregarPago({
   const presupuestos = presupuestosPorPaciente[patientId] ?? [];
   const pagos = pagosPorPaciente[patientId] ?? [];
   const devoluciones = devolucionesPorPaciente[patientId] ?? [];
-  const tratamientosPendientes = renglonesCobrables(presupuestos, pagos, devoluciones);
+  const tratamientosPendientes = renglonesCobrables(presupuestos, pagos, devoluciones, { incluirPropuestas: true });
   const { resumen } = calcularCuenta(presupuestos, pagos, devoluciones);
 
   return (
