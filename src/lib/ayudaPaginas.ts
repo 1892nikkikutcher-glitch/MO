@@ -266,8 +266,12 @@ export const ayudaPaginas: Record<string, AyudaPagina> = {
   },
   "regulacion-sanitaria": {
     titulo: "Regulación Sanitaria",
-    resumen: "Checklist de cumplimiento normativo/sanitario del consultorio.",
-    puntos: [],
+    resumen: "Autoevaluación sanitaria del consultorio con los 43 reactivos de la guía de la COPRISEM (Estado de México), calificados de 0 a 2.",
+    puntos: [
+      "Califica cada punto: 0 si no lo cumples, 1 si cumples una parte y 2 si lo cumples por completo. El porcentaje se calcula sobre el máximo de puntos.",
+      "Si un punto no corresponde a tu consultorio, márcalo «No aplica» y no cuenta. El instrumental por especialidad (35 al 41) solo cuenta si lo calificas.",
+      "Tocar otra vez la calificación elegida la quita. Cada punto guarda su fecha de verificación y notas.",
+    ],
   },
   rpbi: {
     titulo: "RPBI",
