@@ -1,6 +1,6 @@
 ﻿"use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import {
   describirBloque,
   evaluarCitaContraBloques,
@@ -577,6 +577,28 @@ export default function AgendaCitaDialog({
     onSave(citasAGuardar);
   };
 
+  // Que toda la ficha se vea sin desplazarse: si el contenido es más alto que la ventana, se reduce lo justo (sin pasar de 72 %,
+  // para que siga legible; más allá de eso queda el desplazamiento de siempre). En celular no se reduce nada.
+  const cajaRef = useRef<HTMLDivElement>(null);
+  const contenidoRef = useRef<HTMLDivElement>(null);
+  const ajustarAlto = () => {
+    const caja = cajaRef.current;
+    const contenido = contenidoRef.current;
+    if (!caja || !contenido) return;
+    contenido.style.zoom = "";
+    if (window.innerWidth < 640) return;
+    const estilo = getComputedStyle(caja);
+    const relleno = parseFloat(estilo.paddingTop) + parseFloat(estilo.paddingBottom) + parseFloat(estilo.borderTopWidth) + parseFloat(estilo.borderBottomWidth);
+    const disponible = window.innerHeight * 0.97 - relleno - 8; // el margen absorbe los redondeos que, si no, devuelven la barra
+    const natural = contenido.offsetHeight;
+    if (natural > disponible) contenido.style.zoom = String(Math.max(0.72, Math.floor((disponible / natural) * 100) / 100));
+  };
+  useLayoutEffect(ajustarAlto); // en cada pintura: la ficha cambia de alto al elegir estatus, paciente, avisos…
+  useEffect(() => {
+    window.addEventListener("resize", ajustarAlto);
+    return () => window.removeEventListener("resize", ajustarAlto);
+  }, []);
+
   return (
     <div
       className="fixed inset-0 z-50 flex items-center justify-center p-4"
@@ -598,12 +620,14 @@ export default function AgendaCitaDialog({
         ✕
       </button>
       <div
+        ref={cajaRef}
         className="max-h-[97vh] w-full max-w-6xl overflow-y-auto overscroll-contain rounded-2xl border-2 bg-modal-solid p-4 sm:px-6 sm:py-4"
         style={{
           borderColor: CITA_ESTATUS_HEX[estatus] ?? CITA_BORDE_NEUTRO,
           boxShadow: `var(--cita-aro), 0 0 var(--cita-brillo) ${statusAlpha(CITA_ESTATUS_HEX[estatus] ?? CITA_BORDE_NEUTRO, 0.65)}`,
         }}
       >
+        <div ref={contenidoRef}>
         <div className="mb-3 flex flex-col gap-3 sm:relative sm:flex-row sm:items-start sm:justify-between">
           <div>
             <h2 className="text-lg font-semibold text-ink">
@@ -991,11 +1015,13 @@ export default function AgendaCitaDialog({
           </div>
 
           {monedero && (
-            <div className="rounded-lg border border-success/30 bg-success/10 px-3 py-2 text-xs sm:col-span-2">
-              <p className="font-semibold uppercase tracking-wide text-ink/50">Monedero electrónico</p>
-              <p className="mt-0.5 text-sm font-semibold text-success">💰 {monedero.titulo}</p>
+            <div className="rounded-lg border border-success/30 bg-success/10 px-3 py-1.5 text-xs sm:col-span-2">
+              <p className="flex flex-wrap items-baseline gap-x-2">
+                <span className="font-semibold uppercase tracking-wide text-ink/50">Monedero electrónico</span>
+                <span className="text-sm font-semibold text-success">💰 {monedero.titulo}</span>
+              </p>
               {monedero.lineas.map((linea) => (
-                <p key={linea} className="mt-0.5 text-ink/60">
+                <p key={linea} className="text-ink/60">
                   {linea}
                 </p>
               ))}
@@ -1355,6 +1381,7 @@ export default function AgendaCitaDialog({
           >
             Guardar
           </button>
+        </div>
         </div>
       </div>
 
