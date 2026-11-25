@@ -834,7 +834,9 @@ export default function Procedimientos() {
                         }}
                         onDragEnd={terminarArrastre}
                         title="Arrástralo a la tarjeta de su rama para cambiarlo de lugar"
-                        className={`cursor-grab px-4 py-3 active:cursor-grabbing ${activo ? "" : "opacity-50"} ${arrastrandoId === p.id ? "opacity-40" : ""}`}
+                        // Mientras se arrastra, la fila se pliega y deja su lugar libre (sigue en el documento: si se quita, el navegador pierde el arrastre).
+                        style={arrastrandoId === p.id ? { height: 0, overflow: "hidden", padding: 0, opacity: 0 } : undefined}
+                        className={`cursor-grab px-4 py-3 active:cursor-grabbing ${activo ? "" : "opacity-50"}`}
                       >
                         <div className="grid grid-cols-[minmax(0,1fr)_120px_130px_100px_230px] items-center gap-3">
                           <span className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1 text-sm font-medium text-ink">
