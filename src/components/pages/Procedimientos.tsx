@@ -17,6 +17,11 @@ import {
   migrarEspecialidadesRenombradas,
   formatDuracion,
   esProcedimientoActivo,
+  RAMA_TODOS,
+  opcionesOrdenProcedimientos,
+  ordenarProcedimientos,
+  type OrdenProcedimientos,
+  type RamaCatalogo,
   type Procedimiento,
 } from "@/lib/procedimientos";
 import ConfirmarEliminar from "@/components/ConfirmarEliminar";
@@ -282,6 +287,7 @@ export default function Procedimientos() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [miRol]);
   const [ramaAbierta, setRamaAbierta] = useState<string | null>(null);
+  const [orden, setOrden] = useState<OrdenProcedimientos>("nombre-asc");
   // Arrastrar un tratamiento a la tarjeta de su rama: cuál se arrastra, sobre qué tarjeta va y el aviso al soltarlo.
   const [arrastrandoId, setArrastrandoId] = useState<string | null>(null);
   const idArrastrado = useRef<string | null>(null); // la lógica del arrastre lee esto; el estado solo pinta
@@ -362,8 +368,23 @@ export default function Procedimientos() {
   };
 
   const pendienteAjuste = ajustePendiente(configAjuste, ultimoAjuste, new Date());
-  const ramas = ramasDelCatalogo(procedimientos, ramasPropias);
-  const ramaActual = ramas.find((r) => r.nombre === ramaAbierta) ?? null;
+  const todasLasRamas = ramasDelCatalogo(procedimientos, ramasPropias);
+  // Las ramas de verdad (donde se puede soltar un tratamiento). Lo que no tiene rama no tiene tarjeta propia: se ve en «Todos los tratamientos».
+  const ramas = todasLasRamas.filter((r) => !r.sinClasificar);
+  const sinRama = todasLasRamas.find((r) => r.sinClasificar)?.procedimientos ?? [];
+  const preciosTodos = procedimientos.map((p) => p.costoPaciente).filter((c) => c > 0);
+  const ramaTodos: RamaCatalogo = {
+    nombre: RAMA_TODOS,
+    sinClasificar: false,
+    propia: false,
+    procedimientos,
+    desde: preciosTodos.length ? Math.min(...preciosTodos) : null,
+    hasta: preciosTodos.length ? Math.max(...preciosTodos) : null,
+  };
+  const tarjetas = [...ramas, ramaTodos];
+  const ramaActual = tarjetas.find((r) => r.nombre === ramaAbierta) ?? null;
+  const esTodos = ramaActual?.nombre === RAMA_TODOS;
+  const filasOrdenadas = ramaActual ? ordenarProcedimientos(ramaActual.procedimientos, orden) : [];
 
   const cerrarFormulariosDeRama = () => {
     setCreandoRama(false);
@@ -417,7 +438,7 @@ export default function Procedimientos() {
     setRamaAbierta(null);
     setAvisoMovido(
       cuantos > 0
-        ? `Quitaste la rama «${nombre}». ${cuantos === 1 ? "Su procedimiento pasó" : `Sus ${cuantos} procedimientos pasaron`} a Sin clasificar.`
+        ? `Quitaste la rama «${nombre}». ${cuantos === 1 ? "Su procedimiento quedó" : `Sus ${cuantos} procedimientos quedaron`} sin rama: lo${cuantos === 1 ? "" : "s"} ves en «${RAMA_TODOS}».`
         : `Quitaste la rama «${nombre}».`
     );
   };
@@ -665,10 +686,11 @@ export default function Procedimientos() {
           </p>
         )}
         <div className="grid grid-cols-2 gap-3 md:grid-cols-3 xl:grid-cols-4">
-          {ramas.map((r) => {
+          {tarjetas.map((r) => {
             const abierta = ramaAbierta === r.nombre;
             const vacia = r.procedimientos.length === 0;
-            const porUbicar = r.sinClasificar && !vacia;
+            const esTarjetaTodos = r.nombre === RAMA_TODOS;
+            const porUbicar = esTarjetaTodos ? sinRama.length : 0;
             return (
               // div con rol de botón (no <button>): Firefox no entrega los eventos de soltar sobre un <button>.
               <div
@@ -683,7 +705,7 @@ export default function Procedimientos() {
                     setRamaAbierta(abierta ? null : r.nombre);
                   }
                 }}
-                {...destinoRama(r.nombre)}
+                {...(esTarjetaTodos ? {} : destinoRama(r.nombre))}
                 className={`cursor-pointer rounded-2xl border border-l-4 p-4 text-left transition-colors hover:bg-surface2 ${
                   sobreRama === r.nombre ? "border-accent bg-accent/15 ring-2 ring-accent/60" : abierta ? "brillo-tarjeta border-accent/60 bg-surface2" : "brillo-tarjeta border-edge/10 bg-surface"
                 } border-l-accent ${vacia && !arrastrandoId ? "opacity-60" : ""}`}
@@ -695,9 +717,9 @@ export default function Procedimientos() {
                   </span>
                 </div>
                 <p className="mt-2 text-xs font-semibold uppercase tracking-wide text-ink/70">{r.nombre}</p>
-                {porUbicar ? (
+                {porUbicar > 0 ? (
                   <span className="mt-1 inline-block rounded-full bg-accent/15 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-accent">
-                    Por ubicar
+                    {porUbicar} por ubicar
                   </span>
                 ) : (
                   <p className="mt-1 text-[11px] text-ink/40">
@@ -769,14 +791,29 @@ export default function Procedimientos() {
                   </button>
                 </>
               )}
+              <label className="flex items-center gap-2 text-xs text-ink/60">
+                Ordenar por
+                <select
+                  value={orden}
+                  onChange={(e) => setOrden(e.target.value as OrdenProcedimientos)}
+                  aria-label="Ordenar los tratamientos"
+                  className="rounded-lg border border-edge/15 bg-field px-2 py-1.5 text-xs text-ink outline-none focus:border-accent/60"
+                >
+                  {opcionesOrdenProcedimientos.map((o) => (
+                    <option key={o.valor} value={o.valor}>
+                      {o.etiqueta}
+                    </option>
+                  ))}
+                </select>
+              </label>
               <button
                 onClick={() => {
-                  setEspecialidadNuevo(ramaActual.nombre);
+                  setEspecialidadNuevo(esTodos ? undefined : ramaActual.nombre);
                   setEditando("nuevo");
                 }}
                 className="rounded-lg border border-accent/40 px-3 py-1.5 text-xs font-semibold text-accent transition-colors hover:bg-accent/10"
               >
-                + Agregar a {ramaActual.nombre}
+                {esTodos ? "+ Agregar procedimiento" : `+ Agregar a ${ramaActual.nombre}`}
               </button>
             </div>
           </div>
@@ -823,7 +860,7 @@ export default function Procedimientos() {
               <p className="text-sm text-ink">
                 ¿Eliminar la rama «{ramaActual.nombre}»?{" "}
                 {ramaActual.procedimientos.length > 0
-                  ? `Sus ${ramaActual.procedimientos.length} procedimiento(s) no se borran: pasan a «Sin clasificar» para que los ubiques en otra rama.`
+                  ? `Sus ${ramaActual.procedimientos.length} procedimiento(s) no se borran: quedan sin rama y los ves en «${RAMA_TODOS}» para ubicarlos en otra.`
                   : "No tiene procedimientos."}
               </p>
               <div className="mt-3 flex flex-wrap gap-2">
@@ -841,15 +878,15 @@ export default function Procedimientos() {
               )}
             </div>
           )}
-          {ramaActual.sinClasificar && (
+          {esTodos && sinRama.length > 0 && (
             <p className="mb-2 text-xs text-ink/50">
-              Aquí llegan los procedimientos que todavía no tienen rama (por ejemplo, los de una lista de precios con grupos propios). Elige en «Ubicar en» a qué rama
-              pertenece cada uno y se pasa solo a su tarjeta.
+              {sinRama.length === 1 ? "1 tratamiento todavía no tiene rama" : `${sinRama.length} tratamientos todavía no tienen rama`} (por ejemplo, los de una lista de
+              precios con grupos propios). Elige en «Ubicar en» a qué rama pertenece cada uno y se pasa solo a su tarjeta.
             </p>
           )}
           {ramaActual.procedimientos.length === 0 ? (
             <div className="rounded-2xl border border-dashed border-edge/15 bg-surface p-8 text-center text-sm text-ink/40">
-              {ramaActual.sinClasificar ? "No hay nada por ubicar. Lo nuevo que no tenga rama llegará aquí." : "Esta rama todavía no tiene procedimientos."}
+              {esTodos ? "Todavía no hay tratamientos en el catálogo." : "Esta rama todavía no tiene procedimientos."}
             </div>
           ) : (
             <div className="overflow-x-auto rounded-2xl border border-edge/10 bg-surface">
@@ -862,8 +899,9 @@ export default function Procedimientos() {
                   <span className="text-right">Acción</span>
                 </div>
                 <div className="divide-y divide-edge/5">
-                  {ramaActual.procedimientos.map((p) => {
+                  {filasOrdenadas.map((p) => {
                     const activo = esProcedimientoActivo(p);
+                    const ramaDeP = esSinClasificar(p) ? null : especialidadVigente(p.especialidad);
                     const tieneGuia = Boolean(p.origenPlantillaId);
                     return (
                       <div
@@ -899,6 +937,11 @@ export default function Procedimientos() {
                                 {guiaAbiertaId === p.id ? "Ocultar guía ▴" : "Guía ▾"}
                               </button>
                             )}
+                            {esTodos && (
+                              <span className="basis-full text-[11px] font-normal text-ink/50">
+                                Rama: <span className={ramaDeP ? "text-ink/80" : "font-semibold text-accent"}>{ramaDeP ?? "Sin rama"}</span>
+                              </span>
+                            )}
                             {/* Alternativa al arrastre (celular, tableta o teclado): el mismo cambio de rama con un selector. */}
                             <label className="flex basis-full items-center gap-2 text-xs font-normal text-ink/60">
                               {esSinClasificar(p) ? "Ubicar en:" : "Mover a:"}
@@ -911,7 +954,7 @@ export default function Procedimientos() {
                               >
                                 <option value="">Elige la rama…</option>
                                 {ramas
-                                  .filter((r) => r.nombre !== ramaActual.nombre)
+                                  .filter((r) => r.nombre !== ramaDeP)
                                   .map((r) => (
                                     <option key={r.nombre} value={r.nombre}>
                                       {r.nombre}

@@ -99,6 +99,33 @@ export function formatDuracion(minutos: number): string {
  * que no son una especialidad): el dueño los acomoda después. */
 export const ESPECIALIDAD_SIN_CLASIFICAR = "Sin clasificar";
 
+/** La tarjeta que junta todos los tratamientos del catálogo (no es una rama: no se renombra ni recibe tratamientos arrastrados). */
+export const RAMA_TODOS = "Todos los tratamientos";
+
+export type OrdenProcedimientos = "nombre-asc" | "nombre-desc" | "precio-asc" | "precio-desc";
+
+export const opcionesOrdenProcedimientos: { valor: OrdenProcedimientos; etiqueta: string }[] = [
+  { valor: "nombre-asc", etiqueta: "Alfabético (A–Z)" },
+  { valor: "nombre-desc", etiqueta: "Alfabético (Z–A)" },
+  { valor: "precio-asc", etiqueta: "Precio: menor a mayor" },
+  { valor: "precio-desc", etiqueta: "Precio: mayor a menor" },
+];
+
+/** Una copia ordenada. Por precio se usa el costo al paciente; los que todavía no tienen precio ($0) van al final en ambos sentidos,
+ * y a igual precio se desempata por nombre. */
+export function ordenarProcedimientos(lista: Procedimiento[], orden: OrdenProcedimientos): Procedimiento[] {
+  const porNombre = (a: Procedimiento, b: Procedimiento) => a.nombre.localeCompare(b.nombre, "es", { sensitivity: "base" });
+  return [...lista].sort((a, b) => {
+    if (orden === "nombre-asc") return porNombre(a, b);
+    if (orden === "nombre-desc") return porNombre(b, a);
+    const sinA = !(a.costoPaciente > 0);
+    const sinB = !(b.costoPaciente > 0);
+    if (sinA !== sinB) return sinA ? 1 : -1;
+    const dif = orden === "precio-asc" ? a.costoPaciente - b.costoPaciente : b.costoPaciente - a.costoPaciente;
+    return dif !== 0 ? dif : porNombre(a, b);
+  });
+}
+
 export function esSinClasificar(p: Pick<Procedimiento, "especialidad">): boolean {
   const e = (p.especialidad ?? "").trim().toLowerCase();
   return e === "" || e === ESPECIALIDAD_SIN_CLASIFICAR.toLowerCase();
@@ -131,6 +158,7 @@ export function validarNombreRama(nombre: string, existentes: string[], actual?:
   if (!limpio) return "Escribe el nombre de la rama.";
   if (limpio.length > 60) return "El nombre es muy largo (máximo 60 letras).";
   if (claveRama(limpio) === claveRama(ESPECIALIDAD_SIN_CLASIFICAR)) return "«Sin clasificar» ya existe y no se puede repetir.";
+  if (claveRama(limpio) === claveRama(RAMA_TODOS)) return "«Todos los tratamientos» es la tarjeta que junta todo y no se puede usar como nombre de rama.";
   const choca = existentes.some((e) => claveRama(e) === claveRama(limpio) && !(actual && claveRama(actual) === claveRama(e)));
   return choca ? "Ya existe una rama con ese nombre." : null;
 }

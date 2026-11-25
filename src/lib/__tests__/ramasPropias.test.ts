@@ -4,6 +4,7 @@ import {
   especialidadesPredefinidas,
   migrarEspecialidadesRenombradas,
   normalizarNombreRama,
+  ordenarProcedimientos,
   quitarRama,
   ramasDelCatalogo,
   renombrarRama,
@@ -74,6 +75,31 @@ describe("ramas propias de la clínica", () => {
   it("quitar una rama pasa sus procedimientos a «Sin clasificar» sin perderlos", () => {
     const r = quitarRama([proc("a", "Prevención"), proc("b", "Ortodoncia")], "Prevención", "2026-11-24T00:00:00.000Z");
     expect(r.map((p) => p.especialidad)).toEqual([ESPECIALIDAD_SIN_CLASIFICAR, "Ortodoncia"]);
+  });
+});
+
+describe("«Todos los tratamientos» y el orden", () => {
+  const con = (id: string, nombre: string, precio: number): Procedimiento => ({ ...proc(id, "Endodoncia"), nombre, costoPaciente: precio });
+  const lista = [con("a", "Limpieza", 500), con("b", "Corona", 4500), con("c", "Ácido", 0), con("d", "Extracción", 500)];
+
+  it("alfabético en los dos sentidos, sin importar acentos", () => {
+    expect(ordenarProcedimientos(lista, "nombre-asc").map((p) => p.id)).toEqual(["c", "b", "d", "a"]);
+    expect(ordenarProcedimientos(lista, "nombre-desc").map((p) => p.id)).toEqual(["a", "d", "b", "c"]);
+  });
+
+  it("por precio: los que no tienen precio van al final en ambos sentidos y los empates se desempatan por nombre", () => {
+    expect(ordenarProcedimientos(lista, "precio-asc").map((p) => p.id)).toEqual(["d", "a", "b", "c"]);
+    expect(ordenarProcedimientos(lista, "precio-desc").map((p) => p.id)).toEqual(["b", "d", "a", "c"]);
+  });
+
+  it("no modifica la lista original", () => {
+    const copia = [...lista];
+    ordenarProcedimientos(lista, "precio-desc");
+    expect(lista).toEqual(copia);
+  });
+
+  it("«Todos los tratamientos» no se puede usar como nombre de rama", () => {
+    expect(validarNombreRama("todos los tratamientos", [])).toMatch(/no se puede usar/);
   });
 });
 

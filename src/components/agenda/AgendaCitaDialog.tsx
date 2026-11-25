@@ -598,13 +598,13 @@ export default function AgendaCitaDialog({
         ✕
       </button>
       <div
-        className="max-h-[90vh] w-full max-w-5xl overflow-y-auto overscroll-contain rounded-2xl border-2 bg-modal-solid p-4 sm:p-6"
+        className="max-h-[97vh] w-full max-w-6xl overflow-y-auto overscroll-contain rounded-2xl border-2 bg-modal-solid p-4 sm:px-6 sm:py-4"
         style={{
           borderColor: CITA_ESTATUS_HEX[estatus] ?? CITA_BORDE_NEUTRO,
           boxShadow: `var(--cita-aro), 0 0 var(--cita-brillo) ${statusAlpha(CITA_ESTATUS_HEX[estatus] ?? CITA_BORDE_NEUTRO, 0.65)}`,
         }}
       >
-        <div className="mb-4 flex flex-col gap-3 sm:relative sm:flex-row sm:items-center sm:justify-between">
+        <div className="mb-3 flex flex-col gap-3 sm:relative sm:flex-row sm:items-start sm:justify-between">
           <div>
             <h2 className="text-lg font-semibold text-ink">
               {isEditing ? "Editar Cita" : "Nueva Cita"}
@@ -692,7 +692,7 @@ export default function AgendaCitaDialog({
                     ? `Cita anterior: ${patients.find((p) => p.id === citaAnterior.patientId)?.name ?? citaAnterior.paciente} (${citaAnterior.horaInicio})`
                     : "No hay una cita anterior este día"
                 }
-                className="flex h-9 w-9 items-center justify-center rounded-full text-success transition-colors hover:bg-success/15 disabled:cursor-not-allowed disabled:opacity-30 disabled:hover:bg-transparent"
+                className="flex h-9 w-9 items-center justify-center rounded-full border-2 border-ink/40 bg-surface text-xl font-bold leading-none text-ink transition-colors hover:border-success hover:bg-success/20 disabled:cursor-not-allowed disabled:opacity-35 disabled:hover:border-ink/40 disabled:hover:bg-surface"
               >
                 ←
               </button>
@@ -705,7 +705,7 @@ export default function AgendaCitaDialog({
                     ? `Cita siguiente: ${patients.find((p) => p.id === citaSiguiente.patientId)?.name ?? citaSiguiente.paciente} (${citaSiguiente.horaInicio})`
                     : "No hay una cita siguiente este día"
                 }
-                className="flex h-9 w-9 items-center justify-center rounded-full text-success transition-colors hover:bg-success/15 disabled:cursor-not-allowed disabled:opacity-30 disabled:hover:bg-transparent"
+                className="flex h-9 w-9 items-center justify-center rounded-full border-2 border-ink/40 bg-surface text-xl font-bold leading-none text-ink transition-colors hover:border-success hover:bg-success/20 disabled:cursor-not-allowed disabled:opacity-35 disabled:hover:border-ink/40 disabled:hover:bg-surface"
               >
                 →
               </button>
@@ -717,18 +717,18 @@ export default function AgendaCitaDialog({
               onClick={() => patientId && irAExpediente(patientId)}
               disabled={!patientId}
               title={patientId ? "Ver expediente" : "Selecciona un paciente primero"}
-              className="flex h-11 w-11 items-center justify-center rounded-full text-success transition-colors hover:bg-success/15 disabled:cursor-not-allowed disabled:opacity-30 disabled:hover:bg-transparent"
+              className="flex h-10 w-10 items-center justify-center rounded-full border-2 border-ink/40 bg-surface text-ink transition-colors hover:border-success hover:bg-success/20 disabled:cursor-not-allowed disabled:opacity-35 disabled:hover:border-ink/40 disabled:hover:bg-surface"
             >
-              <IconExpediente size={22} />
+              <IconExpediente size={22} trazo={2.2} />
             </button>
             <button
               type="button"
               onClick={() => patientId && irAExpediente(patientId, "Notas de Evolución y Seguimiento", initial.id)}
               disabled={!patientId}
               title={patientId ? "Notas de evolución" : "Selecciona un paciente primero"}
-              className="flex h-11 w-11 items-center justify-center rounded-full text-success transition-colors hover:bg-success/15 disabled:cursor-not-allowed disabled:opacity-30 disabled:hover:bg-transparent"
+              className="flex h-10 w-10 items-center justify-center rounded-full border-2 border-ink/40 bg-surface text-ink transition-colors hover:border-success hover:bg-success/20 disabled:cursor-not-allowed disabled:opacity-35 disabled:hover:border-ink/40 disabled:hover:bg-surface"
             >
-              <IconNotas size={22} />
+              <IconNotas size={22} trazo={2.2} />
             </button>
             <button
               type="button"
@@ -739,22 +739,23 @@ export default function AgendaCitaDialog({
                   ? "Enviar confirmación de cita por WhatsApp"
                   : "Falta teléfono, paciente, fecha u hora para poder enviar"
               }
-              className="flex h-11 w-11 items-center justify-center rounded-full text-success transition-colors hover:bg-success/15 disabled:cursor-not-allowed disabled:opacity-30 disabled:hover:bg-transparent"
+              className="flex h-10 w-10 items-center justify-center rounded-full border-2 border-ink/40 bg-surface text-ink transition-colors hover:border-success hover:bg-success/20 disabled:cursor-not-allowed disabled:opacity-35 disabled:hover:border-ink/40 disabled:hover:bg-surface"
             >
-              <IconWhatsApp size={24} />
+              <IconWhatsApp size={24} trazo={1.8} />
             </button>
             <button
               type="button"
               onClick={() => patientId && setShowAgregarPago(true)}
               disabled={!patientId}
               title={patientId ? "Registrar pago" : "Selecciona un paciente primero"}
-              className="flex h-11 w-11 items-center justify-center rounded-full text-success transition-colors hover:bg-success/15 disabled:cursor-not-allowed disabled:opacity-30 disabled:hover:bg-transparent"
+              className="flex h-10 w-10 items-center justify-center rounded-full border-2 border-ink/40 bg-surface text-ink transition-colors hover:border-success hover:bg-success/20 disabled:cursor-not-allowed disabled:opacity-35 disabled:hover:border-ink/40 disabled:hover:bg-surface"
             >
-              <IconPago size={22} />
+              <IconPago size={22} trazo={2.4} />
             </button>
             <button
               onClick={onClose}
-              className="ml-1 flex h-7 w-7 items-center justify-center rounded-full text-ink/50 hover:bg-surface hover:text-ink"
+              title="Cerrar"
+              className="ml-1 flex h-10 w-10 items-center justify-center rounded-full border-2 border-ink/40 bg-surface text-base font-bold text-ink transition-colors hover:border-danger hover:bg-danger/15"
             >
               ✕
             </button>
@@ -775,9 +776,12 @@ export default function AgendaCitaDialog({
           />
         )}
 
-        <div className="space-y-4">
-          <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
-          <div>
+        {/* En pantallas anchas la ficha va en dos columnas para verse completa sin desplazarse: a la izquierda quién y qué,
+            a la derecha cuándo, cuánto y el seguimiento. */}
+        <div className="grid grid-cols-1 gap-x-6 gap-y-3 lg:grid-cols-2">
+        <div className="space-y-3">
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+          <div className="sm:col-span-2">
             <label className="mb-1 block text-xs font-medium text-ink/60">Paciente</label>
             {patientId ? (
               <div className="flex items-center justify-between rounded-lg border border-success/30 bg-success/10 px-3 py-2 text-sm">
@@ -881,7 +885,7 @@ export default function AgendaCitaDialog({
             </div>
           )}
 
-          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
           <div>
             <label className="mb-1 block text-xs font-medium text-ink/60">
               Tel. celular (WhatsApp)
@@ -971,8 +975,10 @@ export default function AgendaCitaDialog({
               </div>
             )}
           </div>
+        </div>
 
-          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+        <div className="space-y-3">
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
           <div>
             <label className="mb-1 block text-xs font-medium text-ink/60">Costo estimado (informativo: sale en el recordatorio de WhatsApp y no genera deuda)</label>
             <input
@@ -1249,6 +1255,7 @@ export default function AgendaCitaDialog({
             )}
           </div>
         </div>
+        </div>
 
         {medicoId && sedes.length > 0 && (
           <div className="mt-4 space-y-2 rounded-lg border border-edge/10 p-3 text-xs">
@@ -1326,7 +1333,7 @@ export default function AgendaCitaDialog({
           </div>
         )}
 
-        <div className="mt-6 flex flex-col gap-3 sm:flex-row">
+        <div className="mt-4 flex flex-col gap-3 sm:flex-row">
           {isEditing && onDelete && (
             <button
               onClick={() => setConfirmandoEliminarCita(true)}
