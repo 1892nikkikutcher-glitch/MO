@@ -648,7 +648,7 @@ export default function Procedimientos() {
                 }}
                 {...destinoRama(r.nombre)}
                 className={`cursor-pointer rounded-2xl border border-l-4 p-4 text-left transition-colors hover:bg-surface2 ${
-                  sobreRama === r.nombre ? "border-accent bg-accent/15 ring-2 ring-accent/60" : abierta ? "border-accent/60 bg-surface2" : "border-edge/10 bg-surface"
+                  sobreRama === r.nombre ? "border-accent bg-accent/15 ring-2 ring-accent/60" : abierta ? "brillo-tarjeta border-accent/60 bg-surface2" : "brillo-tarjeta border-edge/10 bg-surface"
                 } border-l-accent ${vacia && !arrastrandoId ? "opacity-60" : ""}`}
               >
                 <div className="flex items-start justify-between gap-2">
