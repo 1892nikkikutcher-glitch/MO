@@ -286,6 +286,10 @@ export default function Procedimientos() {
   const [arrastrandoId, setArrastrandoId] = useState<string | null>(null);
   const idArrastrado = useRef<string | null>(null); // la lógica del arrastre lee esto; el estado solo pinta
   const [sobreRama, setSobreRama] = useState<string | null>(null);
+  const [fantasma, setFantasma] = useState<{ x: number; y: number; nombre: string } | null>(null); // lo que sigue al puntero
+  const moverARamaRef = useRef<(id: string | null, rama: string) => void>(() => {});
+  const quitarEscuchas = useRef<(() => void) | null>(null);
+  useEffect(() => () => quitarEscuchas.current?.(), []);
   const [avisoMovido, setAvisoMovido] = useState("");
   useEffect(() => {
     if (!avisoMovido) return;
@@ -432,31 +436,64 @@ export default function Procedimientos() {
     setAvisoMovido(`«${p.nombre}» pasó a ${rama}.`);
   };
 
+  moverARamaRef.current = moverARama;
+
   const terminarArrastre = () => {
     idArrastrado.current = null;
     setArrastrandoId(null);
     setSobreRama(null);
+    setFantasma(null);
   };
 
-  /** Controladores para que algo sea destino de un tratamiento arrastrado (tarjetas y franja flotante). */
-  const destinoRama = (rama: string) => ({
-    onDragEnter: (e: React.DragEvent) => {
-      if (!idArrastrado.current) return;
-      e.preventDefault();
-    },
-    onDragOver: (e: React.DragEvent) => {
-      if (!idArrastrado.current) return;
-      e.preventDefault();
-      e.dataTransfer.dropEffect = "move";
-      setSobreRama((prev) => (prev === rama ? prev : rama));
-    },
-    onDragLeave: () => setSobreRama((prev) => (prev === rama ? null : prev)),
-    onDrop: (e: React.DragEvent) => {
-      e.preventDefault();
-      moverARama(idArrastrado.current ?? e.dataTransfer.getData("text/plain"), rama);
+  /** Marca algo como destino de un tratamiento arrastrado (tarjetas y franja flotante). */
+  const destinoRama = (rama: string) => ({ "data-destino-rama": rama });
+
+  /** Arrastre propio con el puntero (no el arrastre nativo del navegador, que en varios equipos no suelta bien): funciona con
+   * ratón desde cualquier punto de la fila y con el dedo desde el asa «⋮⋮». El destino es lo que haya bajo el puntero al soltar. */
+  const iniciarArrastre = (e: React.PointerEvent, p: Procedimiento, desdeAsa: boolean) => {
+    if (e.button !== 0) return;
+    if (!desdeAsa && e.pointerType === "touch") return; // con el dedo solo desde el asa, para no estorbar el desplazamiento
+    if (!desdeAsa && (e.target as HTMLElement).closest("button, select, input, textarea, a, label")) return;
+    quitarEscuchas.current?.();
+    if (e.pointerType !== "touch") e.preventDefault(); // evita seleccionar texto al arrastrar
+    const inicio = { x: e.clientX, y: e.clientY };
+    let activo = false;
+    const destinoEn = (x: number, y: number) =>
+      (document.elementFromPoint(x, y) as HTMLElement | null)?.closest("[data-destino-rama]")?.getAttribute("data-destino-rama") ?? null;
+    const mover = (ev: PointerEvent) => {
+      if (!activo) {
+        if (Math.hypot(ev.clientX - inicio.x, ev.clientY - inicio.y) < 6) return;
+        activo = true;
+        idArrastrado.current = p.id;
+        setArrastrandoId(p.id);
+        document.body.style.userSelect = "none";
+      }
+      setFantasma({ x: ev.clientX, y: ev.clientY, nombre: p.nombre });
+      const d = destinoEn(ev.clientX, ev.clientY);
+      setSobreRama((prev) => (prev === d ? prev : d));
+    };
+    const limpiar = () => {
+      window.removeEventListener("pointermove", mover);
+      window.removeEventListener("pointerup", soltar);
+      window.removeEventListener("pointercancel", cancelar);
+      document.body.style.userSelect = "";
+      quitarEscuchas.current = null;
+    };
+    const soltar = (ev: PointerEvent) => {
+      const destino = activo ? destinoEn(ev.clientX, ev.clientY) : null;
+      limpiar();
+      if (destino) moverARamaRef.current(p.id, destino);
       terminarArrastre();
-    },
-  });
+    };
+    const cancelar = () => {
+      limpiar();
+      terminarArrastre();
+    };
+    window.addEventListener("pointermove", mover);
+    window.addEventListener("pointerup", soltar);
+    window.addEventListener("pointercancel", cancelar);
+    quitarEscuchas.current = limpiar;
+  };
 
   return (
     <div className="space-y-6">
@@ -693,6 +730,15 @@ export default function Procedimientos() {
         </div>
       )}
 
+      {fantasma && (
+        <div
+          className="pointer-events-none fixed z-[60] max-w-[260px] truncate rounded-lg border border-accent/60 bg-modal-solid px-3 py-2 text-xs font-semibold text-ink shadow-2xl"
+          style={{ left: fantasma.x + 14, top: fantasma.y + 14 }}
+        >
+          {fantasma.nombre}
+        </div>
+      )}
+
       {ramaActual && (
         <div ref={panelRama} className="scroll-mt-4">
           <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
@@ -822,24 +868,23 @@ export default function Procedimientos() {
                     return (
                       <div
                         key={p.id}
-                        draggable
-                        onDragStart={(e) => {
-                          e.dataTransfer.setData("text/plain", p.id);
-                          e.dataTransfer.effectAllowed = "move";
-                          idArrastrado.current = p.id;
-                          // Se pinta en el siguiente ciclo: cambiar la pantalla dentro del dragstart puede cancelar el arrastre.
-                          setTimeout(() => {
-                            if (idArrastrado.current === p.id) setArrastrandoId(p.id);
-                          }, 0);
-                        }}
-                        onDragEnd={terminarArrastre}
+                        onPointerDown={(e) => iniciarArrastre(e, p, false)}
                         title="Arrástralo a la tarjeta de su rama para cambiarlo de lugar"
-                        // Mientras se arrastra, la fila se pliega y deja su lugar libre (sigue en el documento: si se quita, el navegador pierde el arrastre).
+                        // Mientras se arrastra, la fila se pliega y deja su lugar libre.
                         style={arrastrandoId === p.id ? { height: 0, overflow: "hidden", padding: 0, opacity: 0 } : undefined}
                         className={`cursor-grab px-4 py-3 active:cursor-grabbing ${activo ? "" : "opacity-50"}`}
                       >
                         <div className="grid grid-cols-[minmax(0,1fr)_120px_130px_100px_230px] items-center gap-3">
                           <span className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1 text-sm font-medium text-ink">
+                            {/* Asa para arrastrar con el dedo (con el ratón se arrastra desde cualquier punto de la fila). */}
+                            <span
+                              onPointerDown={(e) => iniciarArrastre(e, p, true)}
+                              style={{ touchAction: "none" }}
+                              className="cursor-grab select-none text-ink/30 hover:text-ink/60"
+                              aria-hidden="true"
+                            >
+                              ⋮⋮
+                            </span>
                             {p.nombre}
                             {!activo && (
                               <span className="rounded-full bg-ink/10 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-ink/40">
