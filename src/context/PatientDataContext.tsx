@@ -177,6 +177,7 @@ import type { ConfigAjustePrecios, RegistroAjustePrecios } from "@/lib/ajustePre
 import { catalogoRecomendado } from "@/lib/catalogoRecomendado";
 import { crearProcedimientoDesdeTemplate, idDesdeCodigo } from "@/lib/importarCatalogoRecomendado";
 import { catalogoInicial, type MedicamentoCatalogo } from "@/lib/medicamentos";
+import { migrarNombresGenericos } from "@/lib/nombresGenericos";
 import {
   plantillaInicial,
   conSeccionValoracionDientes,
@@ -1382,6 +1383,15 @@ export function PatientDataProvider({
     "medicamentos",
     catalogoInicial
   );
+  // Denominación genérica primero (LGS art. 226, RIS art. 31): pasa a los consultorios que ya tenían el catálogo con la marca
+  // adelante ("DALACIN C (Clindamicina)" → "CLINDAMICINA (Dalacin C)"). Solo el administrador puede escribir el catálogo;
+  // es idempotente (cuando ya no hay nada que cambiar, no escribe).
+  useEffect(() => {
+    if (rol !== "admin" || catalogoMedicamentos.length === 0) return;
+    const { catalogo, cambios } = migrarNombresGenericos(catalogoMedicamentos);
+    if (cambios > 0) setCatalogoMedicamentos(catalogo);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [rol, catalogoMedicamentos]);
 
   const [presupuestosPorPaciente, setPresupuestosPorPacienteState] = useState<
     Record<string, SavedBudget[]>
