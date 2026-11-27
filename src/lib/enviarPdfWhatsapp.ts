@@ -79,6 +79,8 @@ export async function enviarPdfPorWhatsapp({
 
   const telefonoLimpio = telefono?.replace(/\D/g, "");
   const destino = telefonoLimpio ? `/${telefonoLimpio}` : "/";
-  const waUrl = `https://wa.me${destino}?text=${encodeURIComponent(`${caption}\n\n(Adjunta el PDF que se acaba de descargar)`)}`;
+  // El mensaje va SOLO con lo que el paciente debe leer: la indicación de adjuntar el PDF es para quien envía y vive en el
+  // aviso de la app (AbrirWhatsAppPrompt), no en el texto que se manda.
+  const waUrl = `https://wa.me${destino}?text=${encodeURIComponent(caption)}`;
   return { requiereAbrirManualmente: true, waUrl };
 }

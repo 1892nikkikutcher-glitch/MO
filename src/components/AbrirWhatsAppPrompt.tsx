@@ -9,7 +9,7 @@
 export default function AbrirWhatsAppPrompt({ waUrl, onCerrar, mensaje }: { waUrl: string; onCerrar: () => void; mensaje?: string }) {
   return (
     <div className="fixed inset-x-0 bottom-24 z-50 mx-auto flex w-full max-w-md items-center gap-3 rounded-xl border border-success/40 bg-modal-solid px-4 py-3 shadow-[0_8px_30px_-10px_rgba(0,0,0,0.6)]">
-      <p className="flex-1 text-xs text-ink/70">{mensaje ?? "El PDF ya se descargó — ábrelo en WhatsApp para adjuntarlo."}</p>
+      <p className="flex-1 text-xs text-ink/70">{mensaje ?? "El PDF ya se descargó. Abre WhatsApp, pulsa «+» → Documento y adjúntalo (el mensaje ya va escrito). Ábrelo una sola vez: si lo abres de nuevo, el texto se repite."}</p>
       <a
         href={waUrl}
         target="_blank"
