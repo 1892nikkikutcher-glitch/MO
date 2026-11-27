@@ -179,10 +179,18 @@ export async function generarRecetaPdf(datos: DatosRecetaPdf): Promise<Blob> {
   doc.setFontSize(8);
   doc.text("Firma médico", pageWidth - marginX - 25, yFooter + 5, { align: "center" });
 
+  // Pie: dirección del consultorio y, debajo, su teléfono (el del médico; ver `telefonoPieReceta`).
+  const lineasPie: string[] = [];
   if (datos.perfilDoctor.direccionClinica) {
     doc.setFontSize(8);
-    const direccionLineas = doc.splitTextToSize(datos.perfilDoctor.direccionClinica, pageWidth - marginX * 2);
-    doc.text(direccionLineas, pageWidth / 2, pageHeight - 14, { align: "center" });
+    lineasPie.push(...doc.splitTextToSize(datos.perfilDoctor.direccionClinica, pageWidth - marginX * 2));
+  }
+  if (datos.identidadDoctor.telefono.trim()) lineasPie.push(`Tel. ${datos.identidadDoctor.telefono.trim()}`);
+  if (lineasPie.length > 0) {
+    doc.setFontSize(8);
+    // La última línea siempre queda a 10 mm del borde; si hay más, se suben para no salirse de la hoja.
+    const interlineado = 3.6;
+    doc.text(lineasPie, pageWidth / 2, pageHeight - 10 - (lineasPie.length - 1) * interlineado, { align: "center" });
   }
 
   return doc.output("blob");

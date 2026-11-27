@@ -244,8 +244,18 @@ function FormularioMedico({
         <Field label="Correo">
           <input type="email" value={form.correo} onChange={actualizar("correo")} className={inputClass} />
         </Field>
-        <Field label="Teléfono">
-          <input type="text" value={form.telefono} onChange={actualizar("telefono")} className={inputClass} />
+        <Field label="Teléfono del consultorio">
+          <input
+            type="tel"
+            value={form.telefono}
+            onChange={actualizar("telefono")}
+            placeholder="Ej. 722 123 4567"
+            className={inputClass}
+          />
+          <p className="mt-1 text-[11px] text-ink/40">
+            Se imprime al pie de cada receta de {medico.nombre}, debajo de la dirección. Si lo dejas vacío, se usa el teléfono general del
+            consultorio (Administración → Consultorio).
+          </p>
         </Field>
       </div>
 

@@ -105,12 +105,19 @@ export default function Recetas() {
     perfilDoctor,
     consumirSiguienteFolioReceta,
     renumerarFoliosRecetas,
+    clinicInfo,
     historiaClinicaPorPaciente,
     historiaClinicaTemplate,
     recetasLog,
     setRecetasLog,
   } = usePatientData();
   const medicos = recursos.filter((r) => r.tipo === "medico");
+  /** Identidad que se imprime en la receta de `nombreMedico`. El teléfono es el de SU consultorio; si todavía no lo
+   * capturó, se usa el del consultorio general (Administración → Consultorio) para que la receta nunca salga sin uno. */
+  const identidadParaReceta = (nombreMedico: string) => {
+    const identidad = identidadDoctorDe(nombreMedico, recursos);
+    return { ...identidad, telefono: identidad.telefono.trim() || clinicInfo?.telefono?.trim() || "" };
+  };
 
   const [patientId, setPatientId] = useState("");
   const [busquedaPaciente, setBusquedaPaciente] = useState("");
@@ -336,7 +343,7 @@ export default function Recetas() {
         alergias,
         medicamentos: medicamentosRecetados,
         notas,
-        identidadDoctor: identidadDoctorDe(medico, recursos),
+        identidadDoctor: identidadParaReceta(medico),
         perfilDoctor,
       });
       const resultado = await enviarPdfPorWhatsapp({
@@ -431,7 +438,7 @@ export default function Recetas() {
       alergias: receta.alergias,
       medicamentos: receta.medicamentos,
       notas: receta.notas,
-      identidadDoctor: identidadDoctorDe(receta.medico, recursos),
+      identidadDoctor: identidadParaReceta(receta.medico),
       perfilDoctor,
     })
       .then(async (blob) => {
@@ -467,7 +474,7 @@ export default function Recetas() {
       .finally(() => {
         if (accion === "whatsapp") setEnviandoWhatsApp(false);
       });
-  }, [recetaPorAbrir, recetasPorPaciente, recursos, perfilDoctor, patients]);
+  }, [recetaPorAbrir, recetasPorPaciente, recursos, perfilDoctor, patients, clinicInfo]);
 
   const recetasPrevias = patientId ? recetasPorPaciente[patientId] ?? [] : [];
 
@@ -871,7 +878,7 @@ export default function Recetas() {
 
       {/* Receta imprimible — formato tipo COPRISEM */}
       {patient && medicamentosRecetados.length > 0 && (() => {
-        const identidadDoctor = identidadDoctorDe(medico, recursos);
+        const identidadDoctor = identidadParaReceta(medico);
         return (
         <div className="hidden flex-col border-4 border-black bg-white p-8 text-black print:flex">
           <div className="flex items-start justify-between">
@@ -948,8 +955,11 @@ export default function Recetas() {
             </div>
           </div>
 
-          {perfilDoctor.direccionClinica && (
-            <p className="mt-8 text-center text-xs">{perfilDoctor.direccionClinica}</p>
+          {(perfilDoctor.direccionClinica || identidadDoctor.telefono) && (
+            <div className="mt-8 text-center text-xs">
+              {perfilDoctor.direccionClinica && <p>{perfilDoctor.direccionClinica}</p>}
+              {identidadDoctor.telefono && <p>Tel. {identidadDoctor.telefono}</p>}
+            </div>
           )}
         </div>
         );
