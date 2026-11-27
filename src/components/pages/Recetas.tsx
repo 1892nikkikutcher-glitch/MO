@@ -13,6 +13,7 @@ import { slugify } from "@/lib/textoNombre";
 import type { RecetaLogEntry } from "@/lib/recetasLog";
 import { foliosIrregulares } from "@/lib/recetasFolios";
 import { telefonoConsultorioDe } from "@/lib/telefonoConsultorio";
+import { requisitosFaltantesReceta } from "@/lib/requisitosReceta";
 import { coincideAlergia, condicionesSistemicasPositivas, esNegacionAlergia } from "@/lib/historiaClinica";
 
 const plantillasRecomendaciones = [
@@ -275,6 +276,14 @@ export default function Recetas() {
   };
 
   const puedeGuardar = Boolean(patientId) && medicamentosRecetados.length > 0;
+
+  // Lo que el Reglamento de Insumos (arts. 29 y 30) pide en la receta y todavía falta; se avisa, no se bloquea.
+  const requisitos = requisitosFaltantesReceta({
+    cedulaProfesional: identidadParaReceta(medico).cedulaProfesional,
+    domicilioConsultorio: perfilDoctor.direccionClinica,
+    telefono: identidadParaReceta(medico).telefono,
+    medicamentos: medicamentosRecetados,
+  });
 
   const nuevaReceta = () => {
     setPatientId("");
@@ -730,6 +739,20 @@ export default function Recetas() {
           la receta podría no caber en una sola hoja. Usa Imprimir y revisa la vista previa de tu
           navegador antes de entregarla.
         </AvisoNoCabeEnHoja>
+
+        {medicamentosRecetados.length > 0 && (requisitos.obligatorios.length > 0 || requisitos.recomendados.length > 0) && (
+          <div className="space-y-1 rounded-xl border border-warning/40 bg-warning/10 px-4 py-3 text-sm text-ink/80">
+            {requisitos.obligatorios.length > 0 && (
+              <p>
+                <span className="font-semibold">Para cumplir con COFEPRIS (Reglamento de Insumos, arts. 29 y 30) falta:</span>{" "}
+                {requisitos.obligatorios.join("; ")}.
+              </p>
+            )}
+            {requisitos.recomendados.length > 0 && (
+              <p className="text-ink/60">Recomendado: agrega {requisitos.recomendados.join("; ")}.</p>
+            )}
+          </div>
+        )}
 
         <div className="flex flex-wrap items-center gap-3">
           {!guardado && (
