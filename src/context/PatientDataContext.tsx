@@ -42,7 +42,7 @@ import {
   writeBatch,
   type Unsubscribe,
 } from "firebase/firestore";
-import { db } from "@/lib/firebase";
+import { auth, db } from "@/lib/firebase";
 import ConfirmarEliminar from "@/components/ConfirmarEliminar";
 import { confirmarHorarioPuro } from "@/lib/horarioAtencion";
 import {
@@ -100,7 +100,7 @@ import { asegurarMedicoAdministrador } from "@/lib/medicoAdministrador";
 import { estamparNuevos } from "@/lib/autoriaRegistros";
 import { aplicarMovimientosAPagos, controlesPorError, type PropuestaControl } from "@/lib/controlesPorError";
 import { construirFinanzasDesdePagos, type ResultadoRecalculo } from "@/lib/finanzasRecalculo";
-import { puedeEliminarConRol } from "@/lib/permisosRol";
+import { MENSAJE_ROL_SIN_PERMISO_ELIMINAR, puedeEliminarConRol } from "@/lib/permisosRol";
 import {
   archivarYEliminar,
   fijarEliminacionPermitida,
@@ -109,7 +109,7 @@ import {
   restaurarFotoDePapelera,
   type ResultadoRestauracion,
 } from "@/lib/papeleraFirestore";
-import { analizarRutaOrigen, type EntradaPapelera } from "@/lib/papelera";
+import { analizarRutaOrigen, construirEntradaPapelera, type EntradaPapelera } from "@/lib/papelera";
 import {
   aplicarEstatusConMotivo,
   estatusAdmiteMotivo,
@@ -800,6 +800,10 @@ type PatientDataContextValue = {
   reconciliarSaldoPendiente: (patientId: string) => void;
   /** Devuelve un registro de la Papelera a su lugar (ver Papelera.tsx). */
   restaurarDePapelera: (entrada: EntradaPapelera) => Promise<ResultadoRestauracion>;
+  /** Elimina un expediente: lo oculta de listas y buscadores y deja una copia en la Papelera para restaurarlo. NO destruye
+   * sus citas, pagos, presupuestos, notas ni fotos (la información clínica y financiera se conserva). Solo el administrador;
+   * se niega si el paciente tiene citas próximas por atender. */
+  eliminarPaciente: (patientId: string) => Promise<ResultadoRestauracion>;
   /** Recalcula los saldos de todos los pacientes desde sus datos reales. */
   recalcularSaldosPendientes: (
     onProgreso?: (hechos: number, total: number) => void
@@ -2286,6 +2290,40 @@ export function PatientDataProvider({
    * restauran con las mismas funciones que los dan de alta normalmente, usando
    * las listas REALES de Firestore del paciente (no el estado local, que puede
    * no tenerlo cargado), para que Finanzas, Saldos y Pendientes queden bien. */
+  const eliminarPaciente = async (patientId: string): Promise<ResultadoRestauracion> => {
+    if (!clinicUid) return { ok: false, mensaje: "No hay una clínica activa." };
+    if (!puedeEliminarConRol(rol)) return { ok: false, mensaje: MENSAJE_ROL_SIN_PERMISO_ELIMINAR };
+    const paciente = patients.find((p) => p.id === patientId);
+    if (!paciente) return { ok: false, mensaje: "No se encontró ese expediente." };
+    const hoy = toISODate(new Date());
+    const proximas = citas.filter(
+      (c) => c.patientId === patientId && c.fecha >= hoy && !["Cancelada", "Reagendada", "Atendida", "No Asistió"].includes(c.estatus)
+    ).length;
+    if (proximas > 0) {
+      return {
+        ok: false,
+        mensaje: `Este paciente tiene ${proximas} cita${proximas === 1 ? "" : "s"} próxima${proximas === 1 ? "" : "s"} en la agenda. Cancélala${proximas === 1 ? "" : "s"} o muévela${proximas === 1 ? "" : "s"} antes de eliminar el expediente.`,
+      };
+    }
+    const ahora = new Date();
+    const construida = construirEntradaPapelera({
+      ruta: `users/${clinicUid}/pacientes`,
+      item: { ...paciente } as unknown as { id: string } & Record<string, unknown>,
+      usuario: { uid: auth.currentUser?.uid ?? "", email: userEmail },
+      ahora,
+    });
+    if (!construida) return { ok: false, mensaje: "No se pudo preparar la copia para la Papelera." };
+    try {
+      // Primero la copia en la Papelera: sin ella no se oculta nada (nunca se pierde un expediente por un fallo a medias).
+      await setDoc(doc(db, `users/${clinicUid}/papelera`, construida.id), construida.entrada);
+    } catch (err) {
+      console.error("No se pudo guardar el expediente en la Papelera", err);
+      return { ok: false, mensaje: "No se pudo guardar la copia en la Papelera, así que el expediente no se eliminó. Revisa tu conexión o avisa al administrador." };
+    }
+    setPatients((prev) => prev.map((p) => (p.id === patientId ? { ...p, eliminadoEl: ahora.toISOString(), eliminadoPorEmail: userEmail } : p)));
+    return { ok: true, mensaje: "Expediente eliminado. Se puede restaurar desde la Papelera." };
+  };
+
   const restaurarDePapelera = async (entrada: EntradaPapelera): Promise<ResultadoRestauracion> => {
     if (!clinicUid) return { ok: false, mensaje: "No hay una clínica activa." };
     const origen = analizarRutaOrigen(entrada.rutaOrigen);
@@ -2350,6 +2388,26 @@ export function PatientDataProvider({
           await setDoc(refItem, nuevo);
           aplicarCambiosLaboratorios(pid, prevArr, [nuevo, ...prevArr]);
           r = ok;
+        }
+      } else if (!pid && entrada.tipo === "pacientes") {
+        // El expediente nunca se borró: solo se ocultó. Restaurar es quitarle la marca (con todo lo suyo intacto).
+        const existente = patients.find((p) => p.id === entrada.docId);
+        if (existente && !existente.eliminadoEl) {
+          r = { ok: false, mensaje: "Este expediente ya está activo." };
+        } else if (existente) {
+          setPatients((prev) =>
+            prev.map((p) => {
+              if (p.id !== entrada.docId) return p;
+              const { eliminadoEl: _eliminadoEl, eliminadoPorEmail: _eliminadoPor, ...resto } = p;
+              void _eliminadoEl;
+              void _eliminadoPor;
+              return resto;
+            })
+          );
+          r = { ok: true, mensaje: "El expediente volvió a la lista de pacientes." };
+        } else {
+          // Expediente con documento borrado de verdad (versiones anteriores): se vuelve a escribir tal cual.
+          r = await restaurarDocumentoDePapelera(entrada);
         }
       } else if (pid && entrada.tipo === "recetas") {
         r = await restaurarDocumentoDePapelera(entrada);
@@ -3321,7 +3379,7 @@ export function PatientDataProvider({
         // se borra, pero tampoco debe volver a aparecer en ningún buscador o
         // listado — filtrarlo aquí, en el único punto de exposición, evita
         // tener que tocar cada componente que use `patients` uno por uno.
-        patients: patients.filter((p) => !p.fusionadoEnId),
+        patients: patients.filter((p) => !p.fusionadoEnId && !p.eliminadoEl),
         addPatient,
         updatePatient,
         importarPacientes,
@@ -3367,6 +3425,7 @@ export function PatientDataProvider({
         aplicarFinanzasRecalculadas,
         corregirControlPorError,
         restaurarDePapelera,
+        eliminarPaciente,
         agregarFirmaRecepcionDevolucion,
         comparativasPorPaciente,
         setComparativasPaciente,

@@ -1763,7 +1763,7 @@ export default function Expediente({
             />
           )}
           {activeTab === "Datos del Paciente" && (
-            <DatosPaciente patient={patient} formatDate={formatDate} />
+            <DatosPaciente patient={patient} formatDate={formatDate} onEliminado={onBack} />
           )}
           {activeTab === "Flujo de Formatos" && (
             <FlujoFormatos

@@ -170,7 +170,11 @@ const tiposPapelera: Record<string, DefinicionTipo> = {
   },
 
   // Expediente del paciente
-  pacientes: { singular: "Paciente", grupo: "expediente" },
+  pacientes: {
+    singular: "Expediente de paciente",
+    grupo: "expediente",
+    etiqueta: (d) => unir(texto(d.name) || "Paciente sin nombre", texto(d.phone)),
+  },
   presupuestos: {
     singular: "Presupuesto",
     grupo: "expediente",

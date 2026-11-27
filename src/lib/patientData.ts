@@ -81,6 +81,12 @@ export type Patient = {
   fusionadoEnId?: string;
   /** ISO datetime — cuándo se fusionó. */
   fusionadoEn?: string;
+  /** Presente solo si el administrador eliminó este expediente (botón "Eliminar expediente" en Datos del Paciente).
+   * Igual que con la fusión, el documento y todo lo suyo (citas, pagos, presupuestos, notas, fotos) se CONSERVA —
+   * la información clínica y financiera no se destruye— y solo se oculta de listas y buscadores. Una copia queda en
+   * la Papelera, desde donde se restaura. ISO datetime. */
+  eliminadoEl?: string;
+  eliminadoPorEmail?: string;
 
   /** Marcas a mano del "Flujo de formatos" del expediente (ver lib/flujoFormatos.ts):
    * clave del formato → fecha ISO en que se realizó, o "na" si no aplica a este paciente. */

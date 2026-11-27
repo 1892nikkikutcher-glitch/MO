@@ -62,11 +62,33 @@ function CardShell({ title, children }: { title: string; children: React.ReactNo
 export default function DatosPaciente({
   patient,
   formatDate,
+  onEliminado,
 }: {
   patient: Patient;
   formatDate: (date: string) => string;
+  /** Se llama cuando el expediente se eliminó (la pantalla debe salir de él). */
+  onEliminado?: () => void;
 }) {
-  const { updatePatient, setCambiosSinGuardar, citas } = usePatientData();
+  const { updatePatient, setCambiosSinGuardar, citas, puedeEliminar, eliminarPaciente } = usePatientData();
+  const [eliminando, setEliminando] = useState(false);
+
+  const eliminarExpediente = async () => {
+    const confirmado = window.confirm(
+      `¿Eliminar el expediente de ${patient.name}?\n\n` +
+        "Desaparece de la lista de pacientes y de los buscadores. Sus citas pasadas, pagos, presupuestos, notas y fotografías " +
+        "NO se destruyen: se conservan y una copia queda en la Papelera, desde donde puedes restaurarlo cuando quieras."
+    );
+    if (!confirmado) return;
+    setEliminando(true);
+    const r = await eliminarPaciente(patient.id);
+    setEliminando(false);
+    if (!r.ok) {
+      window.alert(r.mensaje);
+      return;
+    }
+    setCambiosSinGuardar(null);
+    onEliminado?.();
+  };
 
   const [nombreCompleto, setNombreCompleto] = useState(patient.name);
   const [birthDate, setBirthDate] = useState(patient.birthDate ?? "");
@@ -732,6 +754,16 @@ export default function DatosPaciente({
         >
           Guardar Cambios
         </button>
+        {puedeEliminar && (
+          <button
+            onClick={eliminarExpediente}
+            disabled={eliminando}
+            title="Quita el expediente de la lista de pacientes; queda una copia en la Papelera para restaurarlo"
+            className="rounded-lg border border-danger/50 px-5 py-2.5 text-sm font-semibold text-danger transition-colors hover:bg-danger/10 disabled:cursor-not-allowed disabled:opacity-50"
+          >
+            {eliminando ? "Eliminando…" : "Eliminar expediente"}
+          </button>
+        )}
         {saved && <span className="text-sm text-success">Cambios guardados</span>}
       </div>
     </div>
