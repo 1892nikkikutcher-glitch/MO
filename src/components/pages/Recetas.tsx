@@ -142,7 +142,8 @@ export default function Recetas() {
   const [waUrlPendiente, setWaUrlPendiente] = useState<string | null>(null);
   // "Ver receta" de la bitácora: se abre la pestaña en el clic (para que no la bloquee el navegador),
   // se cargan las recetas del paciente si hacía falta y, cuando están, se genera el PDF y se muestra.
-  const [recetaPorAbrir, setRecetaPorAbrir] = useState<Pick<RecetaLogEntry, "id" | "patientId" | "patientName" | "folio"> | null>(null);
+  // `accion` distingue entre abrir el PDF en pantalla y mandarlo por WhatsApp.
+  const [recetaPorAbrir, setRecetaPorAbrir] = useState<(Pick<RecetaLogEntry, "id" | "patientId" | "patientName" | "folio"> & { accion: "ver" | "whatsapp" }) | null>(null);
   const ventanaVerRef = useRef<Window | null>(null);
   const [busquedaBitacora, setBusquedaBitacora] = useState("");
 
@@ -354,11 +355,11 @@ export default function Recetas() {
     }
   };
 
-  const verReceta = (entrada: Pick<RecetaLogEntry, "id" | "patientId" | "patientName" | "folio">) => {
-    if (recetaPorAbrir) return;
+  const verReceta = (entrada: Pick<RecetaLogEntry, "id" | "patientId" | "patientName" | "folio">, accion: "ver" | "whatsapp" = "ver") => {
+    if (recetaPorAbrir || enviandoWhatsApp) return;
     ventanaVerRef.current = window.open("", "_blank");
     cargarDatosPaciente(entrada.patientId);
-    setRecetaPorAbrir(entrada);
+    setRecetaPorAbrir({ ...entrada, accion });
   };
 
   useEffect(() => {
@@ -382,6 +383,8 @@ export default function Recetas() {
     }
     const ventana = ventanaVerRef.current;
     ventanaVerRef.current = null;
+    const { accion, patientId: idPaciente, patientName: nombrePaciente } = recetaPorAbrir;
+    if (accion === "whatsapp") setEnviandoWhatsApp(true);
     setRecetaPorAbrir(null);
     generarRecetaPdf({
       folio: receta.folio,
@@ -402,7 +405,19 @@ export default function Recetas() {
       identidadDoctor: identidadDoctorDe(receta.medico, recursos),
       perfilDoctor,
     })
-      .then((blob) => {
+      .then(async (blob) => {
+        if (accion === "whatsapp") {
+          const telefono = patients.find((p) => p.id === idPaciente)?.phone;
+          const resultado = await enviarPdfPorWhatsapp({
+            blob,
+            nombreArchivo: `Receta_${slugify(nombrePaciente)}_folio-${receta.folio}.pdf`,
+            telefono,
+            caption: `Receta médica — ${nombrePaciente} · Folio ${receta.folio} · ${receta.fecha} ${receta.hora}`,
+            ventanaPrevia: ventana,
+          });
+          if (resultado.requiereAbrirManualmente) setWaUrlPendiente(resultado.waUrl);
+          return;
+        }
         const url = URL.createObjectURL(blob);
         if (ventana && !ventana.closed) {
           ventana.location.href = url;
@@ -410,7 +425,7 @@ export default function Recetas() {
           // El navegador no dejó abrir la pestaña: se descarga el PDF.
           const enlace = document.createElement("a");
           enlace.href = url;
-          enlace.download = `Receta_${slugify(recetaPorAbrir.patientName)}_folio-${receta.folio}.pdf`;
+          enlace.download = `Receta_${slugify(nombrePaciente)}_folio-${receta.folio}.pdf`;
           enlace.click();
         }
         setTimeout(() => URL.revokeObjectURL(url), 120000);
@@ -419,8 +434,11 @@ export default function Recetas() {
         ventana?.close();
         console.error("No se pudo abrir la receta", err);
         alert(`No se pudo generar el PDF de la receta${err instanceof Error && err.message ? ` (${err.message})` : ""}.`);
+      })
+      .finally(() => {
+        if (accion === "whatsapp") setEnviandoWhatsApp(false);
       });
-  }, [recetaPorAbrir, recetasPorPaciente, recursos, perfilDoctor]);
+  }, [recetaPorAbrir, recetasPorPaciente, recursos, perfilDoctor, patients]);
 
   const recetasPrevias = patientId ? recetasPorPaciente[patientId] ?? [] : [];
 
@@ -694,14 +712,24 @@ export default function Recetas() {
                   </p>
                   <p className="mt-1 text-ink/70">{r.medicamentos.map((m) => m.nombre).join(", ")}</p>
                 </div>
-                <button
-                  onClick={() => verReceta({ id: r.id, patientId, patientName: patient?.name ?? "", folio: r.folio })}
-                  disabled={recetaPorAbrir?.id === r.id}
-                  title="Abrir la receta en PDF en una pestaña nueva"
-                  className="shrink-0 whitespace-nowrap rounded-full border border-accent/30 px-3 py-1 text-xs font-semibold text-accent transition-colors hover:border-accent/70 hover:bg-accent/10 disabled:opacity-50"
-                >
-                  {recetaPorAbrir?.id === r.id ? "Abriendo…" : "Ver receta"}
-                </button>
+                <div className="flex shrink-0 flex-wrap items-center justify-end gap-2">
+                  <button
+                    onClick={() => verReceta({ id: r.id, patientId, patientName: patient?.name ?? "", folio: r.folio })}
+                    disabled={recetaPorAbrir?.id === r.id}
+                    title="Abrir la receta en PDF en una pestaña nueva"
+                    className="whitespace-nowrap rounded-full border border-accent/30 px-3 py-1 text-xs font-semibold text-accent transition-colors hover:border-accent/70 hover:bg-accent/10 disabled:opacity-50"
+                  >
+                    {recetaPorAbrir?.id === r.id && recetaPorAbrir.accion === "ver" ? "Abriendo…" : "Ver receta"}
+                  </button>
+                  <button
+                    onClick={() => verReceta({ id: r.id, patientId, patientName: patient?.name ?? "", folio: r.folio }, "whatsapp")}
+                    disabled={recetaPorAbrir?.id === r.id || enviandoWhatsApp}
+                    title="Enviar esta receta en PDF por WhatsApp"
+                    className="whitespace-nowrap rounded-full border border-success/30 px-3 py-1 text-xs font-semibold text-success transition-colors hover:border-success/70 hover:bg-success/10 disabled:opacity-50"
+                  >
+                    {recetaPorAbrir?.id === r.id && recetaPorAbrir.accion === "whatsapp" ? "Preparando…" : "Enviar por WhatsApp"}
+                  </button>
+                </div>
               </div>
             ))}
           </div>
@@ -770,7 +798,15 @@ export default function Recetas() {
                         title="Abrir la receta en PDF en una pestaña nueva"
                         className="whitespace-nowrap rounded-full border border-accent/30 px-3 py-1 text-xs font-semibold text-accent transition-colors hover:border-accent/70 hover:bg-accent/10 disabled:opacity-50"
                       >
-                        {recetaPorAbrir?.id === r.id ? "Abriendo…" : "Ver receta"}
+                        {recetaPorAbrir?.id === r.id && recetaPorAbrir.accion === "ver" ? "Abriendo…" : "Ver receta"}
+                      </button>
+                      <button
+                        onClick={() => verReceta(r, "whatsapp")}
+                        disabled={recetaPorAbrir?.id === r.id || enviandoWhatsApp}
+                        title="Enviar esta receta en PDF por WhatsApp"
+                        className="whitespace-nowrap rounded-full border border-success/30 px-3 py-1 text-xs font-semibold text-success transition-colors hover:border-success/70 hover:bg-success/10 disabled:opacity-50"
+                      >
+                        {recetaPorAbrir?.id === r.id && recetaPorAbrir.accion === "whatsapp" ? "Preparando…" : "Enviar por WhatsApp"}
                       </button>
                       <button
                         onClick={() => setRecetasLog((prev) => prev.filter((x) => x.id !== r.id))}
