@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import EstrellasPaciente from "@/components/EstrellasPaciente";
 import Expediente from "./Expediente";
 import FusionarExpedientesDialog from "./FusionarExpedientesDialog";
+import { textoConfirmarEliminarExpediente } from "@/lib/eliminarExpediente";
 import { usePatientData } from "@/context/PatientDataContext";
 import { coincidePaciente, formatEdad, type Patient } from "@/lib/patientData";
 import { exportarCsv } from "@/lib/exportCsv";
@@ -295,6 +296,20 @@ function coincideTelefono(busqueda: string, phone: string): boolean {
   return phone.replace(/\D/g, "").includes(digitos);
 }
 
+function PapeleraIcon() {
+  return (
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" aria-hidden>
+      <path
+        d="M4 7h16M10 11v6M14 11v6M6 7l1 12a1 1 0 0 0 1 1h8a1 1 0 0 0 1-1l1-12M9 7V4h6v3"
+        stroke="currentColor"
+        strokeWidth="1.8"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+    </svg>
+  );
+}
+
 function ExpedienteIcon() {
   return (
     <svg width="18" height="18" viewBox="0 0 24 24" fill="none">
@@ -365,8 +380,26 @@ function CeldasUltimaConsulta({
 }
 
 export default function Pacientes() {
-  const { patients, citas, clinicInfo, addPatient, importarPacientes, navegacionExpediente, consumirNavegacionExpediente } =
+  const { patients, citas, clinicInfo, addPatient, importarPacientes, navegacionExpediente, consumirNavegacionExpediente, puedeEliminar, eliminarPaciente } =
     usePatientData();
+  const [eliminandoId, setEliminandoId] = useState<string | null>(null);
+  const eliminarDeLaLista = async (p: Patient) => {
+    if (!window.confirm(textoConfirmarEliminarExpediente(p.name))) return;
+    setEliminandoId(p.id);
+    const r = await eliminarPaciente(p.id);
+    setEliminandoId(null);
+    if (!r.ok) {
+      window.alert(r.mensaje);
+      return;
+    }
+    // Si estaba marcado para fusionar, ya no existe en la lista: se desmarca.
+    setSeleccionadosParaFusionar((prev) => {
+      if (!prev.has(p.id)) return prev;
+      const siguiente = new Set(prev);
+      siguiente.delete(p.id);
+      return siguiente;
+    });
+  };
   // Citas agrupadas por paciente una sola vez, para las estrellas de cada renglón.
   const citasPorPaciente = useMemo(() => {
     const mapa = new Map<string, typeof citas>();
@@ -535,14 +568,30 @@ export default function Pacientes() {
             <option value="edad">Edad (menor a mayor)</option>
             <option value="ausencia">Más tiempo sin venir primero</option>
           </select>
-          {seleccionadosParaFusionar.size === 2 && (
-            <button
-              onClick={() => setMostrarFusionar(true)}
-              title="Une los dos expedientes marcados en uno solo — para cuando el mismo paciente quedó duplicado por error"
-              className="rounded-lg border border-warning/40 bg-warning/10 px-4 py-2.5 text-sm font-semibold text-warning transition-colors hover:bg-warning/20"
-            >
-              Fusionar Expedientes
-            </button>
+          {seleccionadosParaFusionar.size > 0 && (
+            <div className="flex items-center gap-2">
+              <button
+                onClick={() => setMostrarFusionar(true)}
+                disabled={seleccionadosParaFusionar.size !== 2}
+                title="Une los dos expedientes marcados en uno solo — para cuando el mismo paciente quedó duplicado por error"
+                className="rounded-lg border border-warning/40 bg-warning/10 px-4 py-2.5 text-sm font-semibold text-warning transition-colors hover:bg-warning/20 disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                Fusionar Expedientes
+              </button>
+              <span className="text-xs text-ink/50">
+                {seleccionadosParaFusionar.size === 1
+                  ? "Marca otro expediente (casilla a la izquierda) para fusionarlos."
+                  : seleccionadosParaFusionar.size === 2
+                    ? "Listo: 2 marcados."
+                    : "Marca solo dos expedientes."}
+              </span>
+              <button
+                onClick={() => setSeleccionadosParaFusionar(new Set())}
+                className="text-xs font-medium text-ink/50 underline hover:text-ink"
+              >
+                Quitar marcas
+              </button>
+            </div>
           )}
           <button
             onClick={exportarPacientes}
@@ -616,6 +665,7 @@ export default function Pacientes() {
             <th className="px-6 py-4 font-medium">Última consulta</th>
             <th className="px-6 py-4 font-medium">WhatsApp</th>
             <th className="px-6 py-4 text-right font-medium">Expediente</th>
+            {puedeEliminar && <th className="w-12 px-3 py-4" />}
           </tr>
         </thead>
         <tbody>
@@ -669,6 +719,19 @@ export default function Pacientes() {
                   <ExpedienteIcon />
                 </button>
               </td>
+              {puedeEliminar && (
+                <td className="px-3 py-4 text-right">
+                  <button
+                    onClick={() => eliminarDeLaLista(p)}
+                    disabled={eliminandoId === p.id}
+                    title="Eliminar expediente (queda una copia en la Papelera)"
+                    aria-label={`Eliminar el expediente de ${p.name}`}
+                    className="inline-flex h-9 w-9 items-center justify-center rounded-lg text-danger/60 transition-colors hover:bg-danger/10 hover:text-danger disabled:opacity-40"
+                  >
+                    <PapeleraIcon />
+                  </button>
+                </td>
+              )}
             </tr>
           ))}
         </tbody>

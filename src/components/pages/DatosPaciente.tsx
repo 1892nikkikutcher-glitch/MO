@@ -7,6 +7,7 @@ import { calcularEdadDetallada, formatEdad, type Patient } from "@/lib/patientDa
 import { manejarCambioNombre } from "@/lib/textoNombre";
 import { sugerirNivelSocioeconomico } from "@/lib/nivelSocioeconomico";
 import { usePatientData } from "@/context/PatientDataContext";
+import { textoConfirmarEliminarExpediente } from "@/lib/eliminarExpediente";
 
 const sexoOptions = ["Femenino", "Masculino", "Otro"];
 const estadoCivilOptions = ["Soltero(a)", "Casado(a)", "Unión libre", "Divorciado(a)", "Viudo(a)"];
@@ -73,11 +74,7 @@ export default function DatosPaciente({
   const [eliminando, setEliminando] = useState(false);
 
   const eliminarExpediente = async () => {
-    const confirmado = window.confirm(
-      `¿Eliminar el expediente de ${patient.name}?\n\n` +
-        "Desaparece de la lista de pacientes y de los buscadores. Sus citas pasadas, pagos, presupuestos, notas y fotografías " +
-        "NO se destruyen: se conservan y una copia queda en la Papelera, desde donde puedes restaurarlo cuando quieras."
-    );
+    const confirmado = window.confirm(textoConfirmarEliminarExpediente(patient.name));
     if (!confirmado) return;
     setEliminando(true);
     const r = await eliminarPaciente(patient.id);
