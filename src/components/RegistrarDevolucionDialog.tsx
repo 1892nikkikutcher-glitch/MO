@@ -12,7 +12,7 @@ import {
 } from "@/lib/devolucionesPago";
 import { subirFirmaRecepcionDevolucion, dataUrlABlob } from "@/lib/firmaRecepcionDevolucion";
 import { generarComprobanteDevolucionPdf } from "@/lib/generarComprobanteDevolucionPdf";
-import { enviarPdfPorWhatsapp } from "@/lib/enviarPdfWhatsapp";
+import { abrirVentanaPreviaWhatsapp, enviarPdfPorWhatsapp } from "@/lib/enviarPdfWhatsapp";
 import AbrirWhatsAppPrompt from "@/components/AbrirWhatsAppPrompt";
 import { manejarCambioNombre, slugify } from "@/lib/textoNombre";
 import {
@@ -216,7 +216,7 @@ export default function RegistrarDevolucionDialog({
     if (!devolucionCompletada || !pago) return;
     setGenerandoPdf(true);
     setErrorPdf("");
-    const ventanaWhatsApp = accion === "whatsapp" ? window.open("", "_blank") : null;
+    const ventanaWhatsApp = accion === "whatsapp" ? abrirVentanaPreviaWhatsapp() : null;
     try {
       const blob = await generarComprobanteDevolucionPdf({
         devolucion: devolucionCompletada,

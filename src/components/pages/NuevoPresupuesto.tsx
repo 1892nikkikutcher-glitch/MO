@@ -14,7 +14,7 @@ import {
   type Procedimiento,
 } from "@/lib/procedimientos";
 import { generarPresupuestoPdf } from "@/lib/generarPresupuestoPdf";
-import { enviarPdfPorWhatsapp } from "@/lib/enviarPdfWhatsapp";
+import { abrirVentanaPreviaWhatsapp, enviarPdfPorWhatsapp } from "@/lib/enviarPdfWhatsapp";
 import AbrirWhatsAppPrompt from "@/components/AbrirWhatsAppPrompt";
 import AvisoNoCabeEnHoja from "@/components/AvisoNoCabeEnHoja";
 import { normalizarTexto } from "@/lib/reportes";
@@ -479,7 +479,7 @@ export default function NuevoPresupuesto({
 
   const handleEnviarWhatsApp = async () => {
     if (enviandoWhatsApp) return;
-    const ventanaWhatsApp = window.open("", "_blank");
+    const ventanaWhatsApp = abrirVentanaPreviaWhatsapp();
     const nombreArchivo = `Presupuesto_${slugify(patientName)}_${slugify(fecha)}.pdf`;
     const caption = `Plan de tratamiento — ${patientName} · Folio ${folio} · Total ${formatCurrency(total)}`;
 

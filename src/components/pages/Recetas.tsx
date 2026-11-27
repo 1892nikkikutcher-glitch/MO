@@ -6,7 +6,7 @@ import { usePatientData } from "@/context/PatientDataContext";
 import { formatNombreConEdad, identidadDoctorDe, type MedicamentoRecetado, type Receta } from "@/lib/patientData";
 import { calcularDosisPediatrica, type MedicamentoCatalogo } from "@/lib/medicamentos";
 import { generarRecetaPdf } from "@/lib/generarRecetaPdf";
-import { enviarPdfPorWhatsapp } from "@/lib/enviarPdfWhatsapp";
+import { abrirVentanaPreviaWhatsapp, enviarPdfPorWhatsapp } from "@/lib/enviarPdfWhatsapp";
 import AbrirWhatsAppPrompt from "@/components/AbrirWhatsAppPrompt";
 import AvisoNoCabeEnHoja from "@/components/AvisoNoCabeEnHoja";
 import { slugify } from "@/lib/textoNombre";
@@ -359,7 +359,7 @@ export default function Recetas() {
     // Se abre la pestaña de inmediato, de forma síncrona dentro del clic, porque
     // window.open() después de esperar la generación del PDF pierde el gesto de
     // usuario y el navegador lo bloquea como pop-up. Se navega una vez listo el PDF.
-    const ventanaWhatsApp = window.open("", "_blank");
+    const ventanaWhatsApp = abrirVentanaPreviaWhatsapp();
     const guardada = handleGuardar();
     if (!guardada) {
       ventanaWhatsApp?.close();
@@ -437,7 +437,8 @@ export default function Recetas() {
 
   const verReceta = (entrada: Pick<RecetaLogEntry, "id" | "patientId" | "patientName" | "folio">, accion: "ver" | "whatsapp" = "ver") => {
     if (recetaPorAbrir || enviandoWhatsApp) return;
-    ventanaVerRef.current = window.open("", "_blank");
+    // Para "ver" se abre la pestaña dentro del toque; para WhatsApp en celular no hace falta (y dejaba un "about:blank" colgado).
+    ventanaVerRef.current = accion === "whatsapp" ? abrirVentanaPreviaWhatsapp() : window.open("", "_blank");
     cargarDatosPaciente(entrada.patientId);
     setRecetaPorAbrir({ ...entrada, accion });
   };

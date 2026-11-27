@@ -27,7 +27,7 @@ import { usePatientData } from "@/context/PatientDataContext";
 import { useMoConecta } from "@/context/MoConectaContext";
 import { generarPresupuestoPdf } from "@/lib/generarPresupuestoPdf";
 import { generarPresupuestoTotalPdf } from "@/lib/generarPresupuestoTotalPdf";
-import { enviarPdfPorWhatsapp } from "@/lib/enviarPdfWhatsapp";
+import { abrirVentanaPreviaWhatsapp, enviarPdfPorWhatsapp } from "@/lib/enviarPdfWhatsapp";
 import { generarExpedientePdf } from "@/lib/generarExpedientePdf";
 import { descargarBlob } from "@/lib/pdfDocumento";
 import AbrirWhatsAppPrompt from "@/components/AbrirWhatsAppPrompt";
@@ -336,7 +336,7 @@ function PresupuestosTab({
 
   const enviarComparativaGuardada = async (comparativa: ComparativaRehabilitacion) => {
     if (enviandoComparativaId) return;
-    const ventanaWhatsApp = window.open("", "_blank");
+    const ventanaWhatsApp = abrirVentanaPreviaWhatsapp();
     const nombreArchivo = `Comparativa_${slugify(patient.name)}_${slugify(fechaLargaHoy())}.pdf`;
     const caption = `Comparativa de rehabilitación — ${patient.name} · ${comparativa.titulo}`;
 
@@ -406,7 +406,7 @@ function PresupuestosTab({
 
   const enviarPresupuestoGuardado = async (budget: SavedBudget) => {
     if (enviandoWhatsAppId) return;
-    const ventanaWhatsApp = window.open("", "_blank");
+    const ventanaWhatsApp = abrirVentanaPreviaWhatsapp();
     const nombreArchivo = `Presupuesto_${slugify(patient.name)}_${slugify(budget.fecha)}.pdf`;
     const caption = `Plan de tratamiento — ${patient.name} · Folio ${budget.folio} · Total ${formatCurrency(budget.total)}`;
 
@@ -445,7 +445,7 @@ function PresupuestosTab({
 
   const enviarPresupuestoCompleto = async () => {
     if (enviandoCompleto || presupuestosParaCompleto.length === 0) return;
-    const ventanaWhatsApp = window.open("", "_blank");
+    const ventanaWhatsApp = abrirVentanaPreviaWhatsapp();
     const nombreArchivo = `Presupuesto_completo_${slugify(patient.name)}_${slugify(fechaLargaHoy())}.pdf`;
     const granTotal = presupuestosParaCompleto.reduce((sum, p) => sum + p.total, 0);
     const caption = `Plan de tratamiento completo — ${patient.name} · ${presupuestosParaCompleto.length} folio(s) · Total ${formatCurrency(granTotal)}`;

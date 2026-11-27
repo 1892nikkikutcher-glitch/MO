@@ -63,6 +63,13 @@ export async function enviarPdfPorWhatsapp({
       await navigator.share({ files: [archivo] });
     } catch (err) {
       if (err instanceof Error && err.name === "AbortError") return { requiereAbrirManualmente: false }; // el usuario canceló el share sheet
+      if (err instanceof Error && err.name === "NotAllowedError") {
+        // Safari de iPhone solo deja abrir el menú de compartir dentro de un toque RECIENTE del usuario, y generar el PDF
+        // (logos, firma) tarda más que esa ventana: "The request is not allowed by the user agent...". El PDF ya está
+        // hecho, así que se deja listo y la UI pide un segundo toque ("Compartir PDF"), que sí cuenta como toque fresco.
+        archivoPendienteDeCompartir = archivo;
+        return { requiereAbrirManualmente: true, waUrl: urlWhatsapp(telefono, caption) };
+      }
       throw err;
     }
     return { requiereAbrirManualmente: false };
@@ -77,10 +84,29 @@ export async function enviarPdfPorWhatsapp({
   enlace.click();
   URL.revokeObjectURL(url);
 
+  return { requiereAbrirManualmente: true, waUrl: urlWhatsapp(telefono, caption) };
+}
+
+/** Enlace al chat del paciente con el mensaje ya escrito. El mensaje va SOLO con lo que el paciente debe leer: la
+ * indicación de adjuntar el PDF es para quien envía y vive en el aviso de la app (AbrirWhatsAppPrompt). */
+function urlWhatsapp(telefono: string | undefined, caption: string): string {
   const telefonoLimpio = telefono?.replace(/\D/g, "");
-  const destino = telefonoLimpio ? `/${telefonoLimpio}` : "/";
-  // El mensaje va SOLO con lo que el paciente debe leer: la indicación de adjuntar el PDF es para quien envía y vive en el
-  // aviso de la app (AbrirWhatsAppPrompt), no en el texto que se manda.
-  const waUrl = `https://wa.me${destino}?text=${encodeURIComponent(caption)}`;
-  return { requiereAbrirManualmente: true, waUrl };
+  return `https://wa.me${telefonoLimpio ? `/${telefonoLimpio}` : "/"}?text=${encodeURIComponent(caption)}`;
+}
+
+/** PDF ya generado que el menú de compartir del celular no pudo abrir solo (ver el `NotAllowedError` de arriba); lo recoge
+ * `AbrirWhatsAppPrompt` para ofrecer el botón "Compartir PDF". */
+let archivoPendienteDeCompartir: File | null = null;
+export function archivoPendiente(): File | null {
+  return archivoPendienteDeCompartir;
+}
+export function limpiarArchivoPendiente() {
+  archivoPendienteDeCompartir = null;
+}
+
+/** Pestaña que se abre dentro del toque para poder navegarla después (escritorio). En iPhone/Android NO se abre nada: el
+ * menú de compartir no la necesita y dejaba una pestaña "about:blank" colgada que no se podía cerrar. */
+export function abrirVentanaPreviaWhatsapp(): Window | null {
+  if (typeof window === "undefined" || esMovilConWhatsappEnShareSheet()) return null;
+  return window.open("", "_blank");
 }
