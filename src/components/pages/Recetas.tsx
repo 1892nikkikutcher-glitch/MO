@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { flushSync } from "react-dom";
 import { usePatientData } from "@/context/PatientDataContext";
 import { formatNombreConEdad, identidadDoctorDe, type MedicamentoRecetado, type Receta } from "@/lib/patientData";
@@ -121,6 +121,10 @@ export default function Recetas() {
   const [guardado, setGuardado] = useState(false);
   const [folioActual, setFolioActual] = useState<string | null>(null);
   const [horaActual, setHoraActual] = useState<string | null>(null);
+  // La receta en curso: su id, folio y hora se fijan al primer guardado (ver handleGuardar) y se sueltan al limpiar el formulario.
+  const idRecetaRef = useRef<string | null>(null);
+  const folioRecetaRef = useRef<string | null>(null);
+  const horaRecetaRef = useRef<string | null>(null);
   const [enviandoWhatsApp, setEnviandoWhatsApp] = useState(false);
   const [waUrlPendiente, setWaUrlPendiente] = useState<string | null>(null);
   const [busquedaBitacora, setBusquedaBitacora] = useState("");
@@ -225,16 +229,26 @@ export default function Recetas() {
     setGuardado(false);
     setFolioActual(null);
     setHoraActual(null);
+    idRecetaRef.current = null;
+    folioRecetaRef.current = null;
+    horaRecetaRef.current = null;
   };
 
-  const handleGuardar = () => {
-    if (!puedeGuardar) return;
-    const folio = folioActual ?? consumirSiguienteFolioReceta();
-    const hora = horaActual ?? horaActualFormateada();
+  /** Guarda la receta y devuelve el folio y la hora con los que quedó. Guardar, Imprimir y Enviar la guardan cada vez que se
+   * pulsan: la misma receta conserva su id (y su folio), así que se actualiza en lugar de sumar otra fila a la bitácora. */
+  const handleGuardar = (): { folio: string; hora: string } | null => {
+    if (!puedeGuardar) return null;
+    // El folio y la hora viven también en refs: el estado todavía no se actualiza si se pulsa dos veces seguidas, y se
+    // consumiría otro folio (o se crearía otra fila) por la misma receta.
+    const folio = folioRecetaRef.current ?? folioActual ?? consumirSiguienteFolioReceta();
+    const hora = horaActual ?? horaRecetaRef.current ?? horaActualFormateada();
+    folioRecetaRef.current = folio;
+    horaRecetaRef.current = hora;
     if (!folioActual) setFolioActual(folio);
     if (!horaActual) setHoraActual(hora);
+    if (!idRecetaRef.current) idRecetaRef.current = `${Date.now()}`;
     const receta: Receta = {
-      id: `${Date.now()}`,
+      id: idRecetaRef.current,
       folio,
       fecha: todayFormatted(),
       hora,
@@ -251,6 +265,7 @@ export default function Recetas() {
     };
     setRecetasPaciente(patientId, (prev) => [receta, ...prev.filter((r) => r.folio !== folio)]);
     setGuardado(true);
+    return { folio, hora };
   };
 
   const handleImprimir = () => {
@@ -274,9 +289,12 @@ export default function Recetas() {
     // window.open() después de esperar la generación del PDF pierde el gesto de
     // usuario y el navegador lo bloquea como pop-up. Se navega una vez listo el PDF.
     const ventanaWhatsApp = window.open("", "_blank");
-    handleGuardar();
-    const folio = folioActual ?? consumirSiguienteFolioReceta();
-    const hora = horaActual ?? horaActualFormateada();
+    const guardada = handleGuardar();
+    if (!guardada) {
+      ventanaWhatsApp?.close();
+      return;
+    }
+    const { folio, hora } = guardada;
     const nombreArchivo = `Receta_${slugify(patient.name)}_${slugify(todayFormatted())}.pdf`;
     const caption = `Receta médica — ${patient.name} · Folio ${folio} · ${todayFormatted()} ${hora}`;
 
@@ -312,7 +330,8 @@ export default function Recetas() {
     } catch (err) {
       console.error("No se pudo generar el PDF de la receta", err);
       ventanaWhatsApp?.close();
-      alert("No se pudo generar el PDF de la receta. Intenta de nuevo.");
+      const motivo = err instanceof Error && err.message ? ` (${err.message})` : "";
+      alert(`No se pudo generar el PDF de la receta${motivo}. La receta sí quedó guardada con el folio ${folio}; intenta de nuevo o usa Imprimir.`);
     } finally {
       setEnviandoWhatsApp(false);
     }

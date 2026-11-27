@@ -15,8 +15,16 @@ export async function cargarImagen(src: string): Promise<ImagenCargada | null> {
   try {
     let dataUri = src;
     if (!src.startsWith("data:")) {
-      const res = await fetch(src, { mode: "cors" });
-      const blob = await res.blob();
+      // Un logo o firma que no responde no debe dejar colgado el PDF: a los 8 s se sigue sin él.
+      const control = new AbortController();
+      const reloj = setTimeout(() => control.abort(), 8000);
+      let blob: Blob;
+      try {
+        const res = await fetch(src, { mode: "cors", signal: control.signal });
+        blob = await res.blob();
+      } finally {
+        clearTimeout(reloj);
+      }
       dataUri = await new Promise<string>((resolve, reject) => {
         const lector = new FileReader();
         lector.onload = () => resolve(lector.result as string);
