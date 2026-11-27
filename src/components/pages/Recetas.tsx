@@ -10,6 +10,7 @@ import { enviarPdfPorWhatsapp } from "@/lib/enviarPdfWhatsapp";
 import AbrirWhatsAppPrompt from "@/components/AbrirWhatsAppPrompt";
 import AvisoNoCabeEnHoja from "@/components/AvisoNoCabeEnHoja";
 import { slugify } from "@/lib/textoNombre";
+import type { RecetaLogEntry } from "@/lib/recetasLog";
 import { coincideAlergia, condicionesSistemicasPositivas, esNegacionAlergia } from "@/lib/historiaClinica";
 
 const plantillasRecomendaciones = [
@@ -69,14 +70,26 @@ function TrashIcon() {
   );
 }
 
-function fechaLargaHoy() {
-  const texto = new Date().toLocaleDateString("es-MX", {
+function fechaLargaDe(fecha: Date) {
+  const texto = fecha.toLocaleDateString("es-MX", {
     weekday: "long",
     day: "numeric",
     month: "long",
     year: "numeric",
   });
   return texto.charAt(0).toUpperCase() + texto.slice(1);
+}
+
+function fechaLargaHoy() {
+  return fechaLargaDe(new Date());
+}
+
+/** "26/11/2026" (como se guarda en la receta) → "Jueves, 26 de noviembre de 2026"; si no se entiende, devuelve el texto tal cual. */
+function fechaLargaDeTexto(fecha: string) {
+  const m = fecha.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
+  if (!m) return fecha;
+  const d = new Date(Number(m[3]), Number(m[2]) - 1, Number(m[1]));
+  return Number.isNaN(d.getTime()) ? fecha : fechaLargaDe(d);
 }
 
 export default function Recetas() {
@@ -127,6 +140,10 @@ export default function Recetas() {
   const horaRecetaRef = useRef<string | null>(null);
   const [enviandoWhatsApp, setEnviandoWhatsApp] = useState(false);
   const [waUrlPendiente, setWaUrlPendiente] = useState<string | null>(null);
+  // "Ver receta" de la bitácora: se abre la pestaña en el clic (para que no la bloquee el navegador),
+  // se cargan las recetas del paciente si hacía falta y, cuando están, se genera el PDF y se muestra.
+  const [recetaPorAbrir, setRecetaPorAbrir] = useState<Pick<RecetaLogEntry, "id" | "patientId" | "patientName" | "folio"> | null>(null);
+  const ventanaVerRef = useRef<Window | null>(null);
   const [busquedaBitacora, setBusquedaBitacora] = useState("");
 
   const patient = patients.find((p) => p.id === patientId) ?? null;
@@ -336,6 +353,74 @@ export default function Recetas() {
       setEnviandoWhatsApp(false);
     }
   };
+
+  const verReceta = (entrada: Pick<RecetaLogEntry, "id" | "patientId" | "patientName" | "folio">) => {
+    if (recetaPorAbrir) return;
+    ventanaVerRef.current = window.open("", "_blank");
+    cargarDatosPaciente(entrada.patientId);
+    setRecetaPorAbrir(entrada);
+  };
+
+  useEffect(() => {
+    if (!recetaPorAbrir) return;
+    const terminar = (mensaje?: string) => {
+      ventanaVerRef.current?.close();
+      ventanaVerRef.current = null;
+      setRecetaPorAbrir(null);
+      if (mensaje) alert(mensaje);
+    };
+    const lista = recetasPorPaciente[recetaPorAbrir.patientId];
+    if (!lista) {
+      const reloj = setTimeout(() => terminar("No se pudieron cargar las recetas de este paciente. Revisa tu conexión e intenta de nuevo."), 15000);
+      return () => clearTimeout(reloj);
+    }
+    // Las filas repetidas de la bitácora (mismo folio) apuntan a la receta que quedó en el expediente.
+    const receta = lista.find((r) => r.id === recetaPorAbrir.id) ?? lista.find((r) => r.folio === recetaPorAbrir.folio);
+    if (!receta) {
+      terminar(`La receta con folio ${recetaPorAbrir.folio} ya no está en el expediente del paciente, por eso no se puede abrir.`);
+      return;
+    }
+    const ventana = ventanaVerRef.current;
+    ventanaVerRef.current = null;
+    setRecetaPorAbrir(null);
+    generarRecetaPdf({
+      folio: receta.folio,
+      fecha: receta.fecha,
+      hora: receta.hora,
+      fechaLarga: fechaLargaDeTexto(receta.fecha),
+      medico: receta.medico,
+      pacienteNombre: recetaPorAbrir.patientName,
+      edadTexto: receta.edadTexto,
+      sexo: receta.sexo,
+      estatura: receta.estatura,
+      temperatura: receta.temperatura,
+      peso: receta.peso,
+      diagnostico: receta.diagnostico,
+      alergias: receta.alergias,
+      medicamentos: receta.medicamentos,
+      notas: receta.notas,
+      identidadDoctor: identidadDoctorDe(receta.medico, recursos),
+      perfilDoctor,
+    })
+      .then((blob) => {
+        const url = URL.createObjectURL(blob);
+        if (ventana && !ventana.closed) {
+          ventana.location.href = url;
+        } else {
+          // El navegador no dejó abrir la pestaña: se descarga el PDF.
+          const enlace = document.createElement("a");
+          enlace.href = url;
+          enlace.download = `Receta_${slugify(recetaPorAbrir.patientName)}_folio-${receta.folio}.pdf`;
+          enlace.click();
+        }
+        setTimeout(() => URL.revokeObjectURL(url), 120000);
+      })
+      .catch((err) => {
+        ventana?.close();
+        console.error("No se pudo abrir la receta", err);
+        alert(`No se pudo generar el PDF de la receta${err instanceof Error && err.message ? ` (${err.message})` : ""}.`);
+      });
+  }, [recetaPorAbrir, recetasPorPaciente, recursos, perfilDoctor]);
 
   const recetasPrevias = patientId ? recetasPorPaciente[patientId] ?? [] : [];
 
@@ -602,11 +687,21 @@ export default function Recetas() {
           <h3 className="mb-3 text-sm font-semibold uppercase tracking-wide text-ink/60">Recetas anteriores de {patient?.name}</h3>
           <div className="space-y-2">
             {recetasPrevias.map((r) => (
-              <div key={r.id} className="rounded-xl border border-edge/10 bg-surface p-3 text-sm">
-                <p className="text-xs text-ink/40">
-                  Folio {r.folio} · {r.fecha} · {r.medico}
-                </p>
-                <p className="mt-1 text-ink/70">{r.medicamentos.map((m) => m.nombre).join(", ")}</p>
+              <div key={r.id} className="flex items-start justify-between gap-3 rounded-xl border border-edge/10 bg-surface p-3 text-sm">
+                <div className="min-w-0">
+                  <p className="text-xs text-ink/40">
+                    Folio {r.folio} · {r.fecha} · {r.medico}
+                  </p>
+                  <p className="mt-1 text-ink/70">{r.medicamentos.map((m) => m.nombre).join(", ")}</p>
+                </div>
+                <button
+                  onClick={() => verReceta({ id: r.id, patientId, patientName: patient?.name ?? "", folio: r.folio })}
+                  disabled={recetaPorAbrir?.id === r.id}
+                  title="Abrir la receta en PDF en una pestaña nueva"
+                  className="shrink-0 whitespace-nowrap rounded-full border border-accent/30 px-3 py-1 text-xs font-semibold text-accent transition-colors hover:border-accent/70 hover:bg-accent/10 disabled:opacity-50"
+                >
+                  {recetaPorAbrir?.id === r.id ? "Abriendo…" : "Ver receta"}
+                </button>
               </div>
             ))}
           </div>
@@ -668,6 +763,15 @@ export default function Recetas() {
                     <td className="px-6 py-3 text-ink/60">{r.medico}</td>
                     <td className="px-6 py-3 text-ink/70">{r.medicamentos.join(", ") || "—"}</td>
                     <td className="px-6 py-3 text-right">
+                      <div className="flex items-center justify-end gap-2">
+                      <button
+                        onClick={() => verReceta(r)}
+                        disabled={recetaPorAbrir?.id === r.id}
+                        title="Abrir la receta en PDF en una pestaña nueva"
+                        className="whitespace-nowrap rounded-full border border-accent/30 px-3 py-1 text-xs font-semibold text-accent transition-colors hover:border-accent/70 hover:bg-accent/10 disabled:opacity-50"
+                      >
+                        {recetaPorAbrir?.id === r.id ? "Abriendo…" : "Ver receta"}
+                      </button>
                       <button
                         onClick={() => setRecetasLog((prev) => prev.filter((x) => x.id !== r.id))}
                         title="Quitar de esta bitácora (no borra la receta del expediente)"
@@ -675,6 +779,7 @@ export default function Recetas() {
                       >
                         <TrashIcon />
                       </button>
+                      </div>
                     </td>
                   </tr>
                 ))}
