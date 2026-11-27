@@ -164,6 +164,7 @@ import {
 import type { PresupuestoLogEntry } from "@/lib/presupuestosLog";
 import type { OtLogEntry } from "@/lib/otsLog";
 import type { RecetaLogEntry } from "@/lib/recetasLog";
+import { planificarRenumeracion } from "@/lib/recetasFolios";
 import type { EncuestaEnviada } from "@/lib/encuestas";
 import type { Pendiente } from "@/lib/pendientes";
 import type { Domiciliacion } from "@/lib/domiciliacion";
@@ -956,6 +957,8 @@ type PatientDataContextValue = {
   fotosPorPaciente: Record<string, FotosPaciente>;
   setFotosPaciente: (patientId: string, updater: Updater<FotosPaciente>) => void;
   consumirSiguienteFolioReceta: () => string;
+  /** Deja los folios de la bitácora de recetas en 1, 2, 3… sin repetir (ver `planificarRenumeracion`). */
+  renumerarFoliosRecetas: () => Promise<{ total: number; cambiadas: number; repetidasFusionadas: number }>;
   catalogoMedicamentos: MedicamentoCatalogo[];
   setCatalogoMedicamentos: (updater: Updater<MedicamentoCatalogo[]>) => void;
   recursos: Recurso[];
@@ -1328,6 +1331,30 @@ export function PatientDataProvider({
     const folio = folioReceta.siguiente;
     setFolioReceta({ siguiente: folio + 1 });
     return String(folio);
+  };
+  const renumerarFoliosRecetas = async () => {
+    if (!clinicUid) throw new Error("No hay una clínica activa.");
+    // Se leen las recetas directo de Firestore (no del estado en memoria, que solo trae a los pacientes ya abiertos).
+    const idsPacientes = [...new Set(recetasLog.map((l) => l.patientId))];
+    const porPaciente: Record<string, Receta[]> = {};
+    await Promise.all(
+      idsPacientes.map(async (pid) => {
+        const snap = await getDocs(collection(db, `users/${clinicUid}/pacientes/${pid}/recetas`));
+        porPaciente[pid] = snap.docs.map((d) => ({ ...(d.data() as Receta), id: d.id }));
+      })
+    );
+    const plan = planificarRenumeracion(recetasLog, porPaciente);
+    // Primero las recetas del expediente (por lotes); si algo falla aquí, la bitácora y el contador no se tocan y se puede reintentar.
+    for (let i = 0; i < plan.cambios.length; i += 400) {
+      const lote = writeBatch(db);
+      for (const c of plan.cambios.slice(i, i + 400)) {
+        lote.update(doc(db, `users/${clinicUid}/pacientes/${c.patientId}/recetas`, c.recetaId), { folio: c.folioNuevo });
+      }
+      await lote.commit();
+    }
+    setRecetasLog(plan.bitacora);
+    setFolioReceta({ siguiente: plan.siguiente });
+    return { total: plan.bitacora.length, cambiadas: plan.cambios.length, repetidasFusionadas: plan.repetidasFusionadas };
   };
   const [catalogoMedicamentos, setCatalogoMedicamentos] = useFirestoreList<MedicamentoCatalogo>(
     clinicUid,
@@ -3390,6 +3417,7 @@ export function PatientDataProvider({
         fotosPorPaciente,
         setFotosPaciente,
         consumirSiguienteFolioReceta,
+        renumerarFoliosRecetas,
         catalogoMedicamentos,
         setCatalogoMedicamentos,
         recursos,

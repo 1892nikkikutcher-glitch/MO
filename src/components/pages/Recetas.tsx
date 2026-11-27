@@ -11,6 +11,7 @@ import AbrirWhatsAppPrompt from "@/components/AbrirWhatsAppPrompt";
 import AvisoNoCabeEnHoja from "@/components/AvisoNoCabeEnHoja";
 import { slugify } from "@/lib/textoNombre";
 import type { RecetaLogEntry } from "@/lib/recetasLog";
+import { foliosIrregulares } from "@/lib/recetasFolios";
 import { coincideAlergia, condicionesSistemicasPositivas, esNegacionAlergia } from "@/lib/historiaClinica";
 
 const plantillasRecomendaciones = [
@@ -103,6 +104,7 @@ export default function Recetas() {
     catalogoMedicamentos,
     perfilDoctor,
     consumirSiguienteFolioReceta,
+    renumerarFoliosRecetas,
     historiaClinicaPorPaciente,
     historiaClinicaTemplate,
     recetasLog,
@@ -352,6 +354,33 @@ export default function Recetas() {
       alert(`No se pudo generar el PDF de la receta${motivo}. La receta sí quedó guardada con el folio ${folio}; intenta de nuevo o usa Imprimir.`);
     } finally {
       setEnviandoWhatsApp(false);
+    }
+  };
+
+  const [renumerando, setRenumerando] = useState(false);
+  const irregulares = foliosIrregulares(recetasLog);
+  const renumerarFolios = async () => {
+    if (renumerando) return;
+    const total = new Set(recetasLog.map((l) => `${l.patientId}:${l.folio}`)).size;
+    const ok = window.confirm(
+      `Se van a renumerar los folios de la bitácora del 1 al ${total}, en el orden en que se expidieron las recetas, sin repetir ninguno. ` +
+        `Las filas repetidas (reintentos de envío de una misma receta) se juntan en una sola, y el siguiente folio será el ${total + 1}.\n\n` +
+        `Ojo: las recetas que ya mandaste en PDF conservan el folio con el que salieron; solo cambia el que aparece aquí y en el expediente. ¿Continuar?`
+    );
+    if (!ok) return;
+    setRenumerando(true);
+    try {
+      const r = await renumerarFoliosRecetas();
+      alert(
+        `Listo: ${r.total} receta${r.total === 1 ? "" : "s"} con folios del 1 al ${r.total}` +
+          (r.repetidasFusionadas > 0 ? ` (${r.repetidasFusionadas} fila${r.repetidasFusionadas === 1 ? "" : "s"} repetida${r.repetidasFusionadas === 1 ? "" : "s"} juntada${r.repetidasFusionadas === 1 ? "" : "s"})` : "") +
+          `. La próxima receta será la ${r.total + 1}.`
+      );
+    } catch (err) {
+      console.error("No se pudieron renumerar los folios", err);
+      alert(`No se pudieron renumerar los folios${err instanceof Error && err.message ? ` (${err.message})` : ""}. No se perdió nada; puedes intentarlo de nuevo.`);
+    } finally {
+      setRenumerando(false);
     }
   };
 
@@ -755,6 +784,21 @@ export default function Recetas() {
             className={`${inputClass} sm:w-72`}
           />
         </div>
+
+        {irregulares && (
+          <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-accent/30 bg-accent/5 px-4 py-3 text-sm">
+            <p className="max-w-2xl text-ink/70">
+              Los folios tienen números repetidos o saltos, o no empiezan en 1. Puedo dejarlos consecutivos (1, 2, 3…) en el orden en que se expidieron.
+            </p>
+            <button
+              onClick={renumerarFolios}
+              disabled={renumerando}
+              className="whitespace-nowrap rounded-full border border-accent/40 px-4 py-1.5 text-xs font-semibold text-accent transition-colors hover:border-accent/80 hover:bg-accent/10 disabled:opacity-50"
+            >
+              {renumerando ? "Renumerando…" : "Renumerar folios"}
+            </button>
+          </div>
+        )}
 
         {bitacoraFiltrada.length === 0 ? (
           <div className="rounded-2xl border border-dashed border-edge/15 bg-surface p-10 text-center text-sm text-ink/40">
