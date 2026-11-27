@@ -4,11 +4,17 @@ import type { CitaAgenda } from "./patientData";
  * expediente) = "reciente"; de 6 a 11 meses = "revisar"; un año o más = "urgente" (dejó de venir). */
 export type NivelAusencia = "reciente" | "revisar" | "urgente";
 
+/** De dónde sale la fecha: una cita marcada "Atendida", una receta expedida, o (sin ninguna de las dos) la última cita de
+ * la agenda que no se canceló. */
+export type OrigenConsulta = "atendida" | "receta" | "agenda";
+
 export type UltimaConsulta = {
   /** Fecha ISO (YYYY-MM-DD) de la consulta. */
   fecha: string;
-  /** true si la cita se marcó "Atendida"; false si solo se usó la última cita que no se canceló (la clínica no la marcó). */
+  /** true si hay constancia de que el paciente sí fue atendido (cita "Atendida" o receta); false si solo se usó la última
+   * cita que no se canceló (la clínica no la marcó y no hay receta). */
   atendida: boolean;
+  origen: OrigenConsulta;
   /** Meses calendario completos desde esa fecha. */
   meses: number;
   /** Días desde esa fecha. */
@@ -30,21 +36,41 @@ function diasEntre(desdeISO: string, hastaISO: string): number {
   return Math.max(0, Math.round(ms / 86400000));
 }
 
+/** Fecha ISO de una receta expedida. `Receta.fecha` se guarda como "26/11/2026" (la que se imprime); si viniera en otro
+ * formato se usa el `creadoEn` (ISO) de la bitácora. Devuelve null si no hay forma de saberla. */
+export function fechaISODeReceta(receta: { fecha?: string | null; creadoEn?: string | null }): string | null {
+  const f = receta.fecha?.trim() ?? "";
+  const dmy = f.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
+  if (dmy) return `${dmy[3]}-${dmy[2].padStart(2, "0")}-${dmy[1].padStart(2, "0")}`;
+  if (/^\d{4}-\d{2}-\d{2}/.test(f)) return f.slice(0, 10);
+  const c = receta.creadoEn?.trim() ?? "";
+  return /^\d{4}-\d{2}-\d{2}/.test(c) ? c.slice(0, 10) : null;
+}
+
 /**
- * Última consulta de UN paciente (pasa solo sus citas): la cita "Atendida" más reciente hasta hoy.
- * Si la clínica nunca marca las citas como atendidas, se usa la más reciente que ya pasó y no se canceló,
- * no se reagendó ni fue inasistencia, y se indica con `atendida: false` para no afirmar de más.
- * Sin ninguna, devuelve null.
+ * Última consulta de UN paciente (pasa solo sus citas y, si las hay, las fechas ISO de sus recetas): la más reciente entre
+ * la cita "Atendida" y la receta expedida, hasta hoy — una receta es constancia de que el paciente fue atendido aunque la
+ * cita no se haya marcado. Si no hay ni cita atendida ni receta, se usa la cita más reciente que ya pasó y no se canceló,
+ * no se reagendó ni fue inasistencia, y se indica con `atendida: false` para no afirmar de más. Sin nada, devuelve null.
  */
-export function ultimaConsultaDe(citas: Pick<CitaAgenda, "fecha" | "estatus">[], hoyISO: string): UltimaConsulta | null {
+export function ultimaConsultaDe(
+  citas: Pick<CitaAgenda, "fecha" | "estatus">[],
+  hoyISO: string,
+  fechasRecetas: string[] = []
+): UltimaConsulta | null {
   const pasadas = citas.filter((c) => c.fecha <= hoyISO);
-  const masReciente = (lista: typeof pasadas) => lista.reduce<string | null>((m, c) => (m === null || c.fecha > m ? c.fecha : m), null);
-  const atendida = masReciente(pasadas.filter((c) => c.estatus === "Atendida"));
-  const respaldo = atendida ? null : masReciente(pasadas.filter((c) => c.estatus !== "Cancelada" && c.estatus !== "Reagendada" && c.estatus !== "No Asistió"));
-  const fecha = atendida ?? respaldo;
+  const masReciente = (fechas: string[]) => fechas.reduce<string | null>((m, f) => (m === null || f > m ? f : m), null);
+  const atendida = masReciente(pasadas.filter((c) => c.estatus === "Atendida").map((c) => c.fecha));
+  const receta = masReciente(fechasRecetas.filter((f) => f <= hoyISO));
+  const constancia = masReciente([atendida, receta].filter((f): f is string => f !== null));
+  const respaldo = constancia
+    ? null
+    : masReciente(pasadas.filter((c) => c.estatus !== "Cancelada" && c.estatus !== "Reagendada" && c.estatus !== "No Asistió").map((c) => c.fecha));
+  const fecha = constancia ?? respaldo;
   if (!fecha) return null;
+  const origen: OrigenConsulta = constancia ? (constancia === atendida ? "atendida" : "receta") : "agenda";
   const meses = mesesEntre(fecha, hoyISO);
-  return { fecha, atendida: atendida !== null, meses, dias: diasEntre(fecha, hoyISO), nivel: meses < 6 ? "reciente" : meses < 12 ? "revisar" : "urgente" };
+  return { fecha, atendida: constancia !== null, origen, meses, dias: diasEntre(fecha, hoyISO), nivel: meses < 6 ? "reciente" : meses < 12 ? "revisar" : "urgente" };
 }
 
 /** "hoy", "hace 12 días", "hace 5 meses", "hace 1 año y 3 meses". */

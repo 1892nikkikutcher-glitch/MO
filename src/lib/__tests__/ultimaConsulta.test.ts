@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { coincideAusencia, mesesEntre, textoHace, ultimaConsultaDe } from "../ultimaConsulta";
+import { coincideAusencia, fechaISODeReceta, mesesEntre, textoHace, ultimaConsultaDe } from "../ultimaConsulta";
 
 const HOY = "2026-11-26";
 const cita = (fecha: string, estatus: string) => ({ fecha, estatus }) as never;
@@ -32,6 +32,41 @@ describe("última consulta de un paciente", () => {
     expect(ultimaConsultaDe([cita("2026-05-26", "Atendida")], HOY)?.nivel).toBe("revisar"); // 6 meses justos
     expect(ultimaConsultaDe([cita("2025-12-01", "Atendida")], HOY)?.nivel).toBe("revisar"); // 11 meses
     expect(ultimaConsultaDe([cita("2025-11-26", "Atendida")], HOY)?.nivel).toBe("urgente"); // 12 meses justos
+  });
+});
+
+describe("las recetas también cuentan como consulta", () => {
+  it("el caso de Paola: sin citas atendidas, su receta es su última consulta", () => {
+    const r = ultimaConsultaDe([], HOY, ["2026-11-25"]);
+    expect(r?.fecha).toBe("2026-11-25");
+    expect(r?.origen).toBe("receta");
+    expect(r?.atendida).toBe(true);
+    expect(r?.nivel).toBe("reciente");
+  });
+
+  it("gana la más reciente entre la cita atendida y la receta", () => {
+    expect(ultimaConsultaDe([cita("2026-03-01", "Atendida")], HOY, ["2026-09-10"])?.origen).toBe("receta");
+    expect(ultimaConsultaDe([cita("2026-10-01", "Atendida")], HOY, ["2026-09-10"])?.origen).toBe("atendida");
+    expect(ultimaConsultaDe([cita("2026-09-10", "Atendida")], HOY, ["2026-09-10"])?.origen).toBe("atendida");
+  });
+
+  it("una receta pesa más que una cita agendada sin marcar", () => {
+    const r = ultimaConsultaDe([cita("2026-11-01", "Agendada")], HOY, ["2026-06-01"]);
+    expect(r?.fecha).toBe("2026-06-01");
+    expect(r?.origen).toBe("receta");
+  });
+
+  it("ignora recetas con fecha futura y, sin nada más, cae en la agenda", () => {
+    expect(ultimaConsultaDe([], HOY, ["2026-12-30"])).toBeNull();
+    expect(ultimaConsultaDe([cita("2026-02-10", "Agendada")], HOY, ["2026-12-30"])?.origen).toBe("agenda");
+  });
+
+  it("lee la fecha de la receta como se imprime (dd/mm/aaaa) o en ISO", () => {
+    expect(fechaISODeReceta({ fecha: "26/11/2026" })).toBe("2026-11-26");
+    expect(fechaISODeReceta({ fecha: "6/1/2026" })).toBe("2026-01-06");
+    expect(fechaISODeReceta({ fecha: "2026-11-26" })).toBe("2026-11-26");
+    expect(fechaISODeReceta({ fecha: "no es fecha", creadoEn: "2026-11-26T19:59:00.000Z" })).toBe("2026-11-26");
+    expect(fechaISODeReceta({ fecha: "", creadoEn: "" })).toBeNull();
   });
 });
 

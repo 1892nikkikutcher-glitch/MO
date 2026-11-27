@@ -13,7 +13,7 @@ import { capitalizarNombre, manejarCambioNombre } from "@/lib/textoNombre";
 import { toISODate } from "@/lib/agendaHelpers";
 import { urlWhatsApp } from "@/lib/avisoWhatsApp";
 import { mensajeProponerCita } from "@/lib/pacientesPorProponer";
-import { coincideAusencia, FILTROS_AUSENCIA_MESES, textoHace, ultimaConsultaDe, type FiltroAusencia, type UltimaConsulta } from "@/lib/ultimaConsulta";
+import { coincideAusencia, fechaISODeReceta, FILTROS_AUSENCIA_MESES, textoHace, ultimaConsultaDe, type FiltroAusencia, type UltimaConsulta } from "@/lib/ultimaConsulta";
 
 const avatarColors = ["#f59e0b", "#ec4899", "#3b82f6", "#22c55e", "#dc2626", "#a855f7"];
 
@@ -347,7 +347,13 @@ function CeldasUltimaConsulta({
           <>
             <span
               className={`font-medium ${color}`}
-              title={consulta.atendida ? "Última cita marcada como Atendida" : "Ninguna cita está marcada como Atendida: es la última cita que no se canceló"}
+              title={
+                consulta.origen === "atendida"
+                  ? "Última cita marcada como Atendida"
+                  : consulta.origen === "receta"
+                    ? "Fecha de su última receta (no hay una cita atendida más reciente)"
+                    : "Ninguna cita está marcada como Atendida ni tiene recetas: es la última cita que no se canceló"
+              }
             >
               {formatDate(consulta.fecha)}
             </span>
@@ -380,7 +386,7 @@ function CeldasUltimaConsulta({
 }
 
 export default function Pacientes() {
-  const { patients, citas, clinicInfo, addPatient, importarPacientes, navegacionExpediente, consumirNavegacionExpediente, puedeEliminar, eliminarPaciente } =
+  const { patients, citas, recetasLog, clinicInfo, addPatient, importarPacientes, navegacionExpediente, consumirNavegacionExpediente, puedeEliminar, eliminarPaciente } =
     usePatientData();
   const [eliminandoId, setEliminandoId] = useState<string | null>(null);
   const eliminarDeLaLista = async (p: Patient) => {
@@ -415,15 +421,24 @@ export default function Pacientes() {
   const consultaPorPaciente = useMemo(() => {
     const hoyISO = toISODate(new Date());
     const mapa = new Map<string, { consulta: UltimaConsulta | null; yaTieneCita: boolean }>();
+    // Las recetas expedidas también cuentan como consulta (bitácora de recetas, con la fecha de cada una).
+    const recetasPorPaciente = new Map<string, string[]>();
+    for (const r of recetasLog) {
+      const f = fechaISODeReceta(r);
+      if (!f) continue;
+      const lista = recetasPorPaciente.get(r.patientId);
+      if (lista) lista.push(f);
+      else recetasPorPaciente.set(r.patientId, [f]);
+    }
     for (const p of patients) {
       const suyas = citasPorPaciente.get(p.id) ?? [];
       mapa.set(p.id, {
-        consulta: ultimaConsultaDe(suyas, hoyISO),
+        consulta: ultimaConsultaDe(suyas, hoyISO, recetasPorPaciente.get(p.id)),
         yaTieneCita: suyas.some((c) => c.fecha >= hoyISO && c.estatus !== "Cancelada" && c.estatus !== "Reagendada"),
       });
     }
     return mapa;
-  }, [patients, citasPorPaciente]);
+  }, [patients, citasPorPaciente, recetasLog]);
   const [filtroAusencia, setFiltroAusencia] = useState<FiltroAusencia>("todos");
   const cuentaAusencia = (filtro: FiltroAusencia) =>
     patients.filter((p) => coincideAusencia(consultaPorPaciente.get(p.id)?.consulta ?? null, filtro)).length;

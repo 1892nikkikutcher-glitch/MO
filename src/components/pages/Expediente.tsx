@@ -65,7 +65,7 @@ import {
   type RespuestaValor,
 } from "@/lib/historiaClinica";
 import { timeToMinutes, toISODate, getMonday, addDays } from "@/lib/agendaHelpers";
-import { textoHace, ultimaConsultaDe } from "@/lib/ultimaConsulta";
+import { fechaISODeReceta, textoHace, ultimaConsultaDe } from "@/lib/ultimaConsulta";
 import { estaVencido, renovarVigencia } from "@/lib/presupuestoVigencia";
 import { generarComparativaPdf } from "@/lib/generarComparativaPdf";
 import type { ComparativaRehabilitacion } from "@/lib/comparativaRehabilitacion";
@@ -1256,6 +1256,7 @@ export default function Expediente({
     updatePatient,
     perfilDoctor: perfilClinica,
     citas,
+    recetasLog,
     recursos,
     puedeVerFinanzas,
     miRol,
@@ -1413,7 +1414,11 @@ export default function Expediente({
     .filter((c) => c.fecha >= hoyISO && c.estatus !== "Cancelada" && c.estatus !== "Reagendada")
     .sort((a, b) => a.fecha.localeCompare(b.fecha) || a.horaInicio.localeCompare(b.horaInicio));
   const ultimaCita = citasPaciente.find((c) => c.fecha < hoyISO && c.estatus !== "Cancelada");
-  const ultimaConsulta = ultimaConsultaDe(citasPaciente, hoyISO);
+  const ultimaConsulta = ultimaConsultaDe(
+    citasPaciente,
+    hoyISO,
+    recetasLog.filter((r) => r.patientId === patient.id).flatMap((r) => fechaISODeReceta(r) ?? [])
+  );
 
   // Flechas del encabezado: navegan al expediente del paciente anterior/
   // siguiente en el orden cronológico de las citas de TODA LA SEMANA en
@@ -1530,8 +1535,10 @@ export default function Expediente({
                 <span
                   title={
                     ultimaConsulta && !ultimaConsulta.atendida
-                      ? "Ninguna cita de este paciente está marcada como Atendida: se muestra la última cita que no se canceló."
-                      : "Fecha de la última cita marcada como Atendida"
+                      ? "Ninguna cita de este paciente está marcada como Atendida ni tiene recetas: se muestra la última cita que no se canceló."
+                      : ultimaConsulta?.origen === "receta"
+                        ? "Fecha de su última receta (no hay una cita atendida más reciente)"
+                        : "Fecha de la última cita marcada como Atendida"
                   }
                   className={`whitespace-nowrap rounded-full border px-2.5 py-1 ${
                     !ultimaConsulta || ultimaConsulta.nivel === "reciente"
