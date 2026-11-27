@@ -130,7 +130,7 @@ export async function generarReciboPagoPdf(datos: DatosReciboPagoPdf): Promise<B
 
   // Total, firma y notas necesitan lugar completo: si no caben, van en otra hoja.
   const resumen = datos.resumenCuenta ?? null;
-  if (y + 52 + (resumen ? 40 : 0) > pageHeight - marginBottom) {
+  if (y + 52 + (resumen ? 40 : 0) + ((pago.saldoAFavorAplicado ?? 0) > 0 ? 12 : 0) > pageHeight - marginBottom) {
     doc.addPage();
     y = 20;
   }
@@ -138,6 +138,16 @@ export async function generarReciboPagoPdf(datos: DatosReciboPagoPdf): Promise<B
   doc.setLineWidth(0.4);
   doc.line(marginX, y, xDerecha, y);
   y += 7;
+  if ((pago.saldoAFavorAplicado ?? 0) > 0) {
+    doc.setFont("helvetica", "normal");
+    doc.setFontSize(10);
+    doc.text("Cobro de hoy", marginX, y);
+    doc.text(dinero(pago.total + (pago.saldoAFavorAplicado ?? 0)), xMonto, y, { align: "right" });
+    y += 5.5;
+    doc.text("Saldo a favor aplicado", marginX, y);
+    doc.text("-" + dinero(pago.saldoAFavorAplicado ?? 0), xMonto, y, { align: "right" });
+    y += 7;
+  }
   doc.setFont("helvetica", "bold");
   doc.setFontSize(12);
   doc.text("Total pagado", marginX, y);

@@ -20,6 +20,7 @@ import { fechaPagoAIso } from "@/lib/metas";
 import { medicoPredeterminadoParaPago } from "@/lib/medicoDelPago";
 import { formaPagoHabitual } from "@/lib/formaPagoHabitual";
 import { cashbackAplicable, repartirLineasConCashback } from "@/lib/cashbackEnCobro";
+import { aplicarSaldoAFavorEnCobro } from "@/lib/saldoAFavorEnCobro";
 import { redondearDinero } from "@/lib/dinero";
 import { FORMA_PAGO_CASHBACK, baseCashbackDePago, calcularCashback, esFormaPagoCashback, otorgarCashbackAPago, puedeOtorgarCashback } from "@/lib/cashback";
 import { avisoCashbackEnPago } from "@/lib/cashbackTextos";
@@ -376,15 +377,16 @@ export function AgregarPagoDialog({
   onClose: () => void;
   /** Guarda un pago ya registrado que cambió (por ejemplo, al agregarle la firma). */
   onSave: (pago: Pago) => void;
-  /** Guarda de una sola vez los pagos nuevos de un cobro (dos si parte se cubrió con Cashback). */
-  onSaveVarios: (pagos: Pago[]) => void;
+  /** Guarda de una sola vez los pagos nuevos de un cobro (dos si parte se cubrió con Cashback) y, si se usó saldo a favor,
+   * los pagos anteriores cuya línea pasó al tratamiento de hoy (reemplazan a los guardados con el mismo id). */
+  onSaveVarios: (pagos: Pago[], pagosAnterioresActualizados?: Pago[]) => void;
 }) {
   // Mismo criterio que ya usa Corte de Caja/Comisiones (ver
   // ReporteCorteCaja.tsx): el médico tratante viene de los Recursos reales
   // de la clínica (Agenda → Recursos), nunca de una lista genérica — así
   // "Médico" en el recibo es el mismo nombre que alimenta el desglose de
   // ingresos por médico, en vez de un valor que nadie más lee.
-  const { recursos, saldoCashbackDe, cashbackConfig, patients, citas, presupuestosPorPaciente, pagosPorPaciente, setPresupuestosPaciente, userEmail } = usePatientData();
+  const { recursos, saldoCashbackDe, cashbackConfig, patients, citas, presupuestosPorPaciente, pagosPorPaciente, devolucionesPorPaciente, setPresupuestosPaciente, userEmail } = usePatientData();
   const medicosDisponibles = recursos.filter((r) => r.tipo === "medico").map((r) => r.nombre);
   const saldoCashbackPaciente = saldoCashbackDe(patientId);
   const cashbackDisponible = saldoCashbackPaciente.disponible;
@@ -395,9 +397,12 @@ export function AgregarPagoDialog({
   const [usarCashback, setUsarCashback] = useState(formaPagoInicial === FORMA_PAGO_CASHBACK && cashbackDisponible > 0);
   const [cashbackTexto, setCashbackTexto] = useState("");
 
-  const [paso, setPaso] = useState<"form" | "firma" | "recibo">("form");
+  const [paso, setPaso] = useState<"form" | "firma" | "recibo" | "cubierto">("form");
   const [pagoGuardado, setPagoGuardado] = useState<Pago | null>(null);
   const [cashbackUsado, setCashbackUsado] = useState(0);
+  // El saldo a favor del paciente (anticipos, pagos de más) se descuenta solo del cobro de hoy; quien cobra puede quitarlo.
+  const [usarSaldoAFavor, setUsarSaldoAFavor] = useState(true);
+  const [saldoAFavorUsado, setSaldoAFavorUsado] = useState(0);
 
   // A quién se le atribuye el pago (de aquí sale lo que ingresó a cada doctor y su comisión): el médico responsable del
   // paciente, el de su cita de hoy o el de su última cita. Si no hay ninguno claro, quien cobra lo elige (no se adivina).
@@ -510,7 +515,32 @@ export function AgregarPagoDialog({
     solicitado: cashbackSolicitado,
   });
   const cashbackAplicado = usarCashback && !sinCashback ? cashbackPosible : 0;
-  const aPagarEnDinero = redondearDinero(totalAPagar - cashbackAplicado);
+
+  // Saldo a favor: lo que el paciente ya dejó (anticipos sin asignar o pagos de más) se descuenta del cobro de hoy, después
+  // del Cashback, y el paciente paga solo la diferencia. Aquí se calcula con los montos capturados (ids provisionales);
+  // al guardar se repite con las líneas reales.
+  const pagosDelPaciente = pagosPorPaciente[patientId] ?? [];
+  const cuentaDelPaciente = calcularCuenta(presupuestosPorPaciente[patientId] ?? [], pagosDelPaciente, devolucionesPorPaciente[patientId] ?? []);
+  const lineasConDevolucion = new Set((devolucionesPorPaciente[patientId] ?? []).flatMap((d) => (d.itemsAfectados ?? []).map((i) => i.lineaPagoId)));
+  const lineasPrevias: LineaPago[] = [
+    ...seleccionados.map((id): LineaPago => ({ id: `prev-${id}`, tratamientoId: id, folio: null, label: "", monto: montos[id] ?? 0 })),
+    ...extras.map((e, i): LineaPago =>
+      e.tipo === "anticipo"
+        ? { id: `prev-x${i}`, tratamientoId: null, folio: null, label: e.label, monto: e.monto, sinAsignar: true }
+        : { id: `prev-x${i}`, tratamientoId: `prev-x${i}`, folio: null, label: e.label, monto: e.monto }
+    ),
+  ];
+  const lineasPreviasConDinero = cashbackAplicado > 0 ? repartirLineasConCashback(lineasPrevias, cashbackAplicado).dinero : lineasPrevias;
+  const favorDisponibleHoy = aplicarSaldoAFavorEnCobro({
+    pagos: pagosDelPaciente,
+    renglones: cuentaDelPaciente.renglones,
+    aFavor: cuentaDelPaciente.resumen.aFavor,
+    lineasDinero: lineasPreviasConDinero,
+    lineasBloqueadas: lineasConDevolucion,
+    esCashback: esFormaPagoCashback,
+  }).aplicado;
+  const saldoAFavorAplicadoAhora = usarSaldoAFavor ? favorDisponibleHoy : 0;
+  const aPagarEnDinero = redondearDinero(totalAPagar - cashbackAplicado - saldoAFavorAplicadoAhora);
   useEffect(() => {
     // Una promoción, cortesía o tarifa especial no se paga con cashback.
     if (sinCashback) setUsarCashback(false);
@@ -574,7 +604,7 @@ export function AgregarPagoDialog({
     }
 
     const todasLasLineas = [...lineasTratamientos, ...lineasExtras];
-    const pagoDe = (id: string, forma: string, lineas: LineaPago[], total: number, esDinero: boolean): Pago => ({
+    const pagoDe = (id: string, forma: string, lineas: LineaPago[], total: number, esDinero: boolean, favor = 0): Pago => ({
       id,
       fecha,
       medico,
@@ -585,22 +615,46 @@ export function AgregarPagoDialog({
       firma: null,
       ...(esDinero && sinCashback ? { sinCashback: true } : {}),
       ...(esDinero && clavePago.trim() ? { clavePago: clavePago.trim() } : {}),
+      ...(esDinero && favor > 0 ? { saldoAFavorAplicado: favor } : {}),
     });
 
+    // Primero el Cashback; luego, de lo que quede por pagar, se descuenta el saldo a favor: esa parte se asigna al
+    // tratamiento de hoy desde el pago anterior donde estaba, y el pago de hoy lleva solo la diferencia.
+    const reparto = cashbackAplicado > 0 ? repartirLineasConCashback(todasLasLineas, cashbackAplicado) : null;
+    const lineasConDinero = reparto ? reparto.dinero : todasLasLineas;
+    const favor = usarSaldoAFavor
+      ? aplicarSaldoAFavorEnCobro({
+          pagos: pagosDelPaciente,
+          renglones: cuentaDelPaciente.renglones,
+          aFavor: cuentaDelPaciente.resumen.aFavor,
+          lineasDinero: lineasConDinero,
+          lineasBloqueadas: lineasConDevolucion,
+          esCashback: esFormaPagoCashback,
+        })
+      : null;
+    const lineasDelDinero = favor ? favor.lineasDinero : lineasConDinero;
+    const favorUsado = favor?.aplicado ?? 0;
+    const totalDelDinero = redondearDinero(lineasDelDinero.reduce((s, l) => s + l.monto, 0));
+
     const nuevos: Pago[] = [];
-    if (cashbackAplicado > 0) {
+    if (reparto) {
       // Parte del cobro la cubre el Cashback: queda como un pago con esa forma y, aparte, el resto con la forma elegida.
-      const reparto = repartirLineasConCashback(todasLasLineas, cashbackAplicado);
       nuevos.push(pagoDe(pagoId, FORMA_PAGO_CASHBACK, reparto.cashback, cashbackAplicado, false));
-      if (reparto.dinero.length > 0) {
-        nuevos.push(pagoDe(`${ahora.getTime() + 1}`, formaPago, reparto.dinero, aPagarEnDinero, true));
+      if (lineasDelDinero.length > 0) {
+        nuevos.push(pagoDe(`${ahora.getTime() + 1}`, formaPago, lineasDelDinero, totalDelDinero, true, favorUsado));
       }
-    } else {
-      nuevos.push(pagoDe(pagoId, formaPago, todasLasLineas, totalAPagar, true));
+    } else if (lineasDelDinero.length > 0) {
+      nuevos.push(pagoDe(pagoId, formaPago, lineasDelDinero, totalDelDinero, true, favorUsado));
     }
 
-    onSaveVarios(nuevos);
+    onSaveVarios(nuevos, favor?.pagosModificados ?? []);
     setCashbackUsado(cashbackAplicado);
+    setSaldoAFavorUsado(favorUsado);
+    if (nuevos.length === 0) {
+      // Todo se cubrió con saldo a favor: no hay pago nuevo ni recibo que emitir.
+      setPaso("cubierto");
+      return;
+    }
     // El recibo es el del pago con dinero; si todo lo cubrió el Cashback, el del pago con Cashback.
     setPagoGuardado(nuevos[nuevos.length - 1]);
     setPaso("recibo");
@@ -626,11 +680,33 @@ export function AgregarPagoDialog({
     );
   }
 
+  if (paso === "cubierto") {
+    return (
+      <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4">
+        <div className="w-full max-w-md rounded-2xl border border-edge/10 bg-modal p-6 text-center">
+          <h2 className="text-lg font-semibold text-ink">Cobro cubierto con saldo a favor</h2>
+          <p className="mt-2 text-sm text-ink/70">
+            Se aplicaron <span className="font-semibold text-success">{formatCurrency(saldoAFavorUsado)}</span> del saldo a favor de {patientName}
+            {cashbackUsado > 0 ? ` y ${formatCurrency(cashbackUsado)} de Cashback` : ""}. No hay nada que cobrar hoy.
+          </p>
+          <button onClick={onClose} className="mt-5 w-full rounded-lg border border-accent/60 bg-accent/15 py-2.5 text-sm font-semibold text-accent transition-colors hover:bg-accent/25">
+            Listo
+          </button>
+        </div>
+      </div>
+    );
+  }
+
   if (paso === "recibo" && pagoGuardado) {
     const acumulaHoy = cashbackConfig.activo ? calcularCashback(baseCashbackDePago(pagoGuardado), cashbackConfig.porcentaje) : 0;
     return (
       <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4 print:bg-transparent">
         <div className="w-full max-w-md rounded-2xl border border-edge/10 bg-modal p-6 print:border-none print:bg-transparent print:p-0">
+          {saldoAFavorUsado > 0 && (
+            <p className="mb-4 rounded-lg border border-success/40 bg-success/10 px-3 py-2 text-sm text-success print:hidden">
+              Se aplicaron <span className="font-semibold">{formatCurrency(saldoAFavorUsado)}</span> del saldo a favor del paciente a este cobro: el recibo es solo por lo que pagó hoy.
+            </p>
+          )}
           {cashbackUsado > 0 && (
             <p className="mb-4 rounded-lg border border-success/40 bg-success/10 px-3 py-2 text-sm text-success print:hidden">
               Se aplicaron <span className="font-semibold">{formatCurrency(cashbackUsado)}</span> de Cashback a este cobro (queda registrado como un pago aparte).
@@ -1007,21 +1083,46 @@ export function AgregarPagoDialog({
               </div>
             </div>
             <div>
+              {favorDisponibleHoy > 0 && (
+                <label className="mb-2 flex cursor-pointer items-start gap-2 rounded-lg border border-success/30 bg-success/10 px-2.5 py-1.5 text-xs text-ink/80">
+                  <input
+                    type="checkbox"
+                    checked={usarSaldoAFavor}
+                    onChange={(e) => setUsarSaldoAFavor(e.target.checked)}
+                    className="mt-0.5 h-4 w-4 shrink-0 accent-accent"
+                  />
+                  <span>
+                    Descontar <span className="font-semibold text-success">{formatCurrency(favorDisponibleHoy)}</span> del saldo a favor del paciente
+                    <span className="block text-[11px] text-ink/50">Ya lo había dejado antes: solo se le cobra la diferencia.</span>
+                  </span>
+                </label>
+              )}
               <div className="mb-1 text-xs font-medium text-ink/60">Resumen del cobro</div>
               <div className="rounded-lg border border-edge/10 bg-inset px-3 py-2 text-sm">
-                {cashbackDisponible > 0 ? (
+                {cashbackDisponible > 0 || favorDisponibleHoy > 0 ? (
                   <>
                     <div className="flex items-baseline justify-between text-ink/70">
                       <span>Total del cobro</span>
                       <span>{formatCurrency(totalAPagar)}</span>
                     </div>
-                    <div className={`flex items-baseline justify-between ${cashbackAplicado > 0 ? "text-success" : "text-ink/40"}`}>
-                      <span>Cashback</span>
-                      <span>
-                        {cashbackAplicado > 0 ? "−" : ""}
-                        {formatCurrency(cashbackAplicado)}
-                      </span>
-                    </div>
+                    {cashbackDisponible > 0 && (
+                      <div className={`flex items-baseline justify-between ${cashbackAplicado > 0 ? "text-success" : "text-ink/40"}`}>
+                        <span>Cashback</span>
+                        <span>
+                          {cashbackAplicado > 0 ? "−" : ""}
+                          {formatCurrency(cashbackAplicado)}
+                        </span>
+                      </div>
+                    )}
+                    {favorDisponibleHoy > 0 && (
+                      <div className={`flex items-baseline justify-between ${saldoAFavorAplicadoAhora > 0 ? "text-success" : "text-ink/40"}`}>
+                        <span>Saldo a favor</span>
+                        <span>
+                          {saldoAFavorAplicadoAhora > 0 ? "−" : ""}
+                          {formatCurrency(saldoAFavorAplicadoAhora)}
+                        </span>
+                      </div>
+                    )}
                     <div className="mt-1 flex items-baseline justify-between border-t border-edge/10 pt-1">
                       <span className="font-semibold text-ink/80">El paciente paga</span>
                       <span className="text-lg font-bold text-success">{formatCurrency(aPagarEnDinero)}</span>
@@ -1441,14 +1542,21 @@ export default function Pagos({
           formaPagoInicial={formaPagoInicial}
           onClose={() => setShowDialog(false)}
           onSave={upsertPago}
-          onSaveVarios={(nuevos) => {
+          onSaveVarios={(nuevos, anterioresActualizados = []) => {
             // Un cobro con Cashback son dos pagos (el del Cashback y el del dinero): entran juntos, en un solo cambio, el del dinero primero.
+            // Si se usó saldo a favor, los pagos anteriores cuya línea pasó al tratamiento de hoy se reemplazan en ese mismo cambio.
             const ordenados = [...nuevos].reverse();
-            setPagos((prev) => [...ordenados, ...prev]);
+            const cambiado = (id: string) => anterioresActualizados.find((p) => p.id === id);
+            setPagos((prev) => [...ordenados, ...prev.map((p) => cambiado(p.id) ?? p)]);
             const ahoraIso = new Date().toISOString();
             setPagosRealizados((prevRealizados) => [
               ...ordenados.map((pago) => ({ id: pago.id, patientId, patientName, pago, registradoEn: ahoraIso, registradoPor: userEmail })),
-              ...prevRealizados.filter((r) => !ordenados.some((n) => n.id === r.id)),
+              ...prevRealizados
+                .filter((r) => !ordenados.some((n) => n.id === r.id))
+                .map((r) => {
+                  const actualizado = cambiado(r.pago.id);
+                  return actualizado ? { ...r, pago: actualizado } : r;
+                }),
             ]);
           }}
         />

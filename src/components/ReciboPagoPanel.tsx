@@ -262,6 +262,18 @@ export default function ReciboPagoPanel({
       )}
 
       <div className="rounded-lg border border-edge/10 bg-inset px-3 py-2 text-sm text-ink/70">
+        {(pago.saldoAFavorAplicado ?? 0) > 0 && (
+          <div className="mb-1 space-y-0.5 border-b border-edge/10 pb-1">
+            <div className="flex justify-between">
+              <span>Cobro de hoy</span>
+              <span>{formatCurrency(pago.total + (pago.saldoAFavorAplicado ?? 0))}</span>
+            </div>
+            <div className="flex justify-between">
+              <span>Saldo a favor aplicado</span>
+              <span>−{formatCurrency(pago.saldoAFavorAplicado ?? 0)}</span>
+            </div>
+          </div>
+        )}
         <div className="flex justify-between">
           <span>Total pagado</span>
           <span className="font-semibold text-success">{formatCurrency(pago.total)}</span>

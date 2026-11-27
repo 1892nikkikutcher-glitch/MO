@@ -258,14 +258,21 @@ export default function GlobalAgregarPago({
           return [pago, ...prev];
         });
       }}
-      onSaveVarios={(nuevos) => {
+      onSaveVarios={(nuevos, anterioresActualizados = []) => {
         // Un cobro con Cashback son dos pagos (el del Cashback y el del dinero): entran juntos, en un solo cambio, el del dinero primero.
+        // Si se usó saldo a favor, los pagos anteriores cuya línea pasó al tratamiento de hoy se reemplazan en ese mismo cambio.
         const ordenados = [...nuevos].reverse();
-        setPagosPaciente(patientId, (prev) => [...ordenados, ...prev]);
+        const cambiado = (id: string) => anterioresActualizados.find((p) => p.id === id);
+        setPagosPaciente(patientId, (prev) => [...ordenados, ...prev.map((p) => cambiado(p.id) ?? p)]);
         const ahoraIso = new Date().toISOString();
         setPagosRealizados((prevRealizados) => [
           ...ordenados.map((pago) => ({ id: pago.id, patientId, patientName: patient.name, pago, registradoEn: ahoraIso, registradoPor: userEmail })),
-          ...prevRealizados.filter((r) => !ordenados.some((n) => n.id === r.id)),
+          ...prevRealizados
+            .filter((r) => !ordenados.some((n) => n.id === r.id))
+            .map((r) => {
+              const actualizado = cambiado(r.pago.id);
+              return actualizado ? { ...r, pago: actualizado } : r;
+            }),
         ]);
       }}
     />

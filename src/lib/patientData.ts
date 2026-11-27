@@ -352,6 +352,9 @@ export type Pago = {
   sinCashback?: boolean;
   /** Folio, referencia o autorización con la que se puede ubicar el pago (transferencia, terminal, cheque…). Opcional. */
   clavePago?: string;
+  /** Parte de este cobro que se cubrió con saldo a favor del paciente (anticipos o pagos de más anteriores). El pago
+   * solo lleva lo que se pagó hoy; esto deja constancia de cuánto era el cobro completo. */
+  saldoAFavorAplicado?: number;
 };
 
 export type MedicamentoRecetado = {
