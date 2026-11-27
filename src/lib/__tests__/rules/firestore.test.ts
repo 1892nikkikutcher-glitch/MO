@@ -241,3 +241,37 @@ describe("eventosCrecimientoConecta — solo superadmin vía dbAdmin", () => {
     await assertFails(setDoc(doc(remitente, "eventosCrecimientoConecta/e2"), { tipo: "manipulado" }));
   });
 });
+
+describe("clinics — la cortesía solo la otorga el Panel de administrador", () => {
+  const UID_DUENO = "uidDuenoClinica";
+  async function sembrarClinica(extra: Record<string, unknown> = {}) {
+    await testEnv.withSecurityRulesDisabled(async (ctx) => {
+      await setDoc(doc(ctx.firestore(), `clinics/${UID_DUENO}`), { ownerId: UID_DUENO, nombre: "Consultorio", ...extra });
+    });
+  }
+
+  it("el dueño puede seguir editando los datos de su clínica", async () => {
+    await sembrarClinica();
+    const dueno = testEnv.authenticatedContext(UID_DUENO).firestore();
+    await assertSucceeds(setDoc(doc(dueno, `clinics/${UID_DUENO}`), { nombre: "Nuevo nombre" }, { merge: true }));
+  });
+
+  it("el dueño no puede darse cortesía a sí mismo", async () => {
+    await sembrarClinica();
+    const dueno = testEnv.authenticatedContext(UID_DUENO).firestore();
+    await assertFails(setDoc(doc(dueno, `clinics/${UID_DUENO}`), { cortesia: true }, { merge: true }));
+  });
+
+  it("el dueño tampoco puede quitarla ni cambiar su motivo", async () => {
+    await sembrarClinica({ cortesia: true, cortesiaNota: "Colaborador" });
+    const dueno = testEnv.authenticatedContext(UID_DUENO).firestore();
+    await assertFails(setDoc(doc(dueno, `clinics/${UID_DUENO}`), { cortesia: false }, { merge: true }));
+    await assertFails(setDoc(doc(dueno, `clinics/${UID_DUENO}`), { cortesiaNota: "otra" }, { merge: true }));
+  });
+
+  it("guardar la clínica con la cortesía tal cual está (sin cambiarla) sí se permite", async () => {
+    await sembrarClinica({ cortesia: true });
+    const dueno = testEnv.authenticatedContext(UID_DUENO).firestore();
+    await assertSucceeds(setDoc(doc(dueno, `clinics/${UID_DUENO}`), { nombre: "Otro", cortesia: true }, { merge: true }));
+  });
+});

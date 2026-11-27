@@ -5,6 +5,7 @@ import {
   planesDisponibles,
   diasRestantesDePrueba,
   pruebaVencida as calcularPruebaVencida,
+  tieneCortesia,
   type ClinicInfo,
   type SuscripcionPlan,
   type SugerenciaPlataforma,
@@ -116,7 +117,9 @@ export async function GET(req: NextRequest) {
       const planActivo = suscripcion.planActivo ?? "prueba";
       const estadoSuscripcion = suscripcion.estadoSuscripcion ?? "prueba";
       const plan = planesDisponibles.find((p) => p.id === planActivo);
-      const mrr = estadoSuscripcion === "activa" ? plan?.precioMensualAprox ?? 0 : 0;
+      const cortesia = tieneCortesia(c);
+      // Una cortesía no es un cliente que paga: aunque su suscripción diga "activa", no suma al MRR.
+      const mrr = estadoSuscripcion === "activa" && !cortesia ? plan?.precioMensualAprox ?? 0 : 0;
       const pruebaIniciadaEl = suscripcion.pruebaIniciadaEl ?? "";
 
       return {
@@ -137,14 +140,19 @@ export async function GET(req: NextRequest) {
         // Solo tiene sentido mientras el plan siga siendo "prueba" — un plan
         // ya pagado nunca se marca vencido sin importar cuánto tiempo pasó.
         diasRestantesPrueba: planActivo === "prueba" ? diasRestantesDePrueba(pruebaIniciadaEl, INICIO_DEL_COBRO) : null,
-        pruebaVencida: calcularPruebaVencida({ planActivo, pruebaIniciadaEl }, INICIO_DEL_COBRO),
+        // Con cortesía la prueba no aplica: nunca se marca vencida (el Dashboard tampoco la bloquea).
+        pruebaVencida: !cortesia && calcularPruebaVencida({ planActivo, pruebaIniciadaEl }, INICIO_DEL_COBRO),
+        cortesia,
+        cortesiaDesde: c.cortesiaDesde ?? null,
+        cortesiaNota: c.cortesiaNota ?? "",
       };
     })
   );
 
   const consultoriosRegistrados = clinicas.length;
   const usuariosTotales = clinicas.reduce((suma, c) => suma + c.usuarios, 0);
-  const pagando = clinicas.filter((c) => c.estadoSuscripcion === "activa");
+  const pagando = clinicas.filter((c) => c.estadoSuscripcion === "activa" && !c.cortesia);
+  const cortesias = clinicas.filter((c) => c.cortesia).length;
   const mrr = pagando.reduce((suma, c) => suma + c.mrr, 0);
   const arpu = pagando.length > 0 ? mrr / pagando.length : 0;
 
@@ -156,7 +164,7 @@ export async function GET(req: NextRequest) {
 
   const mesActualISO = new Date().toISOString().slice(0, 7); // YYYY-MM
   const nuevasDelMes = clinicas.filter((c) => c.creadoEl?.startsWith(mesActualISO)).length;
-  const pruebasActivas = clinicas.filter((c) => c.estadoSuscripcion === "prueba").length;
+  const pruebasActivas = clinicas.filter((c) => c.estadoSuscripcion === "prueba" && !c.cortesia).length;
   const pruebasVencidas = clinicas.filter((c) => c.pruebaVencida).length;
   const cancelaciones = clinicas.filter((c) => c.estadoSuscripcion === "cancelada").length;
 
@@ -176,6 +184,7 @@ export async function GET(req: NextRequest) {
     nuevasDelMes,
     pruebasActivas,
     pruebasVencidas,
+    cortesias,
     cancelaciones,
     // Requiere una foto histórica mensual (ej. un job programado que guarde
     // "suscripciones activas" cada fin de mes) que todavía no existe — se

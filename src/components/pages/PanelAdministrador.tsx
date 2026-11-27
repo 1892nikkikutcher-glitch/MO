@@ -23,6 +23,10 @@ type ClinicaResumen = {
   ultimaActividad: string | null;
   diasRestantesPrueba: number | null;
   pruebaVencida: boolean;
+  /** Acceso de cortesía: sin pagar y sin periodo de prueba. */
+  cortesia: boolean;
+  cortesiaDesde: string | null;
+  cortesiaNota: string;
 };
 
 type SugerenciaResumen = {
@@ -69,6 +73,7 @@ type Resumen = {
   nuevasDelMes: number;
   pruebasActivas: number;
   pruebasVencidas: number;
+  cortesias: number;
   cancelaciones: number;
   churnMensual: number | null;
   clinicas: ClinicaResumen[];
@@ -726,6 +731,32 @@ export default function PanelAdministrador() {
     }
   };
 
+  const alternarCortesia = async (clinica: ClinicaResumen) => {
+    let nota = "";
+    if (clinica.cortesia) {
+      if (!confirm(`¿Quitar la cortesía a ${clinica.nombre}? Volverá a depender de su plan y de su periodo de prueba.`)) return;
+    } else {
+      const respuesta = prompt(
+        `Cortesía para ${clinica.nombre}: usará MO sin pagar y se salta el periodo de prueba.\n\nMotivo (opcional, solo lo ves tú):`,
+        ""
+      );
+      if (respuesta === null) return;
+      nota = respuesta;
+    }
+    setAccionandoId(clinica.id);
+    try {
+      await llamarApi(`/api/admin/clinicas/${clinica.id}`, {
+        method: "PATCH",
+        body: JSON.stringify({ accion: clinica.cortesia ? "quitar-cortesia" : "otorgar-cortesia", nota }),
+      });
+      cargar();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "No se pudo cambiar la cortesía.");
+    } finally {
+      setAccionandoId(null);
+    }
+  };
+
   const otorgarFundadora = async (clinica: ClinicaResumen) => {
     if (!confirm(`¿Otorgar Clínica Fundadora (90 días) a ${clinica.nombre}?`)) return;
     setAccionandoId(clinica.id);
@@ -762,6 +793,7 @@ export default function PanelAdministrador() {
           value={String(resumen.pruebasVencidas)}
           sub={resumen.pruebasVencidas > 0 ? "Ya deberían ver la pantalla de bloqueo" : undefined}
         />
+        <MetricCard label="Cortesías" value={String(resumen.cortesias)} sub="Usan MO sin pagar ni prueba" />
         <MetricCard label="Cancelaciones" value={String(resumen.cancelaciones)} />
         <MetricCard
           label="Churn mensual"
@@ -822,7 +854,11 @@ export default function PanelAdministrador() {
                   </span>
                 </td>
                 <td className="px-4 py-3">
-                  {c.planActivo !== "prueba" ? (
+                  {c.cortesia ? (
+                    <span title={c.cortesiaNota || "Acceso de cortesía"} className="rounded-full bg-accent/15 px-2 py-0.5 text-xs font-semibold text-accent">
+                      Cortesía
+                    </span>
+                  ) : c.planActivo !== "prueba" ? (
                     <span className="text-ink/30">—</span>
                   ) : c.pruebaVencida ? (
                     <span className="rounded-full bg-danger/10 px-2 py-0.5 text-xs font-semibold text-danger">
@@ -865,6 +901,14 @@ export default function PanelAdministrador() {
                     </button>
                     <button onClick={() => setClinicaEliminar(c)} className="text-xs text-danger/60 hover:text-danger">
                       Eliminar
+                    </button>
+                    <button
+                      onClick={() => alternarCortesia(c)}
+                      disabled={accionandoId === c.id}
+                      title={c.cortesia ? "Quitar el acceso de cortesía (volverá a aplicar la prueba o su plan)" : "Dar acceso de cortesía: usa MO sin pagar y se salta la prueba"}
+                      className="text-xs font-semibold text-success hover:text-success disabled:opacity-40"
+                    >
+                      {c.cortesia ? "Quitar cortesía" : "Cortesía"}
                     </button>
                     <button
                       onClick={() => otorgarFundadora(c)}

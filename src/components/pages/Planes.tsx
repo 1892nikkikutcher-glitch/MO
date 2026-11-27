@@ -9,6 +9,7 @@ import {
   diasRestantesDePrueba,
   planesDisponibles,
   pruebaVencida as calcularPruebaVencida,
+  tieneCortesia,
   type PlanId,
 } from "@/lib/patientData";
 
@@ -21,7 +22,8 @@ function hoyLocalIso(): string {
 }
 
 export default function Planes() {
-  const { suscripcion, setSuscripcion, clinicUid, userEmail } = usePatientData();
+  const { suscripcion, setSuscripcion, clinicUid, userEmail, clinicInfo } = usePatientData();
+  const conCortesia = tieneCortesia(clinicInfo);
   const diasRestantes = diasRestantesDePrueba(suscripcion.pruebaIniciadaEl, INICIO_DEL_COBRO);
   const pruebaVencida = calcularPruebaVencida(suscripcion, INICIO_DEL_COBRO);
   const [cargando, setCargando] = useState<PlanId | null>(null);
@@ -67,7 +69,13 @@ export default function Planes() {
 
   return (
     <div className="space-y-6">
-      {suscripcion.planActivo === "prueba" && (
+      {conCortesia && (
+        <div className="rounded-2xl border border-success/30 bg-success/10 p-4 text-sm text-success">
+          Tu consultorio tiene acceso de cortesía: puedes usar todo MO sin pagar ni preocuparte por el periodo de prueba.
+        </div>
+      )}
+
+      {suscripcion.planActivo === "prueba" && !conCortesia && (
         <div
           className={`rounded-2xl border p-4 text-sm ${
             pruebaVencida

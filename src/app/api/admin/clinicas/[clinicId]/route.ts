@@ -123,6 +123,20 @@ export async function PATCH(req: NextRequest, { params }: Params) {
     return NextResponse.json({ ok: true });
   }
 
+  // Cortesía: acceso sin pagar que se salta el periodo de prueba (ver tieneCortesia en patientData.ts).
+  // Se guarda en clinics/{id}, así que no la pisa el webhook de Stripe ni "Editar plan".
+  if (accion === "otorgar-cortesia" || accion === "quitar-cortesia") {
+    const otorgar = accion === "otorgar-cortesia";
+    const nota = typeof body.nota === "string" ? body.nota.trim().slice(0, 200) : "";
+    const hoy = new Date();
+    const hoyIso = `${hoy.getFullYear()}-${String(hoy.getMonth() + 1).padStart(2, "0")}-${String(hoy.getDate()).padStart(2, "0")}`;
+    const datos: Partial<ClinicInfo> = otorgar
+      ? { cortesia: true, cortesiaDesde: hoyIso, cortesiaNota: nota }
+      : { cortesia: false, cortesiaNota: "" };
+    await dbAdmin.collection("clinics").doc(clinicId).set(datos, { merge: true });
+    return NextResponse.json({ ok: true });
+  }
+
   if (accion === "otorgar-fundadora") {
     const hasta = new Date();
     hasta.setDate(hasta.getDate() + 90);

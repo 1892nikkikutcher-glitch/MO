@@ -959,6 +959,8 @@ type PatientDataContextValue = {
   consumirSiguienteFolioReceta: () => string;
   /** Deja los folios de la bitácora de recetas en 1, 2, 3… sin repetir (ver `planificarRenumeracion`). */
   renumerarFoliosRecetas: () => Promise<{ total: number; cambiadas: number; repetidasFusionadas: number }>;
+  /** Cambia el médico de una receta ya expedida (en el expediente y en la bitácora): su cédula, firma y logo salen del médico nuevo. */
+  cambiarMedicoReceta: (receta: { id: string; patientId: string; folio: string }, medicoNuevo: string) => Promise<void>;
   catalogoMedicamentos: MedicamentoCatalogo[];
   setCatalogoMedicamentos: (updater: Updater<MedicamentoCatalogo[]>) => void;
   recursos: Recurso[];
@@ -1355,6 +1357,25 @@ export function PatientDataProvider({
     setRecetasLog(plan.bitacora);
     setFolioReceta({ siguiente: plan.siguiente });
     return { total: plan.bitacora.length, cambiadas: plan.cambios.length, repetidasFusionadas: plan.repetidasFusionadas };
+  };
+  const cambiarMedicoReceta = async (entrada: { id: string; patientId: string; folio: string }, medicoNuevo: string) => {
+    if (!clinicUid) throw new Error("No hay una clínica activa.");
+    const ruta = `users/${clinicUid}/pacientes/${entrada.patientId}/recetas`;
+    // Directo de Firestore: el estado en memoria solo trae las recetas de los pacientes ya abiertos.
+    const snap = await getDocs(collection(db, ruta));
+    const recetas = snap.docs.map((d) => ({ ...(d.data() as Receta), id: d.id }));
+    // Las filas repetidas de la bitácora (mismo folio) apuntan a la receta que quedó en el expediente.
+    const receta = recetas.find((r) => r.id === entrada.id) ?? recetas.find((r) => r.folio === entrada.folio);
+    if (receta) await updateDoc(doc(db, ruta, receta.id), { medico: medicoNuevo });
+    // Si el expediente ya estaba abierto en memoria, se actualiza ahí también (sin reescribir en Firestore).
+    setRecetasPorPacienteState((prev) =>
+      prev[entrada.patientId]
+        ? { ...prev, [entrada.patientId]: prev[entrada.patientId].map((r) => (r.id === receta?.id ? { ...r, medico: medicoNuevo } : r)) }
+        : prev
+    );
+    setRecetasLog((prev) =>
+      prev.map((l) => (l.patientId === entrada.patientId && (l.id === entrada.id || l.folio === entrada.folio) ? { ...l, medico: medicoNuevo } : l))
+    );
   };
   const [catalogoMedicamentos, setCatalogoMedicamentos] = useFirestoreList<MedicamentoCatalogo>(
     clinicUid,
@@ -3418,6 +3439,7 @@ export function PatientDataProvider({
         setFotosPaciente,
         consumirSiguienteFolioReceta,
         renumerarFoliosRecetas,
+        cambiarMedicoReceta,
         catalogoMedicamentos,
         setCatalogoMedicamentos,
         recursos,

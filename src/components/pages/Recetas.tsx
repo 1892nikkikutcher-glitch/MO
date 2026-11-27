@@ -106,6 +106,7 @@ export default function Recetas() {
     perfilDoctor,
     consumirSiguienteFolioReceta,
     renumerarFoliosRecetas,
+    cambiarMedicoReceta,
     clinicInfo,
     historiaClinicaPorPaciente,
     historiaClinicaTemplate,
@@ -182,10 +183,44 @@ export default function Recetas() {
   const seleccionarPaciente = (id: string) => {
     const p = patients.find((pp) => pp.id === id);
     setPatientId(id);
+    // La receta sale a nombre del médico responsable del paciente (si tiene uno asignado); el selector sigue editable.
+    const responsable = p?.medicoResponsableId ? medicos.find((m) => m.id === p.medicoResponsableId)?.nombre : undefined;
+    if (responsable) setMedico(responsable);
     setBusquedaPaciente(p ? formatNombreConEdad(p.name, p.birthDate) : "");
     setGuardado(false);
     if (id) cargarDatosPaciente(id);
   };
+
+  const [cambiandoMedicoId, setCambiandoMedicoId] = useState<string | null>(null);
+  /** Cambia el médico de una receta ya expedida: la cédula, firma, logo y teléfono del PDF salen del médico nuevo. */
+  const cambiarMedico = async (entrada: { id: string; patientId: string; folio: string }, medicoNuevo: string) => {
+    setCambiandoMedicoId(entrada.id);
+    try {
+      await cambiarMedicoReceta(entrada, medicoNuevo);
+    } catch (e) {
+      console.error("No se pudo cambiar el médico de la receta", e);
+      alert("No se pudo cambiar el médico de la receta. Revisa tu conexión e inténtalo de nuevo.");
+    } finally {
+      setCambiandoMedicoId(null);
+    }
+  };
+  /** Selector del médico de una receta expedida (si el médico ya no existe en el catálogo, se conserva como opción). */
+  const selectorMedico = (entrada: { id: string; patientId: string; folio: string; medico: string }) => (
+    <select
+      value={entrada.medico}
+      disabled={cambiandoMedicoId === entrada.id || medicos.length === 0}
+      onChange={(e) => cambiarMedico(entrada, e.target.value)}
+      title="Cambia el médico: la receta mostrará su cédula, firma y teléfono"
+      className="max-w-[11rem] rounded-lg border border-edge/10 bg-field px-2 py-1 text-xs text-ink outline-none focus:border-accent/60 disabled:opacity-50"
+    >
+      {!medicos.some((m) => m.nombre === entrada.medico) && <option value={entrada.medico}>{entrada.medico || "Sin médico"}</option>}
+      {medicos.map((m) => (
+        <option key={m.id} value={m.nombre}>
+          {m.nombre}
+        </option>
+      ))}
+    </select>
+  );
 
   const cambiarPaciente = () => {
     setPatientId("");
@@ -743,25 +778,27 @@ export default function Recetas() {
             {recetasPrevias.map((r) => (
               <div key={r.id} className="flex items-start justify-between gap-3 rounded-xl border border-edge/10 bg-surface p-3 text-sm">
                 <div className="min-w-0">
-                  <p className="text-xs text-ink/40">
-                    Folio {r.folio} · {r.fecha} · {r.medico}
-                  </p>
-                  <p className="mt-1 text-ink/70">{r.medicamentos.map((m) => m.nombre).join(", ")}</p>
-                </div>
-                <div className="flex shrink-0 flex-wrap items-center justify-end gap-2">
+                  <div className="flex flex-wrap items-center gap-2 text-xs text-ink/40">
+                    <span>
+                      Folio {r.folio} · {r.fecha} ·
+                    </span>
+                    {selectorMedico({ id: r.id, patientId, folio: r.folio, medico: r.medico })}
+                  </div>
                   <button
                     onClick={() => verReceta({ id: r.id, patientId, patientName: patient?.name ?? "", folio: r.folio })}
                     disabled={recetaPorAbrir?.id === r.id}
                     title="Abrir la receta en PDF en una pestaña nueva"
-                    className="whitespace-nowrap rounded-full border border-accent/30 px-3 py-1 text-xs font-semibold text-accent transition-colors hover:border-accent/70 hover:bg-accent/10 disabled:opacity-50"
+                    className="mt-1 text-left text-ink/70 underline decoration-ink/20 underline-offset-2 transition-colors hover:text-accent hover:decoration-accent/50 disabled:opacity-50"
                   >
-                    {recetaPorAbrir?.id === r.id && recetaPorAbrir.accion === "ver" ? "Abriendo…" : "Ver receta"}
+                    {recetaPorAbrir?.id === r.id && recetaPorAbrir.accion === "ver" ? "Abriendo…" : r.medicamentos.map((m) => m.nombre).join(", ") || "Ver receta"}
                   </button>
+                </div>
+                <div className="flex shrink-0 flex-wrap items-center justify-end gap-2">
                   <button
                     onClick={() => verReceta({ id: r.id, patientId, patientName: patient?.name ?? "", folio: r.folio }, "whatsapp")}
                     disabled={recetaPorAbrir?.id === r.id || enviandoWhatsApp}
                     title="Enviar esta receta en PDF por WhatsApp"
-                    className="whitespace-nowrap rounded-full border border-success/30 px-3 py-1 text-xs font-semibold text-success transition-colors hover:border-success/70 hover:bg-success/10 disabled:opacity-50"
+                    className="whitespace-nowrap rounded-full bg-[#25D366] px-3 py-1 text-xs font-semibold text-white transition-colors hover:bg-[#1ebe5a] disabled:opacity-50"
                   >
                     {recetaPorAbrir?.id === r.id && recetaPorAbrir.accion === "whatsapp" ? "Preparando…" : "Enviar por WhatsApp"}
                   </button>
@@ -839,23 +876,24 @@ export default function Recetas() {
                         {r.patientName}
                       </button>
                     </td>
-                    <td className="px-6 py-3 text-ink/60">{r.medico}</td>
-                    <td className="px-6 py-3 text-ink/70">{r.medicamentos.join(", ") || "—"}</td>
-                    <td className="px-6 py-3 text-right">
-                      <div className="flex items-center justify-end gap-2">
+                    <td className="px-6 py-3 text-ink/60">{selectorMedico(r)}</td>
+                    <td className="px-6 py-3 text-ink/70">
                       <button
                         onClick={() => verReceta(r)}
                         disabled={recetaPorAbrir?.id === r.id}
                         title="Abrir la receta en PDF en una pestaña nueva"
-                        className="whitespace-nowrap rounded-full border border-accent/30 px-3 py-1 text-xs font-semibold text-accent transition-colors hover:border-accent/70 hover:bg-accent/10 disabled:opacity-50"
+                        className="text-left underline decoration-ink/20 underline-offset-2 transition-colors hover:text-accent hover:decoration-accent/50 disabled:opacity-50"
                       >
-                        {recetaPorAbrir?.id === r.id && recetaPorAbrir.accion === "ver" ? "Abriendo…" : "Ver receta"}
+                        {recetaPorAbrir?.id === r.id && recetaPorAbrir.accion === "ver" ? "Abriendo…" : r.medicamentos.join(", ") || "Ver receta"}
                       </button>
+                    </td>
+                    <td className="px-6 py-3 text-right">
+                      <div className="flex items-center justify-end gap-2">
                       <button
                         onClick={() => verReceta(r, "whatsapp")}
                         disabled={recetaPorAbrir?.id === r.id || enviandoWhatsApp}
                         title="Enviar esta receta en PDF por WhatsApp"
-                        className="whitespace-nowrap rounded-full border border-success/30 px-3 py-1 text-xs font-semibold text-success transition-colors hover:border-success/70 hover:bg-success/10 disabled:opacity-50"
+                        className="whitespace-nowrap rounded-full bg-[#25D366] px-3 py-1 text-xs font-semibold text-white transition-colors hover:bg-[#1ebe5a] disabled:opacity-50"
                       >
                         {recetaPorAbrir?.id === r.id && recetaPorAbrir.accion === "whatsapp" ? "Preparando…" : "Enviar por WhatsApp"}
                       </button>

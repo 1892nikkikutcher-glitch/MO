@@ -612,7 +612,19 @@ export type ClinicInfo = {
    * Solo el Panel de administrador otorga "clinica_fundadora". */
   planConectaId?: "mo_red" | "mo_pro_individual" | "clinica_fundadora";
   fundadoraHasta?: string;
+  /** Acceso de cortesía: la clínica usa MO sin pagar y se salta el periodo de prueba (nunca ve la pantalla de
+   * "Tu periodo de prueba terminó" ni el aviso de días restantes). No cuenta como suscripción que paga (MRR).
+   * Solo el Panel de administrador lo otorga o lo quita (ver tieneCortesia y firestore.rules). */
+  cortesia?: boolean;
+  /** Fecha ISO (YYYY-MM-DD) en que se otorgó la cortesía y, opcional, el motivo (informativo, solo para el administrador). */
+  cortesiaDesde?: string;
+  cortesiaNota?: string;
 };
+
+/** true si la clínica tiene acceso de cortesía vigente (lo otorgado desde el Panel de administrador). */
+export function tieneCortesia(clinica: Pick<ClinicInfo, "cortesia"> | null | undefined): boolean {
+  return clinica?.cortesia === true;
+}
 
 /** Documento `clinicMembers/{clinicId}_{uid}`. Campo `role` en inglés para
  * compatibilidad con la colección compartida de sonrie-x-todos-dental. */

@@ -154,7 +154,12 @@ service cloud.firestore {
       allow read: if isActiveMember(clinicId) || isLinkedPatient(clinicId)
         || (signedIn() && resource.data.ownerId == request.auth.uid);
       allow create: if signedIn() && request.resource.data.ownerId == request.auth.uid;
-      allow update, delete: if isClinicAdmin(clinicId)
+      // La cortesía (acceso sin pagar) solo la otorga el Panel de administrador (Admin SDK, que
+      // ignora estas reglas): ni el dueño ni un admin de la clínica pueden dársela a sí mismos.
+      allow update: if (isClinicAdmin(clinicId)
+        || (signedIn() && resource.data.ownerId == request.auth.uid))
+        && !request.resource.data.diff(resource.data).affectedKeys().hasAny(['cortesia', 'cortesiaDesde', 'cortesiaNota']);
+      allow delete: if isClinicAdmin(clinicId)
         || (signedIn() && resource.data.ownerId == request.auth.uid);
     }
 
