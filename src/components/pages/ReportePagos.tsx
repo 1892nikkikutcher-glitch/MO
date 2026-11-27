@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { usePatientData } from "@/context/PatientDataContext";
+import { direccionConTelefono } from "@/lib/telefonoConsultorio";
 import { formatCurrency, type Pago } from "@/lib/patientData";
 import type { PagoRealizado } from "@/lib/pagosRealizados";
 import { calcularDisponibleDevolucion, resumenDesdeDevoluciones } from "@/lib/devolucionesPago";
@@ -155,7 +156,7 @@ export default function ReportePagos() {
         realizados: realizadosDelPeriodo,
         eliminados: eliminadosDelPeriodo,
         clinicaNombre: clinicInfo?.nombre || "",
-        direccion: perfilDoctor.direccionClinica,
+        direccion: direccionConTelefono(perfilDoctor.direccionClinica, clinicInfo?.telefono),
         logoUrl: perfilDoctor.logoClinicaUrl,
       });
       descargarBlob(blob, nombre);

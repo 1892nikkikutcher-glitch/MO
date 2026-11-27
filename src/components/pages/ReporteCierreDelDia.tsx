@@ -2,6 +2,7 @@
 
 import { useMemo, useState } from "react";
 import { usePatientData } from "@/context/PatientDataContext";
+import { direccionConTelefono } from "@/lib/telefonoConsultorio";
 import { armarCierre, duracionLegible, fechaLargaConDia, siguienteDiaDeAtencion, textoDelCierre, type CitaDelCierre } from "@/lib/cierreDelDia";
 import { sumarDias } from "@/lib/evaluacionSemanal";
 import { generarCierreDelDiaPdf } from "@/lib/generarCierreDelDiaPdf";
@@ -64,7 +65,7 @@ export default function ReporteCierreDelDia() {
       const { blob, nombre } = await generarCierreDelDiaPdf({
         cierre,
         clinicaNombre: clinicInfo?.nombre || "",
-        direccion: perfilDoctor.direccionClinica,
+        direccion: direccionConTelefono(perfilDoctor.direccionClinica, clinicInfo?.telefono),
         logoUrl: perfilDoctor.logoClinicaUrl,
       });
       descargarBlob(blob, nombre);

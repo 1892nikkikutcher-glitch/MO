@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { usePatientData } from "@/context/PatientDataContext";
+import { direccionConTelefono } from "@/lib/telefonoConsultorio";
 import { formatCurrency } from "@/lib/patientData";
 import { generarSaldosPendientesPdf } from "@/lib/generarSaldosPendientesPdf";
 import { descargarBlob } from "@/lib/pdfDocumento";
@@ -145,7 +146,7 @@ export default function ReporteSaldosPendientes() {
         saldos: lista,
         telefonos: Object.fromEntries(patients.map((p) => [p.id, p.phone])),
         clinicaNombre: clinicInfo?.nombre || "",
-        direccion: perfilDoctor.direccionClinica,
+        direccion: direccionConTelefono(perfilDoctor.direccionClinica, clinicInfo?.telefono),
         logoUrl: perfilDoctor.logoClinicaUrl,
         provisional: !resultado,
         fecha: calculadoEl ?? new Date(),

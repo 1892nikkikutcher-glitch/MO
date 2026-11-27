@@ -1,6 +1,7 @@
 import jsPDF from "jspdf";
 import { cargarImagen, type ImagenCargada } from "./imagenesPdf";
 import type { PerfilDoctor, SavedBudget } from "./patientData";
+import { lineasContactoConsultorio, yPieContacto } from "./telefonoConsultorio";
 
 export type DatosPresupuestoTotalPdf = {
   presupuestos: SavedBudget[];
@@ -9,6 +10,8 @@ export type DatosPresupuestoTotalPdf = {
   pacienteCorreo: string;
   pacienteTelefono: string;
   perfilDoctor: PerfilDoctor;
+  /** Teléfono del consultorio a imprimir (un plan completo puede mezclar médicos, así que el general; ver telefonoConsultorioDe). */
+  telefonoConsultorio?: string;
 };
 
 function formatCurrency(valor: number): string {
@@ -55,10 +58,10 @@ export async function generarPresupuestoTotalPdf(datos: DatosPresupuestoTotalPdf
   doc.text("PLAN DE TRATAMIENTO COMPLETO", pageWidth / 2, y + 8, { align: "center" });
 
   y += 24;
-  if (datos.perfilDoctor.direccionClinica) {
-    doc.setFont("helvetica", "normal");
-    doc.setFontSize(8.5);
-    const lineasDir = doc.splitTextToSize(datos.perfilDoctor.direccionClinica, anchoNombre);
+  doc.setFont("helvetica", "normal");
+  doc.setFontSize(8.5);
+  const lineasDir = lineasContactoConsultorio(doc, datos.perfilDoctor.direccionClinica, datos.telefonoConsultorio, anchoNombre);
+  if (lineasDir.length > 0) {
     doc.text(lineasDir, xNombre, y);
     y += lineasDir.length * 4;
   }
@@ -142,11 +145,10 @@ export async function generarPresupuestoTotalPdf(datos: DatosPresupuestoTotalPdf
   doc.text("TOTAL GENERAL", xNombre, y);
   doc.text(formatCurrency(granTotal), xTotal, y, { align: "right" });
 
-  if (datos.perfilDoctor.direccionClinica) {
-    doc.setFont("helvetica", "normal");
-    doc.setFontSize(8);
-    doc.text(datos.perfilDoctor.direccionClinica, pageWidth / 2, pageHeight - 12, { align: "center" });
-  }
+  doc.setFont("helvetica", "normal");
+  doc.setFontSize(8);
+  const lineasPie = lineasContactoConsultorio(doc, datos.perfilDoctor.direccionClinica, datos.telefonoConsultorio, pageWidth - marginX * 2);
+  if (lineasPie.length > 0) doc.text(lineasPie, pageWidth / 2, yPieContacto(pageHeight, lineasPie.length), { align: "center" });
 
   return doc.output("blob");
 }

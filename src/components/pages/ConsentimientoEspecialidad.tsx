@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { usePatientData } from "@/context/PatientDataContext";
+import PieConsultorio from "@/components/PieConsultorio";
 import { calcularEdadDetallada, identidadDoctorDe, type Patient } from "@/lib/patientData";
 import { manejarCambioNombre } from "@/lib/textoNombre";
 import type { TipoConsentimientoEspecialidad } from "@/lib/consentimientosEspecialidad";
@@ -32,7 +33,7 @@ export default function ConsentimientoEspecialidad({
   tipo: TipoConsentimientoEspecialidad;
   onVolver?: () => void;
 }) {
-  const { perfilDoctor, clinicInfo, recursos, citas, consentimientosConfig } = usePatientData();
+  const { clinicInfo, recursos, citas, consentimientosConfig } = usePatientData();
   const medicos = recursos.filter((r) => r.tipo === "medico");
   const contenido = contenidoConsentimiento(tipo, consentimientosConfig);
   const esMenorDeEdad = (calcularEdadDetallada(patient.birthDate)?.years ?? 18) < 18;
@@ -198,7 +199,7 @@ export default function ConsentimientoEspecialidad({
         <div className="mt-3 text-center text-sm leading-snug print:mt-1.5 print:text-xs">
           <p className="font-semibold">{medico || "Consultorio dental"}</p>
           {cedula && <p>Cédula profesional {cedula}</p>}
-          {perfilDoctor.direccionClinica && <p>{perfilDoctor.direccionClinica}</p>}
+          <PieConsultorio medico={medico} />
         </div>
 
         <p className="mt-4 text-sm print:mt-2 print:text-xs">

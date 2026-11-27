@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { usePatientData } from "@/context/PatientDataContext";
+import { direccionConTelefono } from "@/lib/telefonoConsultorio";
 import { formatCurrency } from "@/lib/patientData";
 import { sumarDias } from "@/lib/evaluacionSemanal";
 import { generarCorteCajaPdf } from "@/lib/generarCorteCajaPdf";
@@ -56,7 +57,7 @@ export default function ReporteCorteCaja() {
         medicos: medicos.map(([nombreMedico, monto]) => ({ nombre: nombreMedico, monto, porcentajeComision: medicosPorNombre.get(nombreMedico)?.porcentajeComision ?? null })),
         ultimosDias,
         clinicaNombre: clinicInfo?.nombre || "",
-        direccion: perfilDoctor.direccionClinica,
+        direccion: direccionConTelefono(perfilDoctor.direccionClinica, clinicInfo?.telefono),
         logoUrl: perfilDoctor.logoClinicaUrl,
       });
       descargarBlob(blob, nombre);

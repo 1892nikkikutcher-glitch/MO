@@ -1,6 +1,7 @@
 "use client";
 
 import { usePatientData } from "@/context/PatientDataContext";
+import PieConsultorio from "@/components/PieConsultorio";
 import { formatCurrency, type SavedBudget } from "@/lib/patientData";
 
 /** Versión imprimible de TODO el historial de presupuestos de un paciente —
@@ -49,7 +50,7 @@ export default function PresupuestoTotalImpreso({
         </div>
       </div>
 
-      {perfilDoctor.direccionClinica && <p className="mt-2 text-xs">{perfilDoctor.direccionClinica}</p>}
+      <PieConsultorio className="mt-2 text-xs" />
 
       <div className="mt-4 flex justify-between text-sm">
         <div>
@@ -107,9 +108,7 @@ export default function PresupuestoTotalImpreso({
         <p className="text-base font-bold">TOTAL GENERAL&nbsp;&nbsp;{formatCurrency(granTotal)}</p>
       </div>
 
-      {perfilDoctor.direccionClinica && (
-        <p className="mt-10 text-center text-[10px]">{perfilDoctor.direccionClinica}</p>
-      )}
+      <PieConsultorio className="mt-10 text-center text-[10px]" />
     </div>
   );
 }

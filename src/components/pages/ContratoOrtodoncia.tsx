@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { usePatientData } from "@/context/PatientDataContext";
+import PieConsultorio from "@/components/PieConsultorio";
 import { calcularEdadDetallada, identidadDoctorDe, formatCurrency, type Patient } from "@/lib/patientData";
 import { manejarCambioNombre } from "@/lib/textoNombre";
 import { renderPlantilla } from "@/lib/formatosWhatsapp";
@@ -25,7 +26,7 @@ export default function ContratoOrtodoncia({
   patient: Patient;
   onVolver?: () => void;
 }) {
-  const { perfilDoctor, clinicInfo, recursos, citas, contratoOrtodoncia } = usePatientData();
+  const { clinicInfo, recursos, citas, contratoOrtodoncia } = usePatientData();
   const medicos = recursos.filter((r) => r.tipo === "medico");
   const clinicaNombre = clinicInfo?.nombre || "";
   const esMenorDeEdad = (calcularEdadDetallada(patient.birthDate)?.years ?? 18) < 18;
@@ -281,9 +282,7 @@ export default function ContratoOrtodoncia({
           Contrato de Prestación de Servicios Odontológicos
           {clinicaNombre && <> — {clinicaNombre}</>}
         </h2>
-        {perfilDoctor.direccionClinica && (
-          <p className="mt-2 text-center text-sm print:text-xs">{perfilDoctor.direccionClinica}</p>
-        )}
+        <PieConsultorio medico={medico} className="mt-2 text-center text-sm print:text-xs" />
         <p className="mt-4 whitespace-pre-line text-justify text-[13px] leading-relaxed print:mt-2 print:text-[10.5px] print:leading-snug">
           {textoContrato}
         </p>

@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { usePatientData } from "@/context/PatientDataContext";
+import PieConsultorio from "@/components/PieConsultorio";
 import { calcularEdadDetallada, identidadDoctorDe } from "@/lib/patientData";
 import { manejarCambioNombre } from "@/lib/textoNombre";
 import { toISODate } from "@/lib/agendaHelpers";
@@ -41,7 +42,7 @@ export default function ConsentimientoInformado({
   patient: Patient;
   onVolver?: () => void;
 }) {
-  const { perfilDoctor, clinicInfo, recursos, citas, consentimientosConfig } = usePatientData();
+  const { clinicInfo, recursos, citas, consentimientosConfig } = usePatientData();
   const contenido = contenidoConsentimiento(CLAVE_CONSENTIMIENTO_GENERAL, consentimientosConfig);
   const textoDe = (plantilla: string) =>
     renderConsentimiento(plantilla, CLAVE_CONSENTIMIENTO_GENERAL, {
@@ -215,7 +216,7 @@ export default function ConsentimientoInformado({
         <div className="mt-3 text-center text-sm leading-snug print:mt-1.5 print:text-xs">
           <p className="font-semibold">{medico || "Consultorio dental"}</p>
           {cedula && <p>Cédula profesional {cedula}</p>}
-          {perfilDoctor.direccionClinica && <p>{perfilDoctor.direccionClinica}</p>}
+          <PieConsultorio medico={medico} />
         </div>
 
         <p className="mt-4 text-sm print:mt-2 print:text-xs">

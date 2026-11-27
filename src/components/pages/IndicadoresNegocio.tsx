@@ -2,6 +2,7 @@
 
 import { useMemo, useState } from "react";
 import { usePatientData } from "@/context/PatientDataContext";
+import { direccionConTelefono } from "@/lib/telefonoConsultorio";
 import { usePrivacidad } from "@/context/PrivacidadContext";
 import { formatCurrency } from "@/lib/patientData";
 import { calcularIndicadores, diasDelMes, mesDesplazado } from "@/lib/indicadoresNegocio";
@@ -168,7 +169,7 @@ export default function IndicadoresNegocio() {
         indicadores: ind,
         etiquetaMes,
         clinicaNombre: clinicInfo?.nombre || "",
-        direccion: perfilDoctor.direccionClinica,
+        direccion: direccionConTelefono(perfilDoctor.direccionClinica, clinicInfo?.telefono),
         logoUrl: perfilDoctor.logoClinicaUrl,
         balance,
       });

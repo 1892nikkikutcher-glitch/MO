@@ -7,6 +7,7 @@
 
 import BarrasComparativa, { type OpcionGrafica } from "@/components/BarrasComparativa";
 import { usePatientData } from "@/context/PatientDataContext";
+import PieConsultorio from "@/components/PieConsultorio";
 import { EJES_COMPARATIVA } from "./NuevaComparativaRehabilitacion";
 import { formatCurrency, type SavedBudget } from "@/lib/patientData";
 import { etiquetaTratamiento, type ComparativaRehabilitacion } from "@/lib/comparativaRehabilitacion";
@@ -95,9 +96,7 @@ export default function ComparativaImpresa({
         ))}
       </div>
 
-      {perfilDoctor.direccionClinica && (
-        <p className="mt-6 text-center text-xs">{perfilDoctor.direccionClinica}</p>
-      )}
+      <PieConsultorio className="mt-6 text-center text-xs" />
     </div>
   );
 }

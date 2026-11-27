@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { usePatientData } from "@/context/PatientDataContext";
+import { direccionConTelefono } from "@/lib/telefonoConsultorio";
 import { formatCurrency } from "@/lib/patientData";
 import { generarDevolucionesPdf } from "@/lib/generarDevolucionesPdf";
 import { descargarBlob } from "@/lib/pdfDocumento";
@@ -35,7 +36,7 @@ export default function ReporteDevoluciones() {
         eventos: devolucionesLog,
         nombreDeUid,
         clinicaNombre: clinicInfo?.nombre || "",
-        direccion: perfilDoctor.direccionClinica,
+        direccion: direccionConTelefono(perfilDoctor.direccionClinica, clinicInfo?.telefono),
         logoUrl: perfilDoctor.logoClinicaUrl,
       });
       descargarBlob(blob, nombre);

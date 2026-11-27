@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { usePatientData } from "@/context/PatientDataContext";
+import PieConsultorio from "@/components/PieConsultorio";
 import type { Patient } from "@/lib/patientData";
 
 const inputClass =
@@ -129,9 +130,7 @@ export default function ConstanciaPermanencia({
           </div>
         </div>
 
-        {perfilDoctor.direccionClinica && (
-          <p className="mt-8 text-center text-xs">{perfilDoctor.direccionClinica}</p>
-        )}
+        <PieConsultorio className="mt-8 text-center text-xs" />
       </div>
     </div>
   );

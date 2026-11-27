@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { usePatientData } from "@/context/PatientDataContext";
+import { direccionConTelefono } from "@/lib/telefonoConsultorio";
 import { formatCurrency } from "@/lib/patientData";
 import { sumarDias } from "@/lib/evaluacionSemanal";
 import { generarCorteCajaPdf } from "@/lib/generarCorteCajaPdf";
@@ -47,7 +48,7 @@ export default function ReporteCorteDiario() {
         medicos: [],
         ultimosDias: [],
         clinicaNombre: clinicInfo?.nombre || "",
-        direccion: perfilDoctor.direccionClinica,
+        direccion: direccionConTelefono(perfilDoctor.direccionClinica, clinicInfo?.telefono),
         logoUrl: perfilDoctor.logoClinicaUrl,
       });
       descargarBlob(blob, nombre);

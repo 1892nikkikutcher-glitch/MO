@@ -53,6 +53,7 @@ import {
   type Pago,
   type LineItem,
 } from "@/lib/patientData";
+import { direccionConTelefono, telefonoConsultorioDe } from "@/lib/telefonoConsultorio";
 import { textoMotivoNoAsistencia } from "@/lib/noAsistencia";
 import { textoAutoriaPresupuesto } from "@/lib/autoriaRegistros";
 import {
@@ -272,6 +273,7 @@ function PresupuestosTab({
   const {
     perfilDoctor,
     recursos,
+    clinicInfo: infoConsultorio,
     historiaClinicaPorPaciente,
     setRespuestasHistoriaClinica,
     comparativasPorPaciente,
@@ -345,6 +347,7 @@ function PresupuestosTab({
         fechaLarga: fechaLargaHoy(),
         pacienteNombre: patient.name,
         perfilDoctor,
+        telefonoConsultorio: telefonoConsultorioDe(null, recursos, infoConsultorio?.telefono),
       });
       const resultado = await enviarPdfPorWhatsapp({ blob, nombreArchivo, telefono: patient.phone, caption, ventanaPrevia: ventanaWhatsApp });
       if (resultado.requiereAbrirManualmente) setWaUrlPendiente(resultado.waUrl);
@@ -420,6 +423,7 @@ function PresupuestosTab({
         total: budget.total,
         identidadDoctor: identidadDoctorDe(budget.medico, recursos),
         perfilDoctor,
+        telefonoConsultorio: telefonoConsultorioDe(budget.medico, recursos, infoConsultorio?.telefono),
       });
       const resultado = await enviarPdfPorWhatsapp({
         blob,
@@ -454,6 +458,7 @@ function PresupuestosTab({
         pacienteCorreo: patient.email ?? "",
         pacienteTelefono: patient.phone,
         perfilDoctor,
+        telefonoConsultorio: telefonoConsultorioDe(null, recursos, infoConsultorio?.telefono),
       });
       const resultado = await enviarPdfPorWhatsapp({
         blob,
@@ -1441,7 +1446,7 @@ export default function Expediente({
       const { blob, nombre } = await generarExpedientePdf({
         patient,
         clinicaNombre: clinicInfo?.nombre || "",
-        direccion: perfilClinica.direccionClinica,
+        direccion: direccionConTelefono(perfilClinica.direccionClinica, telefonoConsultorioDe(medicoAsignado?.nombre ?? medicoDeCita?.nombre, recursos, clinicInfo?.telefono)),
         logoUrl: perfilClinica.logoClinicaUrl,
         medicoResponsable: medicoAsignado?.nombre ?? medicoDeCita?.nombre,
         historiaTemplate: historiaClinicaTemplate,

@@ -17,6 +17,8 @@ export const reciboCompartidoSchema = z
     clinicaNombre: texto(200),
     logoClinicaUrl: texto(2000).default(""),
     direccionClinica: texto(1000).default(""),
+    /** Teléfono del consultorio (es público porque va impreso en el recibo; no es el del paciente). Los recibos viejos no lo traen. */
+    telefonoClinica: texto(60).default(""),
     /** Próxima cita y saldo de Cashback, que van al pie del recibo. */
     notaPie: texto(1000).default(""),
     /** Estado de cuenta (presupuestado, pagado, saldo y costo de la próxima cita); los recibos viejos no lo traen. */

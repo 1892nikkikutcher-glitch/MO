@@ -12,6 +12,7 @@ import AvisoNoCabeEnHoja from "@/components/AvisoNoCabeEnHoja";
 import { slugify } from "@/lib/textoNombre";
 import type { RecetaLogEntry } from "@/lib/recetasLog";
 import { foliosIrregulares } from "@/lib/recetasFolios";
+import { telefonoConsultorioDe } from "@/lib/telefonoConsultorio";
 import { coincideAlergia, condicionesSistemicasPositivas, esNegacionAlergia } from "@/lib/historiaClinica";
 
 const plantillasRecomendaciones = [
@@ -115,8 +116,7 @@ export default function Recetas() {
   /** Identidad que se imprime en la receta de `nombreMedico`. El teléfono es el de SU consultorio; si todavía no lo
    * capturó, se usa el del consultorio general (Administración → Consultorio) para que la receta nunca salga sin uno. */
   const identidadParaReceta = (nombreMedico: string) => {
-    const identidad = identidadDoctorDe(nombreMedico, recursos);
-    return { ...identidad, telefono: identidad.telefono.trim() || clinicInfo?.telefono?.trim() || "" };
+    return { ...identidadDoctorDe(nombreMedico, recursos), telefono: telefonoConsultorioDe(nombreMedico, recursos, clinicInfo?.telefono) };
   };
 
   const [patientId, setPatientId] = useState("");

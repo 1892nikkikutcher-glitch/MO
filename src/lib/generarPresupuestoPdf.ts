@@ -1,6 +1,7 @@
 import jsPDF from "jspdf";
 import { cargarImagen, type ImagenCargada } from "./imagenesPdf";
 import type { IdentidadDoctor, LineItem, PerfilDoctor } from "./patientData";
+import { lineasContactoConsultorio, yPieContacto } from "./telefonoConsultorio";
 
 export type DatosPresupuestoPdf = {
   folio: string;
@@ -16,6 +17,8 @@ export type DatosPresupuestoPdf = {
    * cédula/especialidad del médico, y eso no cambia con esta unificación. */
   identidadDoctor: IdentidadDoctor;
   perfilDoctor: PerfilDoctor;
+  /** Teléfono del consultorio a imprimir (el del médico, o el general; ver telefonoConsultorioDe). */
+  telefonoConsultorio?: string;
 };
 
 function formatCurrency(valor: number): string {
@@ -69,9 +72,9 @@ export async function generarPresupuestoPdf(datos: DatosPresupuestoPdf): Promise
   doc.text(`Folio: ${datos.folio}`, xTotal, y + 14, { align: "right" });
 
   y += 24;
-  if (datos.perfilDoctor.direccionClinica) {
-    doc.setFontSize(8.5);
-    const lineasDir = doc.splitTextToSize(datos.perfilDoctor.direccionClinica, anchoNombre);
+  doc.setFontSize(8.5);
+  const lineasDir = lineasContactoConsultorio(doc, datos.perfilDoctor.direccionClinica, datos.telefonoConsultorio, anchoNombre);
+  if (lineasDir.length > 0) {
     doc.text(lineasDir, xNombre, y);
     y += lineasDir.length * 4;
   }
@@ -165,11 +168,10 @@ export async function generarPresupuestoPdf(datos: DatosPresupuestoPdf): Promise
   doc.text("TOTAL PRESUPUESTO", xDesc, y, { align: "right" });
   doc.text(formatCurrency(datos.total), xTotal, y, { align: "right" });
 
-  if (datos.perfilDoctor.direccionClinica) {
-    doc.setFont("helvetica", "normal");
-    doc.setFontSize(8);
-    doc.text(datos.perfilDoctor.direccionClinica, pageWidth / 2, pageHeight - 12, { align: "center" });
-  }
+  doc.setFont("helvetica", "normal");
+  doc.setFontSize(8);
+  const lineasPie = lineasContactoConsultorio(doc, datos.perfilDoctor.direccionClinica, datos.telefonoConsultorio, pageWidth - 32);
+  if (lineasPie.length > 0) doc.text(lineasPie, pageWidth / 2, yPieContacto(pageHeight, lineasPie.length), { align: "center" });
 
   return doc.output("blob");
 }

@@ -7,6 +7,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { usePatientData } from "@/context/PatientDataContext";
+import PieConsultorio from "@/components/PieConsultorio";
 import {
   calcularEdadDetallada,
   formatCurrency,
@@ -124,7 +125,7 @@ export default function DocumentosPago({
           {identidad.cedulaProfesional && <> · Cédula profesional {identidad.cedulaProfesional}</>}
         </p>
       )}
-      {perfilDoctor.direccionClinica && <p>{perfilDoctor.direccionClinica}</p>}
+      <PieConsultorio medico={medico} />
     </div>
   );
 

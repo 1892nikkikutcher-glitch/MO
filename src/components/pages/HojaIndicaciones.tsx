@@ -1,6 +1,7 @@
 "use client";
 
 import { usePatientData } from "@/context/PatientDataContext";
+import PieConsultorio from "@/components/PieConsultorio";
 import { hojasIndicaciones, type TipoHojaIndicaciones } from "@/lib/hojasIndicaciones";
 import type { Patient } from "@/lib/patientData";
 
@@ -94,9 +95,7 @@ export default function HojaIndicaciones({
           Ante cualquier duda, molestia fuera de lo esperado o urgencia, contáctanos de inmediato.
         </p>
 
-        {perfilDoctor.direccionClinica && (
-          <p className="mt-8 text-center text-xs">{perfilDoctor.direccionClinica}</p>
-        )}
+        <PieConsultorio className="mt-8 text-center text-xs" />
       </div>
     </div>
   );

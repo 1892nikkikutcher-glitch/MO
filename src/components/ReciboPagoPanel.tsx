@@ -13,6 +13,7 @@ import { generarReciboPagoPdf } from "@/lib/generarReciboPagoPdf";
 import { buildReciboTexto, formatCurrency, type Pago } from "@/lib/patientData";
 import { resumenCuentaRecibo } from "@/lib/resumenCuentaRecibo";
 import { slugify } from "@/lib/textoNombre";
+import { telefonoConsultorioDe } from "@/lib/telefonoConsultorio";
 
 type EstadoPdf =
   | { tipo: "generando" }
@@ -57,7 +58,10 @@ export default function ReciboPagoPanel({
     presupuestosPorPaciente,
     pagosPorPaciente,
     devolucionesPorPaciente,
+    recursos,
   } = usePatientData();
+  // Teléfono del consultorio del médico que cobró (o el general si no lo capturó).
+  const telefonoConsultorio = telefonoConsultorioDe(pago.medico, recursos, clinicInfo?.telefono);
   const [mensajeWa, setMensajeWa] = useState<string | undefined>(undefined);
   const [estadoEnlace, setEstadoEnlace] = useState<EstadoEnlace>({ tipo: "creando" });
   const [estado, setEstado] = useState<EstadoPdf>({ tipo: "generando" });
@@ -101,6 +105,7 @@ export default function ReciboPagoPanel({
       pacienteNombre: patientName,
       clinicaNombre: clinicInfo?.nombre || "",
       perfilDoctor,
+      telefonoConsultorio,
       notaPie,
       resumenCuenta,
     })
@@ -140,6 +145,8 @@ export default function ReciboPagoPanel({
       clinicaNombre: clinicInfo?.nombre || "",
       logoClinicaUrl: perfilDoctor.logoClinicaUrl || "",
       direccionClinica: perfilDoctor.direccionClinica || "",
+      // Recortado al máximo que acepta la liga: un teléfono escrito de más no debe impedir compartir el recibo.
+      telefonoClinica: telefonoConsultorio.slice(0, 60),
       notaPie,
       resumenCuenta,
       pago: {

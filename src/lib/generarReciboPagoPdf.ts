@@ -3,6 +3,7 @@ import { cargarImagen, type ImagenCargada } from "./imagenesPdf";
 import { formatFechaLarga, formatHora12 } from "./formatosWhatsapp";
 import type { Pago, PerfilDoctor } from "./patientData";
 import type { ResumenCuentaRecibo } from "./resumenCuentaRecibo";
+import { lineasContactoConsultorio } from "./telefonoConsultorio";
 
 export type DatosReciboPagoPdf = {
   pago: Pago;
@@ -10,6 +11,8 @@ export type DatosReciboPagoPdf = {
   clinicaNombre: string;
   /** Solo se usan el logo y la dirección de la clínica. */
   perfilDoctor: Pick<PerfilDoctor, "logoClinicaUrl" | "direccionClinica">;
+  /** Teléfono del consultorio, debajo de la dirección (el del médico que cobró, o el general). */
+  telefonoConsultorio?: string;
   /** Texto libre al pie (ej. la próxima cita del paciente); puede venir con saltos de línea al inicio. */
   notaPie?: string;
   /** Presupuestado, pagado a la fecha, saldo y costo de la próxima cita; sin él el recibo sale como siempre. */
@@ -66,11 +69,11 @@ export async function generarReciboPagoPdf(datos: DatosReciboPagoPdf): Promise<B
   doc.text(`Folio: ${folioReciboPago(pago)}`, xDerecha, y + 5, { align: "right" });
   y += 20;
 
-  if (datos.perfilDoctor.direccionClinica) {
-    doc.setFontSize(8.5);
-    const lineas = doc.splitTextToSize(datos.perfilDoctor.direccionClinica, pageWidth - marginX * 2);
-    doc.text(lineas, pageWidth / 2, y, { align: "center" });
-    y += lineas.length * 4;
+  doc.setFontSize(8.5);
+  const lineasContacto = lineasContactoConsultorio(doc, datos.perfilDoctor.direccionClinica, datos.telefonoConsultorio, pageWidth - marginX * 2);
+  if (lineasContacto.length > 0) {
+    doc.text(lineasContacto, pageWidth / 2, y, { align: "center" });
+    y += lineasContacto.length * 4;
   }
 
   y += 4;

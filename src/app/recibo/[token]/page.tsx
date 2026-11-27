@@ -44,6 +44,7 @@ export default function ReciboPublicoPage({ params }: { params: Promise<{ token:
           pacienteNombre: recibo.pacienteNombre,
           clinicaNombre: recibo.clinicaNombre,
           perfilDoctor: { logoClinicaUrl: recibo.logoClinicaUrl, direccionClinica: recibo.direccionClinica },
+          telefonoConsultorio: recibo.telefonoClinica,
           notaPie: recibo.notaPie,
           resumenCuenta: recibo.resumenCuenta,
         });

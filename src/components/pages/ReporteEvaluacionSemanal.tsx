@@ -2,6 +2,7 @@
 
 import { useMemo, useState } from "react";
 import { usePatientData } from "@/context/PatientDataContext";
+import { direccionConTelefono } from "@/lib/telefonoConsultorio";
 import { formatCurrency } from "@/lib/patientData";
 import {
   CATEGORIAS_COSTO_DIRECTO,
@@ -97,7 +98,7 @@ export default function ReporteEvaluacionSemanal() {
         veredicto,
         nombreOperador,
         clinicaNombre: clinicInfo?.nombre || "",
-        direccion: perfilDoctor.direccionClinica,
+        direccion: direccionConTelefono(perfilDoctor.direccionClinica, clinicInfo?.telefono),
         logoUrl: perfilDoctor.logoClinicaUrl,
       });
       descargarBlob(blob, nombre);

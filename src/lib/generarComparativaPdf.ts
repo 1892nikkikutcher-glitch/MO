@@ -2,6 +2,7 @@ import jsPDF from "jspdf";
 import { cargarImagen, type ImagenCargada } from "./imagenesPdf";
 import { calcularEconomiaRelativa, etiquetaTratamiento, type ComparativaRehabilitacion } from "./comparativaRehabilitacion";
 import type { PerfilDoctor, SavedBudget } from "./patientData";
+import { lineasContactoConsultorio, yPieContacto } from "./telefonoConsultorio";
 
 export type DatosComparativaPdf = {
   comparativa: ComparativaRehabilitacion;
@@ -9,6 +10,8 @@ export type DatosComparativaPdf = {
   fechaLarga: string;
   pacienteNombre: string;
   perfilDoctor: PerfilDoctor;
+  /** Teléfono general del consultorio a imprimir (la comparativa reúne presupuestos de varios médicos). */
+  telefonoConsultorio?: string;
 };
 
 const COLORES: [number, number, number][] = [
@@ -162,11 +165,10 @@ export async function generarComparativaPdf(datos: DatosComparativaPdf): Promise
     doc.line(xIzq, y - 3, xDer, y - 3);
   });
 
-  if (datos.perfilDoctor.direccionClinica) {
-    doc.setFont("helvetica", "normal");
-    doc.setFontSize(8);
-    doc.text(datos.perfilDoctor.direccionClinica, pageWidth / 2, pageHeight - 12, { align: "center" });
-  }
+  doc.setFont("helvetica", "normal");
+  doc.setFontSize(8);
+  const lineasPie = lineasContactoConsultorio(doc, datos.perfilDoctor.direccionClinica, datos.telefonoConsultorio, pageWidth - 32);
+  if (lineasPie.length > 0) doc.text(lineasPie, pageWidth / 2, yPieContacto(pageHeight, lineasPie.length), { align: "center" });
 
   return doc.output("blob");
 }

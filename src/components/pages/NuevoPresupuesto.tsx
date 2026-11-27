@@ -22,6 +22,7 @@ import { slugify } from "@/lib/textoNombre";
 import { calcularFechaVigencia } from "@/lib/presupuestoVigencia";
 import { prioridadTratamientoLabel } from "@/lib/planTratamiento";
 import type { PresupuestoPrefillItem } from "@/lib/historiaClinica";
+import { telefonoConsultorioDe } from "@/lib/telefonoConsultorio";
 import { identidadDoctorDe, unidadCobroLabel, unidadCobroOptions, type BudgetData, type LineItem, type Patient, type UnidadCobro } from "@/lib/patientData";
 import { cantidadDeCobro } from "@/lib/cuentaPaciente";
 import { medicoPredeterminadoParaPago } from "@/lib/medicoDelPago";
@@ -97,7 +98,7 @@ export default function NuevoPresupuesto({
   onSave: (budget: BudgetData) => void;
 }) {
   const patientName = patient.name;
-  const { recursos, citas, procedimientos, setProcedimientos, perfilDoctor, irAPagina, setCambiosSinGuardar, miRol } =
+  const { recursos, citas, procedimientos, setProcedimientos, perfilDoctor, clinicInfo, irAPagina, setCambiosSinGuardar, miRol } =
     usePatientData();
   const medicos = recursos.filter((r) => r.tipo === "medico");
   const procedimientosActivos = procedimientos.filter(esProcedimientoActivo);
@@ -496,6 +497,7 @@ export default function NuevoPresupuesto({
         total,
         identidadDoctor: identidadDoctorDe(medico, recursos),
         perfilDoctor,
+        telefonoConsultorio: telefonoConsultorioDe(medico, recursos, clinicInfo?.telefono),
       });
       const resultado = await enviarPdfPorWhatsapp({
         blob,

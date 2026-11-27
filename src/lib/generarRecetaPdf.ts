@@ -1,6 +1,7 @@
 import jsPDF from "jspdf";
 import { cargarImagen, type ImagenCargada } from "./imagenesPdf";
 import type { IdentidadDoctor, MedicamentoRecetado, PerfilDoctor } from "./patientData";
+import { lineasContactoConsultorio, yPieContacto } from "./telefonoConsultorio";
 
 export type DatosRecetaPdf = {
   folio: string;
@@ -180,17 +181,10 @@ export async function generarRecetaPdf(datos: DatosRecetaPdf): Promise<Blob> {
   doc.text("Firma médico", pageWidth - marginX - 25, yFooter + 5, { align: "center" });
 
   // Pie: dirección del consultorio y, debajo, su teléfono (el del médico; ver `telefonoPieReceta`).
-  const lineasPie: string[] = [];
-  if (datos.perfilDoctor.direccionClinica) {
-    doc.setFontSize(8);
-    lineasPie.push(...doc.splitTextToSize(datos.perfilDoctor.direccionClinica, pageWidth - marginX * 2));
-  }
-  if (datos.identidadDoctor.telefono.trim()) lineasPie.push(`Tel. ${datos.identidadDoctor.telefono.trim()}`);
+  doc.setFontSize(8);
+  const lineasPie = lineasContactoConsultorio(doc, datos.perfilDoctor.direccionClinica, datos.identidadDoctor.telefono, pageWidth - marginX * 2);
   if (lineasPie.length > 0) {
-    doc.setFontSize(8);
-    // La última línea siempre queda a 10 mm del borde; si hay más, se suben para no salirse de la hoja.
-    const interlineado = 3.6;
-    doc.text(lineasPie, pageWidth / 2, pageHeight - 10 - (lineasPie.length - 1) * interlineado, { align: "center" });
+    doc.text(lineasPie, pageWidth / 2, yPieContacto(pageHeight, lineasPie.length), { align: "center" });
   }
 
   return doc.output("blob");

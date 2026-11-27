@@ -1,6 +1,7 @@
 "use client";
 
 import { usePatientData } from "@/context/PatientDataContext";
+import PieConsultorio from "@/components/PieConsultorio";
 import { formatCurrency, identidadDoctorDe, type LineItem } from "@/lib/patientData";
 
 export default function PresupuestoImpreso({
@@ -50,7 +51,7 @@ export default function PresupuestoImpreso({
       </div>
       {perfilDoctor.logoClinicaUrl && <p className="text-right text-xs">Folio: {folio}</p>}
 
-      {perfilDoctor.direccionClinica && <p className="mt-2 text-xs">{perfilDoctor.direccionClinica}</p>}
+      <PieConsultorio medico={medico} className="mt-2 text-xs" />
 
       <div className="mt-4 flex justify-between text-sm">
         <div>
@@ -108,9 +109,7 @@ export default function PresupuestoImpreso({
         <p className="text-base font-bold">TOTAL PRESUPUESTO&nbsp;&nbsp;{formatCurrency(total)}</p>
       </div>
 
-      {perfilDoctor.direccionClinica && (
-        <p className="mt-10 text-center text-[10px]">{perfilDoctor.direccionClinica}</p>
-      )}
+      <PieConsultorio medico={medico} className="mt-10 text-center text-[10px]" />
     </div>
   );
 }
