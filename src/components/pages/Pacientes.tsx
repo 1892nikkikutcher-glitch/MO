@@ -10,6 +10,9 @@ import { exportarCsv } from "@/lib/exportCsv";
 import { parseArchivoPacientes, type RegistroImportado } from "@/lib/importPacientes";
 import { capitalizarNombre, manejarCambioNombre } from "@/lib/textoNombre";
 import { toISODate } from "@/lib/agendaHelpers";
+import { urlWhatsApp } from "@/lib/avisoWhatsApp";
+import { mensajeProponerCita } from "@/lib/pacientesPorProponer";
+import { coincideAusencia, FILTROS_AUSENCIA_MESES, textoHace, ultimaConsultaDe, type FiltroAusencia, type UltimaConsulta } from "@/lib/ultimaConsulta";
 
 const avatarColors = ["#f59e0b", "#ec4899", "#3b82f6", "#22c55e", "#dc2626", "#a855f7"];
 
@@ -306,8 +309,63 @@ function ExpedienteIcon() {
   );
 }
 
+/** Las dos celdas "Última consulta" y "WhatsApp" de cada renglón: la fecha (en amarillo desde 6 meses, rojo desde 1 año)
+ * y un enlace a WhatsApp con el mensaje de "ya toca tu revisión" ya redactado. */
+function CeldasUltimaConsulta({
+  paciente,
+  consulta,
+  yaTieneCita,
+  clinica,
+}: {
+  paciente: Patient;
+  consulta: UltimaConsulta | null;
+  yaTieneCita: boolean;
+  clinica?: string;
+}) {
+  const color =
+    !consulta || consulta.nivel === "reciente" ? "text-ink/70" : consulta.nivel === "revisar" ? "text-warning" : "text-danger";
+  const digitos = paciente.phone.replace(/\D/g, "");
+  return (
+    <>
+      <td className="whitespace-nowrap px-6 py-4">
+        {consulta ? (
+          <>
+            <span
+              className={`font-medium ${color}`}
+              title={consulta.atendida ? "Última cita marcada como Atendida" : "Ninguna cita está marcada como Atendida: es la última cita que no se canceló"}
+            >
+              {formatDate(consulta.fecha)}
+            </span>
+            <span className="ml-2 text-xs text-ink/40">{textoHace(consulta)}</span>
+          </>
+        ) : (
+          <span className="text-ink/40">Sin consultas</span>
+        )}
+        {yaTieneCita && (
+          <span className="ml-2 rounded-full border border-accent/40 bg-accent/10 px-2 py-0.5 text-[11px] font-semibold text-accent">Ya tiene cita</span>
+        )}
+      </td>
+      <td className="px-6 py-4">
+        {digitos.length >= 10 ? (
+          <a
+            href={urlWhatsApp(paciente.phone, mensajeProponerCita({ nombrePaciente: capitalizarNombre(paciente.name), clinica }))}
+            target="_blank"
+            rel="noopener noreferrer"
+            title="Abrir WhatsApp con el mensaje de revisión y limpieza ya escrito"
+            className="inline-block whitespace-nowrap rounded-full bg-[#25D366] px-3 py-1 text-xs font-semibold text-white transition-colors hover:bg-[#1ebe5a]"
+          >
+            WhatsApp
+          </a>
+        ) : (
+          <span className="text-xs text-ink/30">Sin celular</span>
+        )}
+      </td>
+    </>
+  );
+}
+
 export default function Pacientes() {
-  const { patients, citas, addPatient, importarPacientes, navegacionExpediente, consumirNavegacionExpediente } =
+  const { patients, citas, clinicInfo, addPatient, importarPacientes, navegacionExpediente, consumirNavegacionExpediente } =
     usePatientData();
   // Citas agrupadas por paciente una sola vez, para las estrellas de cada renglón.
   const citasPorPaciente = useMemo(() => {
@@ -320,11 +378,27 @@ export default function Pacientes() {
     }
     return mapa;
   }, [citas]);
+  // Última consulta de cada paciente (y si ya tiene una cita por venir), una sola vez: sirve para ver quién dejó de venir.
+  const consultaPorPaciente = useMemo(() => {
+    const hoyISO = toISODate(new Date());
+    const mapa = new Map<string, { consulta: UltimaConsulta | null; yaTieneCita: boolean }>();
+    for (const p of patients) {
+      const suyas = citasPorPaciente.get(p.id) ?? [];
+      mapa.set(p.id, {
+        consulta: ultimaConsultaDe(suyas, hoyISO),
+        yaTieneCita: suyas.some((c) => c.fecha >= hoyISO && c.estatus !== "Cancelada" && c.estatus !== "Reagendada"),
+      });
+    }
+    return mapa;
+  }, [patients, citasPorPaciente]);
+  const [filtroAusencia, setFiltroAusencia] = useState<FiltroAusencia>("todos");
+  const cuentaAusencia = (filtro: FiltroAusencia) =>
+    patients.filter((p) => coincideAusencia(consultaPorPaciente.get(p.id)?.consulta ?? null, filtro)).length;
   const [selected, setSelected] = useState<Patient | null>(null);
   const [showNuevoPaciente, setShowNuevoPaciente] = useState(false);
   const [showImportar, setShowImportar] = useState(false);
   const [busqueda, setBusqueda] = useState("");
-  const [orden, setOrden] = useState<"reciente" | "alfabetico" | "edad">("reciente");
+  const [orden, setOrden] = useState<"reciente" | "alfabetico" | "edad" | "ausencia">("reciente");
   const [seleccionadosParaFusionar, setSeleccionadosParaFusionar] = useState<Set<string>>(new Set());
   const [mostrarFusionar, setMostrarFusionar] = useState(false);
   const toggleSeleccionParaFusionar = (id: string) => {
@@ -350,7 +424,20 @@ export default function Pacientes() {
         return false;
       });
 
-  const pacientesOrdenados = [...pacientesFiltrados].sort((a, b) => {
+  const pacientesConAusencia = pacientesFiltrados.filter((p) =>
+    coincideAusencia(consultaPorPaciente.get(p.id)?.consulta ?? null, filtroAusencia)
+  );
+
+  const pacientesOrdenados = [...pacientesConAusencia].sort((a, b) => {
+    if (orden === "ausencia") {
+      // Quien lleva más tiempo sin venir va primero; quien nunca ha venido, al final.
+      const fa = consultaPorPaciente.get(a.id)?.consulta?.fecha;
+      const fb = consultaPorPaciente.get(b.id)?.consulta?.fecha;
+      if (!fa && !fb) return 0;
+      if (!fa) return 1;
+      if (!fb) return -1;
+      return fa.localeCompare(fb);
+    }
     if (orden === "alfabetico") {
       return capitalizarNombre(a.name).localeCompare(capitalizarNombre(b.name), "es");
     }
@@ -371,15 +458,20 @@ export default function Pacientes() {
   const exportarPacientes = () => {
     exportarCsv(
       `pacientes_${toISODate(new Date())}.csv`,
-      ["Nombre completo", "Teléfono", "Correo", "Fecha de nacimiento", "Edad", "Notas"],
-      patients.map((p) => [
-        p.name,
-        p.phone,
-        p.email ?? "",
-        p.birthDate,
-        p.birthDate ? formatEdad(p.birthDate) : "",
-        p.notas ?? "",
-      ])
+      ["Nombre completo", "Teléfono", "Correo", "Fecha de nacimiento", "Edad", "Última consulta", "Meses sin venir", "Notas"],
+      patients.map((p) => {
+        const consulta = consultaPorPaciente.get(p.id)?.consulta;
+        return [
+          p.name,
+          p.phone,
+          p.email ?? "",
+          p.birthDate,
+          p.birthDate ? formatEdad(p.birthDate) : "",
+          consulta?.fecha ?? "",
+          consulta ? String(consulta.meses) : "",
+          p.notas ?? "",
+        ];
+      })
     );
   };
 
@@ -441,6 +533,7 @@ export default function Pacientes() {
             <option value="reciente">Más reciente primero</option>
             <option value="alfabetico">Alfabético (A-Z)</option>
             <option value="edad">Edad (menor a mayor)</option>
+            <option value="ausencia">Más tiempo sin venir primero</option>
           </select>
           {seleccionadosParaFusionar.size === 2 && (
             <button
@@ -474,11 +567,39 @@ export default function Pacientes() {
         </div>
       </div>
 
-      {busquedaTrim && (
+      {/* ¿Quién dejó de venir? Cada botón filtra a quienes llevan AL MENOS ese tiempo sin consulta. */}
+      <div className="flex flex-wrap items-center gap-2">
+        <span className="text-xs font-semibold uppercase tracking-wide text-ink/40">Sin venir hace</span>
+        {(
+          [
+            { valor: "todos", texto: "Todos" },
+            ...FILTROS_AUSENCIA_MESES.map((m) => ({ valor: m, texto: `${m}+ meses` })),
+            { valor: "nunca", texto: "Nunca han venido" },
+          ] as { valor: FiltroAusencia; texto: string }[]
+        ).map((op) => (
+          <button
+            key={String(op.valor)}
+            type="button"
+            onClick={() => {
+              setFiltroAusencia(op.valor);
+              if (op.valor !== "todos" && op.valor !== "nunca") setOrden("ausencia");
+            }}
+            aria-pressed={filtroAusencia === op.valor}
+            className={`rounded-full border px-3 py-1 text-xs font-semibold transition-colors ${
+              filtroAusencia === op.valor ? "border-accent/60 bg-accent/15 text-accent" : "border-edge/15 text-ink/70 hover:bg-field"
+            }`}
+          >
+            {op.texto}
+            {op.valor !== "todos" && <span className="ml-1.5 text-ink/40">{cuentaAusencia(op.valor)}</span>}
+          </button>
+        ))}
+      </div>
+
+      {(busquedaTrim || filtroAusencia !== "todos") && (
         <p className="text-xs text-ink/40">
-          {pacientesFiltrados.length === 0
+          {pacientesOrdenados.length === 0
             ? "Sin resultados."
-            : `${pacientesFiltrados.length} de ${patients.length} pacientes`}
+            : `${pacientesOrdenados.length} de ${patients.length} pacientes`}
         </p>
       )}
 
@@ -492,6 +613,8 @@ export default function Pacientes() {
             <th className="px-6 py-4 font-medium">Celular</th>
             <th className="px-6 py-4 font-medium">Fecha de nacimiento</th>
             <th className="px-6 py-4 font-medium">Edad</th>
+            <th className="px-6 py-4 font-medium">Última consulta</th>
+            <th className="px-6 py-4 font-medium">WhatsApp</th>
             <th className="px-6 py-4 text-right font-medium">Expediente</th>
           </tr>
         </thead>
@@ -531,6 +654,12 @@ export default function Pacientes() {
               <td className="px-6 py-4 text-ink/70">
                 {p.birthDate ? formatEdad(p.birthDate) : "—"}
               </td>
+              <CeldasUltimaConsulta
+                paciente={p}
+                consulta={consultaPorPaciente.get(p.id)?.consulta ?? null}
+                yaTieneCita={consultaPorPaciente.get(p.id)?.yaTieneCita ?? false}
+                clinica={clinicInfo?.nombre}
+              />
               <td className="px-6 py-4 text-right">
                 <button
                   onClick={() => setSelected(p)}

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { mesesEntre, textoHace, ultimaConsultaDe } from "../ultimaConsulta";
+import { coincideAusencia, mesesEntre, textoHace, ultimaConsultaDe } from "../ultimaConsulta";
 
 const HOY = "2026-11-26";
 const cita = (fecha: string, estatus: string) => ({ fecha, estatus }) as never;
@@ -49,5 +49,25 @@ describe("textos de tiempo", () => {
     expect(textoHace({ meses: 12, dias: 365 })).toBe("hace 1 año");
     expect(textoHace({ meses: 15, dias: 460 })).toBe("hace 1 año y 3 meses");
     expect(textoHace({ meses: 26, dias: 800 })).toBe("hace 2 años y 2 meses");
+  });
+});
+
+describe("filtro por tiempo sin venir", () => {
+  const u = (meses: number) => ({ meses });
+  it("'todos' deja pasar a cualquiera", () => {
+    expect(coincideAusencia(null, "todos")).toBe(true);
+    expect(coincideAusencia(u(1), "todos")).toBe(true);
+  });
+  it("N meses incluye a quien lleva N o más, y deja fuera a quien nunca vino", () => {
+    expect(coincideAusencia(u(5), 6)).toBe(false);
+    expect(coincideAusencia(u(6), 6)).toBe(true);
+    expect(coincideAusencia(u(9), 8)).toBe(true);
+    expect(coincideAusencia(u(9), 10)).toBe(false);
+    expect(coincideAusencia(u(30), 12)).toBe(true);
+    expect(coincideAusencia(null, 6)).toBe(false);
+  });
+  it("'nunca' solo deja a quien no tiene ninguna consulta", () => {
+    expect(coincideAusencia(null, "nunca")).toBe(true);
+    expect(coincideAusencia(u(0), "nunca")).toBe(false);
   });
 });

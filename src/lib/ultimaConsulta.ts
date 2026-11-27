@@ -57,3 +57,15 @@ export function textoHace(c: Pick<UltimaConsulta, "meses" | "dias">): string {
   const a = `${anios} ${anios === 1 ? "año" : "años"}`;
   return resto === 0 ? `hace ${a}` : `hace ${a} y ${resto} ${resto === 1 ? "mes" : "meses"}`;
 }
+
+/** Filtro de la lista de Pacientes: "al menos N meses sin venir", o "nunca" (sin ninguna consulta registrada). */
+export type FiltroAusencia = "todos" | "nunca" | 6 | 8 | 10 | 12;
+
+export const FILTROS_AUSENCIA_MESES = [6, 8, 10, 12] as const;
+
+/** ¿Este paciente entra en el filtro? "6" incluye a quien lleva 6 meses o más (también a quien lleva 12). */
+export function coincideAusencia(consulta: Pick<UltimaConsulta, "meses"> | null, filtro: FiltroAusencia): boolean {
+  if (filtro === "todos") return true;
+  if (filtro === "nunca") return consulta === null;
+  return consulta !== null && consulta.meses >= filtro;
+}
