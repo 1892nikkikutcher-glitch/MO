@@ -65,6 +65,7 @@ import {
   type RespuestaValor,
 } from "@/lib/historiaClinica";
 import { timeToMinutes, toISODate, getMonday, addDays } from "@/lib/agendaHelpers";
+import { textoHace, ultimaConsultaDe } from "@/lib/ultimaConsulta";
 import { estaVencido, renovarVigencia } from "@/lib/presupuestoVigencia";
 import { generarComparativaPdf } from "@/lib/generarComparativaPdf";
 import type { ComparativaRehabilitacion } from "@/lib/comparativaRehabilitacion";
@@ -1412,6 +1413,7 @@ export default function Expediente({
     .filter((c) => c.fecha >= hoyISO && c.estatus !== "Cancelada" && c.estatus !== "Reagendada")
     .sort((a, b) => a.fecha.localeCompare(b.fecha) || a.horaInicio.localeCompare(b.horaInicio));
   const ultimaCita = citasPaciente.find((c) => c.fecha < hoyISO && c.estatus !== "Cancelada");
+  const ultimaConsulta = ultimaConsultaDe(citasPaciente, hoyISO);
 
   // Flechas del encabezado: navegan al expediente del paciente anterior/
   // siguiente en el orden cronológico de las citas de TODA LA SEMANA en
@@ -1524,6 +1526,33 @@ export default function Expediente({
                     🎂 {formatDate(patient.birthDate)} · {formatEdad(patient.birthDate)}
                   </span>
                 )}
+                {/* Para ver de un vistazo quién dejó de venir: fecha de la última consulta y hace cuánto fue. */}
+                <span
+                  title={
+                    ultimaConsulta && !ultimaConsulta.atendida
+                      ? "Ninguna cita de este paciente está marcada como Atendida: se muestra la última cita que no se canceló."
+                      : "Fecha de la última cita marcada como Atendida"
+                  }
+                  className={`whitespace-nowrap rounded-full border px-2.5 py-1 ${
+                    !ultimaConsulta || ultimaConsulta.nivel === "reciente"
+                      ? "border-edge/15 bg-field"
+                      : ultimaConsulta.nivel === "revisar"
+                        ? "border-warning/40 bg-warning/10 text-warning"
+                        : "border-danger/40 bg-danger/10 text-danger"
+                  }`}
+                >
+                  🦷{" "}
+                  {ultimaConsulta ? (
+                    <>
+                      Última consulta: {formatDate(ultimaConsulta.fecha)} · {textoHace(ultimaConsulta)}
+                      {ultimaConsulta.nivel !== "reciente" && (citasFuturas.length > 0 ? " · ya tiene cita" : " · toca consulta")}
+                    </>
+                  ) : citasFuturas.length > 0 ? (
+                    "Aún sin consultas · ya tiene cita"
+                  ) : (
+                    "Aún sin consultas registradas"
+                  )}
+                </span>
               </div>
 
               <label className="block text-xs text-ink/80">
